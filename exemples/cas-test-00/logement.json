@@ -1,0 +1,33 @@
+{
+  "schema": "logement/0.1",
+  "projet_id": "CAS-TEST-00",
+  "unites": "m",
+  "hauteur_sous_plafond": 2.50,
+
+  "murs": [
+    {"id": "M_sud",   "debut": [-0.10, -0.10], "fin": [8.10, -0.10], "epaisseur": 0.20, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "M_est",   "debut": [8.10, -0.10],  "fin": [8.10, 5.50],  "epaisseur": 0.20, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "M_nord",  "debut": [-0.10, 5.50],  "fin": [8.10, 5.50],  "epaisseur": 0.20, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "M_ouest", "debut": [-0.10, -0.10], "fin": [-0.10, 5.50], "epaisseur": 0.20, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "C_sejour",  "debut": [4.85, 0.00], "fin": [4.85, 5.40], "epaisseur": 0.10, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "C_chambre", "debut": [4.90, 2.15], "fin": [8.00, 2.15], "epaisseur": 0.10, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "C_sdb",     "debut": [6.25, 0.00], "fin": [6.25, 2.10], "epaisseur": 0.10, "statut": "mesure", "source": "reference_synthese"}
+  ],
+
+  "ouvertures": [
+    {"id": "P_entree",        "type": "porte",         "mur": "M_sud",     "position": 5.20, "largeur": 0.90, "hauteur": 2.04, "allege": 0.00, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "PF_sejour",       "type": "porte_fenetre", "mur": "M_nord",    "position": 1.60, "largeur": 1.40, "hauteur": 2.15, "allege": 0.00, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "F_sejour_ouest",  "type": "fenetre",       "mur": "M_ouest",   "position": 2.30, "largeur": 1.20, "hauteur": 1.35, "allege": 0.95, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "F_chambre",       "type": "fenetre",       "mur": "M_nord",    "position": 6.10, "largeur": 1.00, "hauteur": 1.35, "allege": 0.95, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "P_sejour",        "type": "porte",         "mur": "C_sejour",  "position": 0.60, "largeur": 0.80, "hauteur": 2.04, "allege": 0.00, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "P_chambre",       "type": "porte",         "mur": "C_chambre", "position": 0.30, "largeur": 0.80, "hauteur": 2.04, "allege": 0.00, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "P_sdb",           "type": "porte",         "mur": "C_sdb",     "position": 0.40, "largeur": 0.80, "hauteur": 2.04, "allege": 0.00, "statut": "mesure", "source": "reference_synthese"}
+  ],
+
+  "pieces": [
+    {"id": "sejour",  "nom": "Séjour + cuisine", "contour": [[0.00, 0.00], [4.80, 0.00], [4.80, 5.40], [0.00, 5.40]], "surface": 25.92, "statut": "mesure", "source": "reference_synthese"},
+    {"id": "chambre", "nom": "Chambre",          "contour": [[4.90, 2.20], [8.00, 2.20], [8.00, 5.40], [4.90, 5.40]], "surface": 9.92,  "statut": "mesure", "source": "reference_synthese"},
+    {"id": "entree",  "nom": "Entrée",           "contour": [[4.90, 0.00], [6.20, 0.00], [6.20, 2.10], [4.90, 2.10]], "surface": 2.73,  "statut": "mesure", "source": "reference_synthese"},
+    {"id": "sdb",     "nom": "Salle d'eau",      "contour": [[6.30, 0.00], [8.00, 0.00], [8.00, 2.10], [6.30, 2.10]], "surface": 3.57,  "statut": "mesure", "source": "reference_synthese"}
+  ]
+}
