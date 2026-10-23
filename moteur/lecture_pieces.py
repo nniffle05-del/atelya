@@ -13,7 +13,9 @@ Principe :
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 
 import cv2
 import numpy as np
@@ -23,6 +25,19 @@ ACCROCHE = 0.03  # m : un coin de pièce se cale sur la face de mur la plus proc
 ACCORD_SURFACE = 0.02  # surfaces écrite et calculée d'accord à 2 % près
 
 FORME_SURFACE = re.compile(r"^(\d+(?:[,.]\d+)?)\s*m\s*[²2]$", re.IGNORECASE)
+# Une surface mal lue (« 1,57 mh2 », « 57 mz2 »), seule ou collée au bout d'un nom.
+SURFACE_ABIMEE = re.compile(r"\s*\d+(?:[,.]\d*)?\s*m\S{0,2}$", re.IGNORECASE)
+
+# Les noms de pièces courants. Un nom lu qui leur ressemble beaucoup est remplacé
+# par le nom exact (« Saile d'eau » → « Salle d'eau ») : la lecture du texte
+# confond parfois une lettre avec une autre.
+NOMS_COURANTS = [
+    "Séjour", "Salon", "Salle à manger", "Cuisine", "Séjour + cuisine", "Chambre",
+    "Entrée", "Salle d'eau", "Salle de bains", "WC", "Dégagement", "Couloir", "Bureau",
+    "Cellier", "Buanderie", "Dressing", "Placard", "Rangement", "Débarras",
+    "Terrasse", "Balcon", "Loggia",
+]
+RESSEMBLANCE_MIN = 0.8  # au moins 80 % de lettres en commun, dans l'ordre
 
 
 @dataclass
@@ -162,8 +177,35 @@ def _dans_l_image(rc: tuple[int, int], h: int, w: int) -> bool:
 
 
 def _nom(textes: list) -> str | None:
-    noms = [t.texte for t in textes if lire_surface(t.texte) is None and re.search(r"[A-Za-zÀ-ÿ]{2}", t.texte)]
+    noms = []
+    for t in textes:
+        if lire_surface(t.texte) is not None:
+            continue
+        texte = SURFACE_ABIMEE.sub("", t.texte)
+        if re.search(r"[A-Za-zÀ-ÿ]{2}", texte):
+            noms.append(nom_propre(texte))
     return " ".join(noms) if noms else None
+
+
+def nom_propre(texte: str) -> str:
+    """Nettoie un nom de pièce lu : signes parasites, apostrophe typographique, lettre mal lue."""
+    texte = texte.replace("’", "'").replace("`", "'")
+    texte = re.sub(r"(?<=\w)[_/](?=\s|\w)|(?<=\s)[_/]", " ", texte)  # « Salle/de bains », « Séjour_+ »
+    texte = re.sub(r"^[^\wÀ-ÿ]+|[^\wÀ-ÿ+]+$", "", texte)  # « \\Entrée », « Séjour/ », « Salle de bains) »
+    texte = re.sub(r"\s+", " ", texte).strip()
+    numero = re.search(r"\s*(\d+)$", texte)
+    base = texte[: numero.start()] if numero else texte
+    proche = max(NOMS_COURANTS, key=lambda n: _ressemblance(n, base))
+    if _ressemblance(proche, base) >= RESSEMBLANCE_MIN:
+        base = proche
+    return f"{base} {numero.group(1)}" if numero else base
+
+
+def _ressemblance(a: str, b: str) -> float:
+    def simple(n: str) -> str:
+        return unicodedata.normalize("NFKD", n).encode("ascii", "ignore").decode().lower().replace(" ", "")
+
+    return SequenceMatcher(None, simple(a), simple(b)).ratio()
 
 
 def _surface_ecrite(textes: list) -> float | None:

@@ -37,11 +37,13 @@ if TYPE_CHECKING:
     from moteur.lecture_pieces import PieceLue
 
 # Les tailles sont en mètres et converties en pixels avec l'échelle.
-TRAIT_FIN_MAX = 0.06  # un trait plus fin que 6 cm sur le plan n'est pas un mur
+TRAIT_FIN_MAX = 0.045  # un trait plus fin que 4,5 cm sur le plan n'est pas un mur (une cloison fait 7 cm et plus)
 MORCEAU_MIN = 0.32  # longueur minimale d'un morceau de mur
 OUVERTURE_MAX = 2.50  # au-delà, deux morceaux alignés sont deux murs distincts
 TOLERANCE = 0.03  # écart admis entre deux morceaux « alignés »
 INCLINAISON_MAX = 5.0  # degrés : inclinaison maximale corrigée
+SAUT_DE_FACE = 0.02  # une face qui se décale de plus de 2 cm : le mur change d'épaisseur
+MORCEAU_EPAISSEUR_MIN = 0.15  # en dessous, un changement d'épaisseur est une bavure
 
 CONFIANCE_LECTURE = 0.7
 
@@ -273,6 +275,7 @@ def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) ->
     bandes = _bandes(noir, px_par_m, horizontal=True) + _bandes(noir, px_par_m, horizontal=False)
     bandes, trous = _recoller(bandes, px_par_m)
     bandes, trous = _garder_le_logement(bandes, trous, px_par_m)
+    trous += _prolonger_jusqu_aux_murs(bandes, noir, px_par_m)
     if not bandes:
         raise ValueError("aucun mur trouvé sur ce plan")
     murs = [_regler_les_bouts(b, bandes, px_par_m) for b in bandes]
@@ -352,20 +355,66 @@ def _tourner(image: np.ndarray, angle: float, fond: int) -> np.ndarray:
 
 
 def _bandes(masque: np.ndarray, px_par_m: float, horizontal: bool) -> list[Bande]:
-    """Les morceaux de murs dans une direction, chacun mesuré par son rectangle."""
+    """Les morceaux de murs dans une direction, chacun mesuré par son rectangle.
+
+    Un même trait épais peut changer d'épaisseur en chemin : dans un logement en L,
+    un mur extérieur se prolonge souvent par une cloison plus fine, posée contre
+    une de ses faces. On coupe alors le trait là où ses faces sautent, pour avoir
+    un morceau par épaisseur (sinon la cloison serait lue comme un mur de 20 cm).
+    """
     longueur = max(3, round(MORCEAU_MIN * px_par_m))
     taille = (longueur, 1) if horizontal else (1, longueur)
     sens = cv2.morphologyEx(masque, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, taille))
-    n, _, stats, _ = cv2.connectedComponentsWithStats(sens, connectivity=4)
+    if not horizontal:
+        sens = sens.T  # on travaille toujours « de gauche à droite »
+    n, etiquettes, stats, _ = cv2.connectedComponentsWithStats(sens, connectivity=4)
     bandes = []
-    for x, y, w, h, surface in stats[1:]:
+    for i, (x, y, w, h, surface) in enumerate(stats[1:], start=1):
         if surface < 0.5 * w * h:
             continue  # pas un rectangle plein
-        if horizontal:
-            bandes.append(Bande(True, x, x + w, y, y + h))
-        else:
-            bandes.append(Bande(False, y, y + h, x, x + w))
+        for debut, fin, bord1, bord2 in _morceaux_d_epaisseur_constante(etiquettes[y:y + h, x:x + w] == i, px_par_m):
+            bandes.append(Bande(horizontal, x + debut, x + fin, y + bord1, y + bord2))
     return bandes
+
+
+def _morceaux_d_epaisseur_constante(trait: np.ndarray, px_par_m: float) -> list[tuple[int, int, int, int]]:
+    """Coupe un trait (couché, de gauche à droite) là où ses faces sautent.
+
+    Renvoie (début, fin, face du haut, face du bas) pour chaque morceau, en pixels
+    dans le cadre du trait.
+    """
+    plein = trait.any(axis=0)
+    haut = np.where(plein, trait.argmax(axis=0), 0)
+    bas = np.where(plein, trait.shape[0] - trait[::-1].argmax(axis=0), 0)
+    saut = max(2.0, SAUT_DE_FACE * px_par_m)
+    court = max(3, round(MORCEAU_EPAISSEUR_MIN * px_par_m))
+
+    # 1. Des morceaux où les deux faces restent à peu près à la même place.
+    morceaux: list[list[int]] = []  # [début, fin]
+    for c in range(trait.shape[1]):
+        if morceaux:
+            d = morceaux[-1][0]
+            if abs(haut[c] - np.median(haut[d:c])) <= saut and abs(bas[c] - np.median(bas[d:c])) <= saut:
+                morceaux[-1][1] = c + 1
+                continue
+        morceaux.append([c, c + 1])
+
+    # 2. Un morceau trop court (bavure, angle) est rendu à son voisin le plus long.
+    while len(morceaux) > 1:
+        k = min(range(len(morceaux)), key=lambda j: morceaux[j][1] - morceaux[j][0])
+        if morceaux[k][1] - morceaux[k][0] >= court:
+            break
+        voisin = k - 1 if k == len(morceaux) - 1 or (
+            k > 0 and morceaux[k - 1][1] - morceaux[k - 1][0] >= morceaux[k + 1][1] - morceaux[k + 1][0]
+        ) else k + 1
+        morceaux[voisin] = [min(morceaux[k][0], morceaux[voisin][0]), max(morceaux[k][1], morceaux[voisin][1])]
+        del morceaux[k]
+
+    resultat = []
+    for d, f in morceaux:
+        # Les faces du morceau : celles de la majorité de ses colonnes (une bavure ne compte pas).
+        resultat.append((d, f, int(np.median(haut[d:f])), int(np.median(bas[d:f]))))
+    return resultat
 
 
 def _recoller(bandes: list[Bande], px_par_m: float) -> tuple[list[Bande], list[tuple[int, float, float]]]:
@@ -433,6 +482,56 @@ def _garder_le_logement(
     )
 
 
+def _prolonger_jusqu_aux_murs(bandes: list[Bande], noir: np.ndarray, px_par_m: float) -> list[tuple[int, float, float]]:
+    """Prolonge jusqu'au mur voisin un mur qui s'arrête dans le vide.
+
+    Quand une porte est percée tout près du bout d'une cloison, le petit bout
+    de cloison qui reste (10 à 30 cm) est trop court pour être lu comme un mur :
+    la cloison semble s'arrêter dans le vide, la pièce n'est plus fermée et se
+    fond avec sa voisine. Dans un logement, une cloison va toujours d'un mur à
+    un autre : on la prolonge donc jusqu'au premier mur perpendiculaire qu'elle
+    rencontre (à moins de OUVERTURE_MAX), et l'espace vide devient une
+    ouverture possible (la porte). Modifie les bandes ; renvoie les nouveaux trous.
+    """
+    tol = TOLERANCE * px_par_m
+    nouveaux: list[tuple[int, float, float]] = []
+    for n, mur in enumerate(bandes):
+        perpendiculaires = [
+            b for b in bandes
+            if b.horizontal != mur.horizontal and b.debut - tol <= mur.bord1 and mur.bord2 <= b.fin + tol
+        ]
+        trait = noir if mur.horizontal else noir.T
+        rangees = trait[max(0, round(mur.bord1)):round(mur.bord2)]
+        if rangees.shape[0] == 0:
+            continue
+        plein = (rangees > 0).mean(axis=0) >= 0.8  # colonnes où le mur (ou un bout de mur) est dessiné
+        for cote in (-1, 1):
+            bout = mur.debut if cote < 0 else mur.fin
+            if any(b.bord1 - tol <= bout <= b.bord2 + tol for b in perpendiculaires):
+                continue  # le mur s'arrête déjà sur un autre mur
+            devant = [b for b in perpendiculaires if (b.bord1 - bout) * cote > 0 or (b.bord2 - bout) * cote > 0]
+            if not devant:
+                continue
+            cible = min(devant, key=lambda b: abs((b.bord1 if cote > 0 else b.bord2) - bout))
+            face = cible.bord1 if cote > 0 else cible.bord2
+            if abs(face - bout) > OUVERTURE_MAX * px_par_m or abs(face - bout) < 2 * tol:
+                continue
+            # Le vide va du bout du mur au premier pixel de mur dessiné (petit bout de cloison, ou mur cible).
+            colonnes = [c for c in range(round(bout), round(face), cote) if 0 <= c < plein.size]
+            depart = next((k for k, c in enumerate(colonnes) if not plein[c]), len(colonnes))  # sortir du mur flou
+            arret = next((c for c in colonnes[depart:] if plein[c]), round(face))
+            bout = colonnes[depart] if depart < len(colonnes) else bout
+            debut_trou, fin_trou = sorted((bout, float(arret)))
+            if fin_trou - debut_trou < MORCEAU_MIN * px_par_m:
+                continue  # trop étroit pour une porte
+            if cote > 0:
+                mur.fin = face
+            else:
+                mur.debut = face
+            nouveaux.append((n, debut_trou, fin_trou))
+    return nouveaux
+
+
 def _regler_les_bouts(mur: Bande, bandes: list[Bande], px_par_m: float) -> MurLu:
     """Place chaque bout du mur selon ce qu'il rencontre.
 
@@ -453,7 +552,10 @@ def _regler_les_bouts(mur: Bande, bandes: list[Bande], px_par_m: float) -> MurLu
             if not (touche and croise):
                 continue
             au_bout = abs(mur.bord1 - autre.debut) <= tol or abs(mur.bord2 - autre.fin) <= tol
-            if au_bout:
+            # Une cloison qui arrive au bout d'un mur plus épais ne fait pas un angle avec lui :
+            # elle prolonge un autre mur (logement en L) et s'arrête sur sa face, comme en té.
+            plus_fin = mur.epaisseur < autre.epaisseur - tol
+            if au_bout and not plus_fin:
                 bouts[i] = autre.axe
             else:
                 bouts[i] = autre.bord2 if i == 0 else autre.bord1

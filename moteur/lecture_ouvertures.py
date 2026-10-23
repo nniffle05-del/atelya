@@ -81,18 +81,26 @@ def lire_ouvertures(
 
 
 def _a_un_battant(fins: np.ndarray, debut: float, fin: float, face1: float, face2: float, px_par_m: float) -> bool:
-    """Cherche un trait perpendiculaire au mur, partant d'un bord du trou, d'un côté ou de l'autre."""
+    """Cherche un trait perpendiculaire au mur, partant d'un bord du trou, d'un côté ou de l'autre.
+
+    Une ouverture large (porte-fenêtre) a souvent deux battants, chacun de la
+    moitié de la largeur, partant des deux bords du trou du même côté du mur.
+    """
     h, w = fins.shape
     largeur = fin - debut
     marge = max(2, round(MARGE_BOUT * px_par_m))
-    for bout in (debut, fin):
-        c0, c1 = max(0, round(bout) - marge), min(w, round(bout) + marge + 1)
-        for r0, r1 in ((face1 - 1.3 * largeur, face1), (face2, face2 + 1.3 * largeur)):
-            r0, r1 = max(0, round(r0)), min(h, round(r1))
-            if r1 - r0 < 3 or c1 <= c0:
-                continue
-            if _plus_longue_suite(fins[r0:r1, c0:c1]) >= BATTANT_MIN * largeur:
-                return True
+    for r0, r1 in ((face1 - 1.3 * largeur, face1), (face2, face2 + 1.3 * largeur)):
+        r0, r1 = max(0, round(r0)), min(h, round(r1))
+        if r1 - r0 < 3:
+            continue
+        longueurs = []
+        for bout in (debut, fin):
+            c0, c1 = max(0, round(bout) - marge), min(w, round(bout) + marge + 1)
+            longueurs.append(_plus_longue_suite(fins[r0:r1, c0:c1]) if c1 > c0 else 0)
+        if max(longueurs) >= BATTANT_MIN * largeur:
+            return True  # un seul battant
+        if min(longueurs) >= BATTANT_MIN * largeur / 2:
+            return True  # deux battants
     return False
 
 

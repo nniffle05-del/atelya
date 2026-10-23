@@ -92,7 +92,9 @@ def lire_echelle(gris: np.ndarray, textes: list[TexteLu] | None = None) -> Echel
 
     mediane = float(np.median([c.px_par_m for c in cotes]))
     retenues = [c for c in cotes if abs(c.px_par_m - mediane) / mediane <= ECART_MAX]
-    ecartees = [c for c in cotes if c not in retenues]
+    # Tri par la même règle (et non « c not in retenues ») : comparer deux cotes
+    # comparerait leurs boîtes de texte, des tableaux numpy, et ferait planter.
+    ecartees = [c for c in cotes if abs(c.px_par_m - mediane) / mediane > ECART_MAX]
     # Moyenne pondérée par la longueur : une grande cote est plus précise qu'une petite.
     px_par_m = sum(c.longueur_px for c in retenues) / sum(c.valeur for c in retenues)
     concordantes = [c for c in retenues if abs(c.px_par_m - px_par_m) / px_par_m <= ACCORD]
