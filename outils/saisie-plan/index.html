@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saisie de plan — moteur-3d</title>
+  <style>
+    :root {
+      --fond: #f4f5f7; --panneau: #ffffff; --bord: #d9dce1; --texte: #1f2328;
+      --doux: #636c76; --accent: #2563eb; --accent-doux: #e8effd; --ok: #15803d; --alerte: #b45309; --erreur: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--texte); background: var(--fond);
+      display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 340px;
+      grid-template-areas: "barre barre" "plan panneau" "etat panneau";
+    }
+    header {
+      grid-area: barre; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      padding: 8px 12px; background: var(--panneau); border-bottom: 1px solid var(--bord);
+    }
+    header h1 { font-size: 15px; margin: 0 12px 0 0; }
+    .mode {
+      border: 1px solid var(--bord); background: var(--panneau); color: var(--texte);
+      border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit;
+    }
+    .mode[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mode .num { font-weight: 600; margin-right: 4px; }
+    .espace { flex: 1; }
+    #zone { grid-area: plan; position: relative; overflow: hidden; }
+    #plan { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+    #zone.depot { outline: 3px dashed var(--accent); outline-offset: -8px; }
+    #etat {
+      grid-area: etat; padding: 6px 12px; background: var(--panneau); border-top: 1px solid var(--bord);
+      color: var(--doux); display: flex; gap: 16px;
+    }
+    #etat strong { color: var(--texte); font-weight: 600; }
+    aside {
+      grid-area: panneau; background: var(--panneau); border-left: 1px solid var(--bord);
+      overflow-y: auto; padding: 12px 14px;
+    }
+    section { border-bottom: 1px solid var(--bord); padding: 10px 0 14px; }
+    section:last-child { border-bottom: 0; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--doux); margin: 0 0 8px; }
+    p { margin: 0 0 8px; }
+    label { display: block; margin: 6px 0 2px; color: var(--doux); font-size: 13px; }
+    input[type=text], input[type=number], select {
+      width: 100%; padding: 6px 8px; border: 1px solid var(--bord); border-radius: 6px; font: inherit;
+    }
+    .ligne { display: flex; gap: 6px; align-items: end; }
+    .ligne > * { flex: 1; }
+    button.action {
+      margin-top: 8px; width: 100%; padding: 7px 10px; border-radius: 6px; cursor: pointer; font: inherit;
+      border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    }
+    button.secondaire { background: var(--panneau); color: var(--accent); }
+    button.danger { border-color: var(--erreur); background: var(--panneau); color: var(--erreur); }
+    button:disabled { opacity: .45; cursor: default; }
+    .info { color: var(--doux); font-size: 13px; }
+    .ok { color: var(--ok); } .alerte { color: var(--alerte); } .erreur { color: var(--erreur); }
+    .choix { display: flex; gap: 6px; }
+    .choix label { flex: 1; margin: 0; border: 1px solid var(--bord); border-radius: 6px; padding: 6px; text-align: center; cursor: pointer; color: var(--texte); }
+    .choix input { display: none; }
+    .choix input:checked + span { color: var(--accent); font-weight: 600; }
+    .choix label:has(input:checked) { border-color: var(--accent); background: var(--accent-doux); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    td, th { padding: 4px 4px; border-bottom: 1px solid #eef0f2; text-align: left; }
+    th { color: var(--doux); font-weight: 500; }
+    td.nb { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.mur { cursor: pointer; }
+    tr.mur:hover { background: var(--fond); }
+    tr.mur.choisi { background: #fff1e6; }
+    .badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eef0f2; }
+    .badge.mesure { background: #dcfce7; color: var(--ok); }
+    ul.erreurs { margin: 6px 0 0; padding-left: 18px; color: var(--erreur); }
+    .cache { display: none; }
+    kbd { border: 1px solid var(--bord); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Saisie de plan</h1>
+    <button class="mode" data-mode="plan"><span class="num">1</span>Plan</button>
+    <button class="mode" data-mode="echelle"><span class="num">2</span>Échelle</button>
+    <button class="mode" data-mode="controle"><span class="num">3</span>Contrôle</button>
+    <button class="mode" data-mode="murs"><span class="num">4</span>Murs</button>
+    <button class="mode" data-mode="origine"><span class="num">5</span>Origine</button>
+    <button class="mode" data-mode="selection">Modifier</button>
+    <span class="espace"></span>
+    <button class="mode" id="zoom-moins" title="Dézoomer">−</button>
+    <button class="mode" id="zoom-plus" title="Zoomer">+</button>
+    <button class="mode" id="zoom-ajuster" title="Voir tout le plan">Ajuster</button>
+    <button class="mode" id="annuler" title="Annuler (Cmd+Z)">Annuler</button>
+  </header>
+
+  <div id="zone"><canvas id="plan"></canvas></div>
+
+  <div id="etat"><span id="consigne"></span><span class="espace"></span><span id="position"></span></div>
+
+  <aside>
+    <!-- Panneaux propres à chaque mode -->
+    <section data-panneau="plan">
+      <h2>1. Le plan</h2>
+      <p>Choisissez l'image du plan (PNG ou JPG). Vous pouvez aussi la glisser sur la zone de gauche.</p>
+      <p class="info">Un PDF ? Ouvrez-le dans Aperçu, puis Fichier › Exporter… › format PNG.</p>
+      <input type="file" id="fichier-plan" accept="image/png,image/jpeg,application/pdf">
+      <p id="plan-info" class="info"></p>
+      <p class="info">Pour se déplacer : glisser avec la souris, ou deux doigts sur le trackpad. Pour zoomer : pincer, ou <kbd>+</kbd> / <kbd>−</kbd>.</p>
+    </section>
+
+    <section data-panneau="echelle" class="cache">
+      <h2>2. Caler l'échelle</h2>
+      <p>Cliquez les deux bouts d'une cote du plan (la plus longue possible), puis tapez sa valeur.</p>
+      <label for="echelle-longueur">Longueur réelle (m)</label>
+      <input type="number" id="echelle-longueur" step="0.01" min="0" placeholder="ex. 8,00">
+      <button class="action" id="echelle-valider" disabled>Valider l'échelle</button>
+      <p id="echelle-info" class="info"></p>
+    </section>
+
+    <section data-panneau="controle" class="cache">
+      <h2>3. Contrôler l'échelle</h2>
+      <p>Cliquez les deux bouts d'une autre cote, de préférence dans l'autre sens (verticale si la première était horizontale), puis tapez sa valeur.</p>
+      <label for="controle-longueur">Longueur réelle (m)</label>
+      <input type="number" id="controle-longueur" step="0.01" min="0" placeholder="ex. 5,40">
+      <button class="action" id="controle-valider" disabled>Contrôler</button>
+      <p id="controle-info" class="info"></p>
+    </section>
+
+    <section data-panneau="murs" class="cache">
+      <h2>4. Tracer les murs</h2>
+      <p>Cliquez au <strong>milieu de l'épaisseur</strong> du mur : un clic au début, un clic à chaque angle. Les murs s'enchaînent. <kbd>Échap</kbd> termine la série.</p>
+      <p class="info">Aimants : un mur presque droit est redressé (maintenir <kbd>Maj</kbd> pour l'éviter) ; un clic près d'un angle existant s'y accroche ; une cloison qui finit sur un mur s'arrête sur sa face.</p>
+      <label>Épaisseur du prochain mur</label>
+      <div class="choix" id="choix-epaisseur">
+        <label><input type="radio" name="ep" value="0.20" checked><span>20 cm</span></label>
+        <label><input type="radio" name="ep" value="0.10"><span>10 cm</span></label>
+        <label><input type="radio" name="ep" value="autre"><span>Autre</span></label>
+      </div>
+      <input type="number" id="ep-autre" class="cache" step="0.01" min="0.01" placeholder="épaisseur en m">
+      <button class="action secondaire" id="murs-terminer">Terminer la série (Échap)</button>
+    </section>
+
+    <section data-panneau="origine" class="cache">
+      <h2>5. Placer l'origine</h2>
+      <p>Cliquez le <strong>coin intérieur sud-ouest</strong> du logement (en bas à gauche si le nord est en haut). C'est le point (0, 0) de toutes les mesures.</p>
+      <p class="info">Le clic s'accroche au coin des murs le plus proche.</p>
+      <p id="origine-info" class="info"></p>
+    </section>
+
+    <section data-panneau="selection" class="cache">
+      <h2>Modifier un mur</h2>
+      <p id="selection-vide">Cliquez un mur sur le plan, ou dans la liste ci-dessous.</p>
+      <div id="selection-detail" class="cache">
+        <label for="sel-id">Nom</label>
+        <input type="text" id="sel-id">
+        <label for="sel-longueur">Longueur d'axe (m), d'un angle à l'autre</label>
+        <div class="ligne">
+          <input type="number" id="sel-longueur" step="0.01" min="0">
+          <button class="action" id="sel-appliquer" style="flex:0 0 auto;width:auto;margin:0">Appliquer</button>
+        </div>
+        <p class="info">Taper une cote lue sur le plan rend la longueur « mesurée » au lieu d'« estimée ». La fin du mur se déplace ; les murs qui y sont accrochés suivent.</p>
+        <label for="sel-epaisseur">Épaisseur (m)</label>
+        <input type="number" id="sel-epaisseur" step="0.01" min="0.01">
+        <button class="action danger" id="sel-supprimer">Supprimer ce mur</button>
+      </div>
+    </section>
+
+    <!-- Toujours visibles -->
+    <section>
+      <h2>Projet</h2>
+      <label for="projet-id">Nom du projet</label>
+      <input type="text" id="projet-id" value="CAS-TEST-00">
+      <label for="hsp">Hauteur sous plafond (m)</label>
+      <input type="number" id="hsp" value="2.50" step="0.01" min="0">
+    </section>
+
+    <section>
+      <h2>Murs (<span id="nb-murs">0</span>)</h2>
+      <table>
+        <thead><tr><th>Nom</th><th class="nb">Longueur</th><th class="nb">Ép.</th><th>Statut</th></tr></thead>
+        <tbody id="liste-murs"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Enregistrer</h2>
+      <button class="action" id="enregistrer-logement">Enregistrer logement.json</button>
+      <button class="action secondaire" id="enregistrer-saisie">Enregistrer la saisie (pour reprendre)</button>
+      <button class="action secondaire" id="reprendre">Reprendre une saisie…</button>
+      <input type="file" id="fichier-saisie" accept="application/json,.json" class="cache">
+      <div id="messages"></div>
+    </section>
+  </aside>
+
+  <script src="calculs.js"></script>
+  <script src="saisie.js"></script>
+</body>
+</html>

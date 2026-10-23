@@ -11,6 +11,10 @@ Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, pui
 - `moteur/blender/mesurer.py` : script lu par Blender, qui mesure la maquette (pour les tests).
 - `moteur/construire.py` : la commande unique, du logement.json à la maquette .blend.
 - `tests/` : les tests automatiques (`test_blender.py` lance vraiment Blender, sans écran).
+- `outils/saisie-plan/` : la page de saisie d'un plan (étape 3), qui produit un `logement.json` en cliquant sur l'image du plan.
+  `calculs.js` contient les calculs (échelle, aimants, export), `saisie.js` les clics et le dessin.
+  `tests/calculs.test.js` se lance avec Node.js (`node --test outils/saisie-plan/tests/calculs.test.js`), qui n'est pas nécessaire pour utiliser la page.
+- `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
 
 ## Commandes utiles
 
@@ -19,6 +23,14 @@ uv run pytest        # lance tous les tests
 uv run python -m moteur.construire exemples/cas-test-00/logement.json sorties/cas-test-00
                      # construit sorties/cas-test-00/maquette.blend
 ```
+
+## Saisir un plan
+
+Ouvrir `outils/saisie-plan/index.html` dans Google Chrome (double-clic, ou `open -a "Google Chrome" outils/saisie-plan/index.html`).
+La page fonctionne sans Internet : le plan ne quitte pas l'ordinateur. Suivre les étapes numérotées en haut :
+plan, échelle, contrôle de l'échelle, murs, origine, puis « Enregistrer logement.json » (le fichier arrive dans Téléchargements).
+Les longueurs affichées sont celles de l'axe des murs, d'un angle à l'autre (8,20 m pour un mur extérieur qui borde 8,00 m intérieurs).
+Une longueur obtenue en cliquant est enregistrée avec le statut `estime` ; une cote tapée dans « Modifier » avec le statut `mesure`.
 
 Les maquettes produites vont dans `sorties/`, qui n'est pas suivi par Git (on peut toujours les reconstruire).
 Blender est cherché dans `/Applications/Blender.app` ; sinon, indiquer son chemin dans la variable `BLENDER`.
