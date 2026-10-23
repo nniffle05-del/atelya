@@ -21,6 +21,8 @@ Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, pui
 - `moteur/lecture_cotes.py` : la lecture automatique de l'échelle (étape 3c) : lit les cotes écrites sur le plan avec RapidOCR (modèle de lecture de texte qui tourne sur l'ordinateur, sans Internet), mesure leurs traits et en déduit les pixels par mètre ; lit aussi la hauteur sous plafond si elle est écrite.
 - `moteur/lecture_ouvertures.py` : la lecture des portes et fenêtres (étape 3d) : regarde le dessin dans chaque trou des murs (battant de porte, traits de fenêtre) ; hauteurs courantes mises par défaut, avec le statut « estimé ».
 - `moteur/lecture_pieces.py` : la lecture des pièces (étape 3d) : les espaces fermés entre les murs, avec le nom et la surface écrits dedans ; la surface écrite sert de contrôle.
+- `moteur/correcteur.py` : le correcteur (étape 5a) : compare une lecture automatique au vrai logement.json et donne une note (murs, dimensions, portes et fenêtres, pièces, hauteur), le nombre de corrections à faire et si le plan est « vert » (vérifiable en moins de 2 minutes).
+- `moteur/banc_essai.py` : le banc d'essai (étape 5a) : lance la lecture sur tous les plans d'un dossier dont on connaît le corrigé, les note et écrit le bilan dans `sorties/banc/rapport.json`. Un logement par sous-dossier : `logement.json` (le corrigé) et un ou plusieurs dessins `plan….png`.
 - `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
 
 ## Commandes utiles
@@ -36,6 +38,10 @@ uv run python -m moteur.lecture_plan exemples/cas-test-00/plan.png sorties/lu.js
                      # et écrit un logement.json proposé
                      # (--echelle 100 pour imposer l'échelle, --hsp 2.50 pour la hauteur sous plafond)
                      # écrit aussi sorties/lu-a-verifier.json, pour la vérification humaine
+uv run python -m moteur.banc_essai
+                     # lit et note tous les plans de exemples/ (ou d'un autre dossier donné)
+uv run python -m moteur.correcteur sorties/lu.json exemples/cas-test-00/logement.json
+                     # note une seule lecture par rapport au corrigé
 ```
 
 ## Saisir un plan
