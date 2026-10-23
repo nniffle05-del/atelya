@@ -37,11 +37,12 @@ Point = tuple[float, float]
 @dataclass(frozen=True)
 class Brique:
     id: str
-    categorie: Literal["mur", "sol", "plafond"]
+    categorie: Literal["mur", "sol", "plafond", "menuiserie"]
     element: str  # identifiant de l'élément du logement d'où vient la brique
     contour: list[Point]  # sens inverse des aiguilles d'une montre, vu de dessus
     z_bas: float
     z_haut: float
+    materiau: str = ""  # choisi à l'habillage (voir moteur/habillage.py)
 
 
 def plan_de_construction(logement: Logement) -> dict:
@@ -173,18 +174,23 @@ def _briques_du_mur(
     return briques
 
 
-def _rectangle(mur: Mur, t1: float, t2: float) -> list[Point]:
-    """Le rectangle occupé par le mur entre les distances t1 et t2 de son axe."""
+def _rectangle(
+    mur: Mur, t1: float, t2: float, n1: float | None = None, n2: float | None = None
+) -> list[Point]:
+    """Le rectangle occupé par le mur entre les distances t1 et t2 de son axe.
+
+    Dans l'épaisseur, il va de n1 à n2 (distances à l'axe, comptées vers la
+    gauche du mur) ; par défaut, toute l'épaisseur. Les menuiseries s'en
+    servent pour se loger au milieu du mur.
+    """
+    if n1 is None or n2 is None:
+        n1, n2 = -mur.epaisseur / 2, mur.epaisseur / 2
     ux, uy = _direction(mur)
-    nx, ny = -uy * mur.epaisseur / 2, ux * mur.epaisseur / 2  # demi-épaisseur, vers la gauche
+    gx, gy = -uy, ux  # vers la gauche du mur
     x0, y0 = mur.debut
-    a = (x0 + ux * t1, y0 + uy * t1)
-    b = (x0 + ux * t2, y0 + uy * t2)
     coins = [
-        (a[0] - nx, a[1] - ny),
-        (b[0] - nx, b[1] - ny),
-        (b[0] + nx, b[1] + ny),
-        (a[0] + nx, a[1] + ny),
+        (x0 + ux * t + gx * n, y0 + uy * t + gy * n)
+        for t, n in ((t1, n1), (t2, n1), (t2, n2), (t1, n2))
     ]
     return _sens_direct([_arrondi(c) for c in coins])
 

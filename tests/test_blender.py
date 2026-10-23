@@ -1,4 +1,5 @@
-"""Test de bout en bout : Blender construit la maquette, puis on la mesure.
+"""Test de bout en bout : Blender construit la maquette habillée, on la mesure,
+puis on lui fait calculer ses images (en qualité brouillon, pour aller vite).
 
 Ce test lance vraiment Blender (sans écran). Il est sauté si Blender est
 introuvable sur la machine.
@@ -9,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from moteur.construire import construire, mesurer, trouver_blender
+from moteur.construire import construire, mesurer, rendre, trouver_blender
 
 CAS_TEST_00 = Path(__file__).parent.parent / "exemples" / "cas-test-00" / "logement.json"
 MILLIMETRE = 0.001
@@ -37,7 +38,8 @@ def test_une_brique_un_objet(resultat):
 
 def test_cotes_au_millimetre(resultat):
     _, plan, mesures = resultat
-    collections = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds"}
+    collections = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds",
+                   "menuiserie": "Menuiseries"}
     for brique in plan["briques"]:
         mesure = mesures[brique["id"]]
         xs = [p[0] for p in brique["contour"]]
@@ -51,13 +53,31 @@ def test_cotes_au_millimetre(resultat):
 
 
 def test_faces_bien_orientees(resultat):
-    """Un sol regarde vers le haut, un plafond vers le bas, un mur a 6 faces."""
+    """Un sol regarde vers le haut, un plafond vers le bas, un mur ou une menuiserie a 6 faces."""
     _, plan, mesures = resultat
     for brique in plan["briques"]:
         mesure = mesures[brique["id"]]
-        if brique["categorie"] == "mur":
+        if brique["categorie"] in ("mur", "menuiserie"):
             assert mesure["faces"] == 6
         elif brique["categorie"] == "sol":
             assert mesure["normales"] == [pytest.approx([0, 0, 1])]
         else:
             assert mesure["normales"] == [pytest.approx([0, 0, -1])]
+
+
+def test_chaque_brique_a_son_materiau(resultat):
+    _, plan, mesures = resultat
+    for brique in plan["briques"]:
+        assert mesures[brique["id"]]["materiaux"] == [brique["materiau"]], brique["id"]
+
+
+def test_deux_images_ni_noires_ni_blanches(resultat, tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    maquette, _, _ = resultat
+    images = rendre(maquette, tmp_path / "images", qualite="brouillon")
+    assert [i.name for i in images] == ["vue-dessus.png", "vue-sejour.png"]
+    for image in images:
+        pixels = cv2.imread(str(image))
+        assert pixels.shape[:2] == (250, 400)  # 25 % de 1600 × 1000
+        assert 60 < pixels.mean() < 230, image.name  # ni trop sombre, ni brûlée
+        assert pixels.std() > 10, image.name  # pas une image toute unie

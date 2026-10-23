@@ -19,6 +19,8 @@ def main() -> None:
     sortie = sys.argv[sys.argv.index("--") + 1]
     mesures = {}
     for objet in bpy.data.objects:
+        if objet.type != "MESH":
+            continue  # les lampes et caméras n'ont pas de forme à mesurer
         points = [objet.matrix_world @ v.co for v in objet.data.vertices]
         mesures[objet.name] = {
             "collection": objet.users_collection[0].name,
@@ -27,6 +29,7 @@ def main() -> None:
             "max": [max(p[i] for p in points) for i in range(3)],
             "faces": len(objet.data.polygons),
             "normales": [list(f.normal) for f in objet.data.polygons],
+            "materiaux": [m.name for m in objet.data.materials if m],
         }
     Path(sortie).write_text(json.dumps(mesures, indent=2), encoding="utf-8")
 
