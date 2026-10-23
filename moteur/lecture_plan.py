@@ -12,9 +12,11 @@ Principe, en partant de l'image du plan :
    rejoints au milieu des murs ; une cloison s'arrête sur la face du mur
    qu'elle rencontre).
 
+L'échelle (pixels par mètre) est lue toute seule sur les cotes du plan
+(voir lecture_cotes.py), ou donnée à la main.
+
 Limites de la version 0.1 : murs droits et perpendiculaires seulement ;
-plan propre (dessin d'architecte, export PDF, scan net) ; l'échelle est
-donnée (sa lecture automatique viendra à l'étape 3c).
+plan propre (dessin d'architecte, export PDF, scan net).
 """
 
 from __future__ import annotations
@@ -24,9 +26,13 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
+
+if TYPE_CHECKING:
+    from moteur.lecture_cotes import Echelle
 
 # Les tailles sont en mètres et converties en pixels avec l'échelle.
 TRAIT_FIN_MAX = 0.06  # un trait plus fin que 6 cm sur le plan n'est pas un mur
@@ -79,15 +85,46 @@ class Lecture:
     ouvertures_candidates: list[tuple[int, float, float]]  # (n° du mur, début, fin), en pixels
 
 
+def lire_plan(image: np.ndarray, px_par_m: float | None = None) -> tuple[Lecture, Echelle | None]:
+    """Lit un plan entier. Sans échelle donnée, elle est lue sur les cotes du plan.
+
+    Renvoie la lecture des murs et, si l'échelle a été lue, le détail de cette
+    lecture (cotes retenues, hauteur sous plafond écrite sur le plan).
+    """
+    gris, angle = redresser(en_gris(image))
+    echelle = None
+    if px_par_m is None:
+        from moteur.lecture_cotes import lire_echelle  # charge le modèle de lecture de texte
+
+        echelle = lire_echelle(gris)
+        if echelle.px_par_m is None:
+            raise ValueError("aucune cote lisible sur ce plan : donner l'échelle à la main")
+        px_par_m = echelle.px_par_m
+    return lire_murs_sur_plan_droit(gris, angle, px_par_m), echelle
+
+
 def lire_murs(image: np.ndarray, px_par_m: float) -> Lecture:
     """Trouve les murs sur l'image d'un plan (niveaux de gris ou couleur)."""
-    gris = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    noir = _traits_epais(gris, px_par_m)
+    gris, angle = redresser(en_gris(image))
+    return lire_murs_sur_plan_droit(gris, angle, px_par_m)
+
+
+def en_gris(image: np.ndarray) -> np.ndarray:
+    return image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
+def redresser(gris: np.ndarray) -> tuple[np.ndarray, float]:
+    """Redresse un plan scanné de travers. Renvoie l'image droite et l'angle corrigé (degrés)."""
+    _, noir = cv2.threshold(gris, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     angle = _inclinaison(noir)
     if abs(angle) > 0.01:
         gris = _tourner(gris, angle, fond=255)
-        noir = _traits_epais(gris, px_par_m)
+    return gris, angle
 
+
+def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) -> Lecture:
+    """Trouve les murs sur un plan déjà redressé."""
+    noir = _traits_epais(gris, px_par_m)
     bandes = _bandes(noir, px_par_m, horizontal=True) + _bandes(noir, px_par_m, horizontal=False)
     bandes, trous = _recoller(bandes, px_par_m)
     bandes, trous = _garder_le_logement(bandes, trous, px_par_m)
@@ -290,18 +327,39 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Lit les murs d'un plan et écrit un logement.json proposé.")
     parser.add_argument("plan", help="image du plan (PNG ou JPG)")
     parser.add_argument("sortie", help="fichier logement.json à écrire")
-    parser.add_argument("--echelle", type=float, required=True, help="pixels par mètre (ex. 100)")
+    parser.add_argument("--echelle", type=float, help="pixels par mètre (ex. 100) ; sinon lue sur les cotes")
+    parser.add_argument("--hsp", type=float, help="hauteur sous plafond en mètres ; sinon lue sur le plan, ou 2,50")
     parser.add_argument("--projet", default="PLAN-LU", help="nom du projet")
     args = parser.parse_args()
     image = cv2.imread(args.plan, cv2.IMREAD_GRAYSCALE)
     if image is None:
         sys.exit(f"Échec : image illisible ({args.plan})")
     try:
-        lecture = lire_murs(image, args.echelle)
+        lecture, echelle = lire_plan(image, args.echelle)
     except ValueError as erreur:
         sys.exit(f"Échec : {erreur}")
-    logement = logement_depuis_lecture(lecture, args.echelle, args.projet)
-    Path(args.sortie).write_text(json.dumps(logement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    px_par_m = args.echelle
+    hsp = args.hsp
+    if echelle is not None:
+        px_par_m = echelle.px_par_m
+        cotes = ", ".join(c.texte.texte for c in echelle.retenues)
+        print(f"Échelle lue : {px_par_m} pixels par mètre, d'après les cotes {cotes}")
+        for c in echelle.ecartees:
+            print(f"  cote écartée (pas d'accord avec les autres) : {c.texte.texte}")
+        if not echelle.sure:
+            print("  ATTENTION : moins de deux cotes concordantes, échelle à vérifier")
+        if hsp is None and echelle.hauteur_sous_plafond is not None:
+            hsp = echelle.hauteur_sous_plafond
+            print(f"Hauteur sous plafond lue sur le plan : {hsp:.2f} m".replace(".", ","))
+    if hsp is None:
+        hsp = 2.50
+        print("Hauteur sous plafond non trouvée : 2,50 m par défaut, à vérifier")
+
+    logement = logement_depuis_lecture(lecture, px_par_m, args.projet, hsp)
+    sortie = Path(args.sortie)
+    sortie.parent.mkdir(parents=True, exist_ok=True)  # crée le dossier (par exemple sorties/) s'il manque
+    sortie.write_text(json.dumps(logement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{len(lecture.murs)} murs trouvés (plan redressé de {lecture.angle}°) → {args.sortie}")
 
 
