@@ -15,14 +15,17 @@ Principe, en partant de l'image du plan :
 L'échelle (pixels par mètre) est lue toute seule sur les cotes du plan
 (voir lecture_cotes.py), ou donnée à la main.
 
-Limites de la version 0.1 : murs droits et perpendiculaires seulement ;
-plan propre (dessin d'architecte, export PDF, scan net).
+Avant tout, l'image est nettoyée (nettoyage.py) : feuille photographiée remise
+à plat, papier rendu blanc, contraste d'une photocopie pâle rendu.
+
+Limites de la version 0.1 : murs droits et perpendiculaires seulement.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +38,7 @@ if TYPE_CHECKING:
     from moteur.lecture_cotes import Echelle
     from moteur.lecture_ouvertures import OuvertureLue
     from moteur.lecture_pieces import PieceLue
+    from moteur.nettoyage import Nettoyage
 
 # Les tailles sont en mètres et converties en pixels avec l'échelle.
 TRAIT_FIN_MAX = 0.045  # un trait plus fin que 4,5 cm sur le plan n'est pas un mur (une cloison fait 7 cm et plus)
@@ -44,6 +48,8 @@ TOLERANCE = 0.03  # écart admis entre deux morceaux « alignés »
 INCLINAISON_MAX = 5.0  # degrés : inclinaison maximale corrigée
 SAUT_DE_FACE = 0.02  # une face qui se décale de plus de 2 cm : le mur change d'épaisseur
 MORCEAU_EPAISSEUR_MIN = 0.15  # en dessous, un changement d'épaisseur est une bavure
+
+CALAGE_EPAISSEUR_MAX = 0.03  # une épaisseur lue à moins de 3 cm d'une épaisseur écrite prend celle-ci
 
 CONFIANCE_LECTURE = 0.7
 
@@ -99,24 +105,34 @@ class PlanLu:
     ouvertures: list[OuvertureLue]
     pieces: list[PieceLue]
     hauteur_sous_plafond: float | None  # si elle est écrite sur le plan
+    nettoyage: Nettoyage | None = None  # ce qui a été fait à l'image avant de la lire
 
 
 def lire_plan(image: np.ndarray, px_par_m: float | None = None) -> PlanLu:
     """Lit un plan entier : échelle (si elle n'est pas donnée), murs, portes, fenêtres et pièces."""
     # Chargés ici : le modèle de lecture de texte met une seconde à démarrer.
-    from moteur.lecture_cotes import lire_echelle, lire_hauteur_sous_plafond, lire_textes
+    from moteur.lecture_cotes import (
+        egaliser_les_echelles, lire_epaisseurs, lire_hauteur_sous_plafond, lire_textes, lire_textes_et_echelle,
+    )
     from moteur.lecture_ouvertures import lire_ouvertures
     from moteur.lecture_pieces import lire_pieces
+    from moteur.nettoyage import nettoyer
 
-    gris, angle = redresser(en_gris(image))
-    textes = lire_textes(gris)
+    propre, nettoyage = nettoyer(en_gris(image))
+    gris, angle = redresser(propre)
     echelle = None
     if px_par_m is None:
-        echelle = lire_echelle(gris, textes)
+        textes, echelle = lire_textes_et_echelle(gris)
+        gris, textes, echelle, nettoyage.etirement_hauteur = egaliser_les_echelles(
+            gris, textes, echelle, photo=nettoyage.feuille_detouree
+        )
         if echelle.px_par_m is None:
             raise ValueError("aucune cote lisible sur ce plan : donner l'échelle à la main")
         px_par_m = echelle.px_par_m
+    else:
+        textes = lire_textes(gris)
     lecture = lire_murs_sur_plan_droit(gris, angle, px_par_m)
+    _caler_les_epaisseurs(lecture.murs, lire_epaisseurs(textes), px_par_m)
 
     bandes = []
     for m in lecture.murs:
@@ -128,7 +144,7 @@ def lire_plan(image: np.ndarray, px_par_m: float | None = None) -> PlanLu:
     )
     murs_m = [(m["debut"], m["fin"], m["epaisseur"]) for m in logement_depuis_lecture(lecture, px_par_m, "-")["murs"]]
     pieces = lire_pieces(gris.shape, murs_m, textes, px_par_m, lecture.origine)
-    return PlanLu(lecture, px_par_m, echelle, ouvertures, pieces, lire_hauteur_sous_plafond(textes))
+    return PlanLu(lecture, px_par_m, echelle, ouvertures, pieces, lire_hauteur_sous_plafond(textes), nettoyage)
 
 
 def logement_depuis_plan(plan: PlanLu, projet_id: str, hauteur_sous_plafond: float | None = None) -> dict:
@@ -327,8 +343,24 @@ def logement_depuis_lecture(
 def _traits_epais(gris: np.ndarray, px_par_m: float) -> np.ndarray:
     """Masque des traits épais : noir sur blanc → blanc sur noir, traits fins effacés."""
     _, noir = cv2.threshold(gris, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    k = max(3, round(TRAIT_FIN_MAX * px_par_m)) | 1  # taille impaire
+    k = max(3, math.ceil(TRAIT_FIN_MAX * px_par_m))  # un trait plus fin que k pixels est effacé
     return cv2.morphologyEx(noir, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (k, k)))
+
+
+def _caler_les_epaisseurs(murs: list[MurLu], ecrites: list[float], px_par_m: float) -> None:
+    """Cale chaque mur sur l'épaisseur écrite sur le plan la plus proche, si elle l'est à 3 cm près.
+
+    Sur une image floue ou très compressée, un mur paraît un ou deux pixels plus
+    épais qu'il n'est (à 60 pixels par mètre, un pixel fait déjà 1,7 cm) ; le
+    cartouche, lui, donne l'épaisseur exacte. Le milieu du mur ne bouge pas.
+    """
+    if not ecrites:
+        return
+    for m in murs:
+        lue = m.epaisseur_px / px_par_m
+        proche = min(ecrites, key=lambda e: abs(e - lue))
+        if abs(proche - lue) <= CALAGE_EPAISSEUR_MAX:
+            m.epaisseur_px = proche * px_par_m
 
 
 def _inclinaison(masque: np.ndarray) -> float:

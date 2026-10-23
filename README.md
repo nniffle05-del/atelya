@@ -25,6 +25,8 @@ Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, pui
 - `moteur/banc_essai.py` : le banc d'essai (étape 5a) : lance la lecture sur tous les plans d'un dossier dont on connaît le corrigé, les note et écrit le bilan dans `sorties/banc/rapport.json`. Un logement par sous-dossier : `logement.json` (le corrigé) et un ou plusieurs dessins `plan….png`.
 - `moteur/fabrique.py` : la fabrique de plans (étape 5b) : invente des logements variés (T1 à T4, rectangles et formes en L, épaisseurs de murs et hauteurs sous plafond variées), vérifie qu'ils sont habitables (tailles des pièces, chaque pièce desservie, une fenêtre par pièce de vie), et écrit pour chacun le corrigé `logement.json`, le dessin `plan.png` et une `fiche.json` (type, forme, style de dessin). Une même « graine » (numéro de départ) redonne toujours le même logement et le même dessin.
 - `moteur/dessin_plan.py` : dessine le plan coté d'un logement.json (murs, portes, fenêtres, cotes, noms et surfaces des pièces, cartouche), avec un « style » qui varie d'un plan à l'autre (échelle, gris, police, taille des textes, cotes partielles, portes à deux battants…).
+- `moteur/salissure.py` : salit les plans fabriqués (étape 5c), pour voir si la lecture tient sur des plans réalistes : scan de travers, photocopie grise et granuleuse, tache de café et pli, image réduite et très compressée (JPEG), photo de la feuille prise au téléphone (en biais, ombre, lumière inégale). Écrit `plan-travers.png`, `plan-photocopie.png`, `plan-taches.png`, `plan-compression.jpg` et `plan-telephone.jpg` à côté de chaque `plan.png` ; même graine, même salissure.
+- `moteur/nettoyage.py` : nettoie l'image d'un plan avant de la lire (étape 5c) : sur une photo, détoure la feuille par ses bords et la remet à plat ; rend le papier blanc partout (ombre, tache, pli) ; rend le contraste d'une photocopie pâle. Sur un plan propre, ne change presque rien.
 - `moteur/polices/` : trois polices libres (Inter, Liberation Sans, DejaVu Sans) pour que les plans soient dessinés pareil sur le Mac et sur le PC ; licences dans `LICENCES.txt`.
 - `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
 
@@ -50,6 +52,11 @@ uv run python -m moteur.fabrique 200
                      # (--depart 1001 pour d'autres graines, un autre dossier en second argument)
 uv run python -m moteur.banc_essai sorties/fabrique --rapport sorties/fabrique/rapport.json
                      # note la lecture sur tous les plans fabriqués (environ 1,5 s par plan)
+                     # (--processus 4 : quatre plans lus en même temps ; --seulement propre,telephone :
+                     #  seulement ces sortes de dessin ; le bilan est aussi donné par sorte de dessin)
+uv run python -m moteur.salissure sorties/fabrique
+                     # salit chaque plan fabriqué de 5 façons, à côté de son plan.png
+                     # (--familles travers,telephone pour n'en faire que certaines)
 ```
 
 ## Saisir un plan

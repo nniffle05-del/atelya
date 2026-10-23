@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -91,6 +92,24 @@ def bilan(resultats: list[Resultat]) -> dict:
     }
 
 
+def famille(image: Path) -> str:
+    """La sorte de dessin, d'après le nom de l'image : « plan-travers.png » → « travers », « plan.png » → « propre »."""
+    reste = image.stem.lower().removeprefix("plan").lstrip("-_ ")
+    return reste or "propre"
+
+
+def bilans_par_famille(resultats: list[Resultat]) -> dict[str, dict]:
+    """Un bilan par sorte de dessin (propre, travers, photocopie…), pour voir où la lecture casse."""
+    familles: dict[str, list[Resultat]] = {}
+    for r in resultats:
+        familles.setdefault(famille(r.plan), []).append(r)
+    return {f: bilan(rs) for f, rs in sorted(familles.items())}
+
+
+def _essayer_couple(couple: tuple[Path, Path]) -> Resultat:
+    return essayer(*couple)
+
+
 def _pourcent(x: float | None) -> str:
     return "—" if x is None else f"{100 * x:.0f} %"
 
@@ -99,6 +118,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Lance la lecture sur tous les plans d'un banc d'essai et les note.")
     parser.add_argument("dossier", nargs="?", default="exemples", help="dossier du banc (par défaut : exemples)")
     parser.add_argument("--rapport", default="sorties/banc/rapport.json", help="fichier où écrire le bilan détaillé")
+    parser.add_argument("--seulement", help="ne lire que ces sortes de dessin, séparées par des virgules (ex. : propre,travers)")
+    parser.add_argument("--processus", type=int, default=1,
+                        help=f"nombre de plans lus en même temps (cet ordinateur a {os.cpu_count()} cœurs ; par défaut : 1)")
     args = parser.parse_args()
 
     dossier = Path(args.dossier)
@@ -106,10 +128,21 @@ def main() -> None:
     if not couples:
         sys.exit(f"Échec : aucun plan avec son logement.json dans {dossier}")
 
+    if args.seulement:
+        voulues = {f.strip() for f in args.seulement.split(",")}
+        couples = [c for c in couples if famille(c[0]) in voulues]
+
+    if args.processus > 1:
+        from multiprocessing import Pool
+
+        pool = Pool(args.processus)
+        suite = pool.imap(_essayer_couple, couples)
+    else:
+        suite = map(_essayer_couple, couples)
     resultats = []
-    for image, corrige in couples:
-        r = essayer(image, corrige)
+    for r in suite:
         resultats.append(r)
+        image = r.plan
         nom = image.relative_to(dossier)
         if r.note is None:
             print(f"✗ {nom} : ÉCHEC de la lecture ({r.echec})")
@@ -131,14 +164,23 @@ def main() -> None:
     print(f"  portes et fenêtres justes {_pourcent(b['ouvertures_justes'])} (inventées : {b['ouvertures_inventees']})")
     print(f"  pièces justes {_pourcent(b['pieces_justes'])} (inventées : {b['pieces_inventees']})")
     print(f"  dimensions justes à 1 % près : {_pourcent(b['dimensions_justes'])}")
+    par_famille = bilans_par_famille(resultats)
+    if len(par_famille) > 1:
+        print("Par sorte de dessin :")
+        for f, bf in par_famille.items():
+            print(f"  {f:<12} {bf['verts']:>4}/{bf['plans']:<4} verts ({_pourcent(bf['taux_verts'])}), {bf['echecs']} échec(s), "
+                  f"murs {_pourcent(bf['murs_justes'])}, ouvertures {_pourcent(bf['ouvertures_justes'])}, "
+                  f"pièces {_pourcent(bf['pieces_justes'])}, dimensions {_pourcent(bf['dimensions_justes'])}")
 
     rapport = Path(args.rapport)
     rapport.parent.mkdir(parents=True, exist_ok=True)
     rapport.write_text(json.dumps({
         "bilan": b,
+        "par_famille": par_famille,
         "plans": [
             {
                 "plan": str(r.plan.relative_to(dossier)),
+                "famille": famille(r.plan),
                 "duree_s": round(r.duree, 2),
                 "echec": r.echec,
                 "note": r.note.en_dict() if r.note else None,

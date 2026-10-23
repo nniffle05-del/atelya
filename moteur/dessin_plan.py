@@ -71,8 +71,8 @@ def style_au_hasard(rng: random.Random) -> Style:
         cotes_partielles=rng.random() < 0.8,
         doubles_vantaux=rng.random() < 0.3,
         arcs=rng.random() < 0.95,
-        cartouche=rng.random() < 0.9,
-        hsp_ecrite=rng.random() < 0.85,
+        cartouche=(cartouche := rng.random() < 0.9),
+        hsp_ecrite=rng.random() < 0.85 and cartouche,  # sans cartouche, la hauteur n'est écrite nulle part
         police=rng.choice(NOMS_POLICES),
     )
 
