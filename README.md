@@ -23,6 +23,9 @@ Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, pui
 - `moteur/lecture_pieces.py` : la lecture des pièces (étape 3d) : les espaces fermés entre les murs, avec le nom et la surface écrits dedans ; la surface écrite sert de contrôle.
 - `moteur/correcteur.py` : le correcteur (étape 5a) : compare une lecture automatique au vrai logement.json et donne une note (murs, dimensions, portes et fenêtres, pièces, hauteur), le nombre de corrections à faire et si le plan est « vert » (vérifiable en moins de 2 minutes).
 - `moteur/banc_essai.py` : le banc d'essai (étape 5a) : lance la lecture sur tous les plans d'un dossier dont on connaît le corrigé, les note et écrit le bilan dans `sorties/banc/rapport.json`. Un logement par sous-dossier : `logement.json` (le corrigé) et un ou plusieurs dessins `plan….png`.
+- `moteur/fabrique.py` : la fabrique de plans (étape 5b) : invente des logements variés (T1 à T4, rectangles et formes en L, épaisseurs de murs et hauteurs sous plafond variées), vérifie qu'ils sont habitables (tailles des pièces, chaque pièce desservie, une fenêtre par pièce de vie), et écrit pour chacun le corrigé `logement.json`, le dessin `plan.png` et une `fiche.json` (type, forme, style de dessin). Une même « graine » (numéro de départ) redonne toujours le même logement et le même dessin.
+- `moteur/dessin_plan.py` : dessine le plan coté d'un logement.json (murs, portes, fenêtres, cotes, noms et surfaces des pièces, cartouche), avec un « style » qui varie d'un plan à l'autre (échelle, gris, police, taille des textes, cotes partielles, portes à deux battants…).
+- `moteur/polices/` : trois polices libres (Inter, Liberation Sans, DejaVu Sans) pour que les plans soient dessinés pareil sur le Mac et sur le PC ; licences dans `LICENCES.txt`.
 - `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
 
 ## Commandes utiles
@@ -42,6 +45,11 @@ uv run python -m moteur.banc_essai
                      # lit et note tous les plans de exemples/ (ou d'un autre dossier donné)
 uv run python -m moteur.correcteur sorties/lu.json exemples/cas-test-00/logement.json
                      # note une seule lecture par rapport au corrigé
+uv run python -m moteur.fabrique 200
+                     # fabrique 200 logements et leurs plans dans sorties/fabrique/plan-00001… (13 s)
+                     # (--depart 1001 pour d'autres graines, un autre dossier en second argument)
+uv run python -m moteur.banc_essai sorties/fabrique --rapport sorties/fabrique/rapport.json
+                     # note la lecture sur tous les plans fabriqués (environ 1,5 s par plan)
 ```
 
 ## Saisir un plan

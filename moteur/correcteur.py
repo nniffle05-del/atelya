@@ -191,7 +191,7 @@ def _ecart_dimensions(murs_lus: list[dict], murs_vrais: list[dict]) -> float:
         return max(xs) - min(xs), max(ys) - min(ys)
 
     (lx, ly), (vx, vy) = cadre(murs_lus), cadre(murs_vrais)
-    return max(abs(lx - vx) / vx, abs(ly - vy) / vy)
+    return float(max(abs(lx - vx) / vx, abs(ly - vy) / vy))  # float : les coordonnées lues peuvent venir de numpy
 
 
 # --- Ouvertures ---------------------------------------------------------
