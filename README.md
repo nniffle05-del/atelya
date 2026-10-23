@@ -16,6 +16,8 @@ Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, pui
   `tests/calculs.test.js` se lance avec Node.js (`node --test outils/saisie-plan/tests/calculs.test.js`), qui n'est pas nécessaire pour utiliser la page.
 - `moteur/lecture_plan.py` : la lecture automatique d'un plan (étape 3b) : trouve les murs sur l'image, redresse un plan scanné de travers, et propose un `logement.json`. Utilise OpenCV.
 - `moteur/lecture_cotes.py` : la lecture automatique de l'échelle (étape 3c) : lit les cotes écrites sur le plan avec RapidOCR (modèle de lecture de texte qui tourne sur l'ordinateur, sans Internet), mesure leurs traits et en déduit les pixels par mètre ; lit aussi la hauteur sous plafond si elle est écrite.
+- `moteur/lecture_ouvertures.py` : la lecture des portes et fenêtres (étape 3d) : regarde le dessin dans chaque trou des murs (battant de porte, traits de fenêtre) ; hauteurs courantes mises par défaut, avec le statut « estimé ».
+- `moteur/lecture_pieces.py` : la lecture des pièces (étape 3d) : les espaces fermés entre les murs, avec le nom et la surface écrits dedans ; la surface écrite sert de contrôle.
 - `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
 
 ## Commandes utiles
@@ -25,7 +27,8 @@ uv run pytest        # lance tous les tests
 uv run python -m moteur.construire exemples/cas-test-00/logement.json sorties/cas-test-00
                      # construit sorties/cas-test-00/maquette.blend
 uv run python -m moteur.lecture_plan exemples/cas-test-00/plan.png sorties/lu.json
-                     # lit l'échelle et les murs du plan et écrit un logement.json proposé
+                     # lit l'échelle, les murs, les portes, les fenêtres et les pièces du plan
+                     # et écrit un logement.json proposé
                      # (--echelle 100 pour imposer l'échelle, --hsp 2.50 pour la hauteur sous plafond)
 ```
 

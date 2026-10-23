@@ -33,6 +33,8 @@ import numpy as np
 
 if TYPE_CHECKING:
     from moteur.lecture_cotes import Echelle
+    from moteur.lecture_ouvertures import OuvertureLue
+    from moteur.lecture_pieces import PieceLue
 
 # Les tailles sont en mètres et converties en pixels avec l'échelle.
 TRAIT_FIN_MAX = 0.06  # un trait plus fin que 6 cm sur le plan n'est pas un mur
@@ -85,22 +87,92 @@ class Lecture:
     ouvertures_candidates: list[tuple[int, float, float]]  # (n° du mur, début, fin), en pixels
 
 
-def lire_plan(image: np.ndarray, px_par_m: float | None = None) -> tuple[Lecture, Echelle | None]:
-    """Lit un plan entier. Sans échelle donnée, elle est lue sur les cotes du plan.
+@dataclass
+class PlanLu:
+    """Tout ce que la lecture automatique a trouvé sur un plan."""
 
-    Renvoie la lecture des murs et, si l'échelle a été lue, le détail de cette
-    lecture (cotes retenues, hauteur sous plafond écrite sur le plan).
-    """
+    lecture: Lecture  # les murs
+    px_par_m: float
+    echelle: Echelle | None  # le détail de l'échelle, si elle a été lue sur les cotes
+    ouvertures: list[OuvertureLue]
+    pieces: list[PieceLue]
+    hauteur_sous_plafond: float | None  # si elle est écrite sur le plan
+
+
+def lire_plan(image: np.ndarray, px_par_m: float | None = None) -> PlanLu:
+    """Lit un plan entier : échelle (si elle n'est pas donnée), murs, portes, fenêtres et pièces."""
+    # Chargés ici : le modèle de lecture de texte met une seconde à démarrer.
+    from moteur.lecture_cotes import lire_echelle, lire_hauteur_sous_plafond, lire_textes
+    from moteur.lecture_ouvertures import lire_ouvertures
+    from moteur.lecture_pieces import lire_pieces
+
     gris, angle = redresser(en_gris(image))
+    textes = lire_textes(gris)
     echelle = None
     if px_par_m is None:
-        from moteur.lecture_cotes import lire_echelle  # charge le modèle de lecture de texte
-
-        echelle = lire_echelle(gris)
+        echelle = lire_echelle(gris, textes)
         if echelle.px_par_m is None:
             raise ValueError("aucune cote lisible sur ce plan : donner l'échelle à la main")
         px_par_m = echelle.px_par_m
-    return lire_murs_sur_plan_droit(gris, angle, px_par_m), echelle
+    lecture = lire_murs_sur_plan_droit(gris, angle, px_par_m)
+
+    bandes = []
+    for m in lecture.murs:
+        horizontal = m.debut[1] == m.fin[1]
+        axe = m.debut[1] if horizontal else m.debut[0]
+        bandes.append((horizontal, axe - m.epaisseur_px / 2, axe + m.epaisseur_px / 2))
+    ouvertures = lire_ouvertures(
+        gris, _traits_epais(gris, px_par_m), bandes, lecture.ouvertures_candidates, px_par_m
+    )
+    murs_m = [(m["debut"], m["fin"], m["epaisseur"]) for m in logement_depuis_lecture(lecture, px_par_m, "-")["murs"]]
+    pieces = lire_pieces(gris.shape, murs_m, textes, px_par_m, lecture.origine)
+    return PlanLu(lecture, px_par_m, echelle, ouvertures, pieces, lire_hauteur_sous_plafond(textes))
+
+
+def logement_depuis_plan(plan: PlanLu, projet_id: str, hauteur_sous_plafond: float | None = None) -> dict:
+    """Le contenu de logement.json (format logement/0.1) : murs, ouvertures et pièces lus."""
+    from moteur.lecture_ouvertures import CONFIANCE, HAUTEURS
+    from moteur.logement import TOLERANCE_SURFACE
+
+    hsp = hauteur_sous_plafond or plan.hauteur_sous_plafond or 2.50
+    s = plan.px_par_m
+    logement = logement_depuis_lecture(plan.lecture, s, projet_id, hsp)
+
+    prefixes = {"porte": "P", "porte_fenetre": "PF", "fenetre": "F"}
+    compteurs: dict[str, int] = {}
+    for o in plan.ouvertures:
+        mur = plan.lecture.murs[o.mur]
+        horizontal = mur.debut[1] == mur.fin[1]
+        # Distance depuis le début du mur (à gauche pour un mur horizontal, en bas pour un vertical).
+        position = (o.debut - mur.debut[0]) if horizontal else (mur.debut[1] - o.fin)
+        hauteur, allege = HAUTEURS[o.type]
+        compteurs[o.type] = compteurs.get(o.type, 0) + 1
+        logement["ouvertures"].append({
+            "id": f"{prefixes[o.type]}{compteurs[o.type]}",
+            "type": o.type,
+            "mur": logement["murs"][o.mur]["id"],
+            "position": round(position / s, 3),
+            "largeur": round((o.fin - o.debut) / s, 3),
+            "hauteur": hauteur,
+            "allege": allege,
+            "statut": "estime",
+            "source": "lecture_auto",
+            "confiance": CONFIANCE[o.sure],
+        })
+
+    for n, p in enumerate(plan.pieces, start=1):
+        d_accord = p.surface_ecrite is not None and abs(p.surface_ecrite - p.surface_calculee) <= TOLERANCE_SURFACE
+        logement["pieces"].append({
+            "id": f"piece_{n}",
+            "nom": p.nom or f"Pièce {n}",
+            "contour": [list(q) for q in p.contour],
+            "surface": p.surface_ecrite if d_accord else None,
+            "statut": "estime",
+            "source": "lecture_auto",
+            # Nom et surface écrits sur le plan, et surface d'accord : la lecture se confirme elle-même.
+            "confiance": CONFIANCE_LECTURE if (p.nom and d_accord) else 0.5,
+        })
+    return logement
 
 
 def lire_murs(image: np.ndarray, px_par_m: float) -> Lecture:
@@ -324,7 +396,7 @@ def _regler_les_bouts(mur: Bande, bandes: list[Bande], px_par_m: float) -> MurLu
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Lit les murs d'un plan et écrit un logement.json proposé.")
+    parser = argparse.ArgumentParser(description="Lit un plan (murs, portes, fenêtres, pièces) et écrit un logement.json proposé.")
     parser.add_argument("plan", help="image du plan (PNG ou JPG)")
     parser.add_argument("sortie", help="fichier logement.json à écrire")
     parser.add_argument("--echelle", type=float, help="pixels par mètre (ex. 100) ; sinon lue sur les cotes")
@@ -335,33 +407,54 @@ def main() -> None:
     if image is None:
         sys.exit(f"Échec : image illisible ({args.plan})")
     try:
-        lecture, echelle = lire_plan(image, args.echelle)
+        plan = lire_plan(image, args.echelle)
     except ValueError as erreur:
         sys.exit(f"Échec : {erreur}")
 
-    px_par_m = args.echelle
-    hsp = args.hsp
+    def fr(x: float) -> str:
+        return f"{x:.2f}".replace(".", ",")
+
+    echelle = plan.echelle
     if echelle is not None:
-        px_par_m = echelle.px_par_m
         cotes = ", ".join(c.texte.texte for c in echelle.retenues)
-        print(f"Échelle lue : {px_par_m} pixels par mètre, d'après les cotes {cotes}")
+        print(f"Échelle lue : {plan.px_par_m} pixels par mètre, d'après les cotes {cotes}")
         for c in echelle.ecartees:
             print(f"  cote écartée (pas d'accord avec les autres) : {c.texte.texte}")
         if not echelle.sure:
             print("  ATTENTION : moins de deux cotes concordantes, échelle à vérifier")
-        if hsp is None and echelle.hauteur_sous_plafond is not None:
-            hsp = echelle.hauteur_sous_plafond
-            print(f"Hauteur sous plafond lue sur le plan : {hsp:.2f} m".replace(".", ","))
-    if hsp is None:
-        hsp = 2.50
-        print("Hauteur sous plafond non trouvée : 2,50 m par défaut, à vérifier")
+    if args.hsp is None:
+        if plan.hauteur_sous_plafond is not None:
+            print(f"Hauteur sous plafond lue sur le plan : {fr(plan.hauteur_sous_plafond)} m")
+        else:
+            print("Hauteur sous plafond non trouvée : 2,50 m par défaut, à vérifier")
 
-    logement = logement_depuis_lecture(lecture, px_par_m, args.projet, hsp)
+    lecture = plan.lecture
+    print(f"{len(lecture.murs)} murs trouvés (plan redressé de {lecture.angle}°)")
+    noms = {"porte": "porte(s)", "porte_fenetre": "porte(s)-fenêtre(s)", "fenetre": "fenêtre(s)"}
+    compte = ", ".join(
+        f"{sum(o.type == t for o in plan.ouvertures)} {nom}"
+        for t, nom in noms.items()
+        if any(o.type == t for o in plan.ouvertures)
+    )
+    print(f"{len(plan.ouvertures)} ouvertures trouvées : {compte or 'aucune'}")
+    if any(not o.sure for o in plan.ouvertures):
+        print(f"  ATTENTION : {sum(not o.sure for o in plan.ouvertures)} ouverture(s) au dessin peu clair, à vérifier")
+    print(f"{len(plan.pieces)} pièces trouvées :")
+    for p in plan.pieces:
+        ligne = f"  {p.nom or 'sans nom (à nommer)'} : {fr(p.surface_calculee)} m² calculés"
+        if p.surface_ecrite is None:
+            ligne += ", pas de surface écrite sur le plan"
+        elif p.surfaces_d_accord:
+            ligne += f", {fr(p.surface_ecrite)} m² écrits : d'accord"
+        else:
+            ligne += f", mais {fr(p.surface_ecrite)} m² écrits : À VÉRIFIER"
+        print(ligne)
+
+    logement = logement_depuis_plan(plan, args.projet, args.hsp)
     sortie = Path(args.sortie)
     sortie.parent.mkdir(parents=True, exist_ok=True)  # crée le dossier (par exemple sorties/) s'il manque
     sortie.write_text(json.dumps(logement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"{len(lecture.murs)} murs trouvés (plan redressé de {lecture.angle}°) → {args.sortie}")
-
+    print(f"→ {args.sortie}")
 
 if __name__ == "__main__":
     main()

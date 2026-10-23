@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from moteur.lecture_cotes import TexteLu, lire_echelle, lire_hauteur_sous_plafond, lire_textes
-from moteur.lecture_plan import en_gris, lire_plan, logement_depuis_lecture, redresser
+from moteur.lecture_plan import en_gris, lire_plan, logement_depuis_plan, redresser
 from moteur.logement import Logement, charger_logement
 from test_lecture_plan import COPIES, DOSSIER, TOLERANCE_LONGUEUR, _milieu, _plan
 
@@ -68,10 +68,8 @@ def test_hauteur_sous_plafond(texte, attendu):
 def test_plan_lu_sans_rien_donner(nom):
     """Le chemin complet : une image, et rien d'autre, donne les bons murs en mètres."""
     image, _ = COPIES[nom]()
-    lecture, echelle = lire_plan(image)
-    logement = Logement.model_validate(
-        logement_depuis_lecture(lecture, echelle.px_par_m, "LU", echelle.hauteur_sous_plafond)
-    )
+    plan = lire_plan(image)
+    logement = Logement.model_validate(logement_depuis_plan(plan, "LU"))
     reference = charger_logement(DOSSIER / "logement.json")
     assert logement.hauteur_sous_plafond == reference.hauteur_sous_plafond
     assert len(logement.murs) == len(reference.murs)
