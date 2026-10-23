@@ -53,6 +53,7 @@ class CoteLue:
     longueur_px: float  # distance mesurée entre les deux marques
     verticale: bool
     texte: TexteLu
+    bouts: tuple[tuple[float, float], tuple[float, float]]  # les deux marques, en pixels (x, y)
 
     @property
     def px_par_m(self) -> float:
@@ -131,13 +132,18 @@ def _mesurer_cote(noir: np.ndarray, texte: TexteLu) -> CoteLue | None:
     if verticale:  # on retourne l'image : la cote verticale devient horizontale
         noir = noir.T
         x0, y0, x1, y1 = y0, x0, y1, x1
-    longueur = _longueur_entre_marques(noir, x0, y0, x1, y1)
-    if longueur is None:
+    marques = _marques(noir, x0, y0, x1, y1)
+    if marques is None:
         return None
-    return CoteLue(float(texte.texte.replace(",", ".")), longueur, verticale, texte)
+    gauche, droite, ligne = marques
+    bouts = ((gauche, ligne), (droite, ligne))
+    if verticale:  # on remet les coordonnées à l'endroit
+        bouts = ((ligne, gauche), (ligne, droite))
+    return CoteLue(float(texte.texte.replace(",", ".")), droite - gauche, verticale, texte, bouts)
 
 
-def _longueur_entre_marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> float | None:
+def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tuple[float, float, int] | None:
+    """Les deux marques qui bornent la cote (colonnes) et la ligne du trait de cote."""
     h, w = noir.shape
     hauteur = y1 - y0
     cx = int(round((x0 + x1) / 2))
@@ -177,7 +183,7 @@ def _longueur_entre_marques(noir: np.ndarray, x0: float, y0: float, x1: float, y
     droite = [m for m in marques if m > cx]
     if not gauche or not droite:
         return None
-    return min(droite) - max(gauche)
+    return max(gauche), min(droite), y
 
 
 def _trait_autour(ligne: np.ndarray, cx: int) -> tuple[int, int]:

@@ -30,6 +30,7 @@ uv run python -m moteur.lecture_plan exemples/cas-test-00/plan.png sorties/lu.js
                      # lit l'échelle, les murs, les portes, les fenêtres et les pièces du plan
                      # et écrit un logement.json proposé
                      # (--echelle 100 pour imposer l'échelle, --hsp 2.50 pour la hauteur sous plafond)
+                     # écrit aussi sorties/lu-a-verifier.json, pour la vérification humaine
 ```
 
 ## Saisir un plan
@@ -37,6 +38,9 @@ uv run python -m moteur.lecture_plan exemples/cas-test-00/plan.png sorties/lu.js
 Ouvrir `outils/saisie-plan/index.html` dans Google Chrome (double-clic, ou `open -a "Google Chrome" outils/saisie-plan/index.html`).
 La page fonctionne sans Internet : le plan ne quitte pas l'ordinateur. Suivre les étapes numérotées en haut :
 plan, échelle, contrôle de l'échelle, murs, origine, puis « Enregistrer logement.json » (le fichier arrive dans Téléchargements).
+Pour vérifier une lecture automatique : bouton « Ouvrir une lecture ou une saisie… », choisir le fichier `…-a-verifier.json`.
+Tout est déjà posé sur le plan ; les points douteux sont listés dans le cadre « À vérifier » et entourés en orange.
+On corrige (type d'une ouverture, nom d'une pièce, mur…) ou on clique « C'est bon » ; l'enregistrement n'est possible qu'une fois la liste vide.
 Les longueurs affichées sont celles de l'axe des murs, d'un angle à l'autre (8,20 m pour un mur extérieur qui borde 8,00 m intérieurs).
 Une longueur obtenue en cliquant est enregistrée avec le statut `estime` ; une cote tapée dans « Modifier » avec le statut `mesure`.
 

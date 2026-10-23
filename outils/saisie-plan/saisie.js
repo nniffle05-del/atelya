@@ -15,7 +15,7 @@
     controle: "Étape 3 : cliquez les deux bouts d'une autre cote pour vérifier l'échelle.",
     murs: "Étape 4 : cliquez le milieu des murs, angle après angle. Échap pour terminer une série.",
     origine: "Étape 5 : cliquez le coin intérieur sud-ouest du logement.",
-    selection: "Cliquez un mur pour le modifier.",
+    selection: "Cliquez un mur, une ouverture ou une pièce pour le modifier.",
   };
 
   const etat = {
@@ -33,6 +33,12 @@
     souris: null, // position de la souris, en pixels du plan
     maj: false, // touche Maj enfoncée
     selection: null, // index du mur choisi
+    choix: null, // ouverture ou pièce choisie : {genre: "ouverture" | "piece", index}
+    ouvertures: [], // {id, type, mur, position, largeur, hauteur, allege, sure, verifie} (mètres le long du mur)
+    pieces: [], // {id, nom, contour (pixels), surfaceEcrite, accord, verifie}
+    lectureAuto: false, // la saisie vient de la lecture automatique (moteur/lecture_plan.py)
+    hspLue: true, // hauteur sous plafond écrite sur le plan
+    hspVerifiee: false,
     historique: [],
   };
   window.Saisie = { etat }; // lecture seule, pour les tests automatiques
@@ -53,13 +59,18 @@
   }
 
   const pxParM = () => (etat.echelle ? etat.echelle.pxParM : null);
+  const COULEURS_OUVERTURE = { porte: "#16a34a", porte_fenetre: "#ea580c", fenetre: "#0891b2" };
+  const COULEURS_PIECE = ["rgba(250,204,21,0.22)", "rgba(96,165,250,0.22)", "rgba(52,211,153,0.22)", "rgba(244,114,182,0.22)"];
   const enPx = (m) => m.map((mur) => ({ ...mur, epaisseurPx: mur.epaisseur * pxParM() }));
   const formatM = (v, d = 2) => v.toFixed(d).replace(".", ",");
 
   // ---------- Historique (Annuler) ----------
 
   function memoriser() {
-    etat.historique.push(JSON.stringify({ echelle: etat.echelle, controle: etat.controle, origine: etat.origine, murs: etat.murs, compteur: etat.compteur }));
+    etat.historique.push(JSON.stringify({
+      echelle: etat.echelle, controle: etat.controle, origine: etat.origine, murs: etat.murs, compteur: etat.compteur,
+      ouvertures: etat.ouvertures, pieces: etat.pieces, hspVerifiee: etat.hspVerifiee,
+    }));
     if (etat.historique.length > 100) etat.historique.shift();
   }
 
@@ -71,6 +82,7 @@
       if (!precedent) return;
       Object.assign(etat, JSON.parse(precedent));
       etat.selection = null;
+      etat.choix = null;
     }
     rafraichir();
   }
@@ -136,7 +148,7 @@
         etat.origine = point;
         break;
       case "selection":
-        etat.selection = murSous(p);
+        choisirSous(p);
         break;
     }
     rafraichir();
@@ -177,6 +189,30 @@
     if (choix !== "autre") return Number(choix);
     const v = Number($("ep-autre").value);
     return v > 0 ? v : 0.2;
+  }
+
+  /** Ce qui est sous le clic : une ouverture d'abord (elle est posée sur un mur), puis un mur, puis une pièce. */
+  function choisirSous(p) {
+    etat.selection = null;
+    etat.choix = null;
+    const o = ouvertureSous(p);
+    if (o != null) return (etat.choix = { genre: "ouverture", index: o });
+    const m = murSous(p);
+    if (m != null) return (etat.selection = m);
+    const i = etat.pieces.findIndex((piece) => C.dansPolygone(p, piece.contour));
+    if (i >= 0) etat.choix = { genre: "piece", index: i };
+  }
+
+  function ouvertureSous(p) {
+    let meilleur = null;
+    etat.ouvertures.forEach((o, i) => {
+      const mur = etat.murs.find((m) => m.id === o.mur);
+      if (!mur) return;
+      const [a, b] = C.boutsOuverture(o, mur, pxParM());
+      const tolerance = Math.max((mur.epaisseur * pxParM()) / 2 + 2, 6 / etat.vue.zoom);
+      if (distanceSegment(p, a, b) <= tolerance) meilleur = i;
+    });
+    return meilleur;
   }
 
   function murSous(p) {
@@ -254,6 +290,8 @@
       return;
     }
     memoriser();
+    const ancien = etat.murs[i].id;
+    for (const o of etat.ouvertures) if (o.mur === ancien) o.mur = nom;
     etat.murs[i].id = nom;
     rafraichir();
   }
@@ -270,8 +308,101 @@
   function supprimer() {
     if (etat.selection == null) return;
     memoriser();
+    const id = etat.murs[etat.selection].id;
+    etat.ouvertures = etat.ouvertures.filter((o) => o.mur !== id); // ses portes et fenêtres partent avec lui
     etat.murs.splice(etat.selection, 1);
     etat.selection = null;
+    rafraichir();
+  }
+
+  // ---------- Modifier une ouverture ou une pièce ----------
+
+  function choisie(genre) {
+    return etat.choix && etat.choix.genre === genre ? (genre === "ouverture" ? etat.ouvertures : etat.pieces)[etat.choix.index] : null;
+  }
+
+  function changerTypeOuverture() {
+    const o = choisie("ouverture");
+    if (!o) return;
+    memoriser();
+    o.type = $("ouv-type").value;
+    Object.assign(o, C.HAUTEURS[o.type]); // hauteurs courantes du nouveau type
+    // Un nom automatique (P1, F2, PF1…) suit le type : une porte devenue fenêtre s'appelle F…
+    const prefixe = { porte: "P", porte_fenetre: "PF", fenetre: "F" }[o.type];
+    const nomAuto = /^(PF|P|F)\d+$/.exec(o.id);
+    if (nomAuto && nomAuto[1] !== prefixe) {
+      const pris = new Set(etat.ouvertures.map((x) => x.id));
+      let n = 1;
+      while (pris.has(prefixe + n)) n++;
+      o.id = prefixe + n;
+    }
+    o.verifie = true;
+    rafraichir();
+  }
+
+  function changerLargeurOuverture() {
+    const o = choisie("ouverture");
+    const v = Number($("ouv-largeur").value);
+    if (!o || !(v > 0)) return;
+    memoriser();
+    o.position += (o.largeur - v) / 2; // on garde le milieu de l'ouverture en place
+    o.largeur = v;
+    o.verifie = true;
+    rafraichir();
+  }
+
+  function renommerPiece() {
+    const p = choisie("piece");
+    if (!p) return;
+    memoriser();
+    p.nom = $("piece-nom").value.trim();
+    if (p.nom) p.verifie = true;
+    rafraichir();
+  }
+
+  function marquerBon(genre, index) {
+    memoriser();
+    if (genre === "echelle") etat.echelle.verifiee = true;
+    else if (genre === "hsp") etat.hspVerifiee = true;
+    else (genre === "ouverture" ? etat.ouvertures : etat.pieces)[index].verifie = true;
+    rafraichir();
+  }
+
+  function supprimerChoix() {
+    if (!etat.choix) return;
+    memoriser();
+    (etat.choix.genre === "ouverture" ? etat.ouvertures : etat.pieces).splice(etat.choix.index, 1);
+    etat.choix = null;
+    rafraichir();
+  }
+
+  /** Montre un élément douteux : on le choisit et on centre la vue dessus. */
+  function montrer(doute) {
+    choisirMode("selection");
+    let centre = null;
+    if (doute.genre === "ouverture") {
+      etat.choix = { genre: "ouverture", index: doute.index };
+      const o = etat.ouvertures[doute.index];
+      const mur = etat.murs.find((m) => m.id === o.mur);
+      if (mur) {
+        const [a, b] = C.boutsOuverture(o, mur, pxParM());
+        centre = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      }
+    } else if (doute.genre === "piece") {
+      etat.choix = { genre: "piece", index: doute.index };
+      const c = etat.pieces[doute.index].contour;
+      centre = [c.reduce((t, q) => t + q[0], 0) / c.length, c.reduce((t, q) => t + q[1], 0) / c.length];
+    } else if (doute.genre === "echelle" && etat.echelle.p1) {
+      centre = [(etat.echelle.p1[0] + etat.echelle.p2[0]) / 2, (etat.echelle.p1[1] + etat.echelle.p2[1]) / 2];
+    } else if (doute.genre === "hsp") {
+      $("hsp").focus();
+      $("hsp").select();
+    }
+    if (centre) {
+      const r = canvas.getBoundingClientRect();
+      etat.vue.dx = r.width / 2 - centre[0] * etat.vue.zoom;
+      etat.vue.dy = r.height / 2 - centre[1] * etat.vue.zoom;
+    }
     rafraichir();
   }
 
@@ -297,6 +428,12 @@
       if (nouvelle) {
         etat.echelle = etat.controle = etat.origine = null;
         etat.murs = [];
+        etat.ouvertures = [];
+        etat.pieces = [];
+        etat.lectureAuto = false;
+        etat.hspLue = true;
+        etat.hspVerifiee = false;
+        etat.choix = null;
         etat.historique = [];
         etat.compteur = 0;
         choisirMode("echelle");
@@ -316,6 +453,11 @@
       echelle: etat.echelle,
       origine: etat.origine,
       murs: etat.murs,
+      ouvertures: etat.ouvertures,
+      pieces: etat.pieces,
+      lecture_auto: etat.lectureAuto,
+      hsp_lue: etat.hspLue,
+      hsp_verifiee: etat.hspVerifiee,
     };
   }
 
@@ -324,7 +466,7 @@
     if (erreurs.length) return message("Impossible d'enregistrer : " + erreurs.join(" ; ") + ".", "erreur");
     if (etat.controle == null) message("Note : l'échelle n'a pas été contrôlée (étape 3).", "alerte");
     telecharger("logement.json", C.construireLogement(saisieCourante()));
-    message("logement.json enregistré dans vos Téléchargements.", "ok");
+    message(etat.lectureAuto ? "Lecture vérifiée : logement.json enregistré dans vos Téléchargements." : "logement.json enregistré dans vos Téléchargements.", "ok");
   }
 
   function enregistrerSaisie() {
@@ -346,13 +488,22 @@
     lecteur.onload = () => {
       try {
         const s = JSON.parse(lecteur.result);
-        if (s.version !== C.VERSION_SAISIE) throw new Error("ce fichier n'est pas une saisie de plan");
-        Object.assign(etat, { echelle: s.echelle, controle: s.controle, origine: s.origine, murs: s.murs, compteur: s.compteur || 0, historique: [], points: [], selection: null });
+        if (!C.VERSIONS_LUES.includes(s.version)) throw new Error("ce fichier n'est pas une saisie ni une lecture de plan");
+        Object.assign(etat, {
+          echelle: s.echelle, controle: s.controle, origine: s.origine, murs: s.murs, compteur: s.compteur || 0,
+          ouvertures: s.ouvertures || [], pieces: s.pieces || [], lectureAuto: !!s.lecture_auto,
+          hspLue: s.hsp_lue !== false, hspVerifiee: !!s.hsp_verifiee,
+          historique: [], points: [], selection: null, choix: null,
+        });
         $("projet-id").value = s.projet_id;
         $("hsp").value = s.hauteur_sous_plafond;
         installerImage(s.image.dataUrl, s.image.nom, false);
         choisirMode("selection");
-        message("Saisie reprise.", "ok");
+        if (etat.lectureAuto) {
+          const n = C.doutes(saisieCourante()).length;
+          message(`Lecture automatique ouverte : ${etat.murs.length} murs, ${etat.ouvertures.length} ouvertures, ${etat.pieces.length} pièces. ` +
+            (n ? `${n} point${n > 1 ? "s" : ""} à vérifier (en orange).` : "Rien de douteux : jetez un œil au plan, puis enregistrez."), n ? "alerte" : "ok");
+        } else message("Saisie reprise.", "ok");
       } catch (e) {
         message("Reprise impossible : " + e.message, "erreur");
       }
@@ -413,6 +564,25 @@
     const trait = 1 / zoom; // un pixel d'écran, exprimé en pixels du plan
     ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, dpr * dx, dpr * dy);
     ctx.drawImage(etat.image, 0, 0);
+    const douteux = new Set(C.doutes(saisieCourante()).map((d) => d.genre + d.index));
+
+    // Pièces
+    etat.pieces.forEach((p, i) => {
+      if (p.contour.length < 3) return;
+      const choisie = etat.choix && etat.choix.genre === "piece" && etat.choix.index === i;
+      ctx.beginPath();
+      p.contour.forEach((q, k) => (k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])));
+      ctx.closePath();
+      ctx.fillStyle = choisie ? "rgba(234,88,12,0.25)" : COULEURS_PIECE[i % COULEURS_PIECE.length];
+      ctx.fill();
+      if (douteux.has("piece" + i)) {
+        ctx.setLineDash([8 * trait, 5 * trait]);
+        ctx.strokeStyle = "#ea580c";
+        ctx.lineWidth = 3 * trait;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
 
     // Murs
     etat.murs.forEach((m, i) => {
@@ -424,8 +594,26 @@
       for (const p of [m.debut, m.fin]) rond(p, 3 * trait, ctx.strokeStyle);
     });
 
+    // Portes et fenêtres, posées sur leur mur
+    etat.ouvertures.forEach((o, i) => {
+      const mur = etat.murs.find((m) => m.id === o.mur);
+      if (!mur) return;
+      const [a, b] = C.boutsOuverture(o, mur, pxParM());
+      const choisie = etat.choix && etat.choix.genre === "ouverture" && etat.choix.index === i;
+      dessinerMur(a, b, mur.epaisseur * pxParM() + 6 * trait, choisie ? "rgba(194,65,12,0.85)" : COULEURS_OUVERTURE[o.type]);
+      if (douteux.has("ouverture" + i)) {
+        ctx.strokeStyle = "#ea580c";
+        ctx.lineWidth = 3 * trait;
+        ctx.setLineDash([5 * trait, 4 * trait]);
+        ctx.beginPath();
+        ctx.arc((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, C.distance(a, b) / 2 + 12 * trait, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
+
     // Échelle et contrôle
-    if (etat.echelle) cote(etat.echelle.p1, etat.echelle.p2, "#15803d", trait);
+    if (etat.echelle && etat.echelle.p1) cote(etat.echelle.p1, etat.echelle.p2, douteux.has("echellenull") ? "#ea580c" : "#15803d", trait);
     if (etat.controle) cote(etat.controle.p1, etat.controle.p2, Math.abs(etat.controle.ecart) <= SEUIL_CONTROLE ? "#15803d" : "#b45309", trait);
 
     // Clics en attente et aperçu sous la souris
@@ -470,6 +658,17 @@
     ctx.textAlign = "center";
     if (etat.echelle && zoom * pxParM() > 25) {
       for (const m of etat.murs) etiquette(milieu(m.debut, m.fin), formatM(C.distance(m.debut, m.fin) / pxParM()), "#1d4ed8");
+    }
+    if (etat.echelle) {
+      etat.pieces.forEach((p, i) => {
+        const c = p.contour;
+        if (c.length < 3) return;
+        const centre = planVersEcran([c.reduce((t, q) => t + q[0], 0) / c.length, c.reduce((t, q) => t + q[1], 0) / c.length]);
+        const surface = formatM(C.surfacePolygone(c) / pxParM() ** 2) + " m²";
+        const couleur = douteux.has("piece" + i) ? "#c2410c" : "#1f2328";
+        etiquette(centre, p.nom || "Sans nom", couleur, [0, -10]);
+        etiquette(centre, surface, couleur, [0, 10]);
+      });
     }
     if (etat.origine) etiquette(planVersEcran(etat.origine), "(0, 0)", "#dc2626", [24, 16]);
     const dernier = etat.points[etat.points.length - 1];
@@ -532,7 +731,7 @@
   function choisirMode(mode) {
     etat.mode = mode;
     etat.points = [];
-    if (mode !== "selection") etat.selection = null;
+    if (mode !== "selection") etat.selection = etat.choix = null;
     rafraichir();
   }
 
@@ -567,10 +766,82 @@
       $("liste-murs").appendChild(tr);
     });
 
+    // Doutes, ouvertures et pièces
+    const doutes = C.doutes(saisieCourante());
+    const douteux = new Set(doutes.map((d) => d.genre + d.index));
+    $("a-verifier").classList.toggle("cache", !etat.lectureAuto);
+    $("a-verifier").classList.toggle("tout-bon", doutes.length === 0);
+    $("nb-doutes").textContent = doutes.length;
+    $("doutes-intro").textContent = doutes.length
+      ? "Le plan a été lu automatiquement. Regardez chaque point : corrigez-le, ou cliquez « C'est bon »."
+      : "Tout est vérifié. Un dernier coup d'œil au plan, puis « Enregistrer logement.json ».";
+    $("liste-doutes").innerHTML = "";
+    for (const d of doutes) {
+      const li = document.createElement("li");
+      li.innerHTML = '<span></span><button class="voir">Voir</button><button class="bon">C\'est bon</button>';
+      li.firstChild.textContent = d.texte;
+      li.querySelector(".voir").addEventListener("click", () => montrer(d));
+      li.querySelector(".bon").addEventListener("click", () => marquerBon(d.genre, d.index));
+      $("liste-doutes").appendChild(li);
+    }
+
+    $("nb-ouvertures").textContent = etat.ouvertures.length;
+    $("liste-ouvertures").innerHTML = "";
+    etat.ouvertures.forEach((o, i) => {
+      const tr = document.createElement("tr");
+      const choisie = etat.choix && etat.choix.genre === "ouverture" && etat.choix.index === i;
+      tr.className = "mur" + (choisie ? " choisi" : "") + (douteux.has("ouverture" + i) ? " doute" : "");
+      tr.innerHTML = `<td></td><td>${C.NOMS_TYPES[o.type]}</td><td></td><td class="nb">${formatM(o.largeur)}</td>`;
+      tr.children[0].textContent = o.id;
+      tr.children[2].textContent = o.mur;
+      tr.addEventListener("click", () => {
+        choisirMode("selection");
+        etat.choix = { genre: "ouverture", index: i };
+        rafraichir();
+      });
+      $("liste-ouvertures").appendChild(tr);
+    });
+
+    $("nb-pieces").textContent = etat.pieces.length;
+    $("liste-pieces").innerHTML = "";
+    etat.pieces.forEach((p, i) => {
+      const tr = document.createElement("tr");
+      const choisie = etat.choix && etat.choix.genre === "piece" && etat.choix.index === i;
+      tr.className = "mur" + (choisie ? " choisi" : "") + (douteux.has("piece" + i) ? " doute" : "");
+      const surface = etat.echelle ? formatM(C.surfacePolygone(p.contour) / pxParM() ** 2) : "—";
+      tr.innerHTML = `<td></td><td class="nb">${surface}</td><td class="nb">${p.surfaceEcrite != null ? formatM(p.surfaceEcrite) : "—"}</td>`;
+      tr.children[0].textContent = p.nom || "Sans nom";
+      tr.addEventListener("click", () => {
+        choisirMode("selection");
+        etat.choix = { genre: "piece", index: i };
+        rafraichir();
+      });
+      $("liste-pieces").appendChild(tr);
+    });
+
     // Détail du mur choisi
     const m = etat.selection != null ? etat.murs[etat.selection] : null;
-    $("selection-vide").classList.toggle("cache", !!m);
+    const o = choisie("ouverture");
+    const piece = choisie("piece");
+    $("selection-vide").classList.toggle("cache", !!(m || o || piece));
     $("selection-detail").classList.toggle("cache", !m);
+    $("ouverture-detail").classList.toggle("cache", !o);
+    $("piece-detail").classList.toggle("cache", !piece);
+    if (o) {
+      $("ouv-titre").textContent = o.id;
+      $("ouv-mur").textContent = `sur le mur ${o.mur}`;
+      $("ouv-type").value = o.type;
+      if (document.activeElement !== $("ouv-largeur")) $("ouv-largeur").value = o.largeur;
+      $("ouv-hauteurs").textContent = `Hauteur ${formatM(o.hauteur)} m` + (o.allege ? `, à ${formatM(o.allege)} m du sol` : "") + " (valeurs courantes, le plan ne les donne pas).";
+      $("ouv-bon").classList.toggle("cache", !douteux.has("ouverture" + etat.choix.index));
+    }
+    if (piece) {
+      if (document.activeElement !== $("piece-nom")) $("piece-nom").value = piece.nom;
+      const mesuree = etat.echelle ? C.surfacePolygone(piece.contour) / pxParM() ** 2 : 0;
+      $("piece-surfaces").textContent = `Surface mesurée : ${formatM(mesuree)} m²` +
+        (piece.surfaceEcrite != null ? ` · écrite sur le plan : ${formatM(piece.surfaceEcrite)} m²` : " · pas de surface écrite sur le plan");
+      $("piece-bon").classList.toggle("cache", !douteux.has("piece" + etat.choix.index));
+    }
     if (m) {
       $("sel-id").value = m.id;
       $("sel-longueur").value = etat.echelle ? (C.distance(m.debut, m.fin) / pxParM()).toFixed(3) : "";
@@ -660,6 +931,7 @@
     } else if (ev.key === "+" || ev.key === "=") zoomer(1.25);
     else if (ev.key === "-") zoomer(0.8);
     else if ((ev.key === "Delete" || ev.key === "Backspace") && etat.selection != null) supprimer();
+    else if ((ev.key === "Delete" || ev.key === "Backspace") && etat.choix) supprimerChoix();
     else if (ev.key === "Shift") {
       etat.maj = true;
       dessiner();
@@ -689,6 +961,17 @@
   $("sel-id").addEventListener("change", renommer);
   $("sel-epaisseur").addEventListener("change", changerEpaisseur);
   $("sel-supprimer").addEventListener("click", supprimer);
+  $("ouv-type").addEventListener("change", changerTypeOuverture);
+  $("ouv-largeur").addEventListener("change", changerLargeurOuverture);
+  $("ouv-bon").addEventListener("click", () => marquerBon("ouverture", etat.choix.index));
+  $("ouv-supprimer").addEventListener("click", supprimerChoix);
+  $("piece-nom").addEventListener("change", renommerPiece);
+  $("piece-bon").addEventListener("click", () => marquerBon("piece", etat.choix.index));
+  $("piece-supprimer").addEventListener("click", supprimerChoix);
+  $("hsp").addEventListener("change", () => {
+    etat.hspVerifiee = true; // l'avoir tapée, c'est l'avoir vérifiée
+    rafraichir();
+  });
   $("enregistrer-logement").addEventListener("click", enregistrerLogement);
   $("enregistrer-saisie").addEventListener("click", enregistrerSaisie);
   $("reprendre").addEventListener("click", () => $("fichier-saisie").click());

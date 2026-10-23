@@ -46,4 +46,5 @@ def test_lire_surface(texte, attendu):
 def test_virgule_perdue():
     """La lecture a perdu la virgule de « 3,57 m² » : on la remet si le contour confirme."""
     assert surface_vraisemblable(357.0, 3.57) == 3.57
-    assert surface_vraisemblable(357.0, 12.0) == 357.0  # rien ne colle : on laisse, ce sera signalé
+    assert surface_vraisemblable(14.0, 12.0) == 14.0  # écart modéré : on garde, ce sera signalé
+    assert surface_vraisemblable(5711.0, 3.57) is None  # sans rapport : texte mal lu, ignoré

@@ -42,7 +42,7 @@ class PieceLue:
     def surfaces_d_accord(self) -> bool | None:
         if self.surface_ecrite is None:
             return None
-        return abs(self.surface_ecrite - self.surface_calculee) <= ACCORD_SURFACE * self.surface_calculee
+        return bool(abs(self.surface_ecrite - self.surface_calculee) <= ACCORD_SURFACE * self.surface_calculee)
 
 
 def lire_pieces(
@@ -117,11 +117,18 @@ def lire_surface(texte: str) -> float | None:
     return float(trouve.group(1).replace(",", ".")) if trouve else None
 
 
-def surface_vraisemblable(lue: float, calculee: float) -> float:
-    """Corrige une virgule perdue par la lecture : 357 pour une pièce de 3,57 m² calculés."""
+def surface_vraisemblable(lue: float, calculee: float) -> float | None:
+    """Corrige une virgule perdue par la lecture : 357 pour une pièce de 3,57 m² calculés.
+
+    Un nombre sans aucun rapport (plus de 5 fois trop grand ou trop petit) est
+    une erreur de lecture du texte : on l'ignore plutôt que de donner une
+    fausse alerte. Un écart plus modéré est gardé : il sera signalé.
+    """
     candidats = [lue, lue / 10, lue / 100]
     meilleur = min(candidats, key=lambda c: abs(c - calculee))
-    return meilleur if abs(meilleur - calculee) <= ACCORD_SURFACE * calculee else lue
+    if abs(meilleur - calculee) <= ACCORD_SURFACE * calculee:
+        return meilleur
+    return lue if calculee / 5 <= lue <= calculee * 5 else None
 
 
 # ---------- Outils ----------
@@ -130,7 +137,7 @@ def surface_vraisemblable(lue: float, calculee: float) -> float:
 def _accrocher(valeur: float, faces: set[float], tolerance: float) -> float:
     proche = min(faces, key=lambda f: abs(f - valeur), default=None)
     v = proche if proche is not None and abs(proche - valeur) <= tolerance else valeur
-    return round(v, 3) + 0.0
+    return round(float(v), 3) + 0.0
 
 
 def _sans_doublons(contour: list[tuple[float, float]]) -> list[tuple[float, float]]:

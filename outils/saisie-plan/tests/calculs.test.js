@@ -106,3 +106,73 @@ test("export refusé tant qu'il manque l'échelle, l'origine ou les murs", () =>
   assert.equal(C.verifierSaisie(vide).length, 3);
   assert.throws(() => C.construireLogement(vide));
 });
+
+// ---------- Vérification d'une lecture automatique (étape 3e) ----------
+
+function lectureAuto() {
+  return {
+    projet_id: "LU",
+    hauteur_sous_plafond: 2.5,
+    echelle: { pxParM: 100, lue: true, sure: true },
+    origine: [210, 760],
+    lecture_auto: true,
+    hsp_lue: true,
+    murs: [{ id: "M1", debut: [200, 770], fin: [1020, 770], epaisseur: 0.2, longueurTapee: null, source: "lecture_auto" }],
+    ouvertures: [
+      { id: "P1", type: "porte", mur: "M1", position: 5.2, largeur: 0.9, hauteur: 2.04, allege: 0, source: "lecture_auto", sure: true, verifie: false },
+    ],
+    pieces: [
+      { id: "piece_1", nom: "Séjour", contour: [[210, 220], [210, 760], [690, 760], [690, 220]], surfaceEcrite: 25.92, accord: true, verifie: false },
+    ],
+  };
+}
+
+test("lecture sans doute : rien à vérifier, logement complet et « vérifié »", () => {
+  const s = lectureAuto();
+  assert.deepEqual(C.doutes(s), []);
+  const l = C.construireLogement(s);
+  assert.equal(l.murs[0].source, "lecture_verifiee");
+  assert.equal(l.ouvertures[0].mur, "M1");
+  assert.equal(l.ouvertures[0].position, 5.2);
+  assert.deepEqual(l.pieces[0].contour, [[0, 5.4], [0, 0], [4.8, 0], [4.8, 5.4]]);
+  assert.equal(l.pieces[0].surface, 25.92);
+});
+
+test("chaque doute bloque l'enregistrement tant qu'il n'est pas levé", () => {
+  const s = lectureAuto();
+  s.echelle.sure = false;
+  s.hsp_lue = false;
+  s.ouvertures[0].sure = false;
+  s.pieces[0].nom = "";
+  assert.deepEqual(C.doutes(s).map((d) => d.genre), ["echelle", "hsp", "ouverture", "piece"]);
+  assert.throws(() => C.construireLogement(s), /4 points à vérifier/);
+  s.echelle.verifiee = true;
+  s.hsp_verifiee = true;
+  s.ouvertures[0].verifie = true;
+  s.pieces[0].verifie = true;
+  assert.deepEqual(C.doutes(s), []);
+  assert.equal(C.construireLogement(s).pieces[0].nom, "Pièce 1"); // nom par défaut
+});
+
+test("une surface écrite qui ne colle pas est signalée, et n'est pas recopiée", () => {
+  const s = lectureAuto();
+  s.pieces[0].surfaceEcrite = 27.5;
+  s.pieces[0].accord = false;
+  assert.match(C.doutes(s)[0].texte, /27,5 m² écrits, 25,92 m² mesurés/);
+  s.pieces[0].verifie = true;
+  assert.equal(C.construireLogement(s).pieces[0].surface, null);
+});
+
+test("une ouverture qui dépasse de son mur est refusée", () => {
+  const s = lectureAuto();
+  s.ouvertures[0].position = 7.8;
+  assert.ok(C.verifierSaisie(s).some((e) => e.includes("dépasse du mur M1")));
+});
+
+test("outils : point dans un polygone, bouts d'une ouverture", () => {
+  const carre = [[0, 0], [10, 0], [10, 10], [0, 10]];
+  assert.ok(C.dansPolygone([5, 5], carre));
+  assert.ok(!C.dansPolygone([15, 5], carre));
+  const [a, b] = C.boutsOuverture({ position: 1, largeur: 0.5 }, { debut: [0, 0], fin: [400, 0] }, 100);
+  assert.deepEqual([a, b], [[100, 0], [150, 0]]);
+});

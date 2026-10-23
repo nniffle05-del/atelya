@@ -15,8 +15,19 @@
   "use strict";
 
   const VERSION_LOGEMENT = "logement/0.1";
-  const VERSION_SAISIE = "saisie/0.1";
+  const VERSION_SAISIE = "saisie/0.2"; // 0.2 : ouvertures et pièces, lecture automatique
+  const VERSIONS_LUES = ["saisie/0.1", "saisie/0.2"];
   const CONFIANCE_CLIC = 0.8; // confiance d'une longueur obtenue en cliquant
+  const CONFIANCE_VERIFIEE = 0.9; // lecture automatique relue et validée par un humain
+  const TOLERANCE_SURFACE = 0.01; // m², la même que le moteur (moteur/logement.py)
+
+  // Hauteurs courantes en France (m) : celles que met la lecture automatique.
+  const HAUTEURS = {
+    porte: { hauteur: 2.04, allege: 0 },
+    porte_fenetre: { hauteur: 2.15, allege: 0 },
+    fenetre: { hauteur: 1.35, allege: 0.95 },
+  };
+  const NOMS_TYPES = { porte: "porte", porte_fenetre: "porte-fenêtre", fenetre: "fenêtre" };
 
   function distance(a, b) {
     return Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -188,6 +199,58 @@
     return Math.abs(total) / 2;
   }
 
+  /** Le point p est-il dans le polygone ? (méthode du rayon) */
+  function dansPolygone(p, points) {
+    let dedans = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const [xi, yi] = points[i];
+      const [xj, yj] = points[j];
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) dedans = !dedans;
+    }
+    return dedans;
+  }
+
+  /** Les deux bouts d'une ouverture, en pixels, à partir de son mur. */
+  function boutsOuverture(o, mur, pxParM) {
+    const u = direction(mur.debut, mur.fin);
+    const a = [mur.debut[0] + u[0] * o.position * pxParM, mur.debut[1] + u[1] * o.position * pxParM];
+    return [a, [a[0] + u[0] * o.largeur * pxParM, a[1] + u[1] * o.largeur * pxParM]];
+  }
+
+  /**
+   * Ce qu'un humain doit encore regarder dans une lecture automatique.
+   * Chaque doute : {genre, index, texte}. La liste se vide au fur et à mesure
+   * des corrections et des « C'est bon ».
+   */
+  function doutes(saisie) {
+    const liste = [];
+    const e = saisie.echelle;
+    if (e && e.lue && !e.sure && !e.verifiee) {
+      liste.push({ genre: "echelle", index: null, texte: "Échelle lue sur une seule cote : à contrôler" });
+    }
+    if (saisie.lecture_auto && !saisie.hsp_lue && !saisie.hsp_verifiee) {
+      liste.push({ genre: "hsp", index: null, texte: "Hauteur sous plafond absente du plan : 2,50 m mis par défaut" });
+    }
+    (saisie.ouvertures || []).forEach((o, i) => {
+      if (o.sure === false && !o.verifie) {
+        liste.push({ genre: "ouverture", index: i, texte: `${o.id} : dessin peu clair, type à confirmer (${NOMS_TYPES[o.type]} ?)` });
+      }
+    });
+    (saisie.pieces || []).forEach((p, i) => {
+      if (p.verifie) return;
+      if (!p.nom) liste.push({ genre: "piece", index: i, texte: `${p.id} : pièce sans nom` });
+      else if (p.accord === false) {
+        const calculee = saisie.echelle ? surfacePolygone(p.contour) / saisie.echelle.pxParM ** 2 : 0;
+        liste.push({
+          genre: "piece",
+          index: i,
+          texte: `${p.nom} : ${String(p.surfaceEcrite).replace(".", ",")} m² écrits, ${calculee.toFixed(2).replace(".", ",")} m² mesurés`,
+        });
+      }
+    });
+    return liste;
+  }
+
   /** Liste des problèmes qui empêchent d'écrire logement.json (vide si tout va bien). */
   function verifierSaisie(saisie) {
     const erreurs = [];
@@ -203,6 +266,15 @@
       if (distance(m.debut, m.fin) === 0) erreurs.push(`le mur ${m.id} a une longueur nulle`);
       if (!(m.epaisseur > 0)) erreurs.push(`le mur ${m.id} a une épaisseur nulle`);
     }
+    for (const o of saisie.ouvertures || []) {
+      const mur = saisie.murs.find((m) => m.id === o.mur);
+      if (!mur) erreurs.push(`l'ouverture ${o.id} est sur un mur qui n'existe plus`);
+      else if (saisie.echelle && o.position + o.largeur > distance(mur.debut, mur.fin) / saisie.echelle.pxParM + 1e-6) {
+        erreurs.push(`l'ouverture ${o.id} dépasse du mur ${mur.id}`);
+      }
+    }
+    const reste = doutes(saisie).length;
+    if (reste) erreurs.push(`il reste ${reste} point${reste > 1 ? "s" : ""} à vérifier (liste « À vérifier »)`);
     return erreurs;
   }
 
@@ -219,24 +291,54 @@
       hauteur_sous_plafond: saisie.hauteur_sous_plafond,
       murs: saisie.murs.map((m) => {
         const tapee = m.longueurTapee != null;
+        const lu = m.source === "lecture_auto";
         return {
           id: m.id,
           debut: versMetres(m.debut, o, s),
           fin: versMetres(m.fin, o, s),
           epaisseur: m.epaisseur,
           statut: tapee ? "mesure" : "estime",
-          source: tapee ? "cote_plan" : "saisie_plan",
-          confiance: tapee ? 1 : CONFIANCE_CLIC,
+          source: tapee ? "cote_plan" : lu ? "lecture_verifiee" : "saisie_plan",
+          confiance: tapee ? 1 : lu ? CONFIANCE_VERIFIEE : CONFIANCE_CLIC,
         };
       }),
-      ouvertures: [],
-      pieces: [],
+      // On n'arrive ici qu'une fois tous les doutes levés : la lecture est « vérifiée ».
+      ouvertures: (saisie.ouvertures || []).map((ou) => ({
+        id: ou.id,
+        type: ou.type,
+        mur: ou.mur,
+        position: arrondi(ou.position),
+        largeur: arrondi(ou.largeur),
+        hauteur: ou.hauteur,
+        allege: ou.allege,
+        statut: "estime",
+        source: ou.source === "lecture_auto" ? "lecture_verifiee" : ou.source || "saisie_plan",
+        confiance: CONFIANCE_VERIFIEE,
+      })),
+      pieces: (saisie.pieces || []).map((p, i) => {
+        const contour = p.contour.map((q) => versMetres(q, o, s));
+        const calculee = surfacePolygone(contour);
+        const ecrite = p.surfaceEcrite;
+        return {
+          id: p.id,
+          nom: p.nom || `Pièce ${i + 1}`,
+          contour,
+          // La surface écrite n'est gardée que si elle colle au contour (le moteur le vérifie aussi).
+          surface: ecrite != null && Math.abs(ecrite - calculee) <= TOLERANCE_SURFACE ? ecrite : null,
+          statut: "estime",
+          source: "lecture_verifiee",
+          confiance: CONFIANCE_VERIFIEE,
+        };
+      }),
     };
   }
 
   const Calculs = {
     VERSION_LOGEMENT,
     VERSION_SAISIE,
+    VERSIONS_LUES,
+    HAUTEURS,
+    NOMS_TYPES,
     distance,
     arrondi,
     echelle,
@@ -250,6 +352,9 @@
     appliquerLongueur,
     coinsDesFaces,
     surfacePolygone,
+    dansPolygone,
+    boutsOuverture,
+    doutes,
     verifierSaisie,
     construireLogement,
   };

@@ -175,6 +175,79 @@ def logement_depuis_plan(plan: PlanLu, projet_id: str, hauteur_sous_plafond: flo
     return logement
 
 
+def proposition_a_verifier(plan: PlanLu, projet_id: str, nom_image: str, hauteur_sous_plafond: float | None = None) -> dict:
+    """La lecture, au format de la page de saisie (outils/saisie-plan), pour qu'un humain la vérifie.
+
+    Tout y est en pixels de l'image redressée, qui est jointe au fichier.
+    Chaque élément douteux est signalé, pour que la page le mette en évidence.
+    """
+    import base64
+
+    logement = logement_depuis_plan(plan, projet_id, hauteur_sous_plafond)
+    s = float(plan.px_par_m)
+    ox, oy = (float(v) for v in plan.lecture.origine)
+
+    def en_pixels(p: list[float]) -> list[float]:
+        return [round(ox + p[0] * s, 2), round(oy - p[1] * s, 2)]
+
+    echelle, controle = {"pxParM": s, "longueur": None, "p1": None, "p2": None, "lue": False, "sure": True}, None
+    if plan.echelle is not None:
+        cotes = sorted(plan.echelle.retenues, key=lambda c: -c.longueur_px)
+        principale = cotes[0]
+        echelle.update(
+            longueur=principale.valeur, p1=_liste(principale.bouts[0]), p2=_liste(principale.bouts[1]),
+            lue=True, sure=plan.echelle.sure, cotes=[c.texte.texte for c in cotes],
+        )
+        # Le contrôle : de préférence une cote dans l'autre sens que la principale.
+        autres = [c for c in cotes[1:] if c.verticale != principale.verticale] or cotes[1:]
+        if autres:
+            c = autres[0]
+            controle = {
+                "p1": _liste(c.bouts[0]), "p2": _liste(c.bouts[1]), "longueur": c.valeur,
+                "ecart": round(float((c.longueur_px / s - c.valeur) / c.valeur * 100), 2),
+            }
+
+    hsp_lue = hauteur_sous_plafond is None and plan.hauteur_sous_plafond is not None
+    _, png = cv2.imencode(".png", plan.lecture.image_redressee)
+    murs = [
+        {
+            "id": m["id"], "debut": en_pixels(m["debut"]), "fin": en_pixels(m["fin"]),
+            "epaisseur": m["epaisseur"], "longueurTapee": None, "source": "lecture_auto",
+        }
+        for m in logement["murs"]
+    ]
+    ouvertures = [
+        {**o, "sure": lue.sure, "verifie": False}
+        for o, lue in zip(logement["ouvertures"], plan.ouvertures)
+    ]
+    pieces = [
+        {
+            "id": p["id"], "nom": lue.nom or "", "contour": [en_pixels(q) for q in p["contour"]],
+            "surfaceEcrite": lue.surface_ecrite, "accord": lue.surfaces_d_accord, "verifie": False,
+        }
+        for p, lue in zip(logement["pieces"], plan.pieces)
+    ]
+    return {
+        "version": "saisie/0.2",
+        "projet_id": projet_id,
+        "hauteur_sous_plafond": logement["hauteur_sous_plafond"],
+        "hsp_lue": hsp_lue or hauteur_sous_plafond is not None,
+        "echelle": echelle,
+        "controle": controle,
+        "origine": [ox, oy],
+        "murs": murs,
+        "ouvertures": ouvertures,
+        "pieces": pieces,
+        "compteur": len(murs),
+        "lecture_auto": True,
+        "image": {"nom": nom_image, "dataUrl": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode()},
+    }
+
+
+def _liste(point) -> list[float]:
+    return [round(float(v), 2) for v in point]
+
+
 def lire_murs(image: np.ndarray, px_par_m: float) -> Lecture:
     """Trouve les murs sur l'image d'un plan (niveaux de gris ou couleur)."""
     gris, angle = redresser(en_gris(image))
@@ -455,6 +528,12 @@ def main() -> None:
     sortie.parent.mkdir(parents=True, exist_ok=True)  # crée le dossier (par exemple sorties/) s'il manque
     sortie.write_text(json.dumps(logement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"→ {args.sortie}")
+
+    # Le même résultat, pour la vérification humaine dans la page de saisie.
+    a_verifier = sortie.with_name(sortie.stem + "-a-verifier.json")
+    proposition = proposition_a_verifier(plan, args.projet, Path(args.plan).name, args.hsp)
+    a_verifier.write_text(json.dumps(proposition, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"→ {a_verifier} (à ouvrir dans la page de saisie pour vérifier)")
 
 if __name__ == "__main__":
     main()

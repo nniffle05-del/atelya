@@ -76,6 +76,17 @@
     .badge.mesure { background: #dcfce7; color: var(--ok); }
     ul.erreurs { margin: 6px 0 0; padding-left: 18px; color: var(--erreur); }
     .cache { display: none; }
+    section.enregistrer { position: sticky; bottom: -12px; background: var(--panneau); padding-bottom: 14px; box-shadow: 0 -6px 8px -6px rgba(0,0,0,.12); }
+    #a-verifier { border: 1px solid #f5c58b; background: #fff8ef; border-radius: 8px; padding: 10px 12px; margin-bottom: 4px; }
+    #a-verifier.tout-bon { border-color: #a7dcb9; background: #f0faf3; }
+    #a-verifier h2 { color: var(--alerte); }
+    #a-verifier.tout-bon h2 { color: var(--ok); }
+    #liste-doutes { list-style: none; margin: 0; padding: 0; }
+    #liste-doutes li { display: flex; gap: 6px; align-items: center; padding: 4px 0; border-top: 1px solid #f3e1c8; }
+    #liste-doutes li span { flex: 1; }
+    #liste-doutes button { border: 1px solid var(--bord); background: var(--panneau); border-radius: 5px; padding: 2px 7px; cursor: pointer; font: inherit; font-size: 12px; }
+    #liste-doutes button.bon { border-color: var(--ok); color: var(--ok); }
+    tr.doute td:first-child::before { content: "● "; color: var(--alerte); }
     kbd { border: 1px solid var(--bord); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; }
   </style>
 </head>
@@ -100,11 +111,18 @@
   <div id="etat"><span id="consigne"></span><span class="espace"></span><span id="position"></span></div>
 
   <aside>
+    <section id="a-verifier" class="cache">
+      <h2>À vérifier (<span id="nb-doutes">0</span>)</h2>
+      <p id="doutes-intro" class="info"></p>
+      <ul id="liste-doutes"></ul>
+    </section>
+
     <!-- Panneaux propres à chaque mode -->
     <section data-panneau="plan">
       <h2>1. Le plan</h2>
       <p>Choisissez l'image du plan (PNG ou JPG). Vous pouvez aussi la glisser sur la zone de gauche.</p>
       <p class="info">Un PDF ? Ouvrez-le dans Aperçu, puis Fichier › Exporter… › format PNG.</p>
+      <p class="info">Le plan a déjà été lu automatiquement ? Ouvrez plutôt le fichier <code>…-a-verifier.json</code> avec le bouton « Ouvrir une lecture ou une saisie… » en bas à droite.</p>
       <input type="file" id="fichier-plan" accept="image/png,image/jpeg,application/pdf">
       <p id="plan-info" class="info"></p>
       <p class="info">Pour se déplacer : glisser avec la souris, ou deux doigts sur le trackpad. Pour zoomer : pincer, ou <kbd>+</kbd> / <kbd>−</kbd>.</p>
@@ -150,8 +168,8 @@
     </section>
 
     <section data-panneau="selection" class="cache">
-      <h2>Modifier un mur</h2>
-      <p id="selection-vide">Cliquez un mur sur le plan, ou dans la liste ci-dessous.</p>
+      <h2>Modifier</h2>
+      <p id="selection-vide">Cliquez un mur, une porte, une fenêtre ou une pièce sur le plan, ou dans les listes ci-dessous.</p>
       <div id="selection-detail" class="cache">
         <label for="sel-id">Nom</label>
         <input type="text" id="sel-id">
@@ -164,6 +182,27 @@
         <label for="sel-epaisseur">Épaisseur (m)</label>
         <input type="number" id="sel-epaisseur" step="0.01" min="0.01">
         <button class="action danger" id="sel-supprimer">Supprimer ce mur</button>
+      </div>
+      <div id="ouverture-detail" class="cache">
+        <p><strong id="ouv-titre"></strong> <span class="info" id="ouv-mur"></span></p>
+        <label for="ouv-type">Type</label>
+        <select id="ouv-type">
+          <option value="porte">Porte</option>
+          <option value="porte_fenetre">Porte-fenêtre</option>
+          <option value="fenetre">Fenêtre</option>
+        </select>
+        <label for="ouv-largeur">Largeur (m)</label>
+        <input type="number" id="ouv-largeur" step="0.01" min="0.1">
+        <p class="info" id="ouv-hauteurs"></p>
+        <button class="action" id="ouv-bon">C'est bon</button>
+        <button class="action danger" id="ouv-supprimer">Supprimer cette ouverture</button>
+      </div>
+      <div id="piece-detail" class="cache">
+        <label for="piece-nom">Nom de la pièce</label>
+        <input type="text" id="piece-nom" placeholder="ex. Chambre">
+        <p class="info" id="piece-surfaces"></p>
+        <button class="action" id="piece-bon">C'est bon</button>
+        <button class="action danger" id="piece-supprimer">Supprimer cette pièce</button>
       </div>
     </section>
 
@@ -185,10 +224,26 @@
     </section>
 
     <section>
+      <h2>Portes et fenêtres (<span id="nb-ouvertures">0</span>)</h2>
+      <table>
+        <thead><tr><th>Nom</th><th>Type</th><th>Mur</th><th class="nb">Largeur</th></tr></thead>
+        <tbody id="liste-ouvertures"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Pièces (<span id="nb-pieces">0</span>)</h2>
+      <table>
+        <thead><tr><th>Nom</th><th class="nb">Surface</th><th class="nb">Écrite</th></tr></thead>
+        <tbody id="liste-pieces"></tbody>
+      </table>
+    </section>
+
+    <section class="enregistrer">
       <h2>Enregistrer</h2>
       <button class="action" id="enregistrer-logement">Enregistrer logement.json</button>
       <button class="action secondaire" id="enregistrer-saisie">Enregistrer la saisie (pour reprendre)</button>
-      <button class="action secondaire" id="reprendre">Reprendre une saisie…</button>
+      <button class="action secondaire" id="reprendre">Ouvrir une lecture ou une saisie…</button>
       <input type="file" id="fichier-saisie" accept="application/json,.json" class="cache">
       <div id="messages"></div>
     </section>
