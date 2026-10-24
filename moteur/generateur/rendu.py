@@ -11,7 +11,7 @@ dernier et ne déplacent aucun pixel.
 Sorties pour un niveau (voir `Rendu`) :
 
 - `plan`              : l'image RGB du plan, selon le style ;
-- `plan_sans_mobilier`: la même sans les meubles (seulement si le style en dessine) ;
+- `plan_sans_mobilier`: la même sans les meubles mais avec l'escalier (seulement si le style dessine des meubles) ;
 - `masque_semantique` : une classe par pixel (voir annotations.CLASSES) ;
 - `masque_pieces`     : l'identifiant de pièce par pixel (0 = aucune) ;
 - `masque_elements`   : l'identifiant de mur ou d'ouverture par pixel (0 = aucun) ;
@@ -430,14 +430,19 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
     rng = random.Random(f"rendu-{log.graine}-{niveau.index}-{graine_style}")
     cadre = _cadre_des_murs(niveau)
     rep = Repere(cadre, style, rng)
-    meubles = meubler_niveau(niveau, log.graine) if style.mobilier else {}
-    d = _Dessin(log, niveau, style, rep, meubles, avec_mobilier=bool(meubles))
+    tous = meubler_niveau(niveau, log.graine)
+    # Les marches d'un escalier ne sont pas du mobilier : un plan les montre toujours, et la carte de
+    # hauteur doit toujours les porter. Un style « sans mobilier » garde donc l'escalier.
+    escaliers = {pid: [m for m in lst if m.forme == "marches"] for pid, lst in tous.items()}
+    escaliers = {pid: lst for pid, lst in escaliers.items() if lst}
+    meubles = tous if style.mobilier else escaliers
+    d = _Dessin(log, niveau, style, rep, meubles, avec_mobilier=True)
     d.tout()
     images: dict[str, np.ndarray] = {}
     plan = rep.deformer(np.asarray(d.image), True, style.fond)
     images["plan"] = salir(plan, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"))
-    if meubles:
-        d2 = _Dessin(log, niveau, style, rep, meubles, avec_mobilier=False)
+    if style.mobilier:
+        d2 = _Dessin(log, niveau, style, rep, escaliers, avec_mobilier=True)
         d2.tout()
         nu = rep.deformer(np.asarray(d2.image), True, style.fond)
         images["plan_sans_mobilier"] = salir(nu, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"))

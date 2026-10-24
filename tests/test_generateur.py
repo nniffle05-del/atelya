@@ -119,6 +119,15 @@ def test_duplex_coherents():
         assert any(o.sous_type == "porte_entree" for o in log.niveaux[0].ouvertures), log.graine
         assert not any(o.sous_type == "porte_entree" for o in log.niveaux[1].ouvertures), log.graine
         assert log.niveaux[1].z_sol > log.niveaux[0].z_sol
+    # Même sans mobilier, l'escalier est dessiné et ses marches montent dans la carte de hauteur.
+    log = duplex[0]
+    style = style_au_hasard(random.Random(1), diversite=0)
+    style.mobilier = False
+    rendu = rendre(log, log.niveaux[0], style)
+    escalier = next(p for p in rendu.annotations["pieces"] if p["classe"] == CLASSES["escalier"])
+    hauteurs = rendu.images["hauteur"][rendu.images["masque_pieces"] == escalier["valeur_masque"]]
+    assert hauteurs.min() < 400 and hauteurs.max() >= 1000, log.graine  # première marche en bas, plan de coupe en haut
+    assert any(m["type"] == "escalier" for m in rendu.annotations["mobilier"])
 
 
 def test_reglages_surcharges():
