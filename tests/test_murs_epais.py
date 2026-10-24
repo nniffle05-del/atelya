@@ -46,3 +46,32 @@ def test_murs_exterieurs_epais_lus(epaisseur):
     assert note.murs_trouves == note.murs_vrais, note.remarques
     assert note.ecart_dimensions <= 0.01, note.remarques
     assert note.pieces_trouvees == 2, note.remarques
+
+
+def test_grande_baie_dans_un_mur_epais():
+    """Une baie de 3,20 m dans un mur de 45 cm : le mur reste entier, la baie est une fenêtre."""
+    from moteur.lecture_plan import lire_plan, logement_depuis_plan
+
+    vrai = _logement(0.45)
+    vrai["ouvertures"].append(
+        {"id": "F1", "type": "fenetre", "mur": "M_sud", "position": 0.8, "largeur": 3.2, "hauteur": 1.35,
+         "allege": 0.95, "statut": "mesure", "source": "test"})
+    image = dessiner_plan(vrai, Style(px_par_m=100))
+    lu = logement_depuis_plan(lire_plan(image, px_par_m=100), "TEST")
+    note = corriger(lu, vrai)
+    assert note.murs_trouves == note.murs_vrais and note.murs_inventes == 0, note.remarques
+    assert note.ouvertures_justes == 2, note.remarques
+    assert note.ecart_dimensions <= 0.01, note.remarques
+
+
+def test_poteau_contre_le_mur_du_bas_ne_decale_pas_le_logement():
+    """Un poteau plus épais que le mur extérieur, collé dessous : l'origine reste le coin intérieur."""
+    from moteur.lecture_plan import lire_plan, logement_depuis_plan
+
+    vrai = _logement(0.30)
+    vrai["murs"].append({"id": "Poteau", "debut": [2.0, -0.05], "fin": [2.6, -0.05], "epaisseur": 0.50,
+                         "statut": "mesure", "source": "test"})
+    image = dessiner_plan(vrai, Style(px_par_m=100))
+    lu = logement_depuis_plan(lire_plan(image, px_par_m=100), "TEST")
+    note = corriger(lu, vrai)
+    assert note.murs_justes >= note.murs_vrais - 1, note.remarques  # le poteau lui-même peut être imprécis

@@ -45,6 +45,10 @@ TRAIT_FIN_MAX = 0.045  # un trait plus fin que 4,5 cm sur le plan n'est pas un m
 MORCEAU_MIN = 0.32  # longueur minimale d'un morceau de mur
 EPAISSEUR_MAX = 0.70  # épaisseur maximale d'un mur (un mur extérieur isolé fait couramment 40 à 55 cm)
 OUVERTURE_MAX = 2.50  # au-delà, deux morceaux alignés sont deux murs distincts
+BAIE_MAX = 4.50  # dans un mur épais (extérieur), une baie vitrée suivie d'une porte-fenêtre peut dépasser 2,50 m
+BAIE_COUVERTE = 0.9  # part du trou où l'on voit le vitrage d'une grande baie
+MUR_EPAIS_MIN = 0.15  # à partir de cette épaisseur, un mur est traité comme un mur extérieur ou porteur
+BORD_ORIGINE = 0.05  # les murs du bord du logement dépassent tous à 5 cm près
 TOLERANCE = 0.03  # écart admis entre deux morceaux « alignés »
 INCLINAISON_MAX = 5.0  # degrés : inclinaison maximale corrigée
 SAUT_DE_FACE = 0.02  # une face qui se décale de plus de 2 cm : le mur change d'épaisseur
@@ -290,7 +294,9 @@ def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) ->
     """Trouve les murs sur un plan déjà redressé."""
     noir = _traits_epais(gris, px_par_m)
     bandes = _bandes(noir, px_par_m, horizontal=True) + _bandes(noir, px_par_m, horizontal=False)
-    bandes, trous = _recoller(bandes, px_par_m)
+    _, traits = cv2.threshold(gris, 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    bandes, trous = _recoller(bandes, px_par_m, traits)
+    bandes, trous = _sans_morceaux_englobes(bandes, trous, px_par_m)
     bandes, trous = _garder_le_logement(bandes, trous, px_par_m)
     trous += _prolonger_jusqu_aux_murs(bandes, noir, px_par_m)
     if not bandes:
@@ -301,8 +307,14 @@ def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) ->
     horizontales = [b for b in bandes if b.horizontal]
     if not verticales or not horizontales:
         raise ValueError("impossible de trouver le contour du logement")
-    gauche = min(verticales, key=lambda b: b.bord1)
-    bas = max(horizontales, key=lambda b: b.bord2)
+    # Un poteau ou une gaine collé au mur extérieur dépasse autant que lui, mais
+    # sa face intérieure est plus loin : parmi les murs du bord, on prend la face
+    # intérieure la plus proche de l'extérieur.
+    bord = BORD_ORIGINE * px_par_m
+    x_min = min(b.bord1 for b in verticales)
+    y_max = max(b.bord2 for b in horizontales)
+    gauche = min((b for b in verticales if b.bord1 <= x_min + bord), key=lambda b: b.bord2)
+    bas = max((b for b in horizontales if b.bord2 >= y_max - bord), key=lambda b: b.bord1)
     origine = (gauche.bord2, bas.bord1)  # faces intérieures du mur de gauche et du mur du bas
     return Lecture(gris, angle, murs, origine, trous)
 
@@ -486,8 +498,15 @@ def _morceaux_d_epaisseur_constante(trait: np.ndarray, px_par_m: float) -> list[
     return resultat
 
 
-def _recoller(bandes: list[Bande], px_par_m: float) -> tuple[list[Bande], list[tuple[int, float, float]]]:
-    """Recolle les morceaux alignés d'un même mur ; les trous entre eux sont des ouvertures possibles."""
+def _recoller(
+    bandes: list[Bande], px_par_m: float, traits: np.ndarray | None = None
+) -> tuple[list[Bande], list[tuple[int, float, float]]]:
+    """Recolle les morceaux alignés d'un même mur ; les trous entre eux sont des ouvertures possibles.
+
+    Un trou plus large que OUVERTURE_MAX n'est recollé que dans un mur épais,
+    et seulement si un vitrage (trait fin le long du mur) le traverse presque
+    entièrement : c'est alors une grande baie, pas deux murs distincts.
+    """
     tol = TOLERANCE * px_par_m
     resultat: list[Bande] = []
     trous: list[tuple[int, float, float]] = []
@@ -498,7 +517,11 @@ def _recoller(bandes: list[Bande], px_par_m: float) -> tuple[list[Bande], list[t
             alignes = [b for b in restants if abs(b.axe - mur.axe) <= tol and abs(b.epaisseur - mur.epaisseur) <= tol]
             for b in sorted(alignes, key=lambda b: b.debut):
                 trou = b.debut - mur.fin
-                if trou > OUVERTURE_MAX * px_par_m:
+                if trou > OUVERTURE_MAX * px_par_m and not (
+                    trou <= BAIE_MAX * px_par_m
+                    and min(mur.epaisseur, b.epaisseur) >= MUR_EPAIS_MIN * px_par_m
+                    and _vitrage_continu(traits, mur, b)
+                ):
                     continue
                 if trou > 0:
                     trous.append((len(resultat), mur.fin, b.debut))
@@ -507,6 +530,41 @@ def _recoller(bandes: list[Bande], px_par_m: float) -> tuple[list[Bande], list[t
                 restants.remove(b)
             resultat.append(mur)
     return resultat, trous
+
+
+def _vitrage_continu(traits: np.ndarray | None, mur: Bande, b: Bande) -> bool:
+    """Le trou entre deux morceaux d'un mur est-il traversé par un dessin presque sans coupure ?"""
+    if traits is None:
+        return False
+    t = traits if mur.horizontal else traits.T
+    r0, r1 = round(max(mur.bord1, b.bord1)), round(min(mur.bord2, b.bord2)) + 1
+    zone = t[r0:r1, round(mur.fin) + 2:round(b.debut) - 1]
+    return zone.size > 0 and zone.max(axis=0).mean() >= BAIE_COUVERTE
+
+
+def _rectangle(b: Bande) -> tuple[float, float, float, float]:
+    return (b.debut, b.bord1, b.fin, b.bord2) if b.horizontal else (b.bord1, b.debut, b.bord2, b.fin)
+
+
+def _sans_morceaux_englobes(
+    bandes: list[Bande], trous: list[tuple[int, float, float]], px_par_m: float
+) -> tuple[list[Bande], list[tuple[int, float, float]]]:
+    """Enlève les petits morceaux tout entiers contenus dans un autre mur.
+
+    Le bout d'un mur épais, au bord d'une baie, se lit aussi comme un petit
+    mur en travers ; une fois la baie recollée, il est à l'intérieur du mur.
+    """
+    tol = TOLERANCE * px_par_m
+
+    def dedans(b: Bande, a: Bande) -> bool:
+        bx0, by0, bx1, by1 = _rectangle(b)
+        ax0, ay0, ax1, ay1 = _rectangle(a)
+        return ax0 - tol <= bx0 and bx1 <= ax1 + tol and ay0 - tol <= by0 and by1 <= ay1 + tol
+
+    garde = [i for i, b in enumerate(bandes)
+             if not any(j != i and a.fin - a.debut > b.fin - b.debut and dedans(b, a) for j, a in enumerate(bandes))]
+    nouveaux = {i: n for n, i in enumerate(garde)}
+    return [bandes[i] for i in garde], [(nouveaux[i], a, b) for i, a, b in trous if i in nouveaux]
 
 
 def _garder_le_logement(
