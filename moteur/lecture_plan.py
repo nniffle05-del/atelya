@@ -51,6 +51,10 @@ BAIE_COUVERTE = 0.9  # part du trou où l'on voit le vitrage d'une grande baie
 MUR_EPAIS_MIN = 0.15  # à partir de cette épaisseur, un mur est traité comme un mur extérieur ou porteur
 PASSAGE_MAX = 1.20  # deux groupes de murs séparés de moins qu'une porte font partie du même logement
 GROUPE_MIN = 1.50  # longueur totale de murs d'un groupe qu'on rattache à travers un passage
+VITRAGE_BOUT_MIN = 0.40  # un vitrage qui prolonge le bout libre d'un mur fait au moins 40 cm
+RESSAUT_MIN = 0.08  # un ressaut (petit bout de mur collé dehors contre un mur épais) dépasse d'au moins 8 cm
+RESSAUT_MAX = 0.80  # et ne dépasse pas 80 cm, ni en saillie ni en largeur (au-delà, ce serait un mur lu à part)
+RESSAUT_PLEIN = 0.90  # part de son rectangle qu'il remplit (une tache ronde en remplit moins)
 BORD_ORIGINE = 0.05  # les murs du bord du logement dépassent tous à 5 cm près
 TOLERANCE = 0.03  # écart admis entre deux morceaux « alignés »
 INCLINAISON_MAX = 5.0  # degrés : inclinaison maximale corrigée
@@ -302,6 +306,8 @@ def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) ->
     bandes, trous = _recoller(bandes, px_par_m, traits)
     bandes, trous = _sans_morceaux_englobes(bandes, trous, px_par_m)
     bandes, trous = _garder_le_logement(bandes, trous, px_par_m)
+    bandes += _ressauts(noir, bandes, px_par_m)
+    trous += _vitrages_au_bout(bandes, traits, noir, px_par_m)
     trous += _prolonger_jusqu_aux_murs(bandes, noir, px_par_m)
     if not bandes:
         raise ValueError("aucun mur trouvé sur ce plan")
@@ -698,6 +704,122 @@ def _garder_le_logement(
         [bandes[i] for i in nouveaux],
         [(nouveaux[i], a, b) for i, a, b in trous if i in nouveaux],
     )
+
+
+def _ressauts(noir: np.ndarray, bandes: list[Bande], px_par_m: float) -> list[Bande]:
+    """Les petits bouts de mur collés à l'extérieur d'un mur épais, qui dépassent du logement.
+
+    Au coin d'un logement, ou au bout d'un mur mitoyen, le mur extérieur porte
+    souvent un ressaut : un bloc de mur plein de 10 à 50 cm qui dépasse vers
+    l'extérieur (bout du mur du voisin, poteau, about de balcon). Il est trop
+    court pour être lu comme un mur, mais il fait partie des dimensions hors
+    tout du logement : sans lui, la façade est lue 20 à 40 cm trop courte.
+    On le lit comme un petit mur perpendiculaire, de l'axe du mur épais
+    jusqu'au bout du ressaut. Seul ce qui dépasse du cadre des murs déjà lus
+    compte : un bloc à l'intérieur (gaine, placard) ne change pas les
+    dimensions et serait plus souvent un meuble ou une tache.
+    """
+    if not bandes:
+        return []
+    tol = TOLERANCE * px_par_m
+    rectangles = [_rectangle(b) for b in bandes]
+    cadre = (min(r[0] for r in rectangles), min(r[1] for r in rectangles),
+             max(r[2] for r in rectangles), max(r[3] for r in rectangles))
+    deja = np.zeros(noir.shape, dtype=np.uint8)
+    for x0, y0, x1, y1 in rectangles:
+        deja[max(0, round(y0)):round(y1) + 1, max(0, round(x0)):round(x1) + 1] = 1
+    mini, maxi = RESSAUT_MIN * px_par_m, RESSAUT_MAX * px_par_m
+    # L'ouverture efface les liserés de mur laissés hors des rectangles (face qui ondule d'un pixel).
+    k = max(3, round(mini))
+    reste = cv2.morphologyEx(np.where(deja > 0, 0, noir).astype(np.uint8), cv2.MORPH_OPEN, np.ones((k, k), np.uint8))
+    n, _, stats, _ = cv2.connectedComponentsWithStats(reste, connectivity=4)
+    nouveaux: list[Bande] = []
+    for x, y, w, h, surface in stats[1:]:
+        if min(w, h) < mini or max(w, h) > maxi or surface < RESSAUT_PLEIN * w * h:
+            continue  # trop petit, trop grand, ou pas un bloc plein
+        x1, y1 = x + w, y + h
+        if not (x < cadre[0] - tol or x1 > cadre[2] + tol or y < cadre[1] - tol or y1 > cadre[3] + tol):
+            continue  # ne dépasse pas du logement
+        for b in bandes:
+            if b.epaisseur < MUR_EPAIS_MIN * px_par_m:
+                continue  # seulement contre un mur épais (extérieur ou porteur)
+            debut, fin_, bord1, bord2 = (x, x1, y, y1) if b.horizontal else (y, y1, x, x1)
+            if debut < b.debut - tol or fin_ > b.fin + tol:
+                continue  # pas tout entier le long de ce mur
+            if abs(bord1 - b.bord2) <= tol:  # collé à sa face « 2 » (dessous ou droite)
+                bout = bord2
+            elif abs(bord2 - b.bord1) <= tol:  # collé à sa face « 1 » (dessus ou gauche)
+                bout = bord1
+            else:
+                continue
+            a, z = sorted((b.axe, float(bout)))
+            nouveaux.append(Bande(not b.horizontal, a, z, float(debut), float(fin_)))
+            break
+    return nouveaux
+
+
+def _vitrages_au_bout(bandes: list[Bande], traits: np.ndarray, noir: np.ndarray, px_par_m: float) -> list[tuple[int, float, float]]:
+    """Prolonge un mur épais dont le bout libre se continue par une fenêtre (fenêtre d'angle, bow-window).
+
+    D'habitude, une fenêtre est posée entre deux morceaux de mur, et le recollage
+    la retrouve. Mais une fenêtre d'angle part du bout du mur et va jusqu'au coin
+    sans morceau de mur après elle : le mur semble s'arrêter net, et le logement
+    est lu trop court de toute la largeur de la fenêtre. On reconnaît la fenêtre
+    à son cadre dessiné dans le prolongement du mur : un trait fin le long de
+    chacune des deux faces, sans coupure. Le mur est prolongé jusqu'au bout du
+    cadre, et la fenêtre devient une ouverture possible. Si un mur reprend juste
+    après le cadre, c'est une fenêtre ordinaire entre deux murs : on n'y touche
+    pas. Modifie les bandes ; renvoie les nouveaux trous.
+    """
+    tol = TOLERANCE * px_par_m
+    nouveaux: list[tuple[int, float, float]] = []
+    for n, mur in enumerate(bandes):
+        if mur.epaisseur < MUR_EPAIS_MIN * px_par_m:
+            continue
+        t = traits if mur.horizontal else traits.T
+        plein = noir if mur.horizontal else noir.T
+        r0, r1 = round(mur.bord1), round(mur.bord2)
+        if r0 < 0 or r1 >= t.shape[0]:
+            continue
+        # Le cadre de la fenêtre : un trait fin sur chaque face (à 2 pixels près), et du blanc entre les deux
+        # (sinon, c'est un autre mur, plein, dans le prolongement).
+        face1 = t[max(0, r0 - 2):r0 + 3].max(axis=0)
+        face2 = t[r1 - 2:r1 + 3].max(axis=0)
+        traits_des_faces = (face1 > 0) & (face2 > 0)
+        cadre = traits_des_faces & (t[r0 + 3:r1 - 2].mean(axis=0) < 0.5)
+        for cote in (-1, 1):
+            bout = mur.debut if cote < 0 else mur.fin
+            if any(_touche_le_bout(mur, b, bout, cote, tol) for b in bandes if b is not mur):
+                continue  # le mur s'arrête sur un autre mur : ce n'est pas un bout libre
+            c = round(bout) + cote * 2
+            longueur = 0
+            while 0 <= c < cadre.size and cadre[c] and longueur <= BAIE_MAX * px_par_m:
+                c += cote
+                longueur += 1
+            if not VITRAGE_BOUT_MIN * px_par_m <= longueur <= BAIE_MAX * px_par_m:
+                continue
+            for _ in range(round(tol)):  # le trait qui ferme le cadre, en travers
+                if not (0 <= c < cadre.size and traits_des_faces[c]):
+                    break
+                c += cote
+            apres = plein[r0:r1 + 1, max(0, min(c, c + cote * round(3 * tol))):max(c, c + cote * round(3 * tol)) + 1]
+            if apres.size and (apres > 0).mean() >= 0.5:
+                continue  # un mur reprend après la fenêtre : le bout n'était pas libre
+            nouveau_bout = float(c - cote)
+            if cote > 0:
+                nouveaux.append((n, mur.fin, nouveau_bout))
+                mur.fin = nouveau_bout
+            else:
+                nouveaux.append((n, nouveau_bout, mur.debut))
+                mur.debut = nouveau_bout
+    return nouveaux
+
+
+def _touche_le_bout(mur: Bande, autre: Bande, bout: float, cote: int, tol: float) -> bool:
+    """Un autre mur commence-t-il au bout du mur (en travers, ou dans son prolongement) ?"""
+    if autre.horizontal != mur.horizontal:
+        return autre.debut - tol <= mur.axe <= autre.fin + tol and autre.bord1 - tol <= bout + cote * tol <= autre.bord2 + tol
+    return abs(autre.axe - mur.axe) <= tol and autre.debut - tol <= bout + cote * 2 * tol <= autre.fin + tol
 
 
 def _prolonger_jusqu_aux_murs(bandes: list[Bande], noir: np.ndarray, px_par_m: float) -> list[tuple[int, float, float]]:

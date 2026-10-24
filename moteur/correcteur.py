@@ -7,8 +7,8 @@ numérote M1, M2… à sa façon), puis il compte :
 
 - les murs trouvés, ceux qui sont justes (bouts et épaisseur à quelques
   centimètres près), ceux qui manquent et ceux qui sont inventés ;
-- l'écart des dimensions générales du logement (une erreur d'échelle se
-  voit ici) ;
+- l'écart des dimensions générales du logement, hors tout, c'est-à-dire
+  d'une face extérieure à l'autre (une erreur d'échelle se voit ici) ;
 - les portes et fenêtres trouvées, de bon type et de bonne largeur ;
 - les pièces trouvées, de bonne surface et de bon nom ;
 - la hauteur sous plafond.
@@ -42,6 +42,7 @@ OUVERTURE_LARGEUR_MAX = 0.05
 SURFACE_MAX = 0.02  # 2 % : le critère de l'étape 3
 DIMENSIONS_MAX = 0.01  # 1 % sur la largeur et la profondeur du logement
 HSP_MAX = 0.01
+ANGLE_COMMUN = 0.03  # deux bouts de mur à moins de 3 cm l'un de l'autre forment un angle
 CORRECTIONS_VERT_MAX = 3  # hypothèse : au plus 3 corrections tiennent en 2 minutes
 
 Point = tuple[float, float]
@@ -184,14 +185,43 @@ def _ecart_bouts(lu: dict, vrai: dict) -> float:
 
 
 def _ecart_dimensions(murs_lus: list[dict], murs_vrais: list[dict]) -> float:
-    """Écart relatif de la largeur et de la profondeur hors tout du logement (le plus grand des deux)."""
+    """Écart relatif de la largeur et de la profondeur hors tout du logement (le plus grand des deux).
+
+    Hors tout : d'une face extérieure à l'autre, et non d'un axe de mur à l'autre.
+    Un même angle peut se dessiner de deux façons (le mur continue jusqu'au coin,
+    ou un petit bout de mur vient le fermer) : leurs axes ne s'arrêtent pas au même
+    endroit, mais leurs faces extérieures, si. C'est elles qu'on mesure sur place.
+    """
     def cadre(murs: list[dict]) -> tuple[float, float]:
-        xs = [p[0] for m in murs for p in (m["debut"], m["fin"])]
-        ys = [p[1] for m in murs for p in (m["debut"], m["fin"])]
-        return max(xs) - min(xs), max(ys) - min(ys)
+        rectangles = [_rectangle_du_mur(m, murs) for m in murs]
+        return (max(r[2] for r in rectangles) - min(r[0] for r in rectangles),
+                max(r[3] for r in rectangles) - min(r[1] for r in rectangles))
 
     (lx, ly), (vx, vy) = cadre(murs_lus), cadre(murs_vrais)
     return float(max(abs(lx - vx) / vx, abs(ly - vy) / vy))  # float : les coordonnées lues peuvent venir de numpy
+
+
+def _rectangle_du_mur(mur: dict, murs: list[dict]) -> tuple[float, float, float, float]:
+    """Le rectangle (x0, y0, x1, y1) occupé par le mur, rallongé dans les angles qu'il partage avec un autre mur.
+
+    Dans un angle, les deux axes s'arrêtent au même point : chaque mur est rallongé
+    de la demi-épaisseur de l'autre, pour aller jusqu'au coin extérieur.
+    """
+    (ax, ay), (bx, by) = mur["debut"], mur["fin"]
+    longueur = math.dist((ax, ay), (bx, by))
+    if longueur == 0:
+        return ax, ay, ax, ay
+    ux, uy = (bx - ax) / longueur, (by - ay) / longueur
+    rallonges = [
+        max((autre["epaisseur"] / 2 for autre in murs if autre is not mur
+             and any(math.dist(bout, p) <= ANGLE_COMMUN for p in (autre["debut"], autre["fin"]))), default=0.0)
+        for bout in (mur["debut"], mur["fin"])
+    ]
+    ax, ay = ax - ux * rallonges[0], ay - uy * rallonges[0]
+    bx, by = bx + ux * rallonges[1], by + uy * rallonges[1]
+    nx, ny = -uy * mur["epaisseur"] / 2, ux * mur["epaisseur"] / 2
+    xs, ys = (ax + nx, ax - nx, bx + nx, bx - nx), (ay + ny, ay - ny, by + ny, by - ny)
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 # --- Ouvertures ---------------------------------------------------------
