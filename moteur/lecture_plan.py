@@ -47,6 +47,9 @@ CLOISON_MIN = 0.06  # épaisseur minimale du mur voisin (une cloison fait 7 cm e
 EPAISSEUR_MAX = 0.70  # épaisseur maximale d'un mur (un mur extérieur isolé fait couramment 40 à 55 cm)
 OUVERTURE_MAX = 2.50  # au-delà, deux morceaux alignés sont deux murs distincts
 BAIE_MAX = 4.50  # dans un mur épais (extérieur), une baie vitrée suivie d'une porte-fenêtre peut dépasser 2,50 m
+MARGE_BATTANT = 0.04  # bande collée à la face du mur qu'on ne regarde pas (bord flou du mur)
+PROFONDEUR_ARC_MAX = 1.20  # on cherche l'arc d'une porte jusqu'à 1,20 m du mur
+ARC_COUVERT = 0.8  # l'arc passe devant au moins 80 % du vide
 BAIE_COUVERTE = 0.9  # part du trou où l'on voit le vitrage d'une grande baie
 MUR_EPAIS_MIN = 0.15  # à partir de cette épaisseur, un mur est traité comme un mur extérieur ou porteur
 PASSAGE_MAX = 1.20  # deux groupes de murs séparés de moins qu'une porte font partie du même logement
@@ -302,13 +305,14 @@ def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) ->
     noir = _traits_epais(gris, px_par_m)
     bandes = _bandes(noir, px_par_m, horizontal=True) + _bandes(noir, px_par_m, horizontal=False)
     _, traits = cv2.threshold(gris, 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    fins = _traits_fins(traits, noir)
     bandes += _bouts_alignes(noir, traits, bandes, px_par_m)
     bandes, trous = _recoller(bandes, px_par_m, traits)
     bandes, trous = _sans_morceaux_englobes(bandes, trous, px_par_m)
     bandes, trous = _garder_le_logement(bandes, trous, px_par_m)
     bandes += _ressauts(noir, bandes, px_par_m)
     trous += _vitrages_au_bout(bandes, traits, noir, px_par_m)
-    trous += _prolonger_jusqu_aux_murs(bandes, noir, px_par_m)
+    trous += _prolonger_jusqu_aux_murs(bandes, noir, traits, fins, px_par_m)
     if not bandes:
         raise ValueError("aucun mur trouvé sur ce plan")
     murs = [_regler_les_bouts(b, bandes, px_par_m) for b in bandes]
@@ -625,6 +629,56 @@ def _vitrage_continu(traits: np.ndarray | None, mur: Bande, b: Bande) -> bool:
     return zone.size > 0 and zone.max(axis=0).mean() >= BAIE_COUVERTE
 
 
+def _traits_fins(traits: np.ndarray, noir: np.ndarray) -> np.ndarray:
+    """Les traits fins seulement (battants de porte, cadres de fenêtre) : les traits sans les murs."""
+    fins = traits.copy()
+    fins[cv2.dilate(noir, np.ones((5, 5), np.uint8)) > 0] = 0  # murs un peu élargis, pour leurs bords flous
+    return fins
+
+
+def _ouverture_dessinee(
+    traits: np.ndarray, fins: np.ndarray, horizontal: bool, debut: float, fin: float,
+    bord1: float, bord2: float, px_par_m: float, vitrages_min: int = 1,
+) -> bool:
+    """Une porte (son battant) ou une fenêtre (son cadre, le long du mur) est-elle dessinée dans ce vide ?"""
+    from moteur.lecture_ouvertures import _a_un_battant, _traits_le_long
+
+    t, f = (traits, fins) if horizontal else (traits.T, fins.T)
+    return (_a_un_battant(f, debut, fin, bord1, bord2, px_par_m)
+            or _traits_le_long(t, debut, fin, bord1, bord2) >= vitrages_min
+            or _battant_dans_le_vide(f, debut, fin, bord1, bord2, px_par_m))
+
+
+def _battant_dans_le_vide(
+    fins: np.ndarray, debut: float, fin: float, bord1: float, bord2: float, px_par_m: float
+) -> bool:
+    """Le battant d'une porte balaie-t-il le vide, d'un côté du mur ou de l'autre ?
+
+    Le battant ne part pas toujours d'un bord du vide (un petit bout de mur non
+    lu l'élargit), et il est souvent dessiné ouvert à plat contre le mur voisin,
+    où il se confond avec lui. Mais l'arc qu'il décrit, lui, passe devant tout le
+    vide. Dans un passage ouvert, il n'y a rien devant. On regarde donc, de
+    chaque côté du mur, une bande aussi profonde que le vide est large : si des
+    traits fins passent devant presque tout le vide (ARC_COUVERT), c'est une porte.
+    Les traits droits parallèles au mur (ligne de cote) n'y comptent pas.
+    """
+    h, w = fins.shape
+    c0, c1 = max(0, round(debut) + 2), min(w, round(fin) - 1)
+    if c1 - c0 < 3:
+        return False
+    marge = max(2, round(MARGE_BATTANT * px_par_m))
+    profondeur = min(fin - debut, PROFONDEUR_ARC_MAX * px_par_m)
+    for r0, r1 in ((bord1 - marge - profondeur, bord1 - marge), (bord2 + marge, bord2 + marge + profondeur)):
+        r0, r1 = max(0, round(r0)), min(h, round(r1))
+        if r1 - r0 < 3:
+            continue
+        zone = fins[r0:r1, c0:c1] > 0
+        zone[zone.mean(axis=1) >= 0.5] = False  # un trait droit le long du mur (ligne de cote, vitrage) n'est pas un arc
+        if zone.any(axis=0).mean() >= ARC_COUVERT:
+            return True
+    return False
+
+
 def _rectangle(b: Bande) -> tuple[float, float, float, float]:
     return (b.debut, b.bord1, b.fin, b.bord2) if b.horizontal else (b.bord1, b.debut, b.bord2, b.fin)
 
@@ -822,7 +876,9 @@ def _touche_le_bout(mur: Bande, autre: Bande, bout: float, cote: int, tol: float
     return abs(autre.axe - mur.axe) <= tol and autre.debut - tol <= bout + cote * 2 * tol <= autre.fin + tol
 
 
-def _prolonger_jusqu_aux_murs(bandes: list[Bande], noir: np.ndarray, px_par_m: float) -> list[tuple[int, float, float]]:
+def _prolonger_jusqu_aux_murs(
+    bandes: list[Bande], noir: np.ndarray, traits: np.ndarray, fins: np.ndarray, px_par_m: float
+) -> list[tuple[int, float, float]]:
     """Prolonge jusqu'au mur voisin un mur qui s'arrête dans le vide.
 
     Quand une porte est percée tout près du bout d'une cloison, le petit bout
@@ -832,6 +888,11 @@ def _prolonger_jusqu_aux_murs(bandes: list[Bande], noir: np.ndarray, px_par_m: f
     un autre : on la prolonge donc jusqu'au premier mur perpendiculaire qu'elle
     rencontre (à moins de OUVERTURE_MAX), et l'espace vide devient une
     ouverture possible (la porte). Modifie les bandes ; renvoie les nouveaux trous.
+
+    Mais un vrai logement a aussi des passages ouverts : une cloison peut
+    s'arrêter net au milieu d'une pièce (entrée ouverte sur le séjour, coin
+    cuisine). On ne prolonge donc que si une porte (son battant) ou une
+    fenêtre (son cadre) est dessinée dans le vide ; sinon, le vide reste ouvert.
     """
     tol = TOLERANCE * px_par_m
     nouveaux: list[tuple[int, float, float]] = []
@@ -864,6 +925,8 @@ def _prolonger_jusqu_aux_murs(bandes: list[Bande], noir: np.ndarray, px_par_m: f
             debut_trou, fin_trou = sorted((bout, float(arret)))
             if fin_trou - debut_trou < MORCEAU_MIN * px_par_m:
                 continue  # trop étroit pour une porte
+            if not _ouverture_dessinee(traits, fins, mur.horizontal, debut_trou, fin_trou, mur.bord1, mur.bord2, px_par_m, 2):
+                continue  # ni porte ni fenêtre dessinée : un passage ouvert
             if cote > 0:
                 mur.fin = face
             else:
