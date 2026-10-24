@@ -27,6 +27,7 @@ Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, pui
 - `moteur/dessin_plan.py` : dessine le plan coté d'un logement.json (murs, portes, fenêtres, cotes, noms et surfaces des pièces, cartouche), avec un « style » qui varie d'un plan à l'autre (échelle, gris, police, taille des textes, cotes partielles, portes à deux battants…).
 - `moteur/salissure.py` : salit les plans fabriqués (étape 5c), pour voir si la lecture tient sur des plans réalistes : scan de travers, photocopie grise et granuleuse, tache de café et pli, image réduite et très compressée (JPEG), photo de la feuille prise au téléphone (en biais, ombre, lumière inégale). Écrit `plan-travers.png`, `plan-photocopie.png`, `plan-taches.png`, `plan-compression.jpg` et `plan-telephone.jpg` à côté de chaque `plan.png` ; même graine, même salissure.
 - `moteur/nettoyage.py` : nettoie l'image d'un plan avant de la lire (étape 5c) : sur une photo, détoure la feuille par ses bords et la remet à plat ; rend le papier blanc partout (ombre, tache, pli) ; rend le contraste d'une photocopie pâle. Sur un plan propre, ne change presque rien.
+- `moteur/generateur/` : le générateur de plans synthétiques (étape 6) : invente des logements du studio au T5 (duplex, rectangles, L, enveloppes irrégulières, couloirs, placards, buanderies), les dessine dans 7 styles (architecte, agence, scan, photo…), et écrit pour chacun la vérité terrain : masques au pixel (classes, pièces, murs et ouvertures, contours, hauteur), polygones, graphe des pièces, et en option le modèle 3D (GLB, OBJ). Validateur, détecteur de doublons, répartition train/validation/test, statistiques et page de contrôle. Mode d'emploi complet dans `moteur/generateur/README.md` ; droits sur les données dans `DATA_LICENSE.md`.
 - `moteur/polices/` : trois polices libres (Inter, Liberation Sans, DejaVu Sans) pour que les plans soient dessinés pareil sur le Mac et sur le PC ; licences dans `LICENCES.txt`.
 - `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
 
@@ -57,6 +58,9 @@ uv run python -m moteur.banc_essai sorties/fabrique --rapport sorties/fabrique/r
 uv run python -m moteur.salissure sorties/fabrique
                      # salit chaque plan fabriqué de 5 façons, à côté de son plan.png
                      # (--familles travers,telephone pour n'en faire que certaines)
+uv run python -m moteur.generateur tout --nombre 100 --dossier sorties/jeu-100 --processus 4
+                     # génère 100 plans synthétiques annotés, les répartit, écrit les statistiques et
+                     # la page sorties/jeu-100/rapports/controle.html (30 s ; voir moteur/generateur/README.md)
 ```
 
 ## Saisir un plan
