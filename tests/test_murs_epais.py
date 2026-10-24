@@ -1,0 +1,48 @@
+"""Murs extérieurs très épais (40 à 55 cm, courants avec l'isolation) : la lecture doit les garder (étape 5d)."""
+
+import pytest
+
+from moteur.correcteur import corriger
+from moteur.dessin_plan import Style, dessiner_plan
+
+
+def _logement(ep: float) -> dict:
+    """Un T2 de 8,00 × 5,40 m intérieur, murs extérieurs d'épaisseur ep, une cloison de 10 cm."""
+    d = ep / 2
+
+    def mur(id_, a, b, e):
+        return {"id": id_, "debut": a, "fin": b, "epaisseur": e, "statut": "mesure", "source": "test"}
+
+    return {
+        "schema": "logement/0.1", "projet_id": "MURS-EPAIS", "unites": "m", "hauteur_sous_plafond": 2.5,
+        "murs": [
+            mur("M_sud", [-d, -d], [8 + d, -d], ep),
+            mur("M_est", [8 + d, -d], [8 + d, 5.4 + d], ep),
+            mur("M_nord", [-d, 5.4 + d], [8 + d, 5.4 + d], ep),
+            mur("M_ouest", [-d, -d], [-d, 5.4 + d], ep),
+            mur("C1", [4.85, 0.0], [4.85, 5.4], 0.10),
+        ],
+        "ouvertures": [
+            {"id": "P1", "type": "porte", "mur": "C1", "position": 2.0, "largeur": 0.8, "hauteur": 2.04,
+             "allege": 0, "statut": "mesure", "source": "test"},
+        ],
+        "pieces": [
+            {"id": "s", "nom": "Séjour", "contour": [[0, 0], [4.8, 0], [4.8, 5.4], [0, 5.4]], "surface": 25.92,
+             "statut": "mesure", "source": "test"},
+            {"id": "c", "nom": "Chambre", "contour": [[4.9, 0], [8, 0], [8, 5.4], [4.9, 5.4]], "surface": 16.74,
+             "statut": "mesure", "source": "test"},
+        ],
+    }
+
+
+@pytest.mark.parametrize("epaisseur", [0.20, 0.45, 0.55])
+def test_murs_exterieurs_epais_lus(epaisseur):
+    from moteur.lecture_plan import lire_plan, logement_depuis_plan
+
+    vrai = _logement(epaisseur)
+    image = dessiner_plan(vrai, Style(px_par_m=100))
+    lu = logement_depuis_plan(lire_plan(image, px_par_m=100), "TEST")
+    note = corriger(lu, vrai)
+    assert note.murs_trouves == note.murs_vrais, note.remarques
+    assert note.ecart_dimensions <= 0.01, note.remarques
+    assert note.pieces_trouvees == 2, note.remarques

@@ -94,7 +94,9 @@ def egaliser_fond(gris: np.ndarray) -> tuple[np.ndarray, bool]:
     """Divise l'image par la couleur du papier, estimée partout en effaçant le dessin."""
     petit = cv2.resize(gris, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
     # Une « fermeture » efface tout ce qui est foncé et plus petit que le gabarit : les murs, les textes.
-    gabarit = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+    # Le gabarit (31 pixels ici, environ 120 sur l'image entière) doit couvrir l'angle de deux murs
+    # extérieurs épais de 55 cm ; plus petit, l'angle serait pris pour du papier sale et blanchi.
+    gabarit = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
     fond = cv2.medianBlur(cv2.morphologyEx(petit, cv2.MORPH_CLOSE, gabarit), 5)
     fond = cv2.resize(fond, (gris.shape[1], gris.shape[0]), interpolation=cv2.INTER_LINEAR).astype(np.float32)
     if np.percentile(fond, 1) >= 250:

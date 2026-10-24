@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 # Les tailles sont en mètres et converties en pixels avec l'échelle.
 TRAIT_FIN_MAX = 0.045  # un trait plus fin que 4,5 cm sur le plan n'est pas un mur (une cloison fait 7 cm et plus)
 MORCEAU_MIN = 0.32  # longueur minimale d'un morceau de mur
+EPAISSEUR_MAX = 0.70  # épaisseur maximale d'un mur (un mur extérieur isolé fait couramment 40 à 55 cm)
 OUVERTURE_MAX = 2.50  # au-delà, deux morceaux alignés sont deux murs distincts
 TOLERANCE = 0.03  # écart admis entre deux morceaux « alignés »
 INCLINAISON_MAX = 5.0  # degrés : inclinaison maximale corrigée
@@ -397,6 +398,7 @@ def _bandes(masque: np.ndarray, px_par_m: float, horizontal: bool) -> list[Bande
     longueur = max(3, round(MORCEAU_MIN * px_par_m))
     taille = (longueur, 1) if horizontal else (1, longueur)
     sens = cv2.morphologyEx(masque, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, taille))
+    sens = _sans_murs_epais_de_travers(sens, masque, taille, longueur, px_par_m, horizontal)
     if not horizontal:
         sens = sens.T  # on travaille toujours « de gauche à droite »
     n, etiquettes, stats, _ = cv2.connectedComponentsWithStats(sens, connectivity=4)
@@ -407,6 +409,41 @@ def _bandes(masque: np.ndarray, px_par_m: float, horizontal: bool) -> list[Bande
         for debut, fin, bord1, bord2 in _morceaux_d_epaisseur_constante(etiquettes[y:y + h, x:x + w] == i, px_par_m):
             bandes.append(Bande(horizontal, x + debut, x + fin, y + bord1, y + bord2))
     return bandes
+
+
+def _sans_murs_epais_de_travers(
+    sens: np.ndarray, masque: np.ndarray, taille: tuple[int, int], longueur: int, px_par_m: float, horizontal: bool
+) -> np.ndarray:
+    """Retire d'un passage les murs très épais qui vont dans l'autre sens.
+
+    Un mur plus épais que MORCEAU_MIN (un mur extérieur isolé de 40 à 55 cm) passe aussi
+    le filtre de l'autre sens : un mur vertical de 50 cm ressort comme un « mur horizontal »
+    de 50 cm de long, souvent soudé aux vrais murs horizontaux. Seuls les morceaux qui ne
+    ressemblent pas à un mur couché (plus hauts que larges, ou pas pleins) sont repris :
+    on n'y garde que les pixels plus longs dans ce sens que dans l'autre.
+    """
+    n, etiquettes, stats, _ = cv2.connectedComponentsWithStats(sens, connectivity=4)
+    douteux = [i for i, (x, y, w, h, surface) in enumerate(stats[1:], start=1)
+               if (h > w if horizontal else w > h) or surface < 0.5 * w * h]
+    if not douteux:
+        return sens
+    zone = np.isin(etiquettes, douteux)
+    le_long, en_travers = _longueurs_de_trait(masque, horizontal), _longueurs_de_trait(masque, not horizontal)
+    epais_de_travers = (le_long >= longueur) & (le_long <= EPAISSEUR_MAX * px_par_m) & (en_travers > le_long)
+    filtre = np.where(zone & epais_de_travers, 0, masque).astype(masque.dtype)
+    repris = cv2.morphologyEx(filtre, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, taille))
+    return np.where(zone, repris, sens).astype(sens.dtype)
+
+
+def _longueurs_de_trait(masque: np.ndarray, horizontal: bool) -> np.ndarray:
+    """Pour chaque pixel noir, la longueur du trait plein qui le traverse, à l'horizontale ou à la verticale."""
+    m = (masque > 0) if horizontal else (masque > 0).T
+    longueurs = np.zeros(m.shape, dtype=np.int32)
+    for i, ligne in enumerate(m):
+        bords = np.diff(np.concatenate(([0], ligne.view(np.int8), [0])))
+        for d, f in zip(np.flatnonzero(bords == 1), np.flatnonzero(bords == -1)):
+            longueurs[i, d:f] = f - d
+    return longueurs if horizontal else longueurs.T
 
 
 def _morceaux_d_epaisseur_constante(trait: np.ndarray, px_par_m: float) -> list[tuple[int, int, int, int]]:
