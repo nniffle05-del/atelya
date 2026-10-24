@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 # Les tailles sont en mètres et converties en pixels avec l'échelle.
 TRAIT_FIN_MAX = 0.045  # un trait plus fin que 4,5 cm sur le plan n'est pas un mur (une cloison fait 7 cm et plus)
 MORCEAU_MIN = 0.32  # longueur minimale d'un morceau de mur
+CLOISON_MIN = 0.06  # épaisseur minimale du mur voisin (une cloison fait 7 cm et plus)
 EPAISSEUR_MAX = 0.70  # épaisseur maximale d'un mur (un mur extérieur isolé fait couramment 40 à 55 cm)
 OUVERTURE_MAX = 2.50  # au-delà, deux morceaux alignés sont deux murs distincts
 BAIE_MAX = 4.50  # dans un mur épais (extérieur), une baie vitrée suivie d'une porte-fenêtre peut dépasser 2,50 m
@@ -297,6 +298,7 @@ def lire_murs_sur_plan_droit(gris: np.ndarray, angle: float, px_par_m: float) ->
     noir = _traits_epais(gris, px_par_m)
     bandes = _bandes(noir, px_par_m, horizontal=True) + _bandes(noir, px_par_m, horizontal=False)
     _, traits = cv2.threshold(gris, 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    bandes += _bouts_alignes(noir, traits, bandes, px_par_m)
     bandes, trous = _recoller(bandes, px_par_m, traits)
     bandes, trous = _sans_morceaux_englobes(bandes, trous, px_par_m)
     bandes, trous = _garder_le_logement(bandes, trous, px_par_m)
@@ -418,11 +420,26 @@ def _bandes(masque: np.ndarray, px_par_m: float, horizontal: bool) -> list[Bande
     n, etiquettes, stats, _ = cv2.connectedComponentsWithStats(sens, connectivity=4)
     bandes = []
     for i, (x, y, w, h, surface) in enumerate(stats[1:], start=1):
-        if surface < 0.5 * w * h:
-            continue  # pas un rectangle plein
-        for debut, fin, bord1, bord2 in _morceaux_d_epaisseur_constante(etiquettes[y:y + h, x:x + w] == i, px_par_m):
+        trait = etiquettes[y:y + h, x:x + w] == i
+        if surface < 0.5 * w * h and not _plein_par_colonnes(trait):
+            continue  # pas un rectangle plein, ni des rectangles bout à bout
+        for debut, fin, bord1, bord2 in _morceaux_d_epaisseur_constante(trait, px_par_m):
             bandes.append(Bande(horizontal, x + debut, x + fin, y + bord1, y + bord2))
     return bandes
+
+
+def _plein_par_colonnes(trait: np.ndarray) -> bool:
+    """Le trait (couché) est-il fait de rectangles pleins mis bout à bout ?
+
+    Une cloison fine de 5 m qui se termine par un bout de mur épais de 70 cm
+    n'occupe qu'une petite part de son cadre : ce n'est pas un rectangle, mais
+    chaque colonne y est pleine d'une face à l'autre. Un dessin troué (texte,
+    hachures, arc) ne l'est pas.
+    """
+    plein = trait.any(axis=0)
+    haut = trait.argmax(axis=0)
+    bas = trait.shape[0] - trait[::-1].argmax(axis=0)
+    return bool(plein.all()) and trait.sum() >= 0.95 * (bas - haut).sum()
 
 
 def _sans_murs_epais_de_travers(
@@ -498,6 +515,64 @@ def _morceaux_d_epaisseur_constante(trait: np.ndarray, px_par_m: float) -> list[
         # Les faces du morceau : celles de la majorité de ses colonnes (une bavure ne compte pas).
         resultat.append((d, f, int(np.median(haut[d:f])), int(np.median(bas[d:f]))))
     return resultat
+
+
+def _bouts_alignes(noir: np.ndarray, traits: np.ndarray, bandes: list[Bande], px_par_m: float) -> list[Bande]:
+    """Les bouts de mur trop courts pour être lus seuls, mais alignés sur un mur déjà lu.
+
+    Entre deux fenêtres, ou entre une porte et un angle, il ne reste souvent
+    qu'un bout de mur de 15 à 30 cm (un « trumeau »), plus court que
+    MORCEAU_MIN : ni le passage horizontal ni le passage vertical ne le
+    gardent. Mais il a exactement les deux faces d'un mur voisin lu sur la
+    même ligne, à moins d'une ouverture de distance : c'est un morceau de ce
+    mur. On l'ajoute ; le recollage le réunit ensuite au reste du mur, et les
+    vides entre eux deviennent des ouvertures possibles.
+
+    Une tache isolée (photocopie, photo) peut par hasard avoir les faces d'une
+    cloison : un vrai bout de mur, lui, touche toujours un autre trait du
+    dessin (cadre de fenêtre, battant de porte, mur voisin).
+    """
+    tol = TOLERANCE * px_par_m
+    fin = max(2, math.ceil(TRAIT_FIN_MAX * px_par_m))
+    _, dessin, taille_dessin, _ = cv2.connectedComponentsWithStats(traits.astype(np.uint8), connectivity=8)
+    logement, _ = _garder_le_logement(bandes, [], px_par_m)
+    if not logement:
+        return []
+    rectangles = [_rectangle(b) for b in logement]
+    cadre = (min(r[0] for r in rectangles), min(r[1] for r in rectangles),
+             max(r[2] for r in rectangles), max(r[3] for r in rectangles))
+    deja = np.zeros(noir.shape, dtype=np.uint8)
+    for b in bandes:
+        x0, y0, x1, y1 = (round(v) for v in _rectangle(b))
+        deja[max(0, y0 - 1):y1 + 1, max(0, x0 - 1):x1 + 1] = 1
+    reste = np.where(deja > 0, 0, noir).astype(np.uint8)
+    n, _, stats, _ = cv2.connectedComponentsWithStats(reste, connectivity=4)
+    nouveaux: list[Bande] = []
+    for x, y, w, h, surface in stats[1:]:
+        if min(w, h) < fin or surface < 0.8 * w * h:
+            continue  # trait fin, ou forme qui n'est pas un rectangle plein
+        if taille_dessin[dessin[y + h // 2, x + w // 2], cv2.CC_STAT_AREA] < 1.5 * surface:
+            continue  # tache isolée
+        if x < cadre[0] - tol or x + w > cadre[2] + tol or y < cadre[1] - tol or y + h > cadre[3] + tol:
+            continue  # hors des murs déjà lus : un trait des cotes ou du cartouche
+        candidats = []
+        for b in bandes:
+            if b.horizontal:
+                bord1, bord2, debut, fin_ = y, y + h, x, x + w
+            else:
+                bord1, bord2, debut, fin_ = x, x + w, y, y + h
+            if abs(b.bord1 - bord1) > tol or abs(b.bord2 - bord2) > tol:
+                continue  # pas les mêmes faces
+            if b.epaisseur < CLOISON_MIN * px_par_m:
+                continue  # un « mur » si fin qu'il est sans doute un reste de trait
+            ecart = max(b.debut - fin_, debut - b.fin)
+            if ecart > OUVERTURE_MAX * px_par_m:
+                continue
+            candidats.append((ecart, b, debut, fin_))
+        if candidats:
+            _, b, debut, fin_ = min(candidats, key=lambda c: c[0])
+            nouveaux.append(Bande(b.horizontal, float(debut), float(fin_), b.bord1, b.bord2))
+    return nouveaux
 
 
 def _recoller(
