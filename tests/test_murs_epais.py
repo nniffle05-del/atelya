@@ -75,3 +75,26 @@ def test_poteau_contre_le_mur_du_bas_ne_decale_pas_le_logement():
     lu = logement_depuis_plan(lire_plan(image, px_par_m=100), "TEST")
     note = corriger(lu, vrai)
     assert note.murs_justes >= note.murs_vrais - 1, note.remarques  # le poteau lui-même peut être imprécis
+
+
+def test_placard_relie_par_une_porte_garde():
+    """Un placard dont les cloisons ne touchent aucun mur (relié au reste par le passage) est gardé."""
+    from moteur.lecture_plan import lire_plan, logement_depuis_plan
+
+    vrai = _logement(0.20)
+
+    def cloison(id_, a, b):
+        return {"id": id_, "debut": a, "fin": b, "epaisseur": 0.10, "statut": "mesure", "source": "test"}
+
+    vrai["murs"] += [
+        cloison("K_sud", [1.0, 3.0], [2.6, 3.0]),
+        cloison("K_nord", [1.0, 4.4], [2.6, 4.4]),
+        cloison("K_ouest", [1.0, 3.0], [1.0, 4.4]),
+        cloison("K_est", [2.6, 3.0], [2.6, 4.4]),
+    ]
+    vrai["ouvertures"].append({"id": "P2", "type": "porte", "mur": "K_sud", "position": 0.4, "largeur": 0.8,
+                               "hauteur": 2.04, "allege": 0, "statut": "mesure", "source": "test"})
+    image = dessiner_plan(vrai, Style(px_par_m=100))
+    lu = logement_depuis_plan(lire_plan(image, px_par_m=100), "TEST")
+    note = corriger(lu, vrai)
+    assert note.murs_justes == note.murs_vrais, note.remarques

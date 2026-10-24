@@ -48,6 +48,8 @@ OUVERTURE_MAX = 2.50  # au-delà, deux morceaux alignés sont deux murs distinct
 BAIE_MAX = 4.50  # dans un mur épais (extérieur), une baie vitrée suivie d'une porte-fenêtre peut dépasser 2,50 m
 BAIE_COUVERTE = 0.9  # part du trou où l'on voit le vitrage d'une grande baie
 MUR_EPAIS_MIN = 0.15  # à partir de cette épaisseur, un mur est traité comme un mur extérieur ou porteur
+PASSAGE_MAX = 1.20  # deux groupes de murs séparés de moins qu'une porte font partie du même logement
+GROUPE_MIN = 1.50  # longueur totale de murs d'un groupe qu'on rattache à travers un passage
 BORD_ORIGINE = 0.05  # les murs du bord du logement dépassent tous à 5 cm près
 TOLERANCE = 0.03  # écart admis entre deux morceaux « alignés »
 INCLINAISON_MAX = 5.0  # degrés : inclinaison maximale corrigée
@@ -572,15 +574,19 @@ def _garder_le_logement(
 ) -> tuple[list[Bande], list[tuple[int, float, float]]]:
     """Garde le plus grand groupe de murs qui se touchent : c'est le logement.
 
-    Les murs d'un logement se tiennent tous entre eux. Un élément isolé
-    (flèche du nord, cartouche, légende) n'en fait pas partie.
+    Les murs d'un logement se tiennent tous entre eux, à une porte près : un
+    groupe de pièces peut n'être relié au reste que par des portes dont le
+    bout de mur est trop court pour être lu. Un élément isolé (flèche du
+    nord, cartouche, légende) est plus loin et n'en fait pas partie. Un trait
+    seul (battant de porte, meuble) ne passe pas une porte : seul un vrai
+    groupe de murs (GROUPE_MIN de long) est rattaché à travers un passage.
     """
-    tol = TOLERANCE * px_par_m
+    contact, passage = TOLERANCE * px_par_m, PASSAGE_MAX * px_par_m
 
     def rectangle(b: Bande) -> tuple[float, float, float, float]:
         return (b.debut, b.bord1, b.fin, b.bord2) if b.horizontal else (b.bord1, b.debut, b.bord2, b.fin)
 
-    def se_touchent(a: Bande, b: Bande) -> bool:
+    def proches(a: Bande, b: Bande, tol: float) -> bool:
         ax0, ay0, ax1, ay1 = rectangle(a)
         bx0, by0, bx1, by1 = rectangle(b)
         return ax0 <= bx1 + tol and bx0 <= ax1 + tol and ay0 <= by1 + tol and by0 <= ay1 + tol
@@ -592,15 +598,25 @@ def _garder_le_logement(
             i = groupe_de[i]
         return i
 
+    def longueurs() -> dict[int, float]:
+        tailles: dict[int, float] = {}
+        for i, b in enumerate(bandes):
+            tailles[chef(i)] = tailles.get(chef(i), 0) + (b.fin - b.debut)
+        return tailles
+
     for i in range(len(bandes)):
         for j in range(i + 1, len(bandes)):
-            if se_touchent(bandes[i], bandes[j]):
+            if proches(bandes[i], bandes[j], contact):
                 groupe_de[chef(j)] = chef(i)
+    vrais_groupes = {g for g, n in longueurs().items() if n >= GROUPE_MIN * px_par_m}
+    for i in range(len(bandes)):
+        for j in range(i + 1, len(bandes)):
+            if chef(i) in vrais_groupes and chef(j) in vrais_groupes and proches(bandes[i], bandes[j], passage):
+                groupe_de[chef(j)] = chef(i)
+                vrais_groupes.add(chef(i))
     if not bandes:
         return [], []
-    tailles: dict[int, float] = {}
-    for i, b in enumerate(bandes):
-        tailles[chef(i)] = tailles.get(chef(i), 0) + (b.fin - b.debut)
+    tailles = longueurs()
     garde = max(tailles, key=tailles.get)
     nouveaux = {i: n for n, i in enumerate(i for i in range(len(bandes)) if chef(i) == garde)}
     return (
