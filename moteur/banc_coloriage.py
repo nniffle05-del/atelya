@@ -30,6 +30,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
+from moteur.redressement import Redressement, corriger_proportions, estimer_redressement
 
 COTE_ATELYA = 768
 
@@ -218,8 +219,22 @@ def coloriage_parfait(niveau: Path) -> np.ndarray:
     return m
 
 
+def echelles_apres_redressement(R: Redressement, annotations: dict, r: float) -> tuple[float, float]:
+    """(px par m en largeur, en hauteur) de l'image redressée, d'après la vérité : c'est ce que donneraient
+    des cotes parfaitement lues, comme l'échelle exacte donnée aux plans à plat."""
+    M = np.array(annotations["image"]["matrice_m_vers_px"], np.float64)  # mètres → pixels du plan entier
+    G = R.H @ np.diag([r, r, 1.0]) @ M  # mètres → pixels redressés
+    pts = np.array([p for m in annotations["murs"] for p in m["polygone_px"]], np.float64)
+    hp = np.c_[pts, np.ones(len(pts))] @ np.linalg.inv(M).T
+    cx, cy = (hp[:, :2] / hp[:, 2:]).mean(0)  # le milieu du logement, en mètres
+    w = G[2] @ (cx, cy, 1)
+    J = (G[:2, :2] * w - np.outer(G[:2] @ (cx, cy, 1), G[2, :2])) / w ** 2
+    return float(np.hypot(*J[:, 0])), float(np.hypot(*J[:, 1]))
+
+
 def noter_niveau(args) -> dict:
-    exemple, niveau_nom, fichier_coloriage = args
+    exemple, niveau_nom, fichier_coloriage, *options = args
+    redresser, proportions = options if options else (True, "cotes")
     exemple, niveau = Path(exemple), Path(exemple) / niveau_nom
     idx = int(niveau_nom.split("_")[1])
     ann = json.loads((niveau / "annotations.json").read_text(encoding="utf-8"))
@@ -234,9 +249,23 @@ def noter_niveau(args) -> dict:
     types_vrais = {p["id"]: TYPE_VERS_CLASSE.get(p["type"], 5) for n in geo["niveaux"] for p in n["pieces"]}
     resultat = {"plan": exemple.name, "niveau": idx, "perspective": float(ann["image"].get("perspective", 0) or 0),
                 "rotation": float(ann["image"].get("rotation_deg", 0) or 0)}
+    R = estimer_redressement(col) if redresser else None
+    if R is not None:
+        resultat["deformation_lue"] = round(R.deformation, 5)
+    if R is not None and not R.de_biais:
+        R = None  # page vue de face : la lecture habituelle (avec sa rotation) suffit
+    if R is not None:
+        sx, sy = echelles_apres_redressement(R, ann, s / ann["image"]["px_par_m"])
+        resultat["perspective_lue"] = round(R.perspective, 4)
+        if proportions == "cotes":
+            R = corriger_proportions(R, sx / sy)
+        else:  # sans cotes : l'image redressée garde les proportions de la photo
+            resultat["proportions_ecart_pct"] = round(100 * abs(sy / sx - 1), 2)
+        s = sx
+    resultat["redresse"] = R is not None
     try:
         lu, details = lire_coloriage(col, s, projet_id=f"{exemple.name}-N{idx}",
-                                     hauteur_sous_plafond=vrai["hauteur_sous_plafond"])
+                                     hauteur_sous_plafond=vrai["hauteur_sous_plafond"], redressement=R)
     except Exception as e:  # noqa: BLE001 — un plan raté est noté comme tel
         resultat["erreur"] = f"{type(e).__name__}: {str(e)[:200]}"
         return resultat
@@ -333,14 +362,18 @@ def main() -> None:
     ap.add_argument("--nombre", type=int, default=0)
     ap.add_argument("--processus", type=int, default=4)
     ap.add_argument("--sortie", type=Path, required=True)
+    ap.add_argument("--sans-redressement", action="store_true",
+                    help="ne pas remettre les plans à plat avant de les lire (comme avant la version 0.2)")
+    ap.add_argument("--proportions", choices=("cotes", "photo"), default="cotes",
+                    help="après redressement, rapport largeur/hauteur donné par les cotes (exactes) ou gardé de la photo")
     a = ap.parse_args()
-    taches = lister(a.jeu, a.partie, a.coloriages, a.nombre)
+    taches = [(*t, not a.sans_redressement, a.proportions) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
     t0 = time.time()
     with ProcessPoolExecutor(a.processus) as ex:
         resultats = list(ex.map(noter_niveau, taches, chunksize=8))
     a.sortie.mkdir(parents=True, exist_ok=True)
     b = bilan(resultats)
-    # Plans « photographiés » (page vue de biais) : le traducteur ne sait pas encore les redresser.
+    # Plans « photographiés » (page vue de biais) : notés à part, car ils passent par le redressement.
     b["plans_a_plat"] = bilan([r for r in resultats if r["perspective"] == 0])
     b["plans_de_biais"] = bilan([r for r in resultats if r["perspective"] > 0])
     b["source"] = "atelya" if a.coloriages else "parfait"

@@ -7,7 +7,8 @@ et une épaisseur en mètres. Ce module fait la traduction, sans rien apprendre 
 uniquement des règles de géométrie (OpenCV et numpy).
 
 Étapes, dans l'ordre :
-1. redresser le coloriage (un plan scanné est souvent penché de quelques degrés) ;
+1. redresser le coloriage (un plan scanné est souvent penché de quelques degrés ; un plan
+   photographié de biais est d'abord remis à plat par moteur.redressement) ;
 2. garder le bâti (murs + portes + fenêtres) relié au logement, jeter les
    taches isolées (flèche du Nord, barre d'échelle…) ;
 3. trouver les murs droits horizontaux et verticaux, leur axe et leur épaisseur ;
@@ -28,8 +29,9 @@ import cv2
 import numpy as np
 
 from moteur.logement import Logement
+from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.1.0"
+VERSION_COLORIAGE = "0.2.0"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -497,13 +499,19 @@ def _contour_orthogonal(zone: np.ndarray) -> list[tuple[float, float]] | None:
 # ---------------------------------------------------------------- 6. vers les mètres
 
 def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "atelya",
-                   hauteur_sous_plafond: float | None = None, angle: float | None = None) -> tuple[dict, dict]:
+                   hauteur_sous_plafond: float | None = None, angle: float | None = None,
+                   redressement: Redressement | None = None) -> tuple[dict, dict]:
     """Traduit un coloriage d'Atelya (classes 0 à 15, une par pixel) en contenu de logement.json.
 
     `px_par_m` : l'échelle de l'image donnée à Atelya (pixels par mètre).
+    `redressement` : pour un plan photographié de biais, la transformation qui le remet à plat
+    (moteur.redressement) ; `px_par_m` est alors l'échelle de l'image redressée.
     Renvoie (logement, détails) ; le logement est vérifié par le format logement/0.1.
     """
     col = coloriage.astype(np.uint8)
+    if redressement is not None:
+        col = redressement.appliquer(col)
+        angle = 0.0  # le redressement a déjà remis les murs d'aplomb
     if angle is None:
         angle = estimer_rotation(((col >= MUR) & (col <= PORTE_FENETRE)))
     col = redresser(col, angle)
@@ -590,5 +598,6 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
                 "hauteur_sous_plafond": hsp, "murs": murs, "ouvertures": sortie_ouv, "pieces": sortie_pieces}
     Logement.model_validate(logement)
     details = {"version": VERSION_COLORIAGE, "angle_deg": round(angle, 3), "px_par_m": px_par_m,
+               "redresse": redressement is not None,
                "types_pieces": types_pieces}
     return logement, details
