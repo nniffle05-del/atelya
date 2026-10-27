@@ -13,7 +13,8 @@ uniquement des règles de géométrie (OpenCV et numpy).
    taches isolées (flèche du Nord, barre d'échelle…) ;
 3. trouver les murs droits horizontaux et verticaux, leur axe et leur épaisseur ;
 4. poser chaque porte ou fenêtre sur le mur qui la porte ;
-5. découper l'intérieur en pièces fermées et leur donner le type le plus colorié ;
+5. découper l'intérieur en pièces fermées et leur donner le type le plus colorié,
+   ou celui du nom écrit dedans quand on l'a lu (moteur.noms_pieces) ;
 6. passer des pixels aux mètres, origine au coin sud-ouest de l'intérieur.
 
 Les hauteurs (sous plafond, portes, fenêtres) ne se lisent pas sur un plan vu
@@ -31,7 +32,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.2.0"
+VERSION_COLORIAGE = "0.3.0"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -56,6 +57,8 @@ EPAISSEUR_MIN = 0.03  # m
 SURFACE_MIN_PIECE = 0.25  # m²
 LARGEUR_MIN_OUVERTURE = 0.25
 ECART_FUSION_OUVERTURE = 0.10  # deux morceaux d'une même fenêtre séparés de moins : une seule
+SURFACE_MIN_SEPARATION = 0.4  # m² : plus petite tache de couleur qui compte comme une pièce à part
+PART_MIN_SEPARATION = 0.05  # … et au moins cette part de la zone
 
 
 @dataclass
@@ -103,21 +106,75 @@ def estimer_rotation(bati: np.ndarray, angle_max: float = 10.0) -> float:
     return float(max(fins, key=nettete))
 
 
-def redresser(coloriage: np.ndarray, angle: float, lineaire: bool = False) -> np.ndarray:
-    """Tourne le coloriage de -angle (plus proche voisin : les numéros de classe restent entiers)."""
-    if abs(angle) < 0.01:
-        return coloriage.copy()
-    h, w = coloriage.shape
+def _rotation(forme: tuple[int, int], angle: float) -> tuple[np.ndarray, int, int]:
+    """Matrice (2 × 3) qui tourne une image de cette forme, et la taille de l'image tournée."""
+    h, w = forme[:2]
     m = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
     c, s = abs(m[0, 0]), abs(m[0, 1])
     W, H = int(math.ceil(h * s + w * c)), int(math.ceil(h * c + w * s))
     m[0, 2] += W / 2 - w / 2
     m[1, 2] += H / 2 - h / 2
+    return m, W, H
+
+
+def redresser(coloriage: np.ndarray, angle: float, lineaire: bool = False) -> np.ndarray:
+    """Tourne le coloriage de -angle (plus proche voisin : les numéros de classe restent entiers)."""
+    if abs(angle) < 0.01:
+        return coloriage.copy()
+    m, W, H = _rotation(coloriage.shape, angle)
     mode = cv2.INTER_LINEAR if lineaire else cv2.INTER_NEAREST
     return cv2.warpAffine(coloriage, m, (W, H), flags=mode, borderValue=FOND)
 
 
 # ---------------------------------------------------------------- 2. le bâti
+
+def regulariser_ouvertures(col: np.ndarray, px_par_m: float) -> np.ndarray:
+    """Remet chaque porte ou fenêtre à l'épaisseur exacte du mur qui la porte.
+
+    Atelya colorie souvent une porte-fenêtre ou une fenêtre un peu plus large (ou plus fine)
+    que le mur, avec un bord ondulé. Le suivi des murs, qui compare chaque colonne de pixels à
+    la précédente, coupait alors le mur en morceaux au milieu de l'ouverture, et l'ouverture
+    se retrouvait décalée. On mesure l'épaisseur du mur juste avant et juste après l'ouverture,
+    puis on « repeint » l'ouverture pile dans cette bande."""
+    sortie = col.copy()
+    ep_max = max(3, int(round(0.6 * px_par_m)))
+    k_cote = 4
+    for classe in OUVERTURES:
+        n, etiq, stats, _ = cv2.connectedComponentsWithStats((col == classe).astype(np.uint8), connectivity=8)
+        for i in range(1, n):
+            x, y, w, h, aire = stats[i]
+            if aire < 4:
+                continue
+            horizontal = w >= h
+            c = col if horizontal else col.T
+            e = etiq if horizontal else etiq.T
+            s = sortie if horizontal else sortie.T  # vue : écrire dans s écrit dans sortie
+            a, b, t0, t1 = (x, x + w, y, y + h) if horizontal else (y, y + h, x, x + w)
+            marge = max(t1 - t0, 4)
+            lo, hi = max(0, t0 - marge), min(c.shape[0], t1 + marge)
+            bandes = []
+            for u in [*range(a - k_cote, a), *range(b, b + k_cote)]:
+                if not 0 <= u < c.shape[1]:
+                    continue
+                murs = np.concatenate([[0], (c[lo:hi, u] == MUR).astype(np.int8), [0]])
+                d = np.diff(murs)
+                for h0, b0 in zip(np.nonzero(d == 1)[0] + lo, np.nonzero(d == -1)[0] + lo):
+                    if h0 < t1 and b0 > t0 and b0 - h0 <= ep_max:
+                        bandes.append((h0, b0))
+            if len(bandes) < 2:
+                continue
+            haut = int(round(np.median([v[0] for v in bandes])))
+            bas = int(round(np.median([v[1] for v in bandes])))
+            if bas - haut < 1:
+                continue
+            fenetre = e[min(t0, haut):max(t1, bas), a:b] == i
+            zone = s[min(t0, haut):max(t1, bas), a:b]
+            lignes = np.arange(min(t0, haut), max(t1, bas))[:, None]
+            dans = (lignes >= haut) & (lignes < bas)
+            zone[fenetre & ~dans] = FOND
+            zone[np.broadcast_to(dans, zone.shape)] = classe
+    return sortie
+
 
 def bati_du_logement(col: np.ndarray, px_par_m: float) -> np.ndarray:
     """Masque des murs, portes et fenêtres reliés au logement. Une tache coloriée « mur »
@@ -415,15 +472,28 @@ def trouver_ouvertures(col: np.ndarray, bati: np.ndarray, segs: list[Segment], p
 
 # ---------------------------------------------------------------- 5. les pièces
 
-def trouver_pieces(col: np.ndarray, bati: np.ndarray, dehors: np.ndarray, px_par_m: float) -> list[dict]:
-    """Les zones fermées de l'intérieur, chacune avec le type de pièce le plus colorié dedans."""
+def trouver_pieces(col: np.ndarray, bati: np.ndarray, dehors: np.ndarray, px_par_m: float,
+                   noms: list[tuple[int, float, float]] | None = None) -> list[dict]:
+    """Les zones fermées de l'intérieur, chacune avec le type de pièce le plus colorié dedans.
+
+    `noms` : les noms de pièces lus sur le plan, (classe, x, y) en pixels du coloriage redressé.
+    Un nom écrit dans une zone l'emporte sur la couleur ; deux noms différents dans une zone d'une
+    seule couleur (cloison oubliée par Atelya) la coupent en deux."""
     dedans = (~bati & ~dehors).astype(np.uint8)
     n, etiq, stats, _ = cv2.connectedComponentsWithStats(dedans, connectivity=4)
+    h, w = col.shape
     pieces = []
+    zones = []
     for i in range(1, n):
         if stats[i, cv2.CC_STAT_AREA] < SURFACE_MIN_PIECE * px_par_m ** 2:
             continue
         zone = etiq == i
+        parts = separer_par_couleur(zone, col, px_par_m)
+        dans = _noms_dans(zone, noms)
+        if len(parts) == 1 and len({c for c, _, _ in dans}) >= 2:
+            parts = separer_par_noms(zone, dans)  # une seule couleur, mais deux noms : deux pièces
+        zones += parts
+    for zone in zones:
         valeurs = col[zone]
         valeurs = valeurs[valeurs >= 5]
         if len(valeurs):
@@ -432,11 +502,74 @@ def trouver_pieces(col: np.ndarray, bati: np.ndarray, dehors: np.ndarray, px_par
             confiance = float(compte[classe] / len(valeurs))
         else:
             classe, confiance = 5, 0.0
+        lus = {c for c, _, _ in _noms_dans(zone, noms)}
+        nom_lu = len(lus) == 1
+        if nom_lu:
+            classe, confiance = lus.pop(), 1.0
         contour = _contour_orthogonal(zone)
         if contour is None:
             continue
-        pieces.append({"classe": classe, "contour_px": contour, "confiance": round(confiance, 2)})
+        pieces.append({"classe": classe, "contour_px": contour, "confiance": round(confiance, 2), "nom_lu": nom_lu})
     return pieces
+
+
+def _noms_dans(zone: np.ndarray, noms: list[tuple[int, float, float]] | None) -> list[tuple[int, float, float]]:
+    h, w = zone.shape
+    return [(c, x, y) for c, x, y in (noms or []) if 0 <= int(y) < h and 0 <= int(x) < w and zone[int(y), int(x)]]
+
+
+def separer_par_noms(zone: np.ndarray, noms: list[tuple[int, float, float]]) -> list[np.ndarray]:
+    """Partage une zone entre les noms de types différents écrits dedans : chaque pixel va au nom le plus proche."""
+    ys, xs = np.nonzero(zone)
+    centres = np.array([(x, y) for _, x, y in noms])
+    classes = np.array([c for c, _, _ in noms])
+    d = (xs[:, None] - centres[None, :, 0]) ** 2 + (ys[:, None] - centres[None, :, 1]) ** 2
+    proche = classes[np.argmin(d, axis=1)]
+    sortie = []
+    for c in np.unique(classes):
+        m = np.zeros(zone.shape, bool)
+        m[ys[proche == c], xs[proche == c]] = True
+        sortie.append(m)
+    return sortie
+
+
+def separer_par_couleur(zone: np.ndarray, col: np.ndarray, px_par_m: float) -> list[np.ndarray]:
+    """Coupe une zone fermée qui contient deux pièces de types différents.
+
+    Quand Atelya oublie un bout de cloison fine (entre un WC et un placard, par exemple), les deux
+    pièces ne font plus qu'une zone. Mais chacune garde souvent sa propre couleur : si la zone
+    contient deux grandes taches de types différents, on la partage entre elles (chaque pixel va
+    à la tache la plus proche)."""
+    x, y, w, h = cv2.boundingRect(zone.astype(np.uint8))
+    z = zone[y:y + h, x:x + w]
+    c = col[y:y + h, x:x + w]
+    aire_min = max(SURFACE_MIN_SEPARATION * px_par_m ** 2, PART_MIN_SEPARATION * z.sum())
+    noyau = np.ones((3, 3), np.uint8)
+    graines = []
+    for classe in np.unique(c[z]):
+        if classe < 5:
+            continue
+        tache = cv2.morphologyEx((z & (c == classe)).astype(np.uint8), cv2.MORPH_OPEN, noyau)
+        n, etiq, stats, _ = cv2.connectedComponentsWithStats(tache, connectivity=4)
+        graines += [etiq == k for k in range(1, n) if stats[k, cv2.CC_STAT_AREA] >= aire_min]
+    if len(graines) < 2:
+        return [zone]
+    marques = np.zeros(z.shape, np.int32)
+    for k, g in enumerate(graines, 1):
+        marques[g] = k
+    # Chaque pixel de la zone rejoint la graine la plus proche (distance mesurée dans la zone).
+    _, plus_proche = cv2.distanceTransformWithLabels((marques == 0).astype(np.uint8), cv2.DIST_L2, 5,
+                                                     labelType=cv2.DIST_LABEL_PIXEL)
+    ys, xs = np.nonzero(marques)
+    vers = np.zeros(plus_proche.max() + 1, np.int32)
+    vers[plus_proche[ys, xs]] = marques[ys, xs]
+    parts = vers[plus_proche]
+    sortie = []
+    for k in range(1, len(graines) + 1):
+        m = np.zeros(zone.shape, bool)
+        m[y:y + h, x:x + w] = z & (parts == k)
+        sortie.append(m)
+    return sortie
 
 
 def _contour_orthogonal(zone: np.ndarray) -> list[tuple[float, float]] | None:
@@ -500,21 +633,30 @@ def _contour_orthogonal(zone: np.ndarray) -> list[tuple[float, float]] | None:
 
 def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "atelya",
                    hauteur_sous_plafond: float | None = None, angle: float | None = None,
-                   redressement: Redressement | None = None) -> tuple[dict, dict]:
+                   redressement: Redressement | None = None, noms: list | None = None) -> tuple[dict, dict]:
     """Traduit un coloriage d'Atelya (classes 0 à 15, une par pixel) en contenu de logement.json.
 
     `px_par_m` : l'échelle de l'image donnée à Atelya (pixels par mètre).
     `redressement` : pour un plan photographié de biais, la transformation qui le remet à plat
     (moteur.redressement) ; `px_par_m` est alors l'échelle de l'image redressée.
+    `noms` : les noms de pièces lus sur le plan (moteur.noms_pieces.NomLu), en pixels du coloriage
+    donné ; ils décident du type des pièces où ils sont écrits.
     Renvoie (logement, détails) ; le logement est vérifié par le format logement/0.1.
     """
     col = coloriage.astype(np.uint8)
+    classe_du_type = {t: c for c, (t, _) in PIECES.items()}
+    points = [(classe_du_type[n.type], n.x, n.y) for n in (noms or []) if n.type in classe_du_type]
     if redressement is not None:
         col = redressement.appliquer(col)
+        points = [(c, *redressement.point(x, y)) for c, x, y in points]
         angle = 0.0  # le redressement a déjà remis les murs d'aplomb
     if angle is None:
         angle = estimer_rotation(((col >= MUR) & (col <= PORTE_FENETRE)))
+    if abs(angle) >= 0.01:
+        m, _, _ = _rotation(col.shape, angle)
+        points = [(c, *(m @ (x, y, 1.0))) for c, x, y in points]
     col = redresser(col, angle)
+    col = regulariser_ouvertures(col, px_par_m)
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         raise ValueError("aucun mur trouvé dans le coloriage")
@@ -523,7 +665,7 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
     if not segs:
         raise ValueError("aucun mur droit trouvé dans le coloriage")
     ouvertures = trouver_ouvertures(col, bati, segs, px_par_m)
-    pieces = trouver_pieces(col, bati, dehors, px_par_m)
+    pieces = trouver_pieces(col, bati, dehors, px_par_m, points)
 
     dedans = ~bati & ~dehors
     ys, xs = np.nonzero(dedans)
@@ -582,7 +724,7 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
                            "hauteur": round(hauteur, 3), "allege": round(allege, 3),
                            "statut": "estime", "source": "atelya"})
 
-    sortie_pieces, compte, types_pieces = [], {}, {}
+    sortie_pieces, compte, types_pieces, noms_lus = [], {}, {}, []
     for p in pieces:
         type_, nom = PIECES.get(p["classe"], ("sejour", "Séjour"))
         compte[type_] = compte.get(type_, 0) + 1
@@ -593,11 +735,13 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
                               "contour": contour, "statut": "estime", "source": "atelya",
                               "confiance": p["confiance"]})
         types_pieces[sortie_pieces[-1]["id"]] = type_
+        if p["nom_lu"]:
+            noms_lus.append(sortie_pieces[-1]["id"])
 
     logement = {"schema": "logement/0.1", "projet_id": projet_id, "unites": "m",
                 "hauteur_sous_plafond": hsp, "murs": murs, "ouvertures": sortie_ouv, "pieces": sortie_pieces}
     Logement.model_validate(logement)
     details = {"version": VERSION_COLORIAGE, "angle_deg": round(angle, 3), "px_par_m": px_par_m,
                "redresse": redressement is not None,
-               "types_pieces": types_pieces}
+               "types_pieces": types_pieces, "pieces_nom_lu": noms_lus}
     return logement, details

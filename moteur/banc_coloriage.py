@@ -14,6 +14,7 @@ Le coloriage est mis à la taille vue par Atelya (grand côté 768 px).
 
     uv run python -m moteur.banc_coloriage sorties/jeu-10000 --partie test --sortie sorties/banc-coloriage
     uv run python -m moteur.banc_coloriage sorties/jeu-10000 --coloriages coloriages-atelya/ ...
+    uv run python -m moteur.banc_coloriage sorties/jeu-10000 --coloriages coloriages-atelya/ --noms ...  (noms lus sur le plan)
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
+from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import Redressement, corriger_proportions, estimer_redressement
 
 COTE_ATELYA = 768
@@ -232,9 +234,32 @@ def echelles_apres_redressement(R: Redressement, annotations: dict, r: float) ->
     return float(np.hypot(*J[:, 0])), float(np.hypot(*J[:, 1]))
 
 
+def dessin_du_niveau(niveau: Path, images: Path | None) -> Path | None:
+    """Le dessin qu'Atelya a colorié : plan.png (dessin propre) ou plan.jpg (plan abîmé).
+    `images` : dossier « exemples » où se trouvent les dessins, s'ils ne sont pas à côté du niveau."""
+    dossier = images / niveau.parent.name / niveau.name if images else niveau
+    nom = (niveau / "dessin.txt").read_text(encoding="utf-8").strip() if (niveau / "dessin.txt").exists() else None
+    for f in ([dossier / nom] if nom else []) + [dossier / "plan.png", dossier / "plan.jpg"]:
+        if f.exists():
+            return f
+    return None
+
+
+def textes_du_plan(dessin: Path, cache: Path | None) -> list:
+    """Les textes lus sur le dessin (RapidOCR), gardés dans un fichier cache pour les fois suivantes."""
+    f = cache / f"{dessin.parent.parent.name}-{dessin.parent.name}.json" if cache else None
+    if f and f.exists():
+        return json.loads(f.read_text(encoding="utf-8"))
+    img = np.array(Image.open(dessin).convert("RGB"))
+    textes = lire_textes(img)
+    if f:
+        f.write_text(json.dumps(textes, ensure_ascii=False), encoding="utf-8")
+    return textes
+
+
 def noter_niveau(args) -> dict:
     exemple, niveau_nom, fichier_coloriage, *options = args
-    redresser, proportions = options if options else (True, "cotes")
+    redresser, proportions, noms_opt = (list(options) + [None])[:3] if options else (True, "cotes", None)
     exemple, niveau = Path(exemple), Path(exemple) / niveau_nom
     idx = int(niveau_nom.split("_")[1])
     ann = json.loads((niveau / "annotations.json").read_text(encoding="utf-8"))
@@ -263,14 +288,25 @@ def noter_niveau(args) -> dict:
             resultat["proportions_ecart_pct"] = round(100 * abs(sy / sx - 1), 2)
         s = sx
     resultat["redresse"] = R is not None
+    noms = None
+    if noms_opt is not None:
+        images, cache = noms_opt
+        dessin = dessin_du_niveau(niveau, Path(images) if images else None)
+        if dessin is not None:
+            r = col.shape[1] / Image.open(dessin).width  # dessin d'origine → coloriage (grand côté 768 px)
+            noms = noms_depuis_textes(textes_du_plan(dessin, Path(cache) if cache else None))
+            for n in noms:
+                n.x, n.y = (n.x + 0.5) * r - 0.5, (n.y + 0.5) * r - 0.5
+        resultat["noms_lus"] = len(noms or [])
     try:
         lu, details = lire_coloriage(col, s, projet_id=f"{exemple.name}-N{idx}",
-                                     hauteur_sous_plafond=vrai["hauteur_sous_plafond"], redressement=R)
+                                     hauteur_sous_plafond=vrai["hauteur_sous_plafond"], redressement=R, noms=noms)
     except Exception as e:  # noqa: BLE001 — un plan raté est noté comme tel
         resultat["erreur"] = f"{type(e).__name__}: {str(e)[:200]}"
         return resultat
     resultat["angle_lu"] = details["angle_deg"]
     resultat.update(comparer(vrai, lu, types_vrais, details["types_pieces"]))
+    resultat["pieces_nom_lu"] = len(details["pieces_nom_lu"])
     resultat["logement"] = lu
     return resultat
 
@@ -366,8 +402,16 @@ def main() -> None:
                     help="ne pas remettre les plans à plat avant de les lire (comme avant la version 0.2)")
     ap.add_argument("--proportions", choices=("cotes", "photo"), default="cotes",
                     help="après redressement, rapport largeur/hauteur donné par les cotes (exactes) ou gardé de la photo")
+    ap.add_argument("--noms", action="store_true",
+                    help="lire aussi les noms de pièces écrits sur le plan (RapidOCR) : ils décident du type")
+    ap.add_argument("--images", type=Path, help="dossier « exemples » des dessins, s'ils ne sont pas dans le jeu")
     a = ap.parse_args()
-    taches = [(*t, not a.sans_redressement, a.proportions) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
+    noms_opt = None
+    if a.noms:
+        cache = a.sortie / "textes-lus"
+        cache.mkdir(parents=True, exist_ok=True)
+        noms_opt = (str(a.images) if a.images else None, str(cache))
+    taches = [(*t, not a.sans_redressement, a.proportions, noms_opt) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
     t0 = time.time()
     with ProcessPoolExecutor(a.processus) as ex:
         resultats = list(ex.map(noter_niveau, taches, chunksize=8))
