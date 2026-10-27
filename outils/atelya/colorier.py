@@ -4,6 +4,11 @@
 
     uv run python colorier.py --jeu donnees/jeu-10000 --modele resultats-essai-2/atelya-essai-2.pt --sortie coloriages-test
 
+Le « duo » (étape 6-9) : --modele lit le bâti (murs, ouvertures), --modele-pieces le type des pièces :
+
+    uv run python colorier.py --jeu donnees/jeu-10000 --modele resultats-essai-2/atelya-essai-2.pt \
+        --modele-pieces resultats-essai-3/atelya-essai-3.pt --sortie coloriages-test-duo
+
 Pour chaque plan de la partie « test » (983 plans jamais vus pendant l'apprentissage),
 chaque niveau est colorié tel qu'Atelya l'a appris : dessin en gris, grand côté 768 px.
 Le dossier de sortie reçoit, plan par plan :
@@ -29,11 +34,30 @@ from PIL import Image
 
 from entrainer import UNet, dessins, lire_partitions, predire
 
+PREMIERE_PIECE = 5  # classes 5 à 15 : les pièces
+
+
+def fusionner_coloriages(murs: np.ndarray, pieces: np.ndarray) -> np.ndarray:
+    """Même règle que moteur.coloriage.fusionner_coloriages (le PC n'a pas le moteur) :
+    bâti de `murs`, type de pièce de `pieces` là où les deux voient une pièce."""
+    sortie = murs.copy()
+    deux = (murs >= PREMIERE_PIECE) & (pieces >= PREMIERE_PIECE)
+    sortie[deux] = pieces[deux]
+    return sortie
+
+
+def charger_modele(chemin: Path, dev) -> UNet:
+    sauve = torch.load(chemin, map_location=dev)
+    modele = UNet(base=sauve.get("base", 32), contexte=sauve.get("contexte", True)).to(dev)
+    modele.load_state_dict(sauve["modele"])
+    return modele.eval()
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Atelya colorie une partie du jeu")
     ap.add_argument("--jeu", type=Path, required=True)
     ap.add_argument("--modele", type=Path, required=True)
+    ap.add_argument("--modele-pieces", type=Path, help="second modèle, pour le type des pièces seulement (duo)")
     ap.add_argument("--sortie", type=Path, required=True)
     ap.add_argument("--partie", default="test")
     ap.add_argument("--cote", type=int, default=768)
@@ -41,10 +65,8 @@ def main() -> None:
     a = ap.parse_args()
 
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    sauve = torch.load(a.modele, map_location=dev)
-    modele = UNet(base=sauve.get("base", 32), contexte=sauve.get("contexte", True)).to(dev)
-    modele.load_state_dict(sauve["modele"])
-    modele.eval()
+    modele = charger_modele(a.modele, dev)
+    modele_pieces = charger_modele(a.modele_pieces, dev) if a.modele_pieces else None
 
     ids = lire_partitions(a.jeu)[a.partie]
     if a.nombre:
@@ -66,14 +88,17 @@ def main() -> None:
             img = Image.open(dessin).convert("L")
             r = a.cote / max(img.size)
             img = img.resize((max(1, round(img.width * r)), max(1, round(img.height * r))), Image.BILINEAR)
-            col = predire(modele, np.array(img, np.uint8), dev)
+            gris = np.array(img, np.uint8)
+            col = predire(modele, gris, dev)
+            if modele_pieces is not None:
+                col = fusionner_coloriages(col, predire(modele_pieces, gris, dev))
             Image.fromarray(col).save(dest / f"{niv.name}.png")
             (dest / niv.name / "dessin.txt").write_text(dessin.name, encoding="utf-8")
             n += 1
         if k % 100 == 0 or k == len(ids):
             print(f"{k}/{len(ids)} plans, {n} niveaux coloriés ({time.time() - t0:.0f} s)", flush=True)
     (a.sortie / "resume.json").write_text(json.dumps(
-        {"modele": str(a.modele), "partie": a.partie, "plans": len(ids), "niveaux": n,
+        {"modele": str(a.modele), "modele_pieces": str(a.modele_pieces) if a.modele_pieces else None, "partie": a.partie, "plans": len(ids), "niveaux": n,
          "duree_s": round(time.time() - t0, 1), "appareil": str(dev)}, indent=1), encoding="utf-8")
     archive = a.sortie.with_suffix(".zip")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:

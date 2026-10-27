@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from moteur.coloriage import MUR, PORTE_FENETRE, lire_coloriage
+from moteur.coloriage import MUR, PORTE_FENETRE, fusionner_coloriages, lire_coloriage
 
 S = 100  # pixels par mètre
 
@@ -60,3 +60,14 @@ def test_petite_tache_ne_coupe_pas_une_grande_piece():
     c, rect = coloriage_t1([(0, 0, 5, 4, 5), (1, 1, 1.5, 1.5, 6)])  # 0,25 m² de « cuisine » dans le séjour
     _, details = lire_coloriage(c, S)
     assert list(details["types_pieces"].values()) == ["sejour"]
+
+
+def test_duo_garde_le_bati_et_prend_le_type_des_pieces():
+    murs = np.array([[0, 1, 5, 5], [2, 1, 12, 12]], np.uint8)  # essai 2 : fond, mur, porte, séjour, placard
+    pieces = np.array([[7, 5, 6, 0], [9, 9, 9, 1]], np.uint8)  # essai 3 : voit d'autres choses
+    duo = fusionner_coloriages(murs, pieces)
+    # Fond, murs et porte restent ceux de l'essai 2 ; une pièce vue par les deux prend le type de l'essai 3 ;
+    # une pièce que l'essai 3 prend pour du fond ou un mur garde le type de l'essai 2.
+    assert duo.tolist() == [[0, 1, 6, 5], [2, 1, 9, 12]]
+    with pytest.raises(ValueError):
+        fusionner_coloriages(murs, pieces[:, :3])
