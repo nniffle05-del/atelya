@@ -15,6 +15,12 @@ Le coloriage est mis à la taille vue par Atelya (grand côté 768 px).
     uv run python -m moteur.banc_coloriage sorties/jeu-10000 --partie test --sortie sorties/banc-coloriage
     uv run python -m moteur.banc_coloriage sorties/jeu-10000 --coloriages coloriages-atelya/ ...
     uv run python -m moteur.banc_coloriage sorties/jeu-10000 --coloriages coloriages-atelya/ --noms ...  (noms lus sur le plan)
+    uv run python -m moteur.banc_coloriage sorties/jeu-10000 --coloriages coloriages-atelya/ --echelle lue ...  (échelle lue sur les cotes)
+
+Échelle : par défaut (« exacte »), le banc donne au traducteur l'échelle vraie du plan, et pour une
+photo de biais les vraies proportions. Avec --echelle lue, elle est lue sur les cotes du dessin
+(moteur.echelle_plan), comme pour un vrai client ; un plan sans cotes lisibles est compté « à vérifier »
+et noté à part (avec l'échelle exacte, pour ne pas mélanger deux défauts).
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
+from moteur.echelle_plan import decider, lire_echelle_plan
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import Redressement, corriger_proportions, estimer_redressement
 
@@ -257,9 +264,22 @@ def textes_du_plan(dessin: Path, cache: Path | None) -> list:
     return textes
 
 
+def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement | None, cache: Path | None) -> dict:
+    """L'échelle lue sur les cotes du dessin (px par m du coloriage, en largeur et en hauteur), gardée en cache."""
+    f = cache / f"{niveau.parent.name}-{niveau.name}.json" if cache else None
+    if f and f.exists():
+        return json.loads(f.read_text(encoding="utf-8"))
+    e = lire_echelle_plan(np.array(Image.open(dessin).convert("L")), col, R)
+    lu = {"largeur": e.largeur, "hauteur": e.hauteur, "sure": e.sure, "cotes": len(e.cotes), "redresse": R is not None,
+          "cote_max_largeur": e.cote_max_largeur, "cote_max_hauteur": e.cote_max_hauteur, "interieur_px": e.interieur_px}
+    if f:
+        f.write_text(json.dumps(lu), encoding="utf-8")
+    return lu
+
+
 def noter_niveau(args) -> dict:
     exemple, niveau_nom, fichier_coloriage, *options = args
-    redresser, proportions, noms_opt = (list(options) + [None])[:3] if options else (True, "cotes", None)
+    redresser, proportions, noms_opt, echelle_opt = (list(options) + [None, None])[:4] if options else (True, "cotes", None, None)
     exemple, niveau = Path(exemple), Path(exemple) / niveau_nom
     idx = int(niveau_nom.split("_")[1])
     ann = json.loads((niveau / "annotations.json").read_text(encoding="utf-8"))
@@ -279,14 +299,33 @@ def noter_niveau(args) -> dict:
         resultat["deformation_lue"] = round(R.deformation, 5)
     if R is not None and not R.de_biais:
         R = None  # page vue de face : la lecture habituelle (avec sa rotation) suffit
+    vx = vy = s  # l'échelle vraie, en largeur et en hauteur
     if R is not None:
-        sx, sy = echelles_apres_redressement(R, ann, s / ann["image"]["px_par_m"])
+        vx, vy = echelles_apres_redressement(R, ann, s / ann["image"]["px_par_m"])
         resultat["perspective_lue"] = round(R.perspective, 4)
-        if proportions == "cotes":
-            R = corriger_proportions(R, sx / sy)
+    lu = None
+    if echelle_opt is not None:
+        images, cache = echelle_opt
+        dessin = dessin_du_niveau(niveau, Path(images) if images else None)
+        lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None) if dessin else {"largeur": None, "hauteur": None}
+        lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
+                                 lu.get("interieur_px"), R is not None)
+        if R is None:
+            lx = ly = lx or ly
+        resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,
+                                   "ecart_largeur_pct": round(100 * (lx / vx - 1), 3) if lx else None,
+                                   "ecart_hauteur_pct": round(100 * (ly / vy - 1), 3) if ly else None}
+        resultat["echelle_a_verifier"] = not (lx or ly)
+        if lx or ly:  # sinon : plan « à vérifier », noté avec l'échelle exacte (bilan à part)
+            vx, vy = lx or ly, ly or lx
+            if R is not None and not (lx and ly):  # un seul sens coté : la photo garde ses proportions
+                resultat["proportions_de_la_photo"] = True
+    if R is not None:
+        if proportions == "cotes" and not resultat.get("proportions_de_la_photo"):
+            R = corriger_proportions(R, vx / vy)
         else:  # sans cotes : l'image redressée garde les proportions de la photo
-            resultat["proportions_ecart_pct"] = round(100 * abs(sy / sx - 1), 2)
-        s = sx
+            resultat["proportions_ecart_pct"] = round(100 * abs(vy / vx - 1), 2)
+    s = vx
     resultat["redresse"] = R is not None
     noms = None
     if noms_opt is not None:
@@ -365,6 +404,25 @@ def bilan(resultats: list[dict]) -> dict:
     }
 
 
+def bilan_echelle(resultats: list[dict]) -> dict:
+    """Combien de plans ont une échelle lue, et à quel point elle est juste."""
+    def part(rs):
+        lus = [r["echelle_lue"] for r in rs if "echelle_lue" in r and not r.get("echelle_a_verifier")]
+        ec = [abs(e[k]) for e in lus for k in ("ecart_largeur_pct", "ecart_hauteur_pct") if e[k] is not None]
+        pire = [max(abs(e[k]) for k in ("ecart_largeur_pct", "ecart_hauteur_pct") if e[k] is not None) for e in lus]
+        n = len(rs)
+        return {"niveaux": n, "echelle_lue": len(lus), "a_verifier": n - len(lus),
+                "lue_pct": round(100 * len(lus) / n, 1) if n else None,
+                "ecart_pct_median": round(float(np.median(ec)), 3) if ec else None,
+                "ecart_pct_moyen": round(float(np.mean(ec)), 3) if ec else None,
+                "a_0_5_pct_pres_pct": round(100 * sum(p <= 0.5 for p in pire) / len(pire), 1) if pire else None,
+                "a_1_pct_pres_pct": round(100 * sum(p <= 1 for p in pire) / len(pire), 1) if pire else None,
+                "plus_de_3_pct": sum(p > 3 for p in pire),
+                "par_cote_d_ensemble": sum(r["echelle_lue"].get("source") == "cote d'ensemble" for r in rs if "echelle_lue" in r)}
+    return {"tous": part(resultats), "a_plat": part([r for r in resultats if r["perspective"] == 0]),
+            "de_biais": part([r for r in resultats if r["perspective"] > 0])}
+
+
 def lister(jeu: Path, partie: str, coloriages: Path | None, nombre: int) -> list[tuple]:
     rep = json.loads((jeu / "repartition.json").read_text(encoding="utf-8"))
     parts = rep.get("partitions", rep)
@@ -405,13 +463,20 @@ def main() -> None:
     ap.add_argument("--noms", action="store_true",
                     help="lire aussi les noms de pièces écrits sur le plan (RapidOCR) : ils décident du type")
     ap.add_argument("--images", type=Path, help="dossier « exemples » des dessins, s'ils ne sont pas dans le jeu")
+    ap.add_argument("--echelle", choices=("exacte", "lue"), default="exacte",
+                    help="échelle donnée au traducteur : l'exacte (vérité du jeu) ou celle lue sur les cotes du dessin")
     a = ap.parse_args()
     noms_opt = None
     if a.noms:
         cache = a.sortie / "textes-lus"
         cache.mkdir(parents=True, exist_ok=True)
         noms_opt = (str(a.images) if a.images else None, str(cache))
-    taches = [(*t, not a.sans_redressement, a.proportions, noms_opt) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
+    echelle_opt = None
+    if a.echelle == "lue":
+        cache = a.sortie / "echelles-lues"
+        cache.mkdir(parents=True, exist_ok=True)
+        echelle_opt = (str(a.images) if a.images else None, str(cache))
+    taches = [(*t, not a.sans_redressement, a.proportions, noms_opt, echelle_opt) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
     t0 = time.time()
     with ProcessPoolExecutor(a.processus) as ex:
         resultats = list(ex.map(noter_niveau, taches, chunksize=8))
@@ -420,6 +485,12 @@ def main() -> None:
     # Plans « photographiés » (page vue de biais) : notés à part, car ils passent par le redressement.
     b["plans_a_plat"] = bilan([r for r in resultats if r["perspective"] == 0])
     b["plans_de_biais"] = bilan([r for r in resultats if r["perspective"] > 0])
+    if a.echelle == "lue":
+        lus = [r for r in resultats if not r.get("echelle_a_verifier", False)]
+        b["echelle_lue"] = bilan_echelle(resultats)
+        b["plans_echelle_lue"] = bilan(lus)
+        b["plans_echelle_lue_a_plat"] = bilan([r for r in lus if r["perspective"] == 0])
+        b["plans_echelle_lue_de_biais"] = bilan([r for r in lus if r["perspective"] > 0])
     b["source"] = "atelya" if a.coloriages else "parfait"
     b["duree_s"] = round(time.time() - t0, 1)
     (a.sortie / "bilan.json").write_text(json.dumps(b, ensure_ascii=False, indent=1, default=_en_json), encoding="utf-8")
