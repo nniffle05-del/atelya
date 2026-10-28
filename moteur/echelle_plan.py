@@ -12,7 +12,9 @@ ses vraies proportions.
 
 Garde-fou (decider) : l'échelle doit s'accorder avec la plus grande cote lue (la cote d'ensemble) et la
 taille du logement colorié. Sinon le plan part à la vérification humaine, au lieu d'être construit à
-la mauvaise taille. Un plan sans cote lisible y part aussi.
+la mauvaise taille. Un plan sans cote lisible y part aussi, sauf s'il porte une barre d'échelle
+dessinée (moteur.barre_echelle, version 0.2) : elle sert alors d'échelle, si elle est sûre et que le
+logement qu'elle donne a une taille vraisemblable.
 """
 
 from __future__ import annotations
@@ -22,13 +24,15 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
+from moteur.barre_echelle import lire_barre
 from moteur.coloriage import MUR, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
 from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, lire_echelle, lire_textes
 from moteur.redressement import Redressement
 
-VERSION_ECHELLE = "0.1.0"
+VERSION_ECHELLE = "0.2.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
+LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
 
 
 @dataclass
@@ -45,6 +49,10 @@ class EchelleLue:
     cote_max_largeur: float | None = None
     cote_max_hauteur: float | None = None
     interieur_px: tuple[float, float] | None = None
+    # La barre d'échelle dessinée, s'il y en a une : px par m du coloriage, et le détail en clair.
+    barre: float | None = None
+    barre_sure: bool = False
+    barre_detail: str = ""
 
     @property
     def px_par_m(self) -> float | None:
@@ -54,7 +62,7 @@ class EchelleLue:
     def decision(self, de_biais: bool) -> tuple[float | None, float | None, str]:
         """L'échelle retenue (largeur, hauteur) et sa source, après contrôle (voir decider)."""
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
-                       self.interieur_px, de_biais)
+                       self.interieur_px, de_biais, self.barre if self.barre_sure else None)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -77,7 +85,7 @@ def _plausible(echelle: float | None, interieur: float | None, cote_max: float |
 
 def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_largeur: float | None,
             cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
-            de_biais: bool) -> tuple[float | None, float | None, str]:
+            de_biais: bool, barre: float | None = None) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -87,8 +95,11 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     un logement à la mauvaise taille (voir _plausible).
     Sans aucune cote mesurée, la cote d'ensemble sert de secours, si la largeur et la hauteur
     donnent la même échelle (plan à plat seulement : sur une photo elles diffèrent).
+    Sans cotes utilisables, une barre d'échelle sûre (`barre`, déjà jugée sûre par lire_barre) sert
+    d'échelle si le logement qu'elle donne mesure entre 1,5 et 40 m de côté et ne contredit pas la
+    cote d'ensemble (quand des cotes ont été mesurées). Sur une photo, elle ne donne que la largeur : la photo garde ses proportions.
 
-    Rend (largeur, hauteur, source) ; source = « cotes », « cote d'ensemble » ou « à vérifier »
+    Rend (largeur, hauteur, source) ; source = « cotes », « barre », « cote d'ensemble » ou « à vérifier »
     (échelles à None)."""
     il, ih = interieur_px or (None, None)
     if largeur or hauteur:
@@ -97,13 +108,32 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
         else:
             m = largeur or hauteur
             bon = _plausible(m, il, cote_max_largeur, sure) and _plausible(m, ih, cote_max_hauteur, sure)
-        return (largeur, hauteur, "cotes") if bon else (None, None, "à vérifier")
+        if bon:
+            return largeur, hauteur, "cotes"
+    # Sans aucune cote mesurée, les « nombres en forme de cote » lus sont souvent des surfaces
+    # (« 12,33 » de « 12,33 m² ») : on ne confronte alors pas la barre à leur maximum.
+    controle = (cote_max_largeur, cote_max_hauteur) if (largeur or hauteur) else (None, None)
+    if barre and _barre_plausible(barre, il, ih, *controle):
+        return (barre, None, "barre") if de_biais else (barre, barre, "barre")
+    if largeur or hauteur:
+        return None, None, "à vérifier"
     ctrl_l = il / cote_max_largeur if il and cote_max_largeur else None
     ctrl_h = ih / cote_max_hauteur if ih and cote_max_hauteur else None
     if not de_biais and ctrl_l and ctrl_h and abs(ctrl_l / ctrl_h - 1) <= ACCORD_SECOURS:
         e = (ctrl_l + ctrl_h) / 2
         return e, e, "cote d'ensemble"
     return None, None, "à vérifier"
+
+
+def _barre_plausible(barre: float, il: float | None, ih: float | None, cote_max_largeur: float | None,
+                     cote_max_hauteur: float | None) -> bool:
+    """Le logement mesuré avec l'échelle de la barre a-t-il une taille vraisemblable ?"""
+    for interieur, cote_max in ((il, cote_max_largeur), (ih, cote_max_hauteur)):
+        if interieur and not LOGEMENT_MIN <= interieur / barre <= LOGEMENT_MAX:
+            return False
+        if not _plausible(barre, interieur, cote_max, True):
+            return False
+    return True
 
 
 def _mediane_accordee(valeurs: list[CoteLue]) -> float | None:
@@ -130,11 +160,11 @@ def _cadre_entier(G: np.ndarray, forme: tuple[int, int], taille: tuple[int, int]
     return T @ G, (int(np.ceil(x1 - x0)), int(np.ceil(y1 - y0)))
 
 
-def _lire(gris: np.ndarray) -> tuple[Echelle, list[tuple[float, bool]]]:
+def _lire(gris: np.ndarray) -> tuple[Echelle, list[tuple[float, bool]], list]:
     """Comme lecture_cotes.lire_textes_et_echelle, mais sans insister quand la première lecture ne trouve
     aucun nombre en forme de cote : le plan n'a pas de cotes, les lectures suivantes (plus lentes) n'en
     trouveraient pas davantage. Rend aussi tous les nombres en forme de cote lus (valeur, vertical),
-    même ceux dont le trait n'a pas été retrouvé."""
+    même ceux dont le trait n'a pas été retrouvé, et les textes de la lecture gardée."""
     meilleure = None
     for debruiter, agrandir in ESSAIS_LECTURE:
         image = cv2.fastNlMeansDenoising(gris, None, 10, 7, 21) if debruiter else gris
@@ -143,10 +173,10 @@ def _lire(gris: np.ndarray) -> tuple[Echelle, list[tuple[float, bool]]]:
         score = (echelle.sure, echelle.px_par_m is not None, len(echelle.retenues))
         nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
         if meilleure is None or score > meilleure[0]:
-            meilleure = (score, echelle, nombres)
+            meilleure = (score, echelle, nombres, textes)
         if echelle.sure or not nombres:
             break
-    return meilleure[1], meilleure[2]
+    return meilleure[1], meilleure[2], meilleure[3]
 
 
 def _vertical(boite: np.ndarray) -> bool:
@@ -193,7 +223,8 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
             vu = cv2.warpAffine(gris, m, (W, H), flags=cv2.INTER_LINEAR, borderValue=255)
         facteur = r
         col = redresser(coloriage, angle)
-    echelle, nombres = _lire(vu)
+    echelle, nombres, textes = _lire(vu)
+    barre = lire_barre(vu, textes)
     cotes = echelle.retenues + echelle.ecartees
     if redressement is not None:
         # Sur une photo, largeur et hauteur peuvent différer : chaque sens a sa propre médiane.
@@ -207,4 +238,6 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
     verti = [v for v, vert in nombres if vert and v >= COTE_MIN]
     interieur = interieur_du_logement(col, largeur or hauteur or max(col.shape) / 15)
     return EchelleLue(largeur, hauteur, echelle.sure, cotes, echelle.hauteur_sous_plafond,
-                      max(horiz) if horiz else None, max(verti) if verti else None, interieur)
+                      max(horiz) if horiz else None, max(verti) if verti else None, interieur,
+                      barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
+                      barre.detail if barre else "")
