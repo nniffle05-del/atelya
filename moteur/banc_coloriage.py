@@ -19,7 +19,8 @@ Le coloriage est mis à la taille vue par Atelya (grand côté 768 px).
 
 Échelle : par défaut (« exacte »), le banc donne au traducteur l'échelle vraie du plan, et pour une
 photo de biais les vraies proportions. Avec --echelle lue, elle est lue sur les cotes du dessin
-(moteur.echelle_plan), comme pour un vrai client ; un plan sans cotes lisibles est compté « à vérifier »
+(moteur.echelle_plan) — à défaut, sur la barre d'échelle ou les surfaces écrites des pièces —, comme pour
+un vrai client ; un plan sans échelle lisible est compté « à vérifier »
 et noté à part (avec l'échelle exacte, pour ne pas mélanger deux défauts).
 """
 
@@ -272,7 +273,8 @@ def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement
     e = lire_echelle_plan(np.array(Image.open(dessin).convert("L")), col, R)
     lu = {"largeur": e.largeur, "hauteur": e.hauteur, "sure": e.sure, "cotes": len(e.cotes), "redresse": R is not None,
           "cote_max_largeur": e.cote_max_largeur, "cote_max_hauteur": e.cote_max_hauteur, "interieur_px": e.interieur_px,
-          "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail}
+          "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail,
+          "surfaces": e.surfaces, "surfaces_sure": e.surfaces_sure, "surfaces_detail": e.surfaces_detail}
     if f:
         f.write_text(json.dumps(lu), encoding="utf-8")
     return lu
@@ -310,7 +312,8 @@ def noter_niveau(args) -> dict:
         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
         lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None) if dessin else {"largeur": None, "hauteur": None}
         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
-                                 lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None)
+                                 lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
+                                 lu.get("surfaces") if lu.get("surfaces_sure") else None)
         if R is None:
             lx = ly = lx or ly
         resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,
@@ -420,7 +423,8 @@ def bilan_echelle(resultats: list[dict]) -> dict:
                 "a_1_pct_pres_pct": round(100 * sum(p <= 1 for p in pire) / len(pire), 1) if pire else None,
                 "plus_de_3_pct": sum(p > 3 for p in pire),
                 "par_cote_d_ensemble": sum(r["echelle_lue"].get("source") == "cote d'ensemble" for r in rs if "echelle_lue" in r),
-                "par_barre": sum(r["echelle_lue"].get("source") == "barre" for r in rs if "echelle_lue" in r)}
+                "par_barre": sum(r["echelle_lue"].get("source") == "barre" for r in rs if "echelle_lue" in r),
+                "par_surfaces": sum(r["echelle_lue"].get("source") == "surfaces" for r in rs if "echelle_lue" in r)}
     return {"tous": part(resultats), "a_plat": part([r for r in resultats if r["perspective"] == 0]),
             "de_biais": part([r for r in resultats if r["perspective"] > 0])}
 

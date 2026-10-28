@@ -14,7 +14,8 @@ Garde-fou (decider) : l'échelle doit s'accorder avec la plus grande cote lue (l
 taille du logement colorié. Sinon le plan part à la vérification humaine, au lieu d'être construit à
 la mauvaise taille. Un plan sans cote lisible y part aussi, sauf s'il porte une barre d'échelle
 dessinée (moteur.barre_echelle, version 0.2) : elle sert alors d'échelle, si elle est sûre et que le
-logement qu'elle donne a une taille vraisemblable.
+logement qu'elle donne a une taille vraisemblable. À défaut de barre, les surfaces écrites dans les pièces
+(« Chambre 12,50 m² », moteur.surfaces_ecrites, version 0.3) donnent l'échelle si plusieurs pièces sont d'accord.
 """
 
 from __future__ import annotations
@@ -28,10 +29,12 @@ from moteur.barre_echelle import lire_barre
 from moteur.coloriage import MUR, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
 from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, lire_echelle, lire_textes
 from moteur.redressement import Redressement
+from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.2.0"
+VERSION_ECHELLE = "0.3.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
+ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
 
 
@@ -53,6 +56,10 @@ class EchelleLue:
     barre: float | None = None
     barre_sure: bool = False
     barre_detail: str = ""
+    # L'échelle donnée par les surfaces écrites des pièces (px par m du coloriage), et le détail en clair.
+    surfaces: float | None = None
+    surfaces_sure: bool = False
+    surfaces_detail: str = ""
 
     @property
     def px_par_m(self) -> float | None:
@@ -62,7 +69,8 @@ class EchelleLue:
     def decision(self, de_biais: bool) -> tuple[float | None, float | None, str]:
         """L'échelle retenue (largeur, hauteur) et sa source, après contrôle (voir decider)."""
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
-                       self.interieur_px, de_biais, self.barre if self.barre_sure else None)
+                       self.interieur_px, de_biais, self.barre if self.barre_sure else None,
+                       self.surfaces if self.surfaces_sure else None)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -85,7 +93,8 @@ def _plausible(echelle: float | None, interieur: float | None, cote_max: float |
 
 def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_largeur: float | None,
             cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
-            de_biais: bool, barre: float | None = None) -> tuple[float | None, float | None, str]:
+            de_biais: bool, barre: float | None = None,
+            surfaces: float | None = None) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -98,8 +107,12 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     Sans cotes utilisables, une barre d'échelle sûre (`barre`, déjà jugée sûre par lire_barre) sert
     d'échelle si le logement qu'elle donne mesure entre 1,5 et 40 m de côté et ne contredit pas la
     cote d'ensemble (quand des cotes ont été mesurées). Sur une photo, elle ne donne que la largeur : la photo garde ses proportions.
+    Sans barre, l'échelle des surfaces écrites (`surfaces`, déjà jugée sûre par echelle_par_surfaces) sert
+    de la même façon, avec les mêmes contrôles, mais sur un plan à plat seulement : sur une photo de biais,
+    la surface d'une pièce redressée est trop imprécise (jusqu'à 6 % d'écart sur l'échelle). Elle sert aussi
+    de contrôle : des cotes peu sûres (une seule cote) qu'elle contredit de plus de 3 % partent à la vérification.
 
-    Rend (largeur, hauteur, source) ; source = « cotes », « barre », « cote d'ensemble » ou « à vérifier »
+    Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
     (échelles à None)."""
     il, ih = interieur_px or (None, None)
     if largeur or hauteur:
@@ -108,6 +121,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
         else:
             m = largeur or hauteur
             bon = _plausible(m, il, cote_max_largeur, sure) and _plausible(m, ih, cote_max_hauteur, sure)
+        if bon and not sure and surfaces and not de_biais and abs(surfaces / (largeur or hauteur) - 1) > ACCORD_SURFACES:
+            return None, None, "à vérifier"  # deux avis sérieux en désaccord : un humain tranche
         if bon:
             return largeur, hauteur, "cotes"
     # Sans aucune cote mesurée, les « nombres en forme de cote » lus sont souvent des surfaces
@@ -115,6 +130,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     controle = (cote_max_largeur, cote_max_hauteur) if (largeur or hauteur) else (None, None)
     if barre and _barre_plausible(barre, il, ih, *controle):
         return (barre, None, "barre") if de_biais else (barre, barre, "barre")
+    if surfaces and not de_biais and _barre_plausible(surfaces, il, ih, *controle):
+        return surfaces, surfaces, "surfaces"
     if largeur or hauteur:
         return None, None, "à vérifier"
     ctrl_l = il / cote_max_largeur if il and cote_max_largeur else None
@@ -127,7 +144,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
 
 def _barre_plausible(barre: float, il: float | None, ih: float | None, cote_max_largeur: float | None,
                      cote_max_hauteur: float | None) -> bool:
-    """Le logement mesuré avec l'échelle de la barre a-t-il une taille vraisemblable ?"""
+    """Le logement mesuré avec l'échelle de la barre (ou des surfaces) a-t-il une taille vraisemblable ?"""
     for interieur, cote_max in ((il, cote_max_largeur), (ih, cote_max_hauteur)):
         if interieur and not LOGEMENT_MIN <= interieur / barre <= LOGEMENT_MAX:
             return False
@@ -214,6 +231,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=255)
         facteur = 1 / k
         col = redressement.appliquer(coloriage)
+        vers_col = redressement.H @ np.diag([r, r, 1.0]) @ np.linalg.inv(G[0])  # dessin lu → coloriage redressé
     else:
         if angle is None:
             angle = estimer_rotation((coloriage >= MUR) & (coloriage <= PORTE_FENETRE))
@@ -223,6 +241,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
             vu = cv2.warpAffine(gris, m, (W, H), flags=cv2.INTER_LINEAR, borderValue=255)
         facteur = r
         col = redresser(coloriage, angle)
+        vers_col = np.diag([r, r, 1.0])  # les deux sont tournés autour de leur centre
     echelle, nombres, textes = _lire(vu)
     barre = lire_barre(vu, textes)
     cotes = echelle.retenues + echelle.ecartees
@@ -237,7 +256,22 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
     horiz = [v for v, vert in nombres if not vert and v >= COTE_MIN]
     verti = [v for v, vert in nombres if vert and v >= COTE_MIN]
     interieur = interieur_du_logement(col, largeur or hauteur or max(col.shape) / 15)
+    surf = _echelle_des_surfaces(col, textes, vers_col, largeur or hauteur or max(col.shape) / 15)
     return EchelleLue(largeur, hauteur, echelle.sure, cotes, echelle.hauteur_sous_plafond,
                       max(horiz) if horiz else None, max(verti) if verti else None, interieur,
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
-                      barre.detail if barre else "")
+                      barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
+                      surf.detail if surf else "")
+
+
+def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
+    """L'échelle des surfaces écrites (voir moteur.surfaces_ecrites), placées sur le coloriage remis droit."""
+    lues = surfaces_dans_textes(textes)
+    if not lues:
+        return None
+    pts = np.array([[x, y, 1.0] for _, x, y in lues]) @ vers_col.T
+    surfaces = [SurfaceLue(v, float(p[0] / p[2]), float(p[1] / p[2])) for (v, _, _), p in zip(lues, pts)]
+    bati = bati_du_logement(col, px_par_m)
+    if not bati.any():
+        return None
+    return echelle_par_surfaces(~bati & ~dehors_du_logement(bati), surfaces)
