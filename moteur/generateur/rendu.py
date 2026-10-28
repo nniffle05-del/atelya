@@ -42,6 +42,18 @@ Point = tuple[float, float]
 RECUL_COTE = 60  # pixels entre le mur et une ligne de cote
 DOUBLE_VANTAIL_MIN = 1200  # mm : à partir de cette largeur, une porte peut avoir deux battants
 PLAN_DE_COUPE = 1500  # mm : la hauteur à laquelle le plan « coupe » le logement
+BLANC_SOUS_ECHELLE = 25  # pixels de papier laissés sous le texte de la barre d'échelle
+
+
+def _place_echelle(style: Style) -> tuple[float, float]:
+    """Où tombe la barre d'échelle, en pixels sous le bas du logement : (haut de la barre, bas de son texte).
+
+    Sert au dessin de la barre ET à la marge du bas, pour que la barre et son « N m » restent
+    entiers dans la page (avant 0.1.1, la moitié sortaient par le bas quand la marge était petite).
+    """
+    haut = RECUL_COTE + (style.taille_texte * 1.8 if style.cotes else 10)
+    police = _police(style.police, round(style.taille_texte * 0.8))
+    return haut, haut + 22 + max(police.getbbox(t, anchor="mm")[3] for t in ("0", "2 m"))
 
 
 @dataclass
@@ -64,6 +76,8 @@ class Repere:
         haut, bas, gauche, droite = style.marges
         if style.cartouche:  # la marge de droite s'élargit si le cartouche est écrit gros
             droite = max(droite, RECUL_COTE + 100 + round(style.taille_texte * 0.85 * 17))
+        if style.echelle_graphique:  # la marge du bas s'élargit pour garder la barre d'échelle entière
+            bas = max(bas, math.ceil(_place_echelle(style)[1]) + BLANC_SOUS_ECHELLE)
         self.xmin, self.ymin, self.xmax, self.ymax = cadre.x0, cadre.y0, cadre.x1, cadre.y1
         self.largeur0 = round((self.xmax - self.xmin) * self.s) + gauche + droite
         self.hauteur0 = round((self.ymax - self.ymin) * self.s) + haut + bas
@@ -402,7 +416,7 @@ class _Dessin:
         rep, st = self.rep, self.style
         metres = 1 if (rep.xmax - rep.xmin) < 5000 else 2
         x = self.px(rep.xmin, 0)[0]
-        y = self.px(0, rep.ymin)[1] + RECUL_COTE + (st.taille_texte * 1.8 if st.cotes else 10)
+        y = self.px(0, rep.ymin)[1] + _place_echelle(st)[0]
         for k in range(metres):
             u0, u1 = x + k * rep.s * 1000, x + (k + 1) * rep.s * 1000
             self.d.rectangle((u0, y, u1, y + 8), fill=st.traits if k % 2 == 0 else st.fond, outline=st.traits)

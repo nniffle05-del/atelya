@@ -70,6 +70,22 @@ def test_barre_mesuree_au_pixel_pres():
     assert b.px_par_m == pytest.approx(123.0, abs=0.6)
 
 
+def test_barre_d_un_plan_un_peu_de_travers_mesuree_en_entier():
+    """Un scan penché de 0,45° que rien n'a remis droit : la barre descend de 2 pixels d'un bout à
+    l'autre, mais elle est mesurée en entier (et pas jusqu'à la première marche de la pente)."""
+    from moteur.barre_echelle import lire_barre
+
+    g = np.full((300, 700), 255, np.uint8)
+    _barre(g, 100, 150, 123.0, 2)
+    m = cv2.getRotationMatrix2D((350, 150), -0.45, 1.0)
+    g = cv2.warpAffine(g, m, (700, 300), flags=cv2.INTER_LINEAR, borderValue=255)
+    textes = [TexteLu("0", np.array([[92, 172], [110, 172], [110, 192], [92, 192]], float), 0.9),
+              TexteLu("2 m", np.array([[336, 174], [380, 174], [380, 194], [336, 194]], float), 0.9)]
+    b = lire_barre(g, textes)
+    assert b is not None and b.sure
+    assert b.px_par_m == pytest.approx(123.0, rel=0.01)
+
+
 def test_barre_sans_second_indice_pas_sure():
     """Une barre d'un mètre toute pleine, sans « 0 » : rien ne la confirme, elle n'est pas sûre."""
     from moteur.barre_echelle import lire_barre
@@ -100,3 +116,6 @@ def test_decider_avec_une_barre():
     assert decider(None, None, False, 12.33, None, (600, 400), False, 100.0)[2] == "barre"
     # Des cotes rejetées par le garde-fou, mais une barre plausible : on garde la barre.
     assert decider(150.0, 150.0, True, 6.0, 4.0, (600, 400), False, 100.0) == (100.0, 100.0, "barre")
+    # Des surfaces écrites qui contredisent la barre de plus de 3 % : à vérifier ; d'accord : la barre.
+    assert decider(None, None, False, None, None, (600, 400), False, 80.0, 100.0)[2] == "à vérifier"
+    assert decider(None, None, False, None, None, (600, 400), False, 100.0, 101.0) == (100.0, 100.0, "barre")

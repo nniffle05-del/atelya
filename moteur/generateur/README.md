@@ -5,7 +5,7 @@ d'agence, d'architecte, de scan ou de photo, et écrit pour chacun la **vérité
 au pixel, polygones, graphe des pièces, et en option le modèle 3D. Le but : des données d'entraînement en
 quantité illimitée, variées, sans aucune donnée tierce (voir `DATA_LICENSE.md` à la racine).
 
-Version du générateur : `0.1.0` (`moteur/generateur/__init__.py`). Format d'annotations : `plan-synthetique/1.0`.
+Version du générateur : `0.1.1` (`moteur/generateur/__init__.py`). Format d'annotations : `plan-synthetique/1.0`.
 
 ## Installation
 

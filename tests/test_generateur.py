@@ -14,7 +14,7 @@ from moteur.generateur.doublons import chercher, empreinte, signature
 from moteur.generateur.exportateur import Options, generer_lot, repartir
 from moteur.generateur.logements import LogementGenere, Rate, en_logement, generer
 from moteur.generateur.reglages import Reglages
-from moteur.generateur.rendu import rendre
+from moteur.generateur.rendu import BLANC_SOUS_ECHELLE, Repere, _cadre_des_murs, _Dessin, rendre
 from moteur.generateur.validateur import Regles, valider_dossier, valider_geometrie
 from moteur.generateur.variantes import style_au_hasard
 from moteur.logement import Logement
@@ -189,6 +189,25 @@ def test_rotation_annotations_toujours_alignees():
     cadre = log.niveaux[0].cadre
     u, v, w = H @ (cadre.x0 / 1000, cadre.y0 / 1000, 1)
     assert 0 <= u / w <= pieces_m.shape[1] and 0 <= v / w <= pieces_m.shape[0]
+
+
+def test_barre_d_echelle_toujours_entiere_dans_la_page(logements):
+    """La barre d'échelle et son texte « N m » restent dans la page, même avec une petite marge du bas."""
+    for g in list(logements)[:8]:
+        log = logements[g]
+        niveau = log.niveaux[0]
+        for cotes in (False, True):
+            style = style_au_hasard(random.Random(g), diversite=0)
+            style.echelle_graphique, style.cotes, style.cartouche, style.titre = True, cotes, False, False
+            style.marges = (54, 54, 54, 132)  # la plus petite marge que le générateur tire
+            rep = Repere(_cadre_des_murs(niveau), style, random.Random(0))
+            d = _Dessin(log, niveau, style, rep, {}, avec_mobilier=False)
+            d.echelle_graphique()
+            encre = (np.asarray(d.image) != np.array(style.fond, np.uint8)).any(axis=2)
+            lignes = np.flatnonzero(encre.any(axis=1))
+            bas_logement = rep.plat(0, rep.ymin)[1]
+            assert len(lignes) and lignes.min() > bas_logement, (g, cotes)  # la barre est bien dessinée
+            assert lignes.max() < rep.hauteur0 - BLANC_SOUS_ECHELLE // 2, (g, cotes, lignes.max(), rep.hauteur0)
 
 
 def test_meme_style_meme_image():

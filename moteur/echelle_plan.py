@@ -31,7 +31,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.3.0"
+VERSION_ECHELLE = "0.3.1"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -110,7 +110,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     Sans barre, l'échelle des surfaces écrites (`surfaces`, déjà jugée sûre par echelle_par_surfaces) sert
     de la même façon, avec les mêmes contrôles, mais sur un plan à plat seulement : sur une photo de biais,
     la surface d'une pièce redressée est trop imprécise (jusqu'à 6 % d'écart sur l'échelle). Elle sert aussi
-    de contrôle : des cotes peu sûres (une seule cote) qu'elle contredit de plus de 3 % partent à la vérification.
+    de contrôle : des cotes peu sûres (une seule cote) ou une barre qu'elle contredit de plus de 3 % partent à la vérification.
 
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
     (échelles à None)."""
@@ -129,6 +129,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     # (« 12,33 » de « 12,33 m² ») : on ne confronte alors pas la barre à leur maximum.
     controle = (cote_max_largeur, cote_max_hauteur) if (largeur or hauteur) else (None, None)
     if barre and _barre_plausible(barre, il, ih, *controle):
+        if surfaces and not de_biais and abs(surfaces / barre - 1) > ACCORD_SURFACES:
+            return None, None, "à vérifier"  # barre et surfaces en désaccord : un humain tranche
         return (barre, None, "barre") if de_biais else (barre, barre, "barre")
     if surfaces and not de_biais and _barre_plausible(surfaces, il, ih, *controle):
         return surfaces, surfaces, "surfaces"

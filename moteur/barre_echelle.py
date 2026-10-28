@@ -26,6 +26,7 @@ FORME_ZERO = re.compile(r"^[0oO]$")
 TROU_BARRE = 6  # trou toléré (pixels) dans le cadre d'une barre abîmée (grain, compression)
 CASES_ACCORD = 0.06  # les cases d'une barre font la même longueur à 6 % près
 MONTEE_MAX = 4  # on cherche la barre jusqu'à 4 hauteurs de texte au-dessus du « N m »
+PENTE_BARRE = 3  # pixels de pente tolérés d'un bout à l'autre d'une barre (plan un peu de travers)
 
 
 @dataclass
@@ -96,6 +97,16 @@ def _barre_au_dessus(noir: np.ndarray, t: TexteLu, metres: int, textes: list[Tex
     debut = float(np.median([r[1] for r in pleines]))
     fin = float(np.median([r[2] for r in pleines]))
     y_bas, y_haut = max(r[0] for r in pleines), min(r[0] for r in pleines)
+    # Un plan scanné un peu de travers, que le coloriage n'a pas permis de remettre tout à fait droit :
+    # la barre penche, et une seule rangée n'en couvre qu'une partie (2 m lus 1,6 m). On la suit donc
+    # sur toute la bande de ses rangées, à quelques pixels près en hauteur.
+    y0b, y1b = max(0, y_haut - PENTE_BARRE), min(noir.shape[0], y_bas + PENTE_BARRE + 1)
+    bande = noir[y0b:y1b].any(axis=0)
+    a, b = _trait_autour(bande, int(debut), int(fin))
+    if b > fin and b <= bout_max:
+        debut, fin = float(min(a, debut)), float(b)
+        lignes = np.flatnonzero(noir[y0b:y1b, max(0, b - 6):b + 1].any(axis=1))
+        y_haut, y_bas = y0b + int(lignes.min()), y0b + int(lignes.max())
     if y_bas - y_haut >= 2:  # un cadre : son bord droit doit relier le haut et le bas
         bord = noir[y_haut:y_bas + 1, max(0, int(fin) - 1):int(fin) + 2].any(axis=1)
         if bord.mean() < 0.8:
@@ -122,6 +133,15 @@ def _trait_qui_finit_entre(ligne: np.ndarray, a: float, b: float, longueur_min: 
         return None
     i = int(np.argmax(np.where(ok, fins - debuts, -1)))
     return int(debuts[i]), int(fins[i])
+
+
+def _trait_autour(ligne: np.ndarray, a: int, b: int) -> tuple[int, int]:
+    """Le trait foncé de la rangée qui contient [a, b], prolongé tant qu'il ne s'interrompt pas."""
+    while a > 0 and ligne[a - 1]:
+        a -= 1
+    while b + 1 < len(ligne) and ligne[b + 1]:
+        b += 1
+    return a, b
 
 
 def _cases_regulieres(rangee: np.ndarray, debut: float, fin: float, px_par_m: float) -> bool:

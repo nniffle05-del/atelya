@@ -44,7 +44,7 @@ def test_une_seule_piece_ou_des_pieces_en_desaccord_ne_suffisent_pas():
 def test_les_cotes_puis_la_barre_passent_avant_les_surfaces():
     interieur = (6.0 * S, 4.0 * S)
     assert decider(S, S, True, 6.0, 4.0, interieur, False, None, 1.05 * S)[2] == "cotes"
-    assert decider(None, None, False, None, None, interieur, False, S, 1.05 * S)[2] == "barre"
+    assert decider(None, None, False, None, None, interieur, False, S, 1.02 * S)[2] == "barre"  # d'accord à 3 % près
     assert decider(None, None, False, None, None, interieur, False, None, S) == (S, S, "surfaces")
     # Un logement de 600 m de côté n'est pas vraisemblable : à vérifier.
     assert decider(None, None, False, None, None, interieur, False, None, S / 100)[2] == "à vérifier"
