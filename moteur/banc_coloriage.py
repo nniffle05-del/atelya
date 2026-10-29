@@ -40,7 +40,8 @@ from PIL import Image
 from moteur.coloriage import PIECES, lire_coloriage
 from moteur.echelle_plan import decider, lire_echelle_plan
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
-from moteur.redressement import Redressement, corriger_proportions, estimer_redressement
+from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique,
+                                 rapport_plausible)
 
 COTE_ATELYA = 768
 
@@ -303,18 +304,30 @@ def noter_niveau(args) -> dict:
         resultat["deformation_lue"] = round(R.deformation, 5)
     if R is not None and not R.de_biais:
         R = None  # page vue de face : la lecture habituelle (avec sa rotation) suffit
+    optique = R is not None and proportions == "optique"
+    if optique and not photo_entiere(*taille):  # photo recadrée : l'optique ne sait pas, la photo garde ses proportions
+        optique = False
+        resultat["photo_recadree"] = True
+    if optique:  # les proportions retrouvées par l'optique, avant toute lecture d'échelle
+        rapport = rapport_par_optique(R, col.shape)
+        resultat["rapport_optique"] = round(rapport, 5)
+        if rapport_plausible(rapport):
+            R = corriger_proportions(R, rapport)
+        else:  # points de fuite douteux : la photo garde ses proportions
+            optique = False
+            resultat["optique_douteuse"] = True
     vx = vy = s  # l'échelle vraie, en largeur et en hauteur
     if R is not None:
         vx, vy = echelles_apres_redressement(R, ann, s / ann["image"]["px_par_m"])
         resultat["perspective_lue"] = round(R.perspective, 4)
-    lu = None
+    lu = lx = ly = None
     if echelle_opt is not None:
         images, cache = echelle_opt
         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
         lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None) if dessin else {"largeur": None, "hauteur": None}
         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
                                  lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
-                                 lu.get("surfaces") if lu.get("surfaces_sure") else None)
+                                 lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"))
         if R is None:
             lx = ly = lx or ly
         resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,
@@ -330,7 +343,9 @@ def noter_niveau(args) -> dict:
     if R is not None:
         if proportions == "cotes" and not resultat.get("proportions_de_la_photo"):
             R = corriger_proportions(R, vx / vy)
-        else:  # sans cotes : l'image redressée garde les proportions de la photo
+        elif proportions == "optique" and lx and ly:  # échelle lue dans les deux sens : elle a le dernier mot
+            R = corriger_proportions(R, vx / vy)
+        else:  # l'image redressée garde les proportions de l'optique (ou de la photo) ; écart à la vérité :
             resultat["proportions_ecart_pct"] = round(100 * abs(vy / vx - 1), 2)
     s = vx
     resultat["redresse"] = R is not None
@@ -472,8 +487,9 @@ def main() -> None:
     ap.add_argument("--sortie", type=Path, required=True)
     ap.add_argument("--sans-redressement", action="store_true",
                     help="ne pas remettre les plans à plat avant de les lire (comme avant la version 0.2)")
-    ap.add_argument("--proportions", choices=("cotes", "photo"), default="cotes",
-                    help="après redressement, rapport largeur/hauteur donné par les cotes (exactes) ou gardé de la photo")
+    ap.add_argument("--proportions", choices=("cotes", "photo", "optique"), default="cotes",
+                    help="après redressement, rapport largeur/hauteur donné par les cotes (exactes), gardé de la photo, "
+                         "ou retrouvé par l'optique (photo sans cotes ; des cotes lues ont le dernier mot)")
     ap.add_argument("--noms", action="store_true",
                     help="lire aussi les noms de pièces écrits sur le plan (RapidOCR) : ils décident du type")
     ap.add_argument("--images", type=Path, help="dossier « exemples » des dessins, s'ils ne sont pas dans le jeu")

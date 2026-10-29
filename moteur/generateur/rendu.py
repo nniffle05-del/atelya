@@ -64,6 +64,25 @@ class Rendu:
     meubles: dict[str, list[Meuble]] = field(default_factory=dict)
 
 
+def _vue_par_camera(points: np.ndarray, centre: tuple[float, float], cote: float, style) -> np.ndarray:
+    """Où tombent des points de la page (pixels à plat) sur la photo d'un appareil incliné (sténopé).
+
+    La page est posée à plat ; l'appareil, à une distance égale à sa focale, la regarde penché de
+    `style.inclinaison` degrés (autour de l'axe horizontal de la page, puis du vertical). C'est ce que fait
+    un vrai téléphone : les proportions perdues par la perspective se retrouvent par l'optique (moteur.redressement)."""
+    f = style.focale * cote
+    ax, ay = (math.radians(a) for a in style.inclinaison)
+    rx = np.array([[1, 0, 0], [0, math.cos(ax), -math.sin(ax)], [0, math.sin(ax), math.cos(ax)]])
+    ry = np.array([[math.cos(ay), 0, math.sin(ay)], [0, 1, 0], [-math.sin(ay), 0, math.cos(ay)]])
+    R = ry @ rx
+    dx, dy = style.centre_optique[0] * cote, style.centre_optique[1] * cote
+    sortie = []
+    for x, y in points:
+        X = R @ (x - centre[0] - dx, y - centre[1] - dy, 0.0) + (0.0, 0.0, f)
+        sortie.append([centre[0] + dx + f * X[0] / X[2], centre[1] + dy + f * X[1] / X[2]])
+    return np.array(sortie)
+
+
 class Repere:
     """Millimètres du logement → pixels de l'image finale.
 
@@ -93,14 +112,39 @@ class Repere:
             dx, dy = x - cx, y - cy
             tournes.append([cx + dx * math.cos(a) - dy * math.sin(a), cy + dx * math.sin(a) + dy * math.cos(a)])
         tournes = np.float32(tournes)
-        if style.perspective:
-            p = style.perspective
-            tournes += np.float32([[rng.uniform(-p, p) * self.largeur0, rng.uniform(-p, p) * self.hauteur0] for _ in range(4)])
-        decal = tournes.min(axis=0)
+        if style.focale:
+            # Une vraie photo n'est pas recadrée sur la page : son centre est l'axe de l'objectif. On garde donc
+            # autant de place de chaque côté de ce centre (le reste de la table apparaît sur la photo).
+            cote = max(self.largeur0, self.hauteur0)
+            axe = np.float32([cx + style.centre_optique[0] * cote, cy + style.centre_optique[1] * cote])
+            plats = tournes
+            for _ in range(10):
+                tournes = np.float32(_vue_par_camera(plats, (cx, cy), cote, style))
+                demi = np.abs(tournes - axe).max(axis=0)
+                if not style.focale_photo:
+                    break
+                # Une photo de téléphone est au format 4:3 (ou 16:9), et sa focale (objectif ~26 mm) vaut environ
+                # 0,77 fois son grand côté. Si la page n'y tient pas, le photographe recule (la focale, en pages, grandit).
+                cadre = style.focale * cote / style.focale_photo / 2
+                besoin = max(demi.max(), demi.min() * style.format_photo)
+                if besoin <= cadre:
+                    break
+                style.focale = float(style.focale * besoin / cadre * 1.01)
+            if style.focale_photo:
+                long_ = style.focale * cote / style.focale_photo / 2
+                court = long_ / style.format_photo
+                demi = np.float32([long_, court] if demi[0] >= demi[1] else [court, long_])
+            decal = axe - demi
+            tournes = np.vstack([tournes, axe + demi])  # le coin opposé fixe la taille de la photo
+        else:
+            if style.perspective:
+                p = style.perspective
+                tournes += np.float32([[rng.uniform(-p, p) * self.largeur0, rng.uniform(-p, p) * self.hauteur0] for _ in range(4)])
+            decal = tournes.min(axis=0)
         tournes -= decal
         self.largeur, self.hauteur = int(math.ceil(tournes[:, 0].max())), int(math.ceil(tournes[:, 1].max()))
-        self.W = cv2.getPerspectiveTransform(coins, tournes).astype(np.float64)
-        self.identite = not style.rotation and not style.perspective
+        self.W = cv2.getPerspectiveTransform(coins, tournes[:4]).astype(np.float64)
+        self.identite = not style.rotation and not style.perspective and not style.focale
         self.H = self.W @ self.A
 
     def plat(self, x: float, y: float) -> Point:

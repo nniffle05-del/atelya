@@ -21,6 +21,11 @@ Ce qu'un plan de biais ne dit pas seul : le rapport entre l'échelle en largeur 
 celle en hauteur (une photo peut « écraser » un peu la page dans un sens). Ce rapport
 vient des cotes, lues séparément en largeur et en hauteur. Sans cotes, on garde
 l'échelle de la photo autour de son centre, qui est juste à quelques pour cent près.
+
+Version 0.2 (sans cotes) : ce rapport se retrouve aussi par l'optique (rapport_par_optique). Un téléphone voit
+la page par un objectif : avec sa focale, les deux points de fuite disent comment il était penché, donc les
+vraies proportions. La focale se calcule sur la photo quand elle est penchée dans les deux sens (focale_par_fuite),
+sinon on prend celle d'un téléphone. Hypothèse : la photo n'a pas été recadrée (son centre est l'axe de l'objectif).
 """
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-VERSION_REDRESSEMENT = "0.1.0"
+VERSION_REDRESSEMENT = "0.2.0"
 
 MUR, PORTE_FENETRE = 1, 4
 FOND = 0
@@ -348,3 +353,96 @@ def corriger_proportions(r: Redressement, rapport: float) -> Redressement:
     return Redressement(H=S @ r.H, taille=(w, int(math.ceil(h * rapport))), bords=r.bords,
                         perspective=r.perspective, angle_deg=r.angle_deg, deformation=r.deformation)
 
+
+
+# ---------------------------------------------------------------- 6. les proportions par l'optique (sans cotes)
+
+# Focale supposée (fraction du grand côté de l'image) quand la photo ne permet pas de la calculer : celle d'un
+# téléphone (objectif principal ~26 mm, en équivalent 24×36), photo non recadrée.
+FOCALE_TELEPHONE = 0.77
+FOCALE_MIN, FOCALE_MAX = 0.4, 1.5  # en dehors, la focale calculée est invraisemblable pour un téléphone
+FORMATS_PHOTO = (4 / 3, 16 / 9, 3 / 2, 1.0)  # grand côté / petit côté des photos de téléphone non recadrées
+ECART_FORMAT = 0.003  # 1 pixel près sur une petite photo
+RAPPORT_MAX = 0.12  # un téléphone tenu à moins de ~30° n'écrase pas la page de plus de ~10 % : au-delà, coloriage douteux
+FUITE_LOINTAINE = 25.0  # un point de fuite plus loin que ça (en grands côtés) : ces murs sont restés parallèles
+
+
+def _points_de_fuite_trouves(r: Redressement, forme: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
+    """Les deux points de fuite (homogènes, origine au centre de l'image) que le redressement a renvoyés à l'infini."""
+    h, w = forme
+    C = np.array([[1, 0, -w / 2], [0, 1, -h / 2], [0, 0, 1]], np.float64)
+    Hi = np.linalg.inv(r.H)
+    return C @ Hi @ (1.0, 0.0, 0.0), C @ Hi @ (0.0, 1.0, 0.0)
+
+
+def rapport_plausible(rapport: float) -> bool:
+    """Le rapport trouvé par l'optique est-il celui d'une photo de téléphone ? Un rapport extrême vient presque
+    toujours de bords de murs mal coloriés (points de fuite faux) : mieux vaut alors ne pas s'en servir."""
+    return abs(rapport - 1) <= RAPPORT_MAX
+
+
+def photo_entiere(largeur: int, hauteur: int) -> bool:
+    """La photo a-t-elle le format d'une photo de téléphone non recadrée (4:3, 16:9, 3:2 ou carrée) ?
+    Une photo recadrée a perdu son centre (l'axe de l'objectif) : l'optique n'y retrouve pas les proportions."""
+    f = max(largeur, hauteur) / max(1, min(largeur, hauteur))
+    return any(abs(f / g - 1) <= ECART_FORMAT for g in FORMATS_PHOTO)
+
+
+def lire_focale(r: Redressement, forme: tuple[int, int]) -> tuple[float | None, str]:
+    """La focale (en pixels) qui rend les deux familles de murs perpendiculaires : f² = −(v1 · v2), points de fuite
+    vus du centre de l'image. Rend (focale ou None, raison) :
+    - « calculée » : la photo dit sa focale ;
+    - « un seul sens » : la page n'est penchée que dans un sens (un point de fuite très loin), la photo ne dit pas
+      sa focale ; celle d'un téléphone convient ;
+    - « incohérente » : pas de focale possible, ou invraisemblable pour un téléphone. Le plus souvent la photo a été
+      recadrée (son centre n'est plus l'axe de l'objectif) : l'optique n'est alors pas fiable."""
+    v1, v2 = _points_de_fuite_trouves(r, forme)
+    cote = max(forme)
+    loin = [abs(v[2]) < 1e-12 or np.hypot(*(v[:2] / v[2])) > FUITE_LOINTAINE * cote for v in (v1, v2)]
+    if any(loin):
+        return None, "un seul sens"
+    p1, p2 = v1[:2] / v1[2], v2[:2] / v2[2]
+    f2 = -float(p1 @ p2)
+    if f2 <= 0:
+        return None, "incohérente"
+    f = math.sqrt(f2)
+    if not FOCALE_MIN * cote <= f <= FOCALE_MAX * cote:
+        return None, "incohérente"
+    return f, "calculée"
+
+
+def focale_par_fuite(r: Redressement, forme: tuple[int, int]) -> float | None:
+    """La focale (pixels) calculée sur la photo, ou None (voir lire_focale)."""
+    return lire_focale(r, forme)[0]
+
+
+def rapport_par_optique(r: Redressement, forme: tuple[int, int], focale: float | None = None) -> float:
+    """Le rapport (échelle en largeur / échelle en hauteur) de l'image redressée, retrouvé par l'optique, sans cotes.
+
+    Un appareil photo voit la page par un trou (sténopé) : avec sa focale f et les deux points de fuite, on connaît la
+    direction des murs « horizontaux » et « verticaux » dans l'espace, donc la page vraie. On compare ensuite, au
+    centre de l'image redressée, combien de pixels fait un même pas sur la page en largeur et en hauteur.
+    `focale` (pixels) : connue par ailleurs ; sinon calculée sur la photo, ou à défaut celle d'un téléphone."""
+    h, w = forme
+    f = focale or focale_par_fuite(r, forme) or FOCALE_TELEPHONE * max(forme)
+    v1, v2 = _points_de_fuite_trouves(r, forme)
+    Ki = np.diag([1.0 / f, 1.0 / f, 1.0])
+    d1, d2 = Ki @ v1, Ki @ v2
+    d1, d2 = d1 / np.linalg.norm(d1), d2 / np.linalg.norm(d2)
+    # Si la focale n'est pas exacte, les deux directions ne sont pas tout à fait perpendiculaires : on les écarte
+    # symétriquement jusqu'à 90°.
+    s, d = d1 + d2, d1 - d2
+    if np.linalg.norm(s) > 1e-9 and np.linalg.norm(d) > 1e-9:
+        s, d = s / np.linalg.norm(s), d / np.linalg.norm(d)
+        d1, d2 = (s + d) / math.sqrt(2), (s - d) / math.sqrt(2)
+    C_inv = np.array([[1, 0, w / 2], [0, 1, h / 2], [0, 0, 1]], np.float64)
+    K = np.diag([f, f, 1.0])
+    G = C_inv @ K @ np.column_stack([d1, d2, (0.0, 0.0, 1.0)])  # (pas en largeur, pas en hauteur, 1) → pixels
+    M = r.H @ G
+    z = M[2, 2]
+    J = (M[:2, :2] * z - np.outer(M[:2, 2], M[2, :2])) / z ** 2
+    sx, sy = np.hypot(*J[:, 0]), np.hypot(*J[:, 1])
+    # Les colonnes peuvent être échangées (d1 n'est pas forcément la famille « largeur ») : on les range.
+    if abs(J[0, 0]) < abs(J[1, 0]):
+        sx, sy = sy, sx
+    return float(sx / sy)

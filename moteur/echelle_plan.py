@@ -38,11 +38,12 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.4.0"
+VERSION_ECHELLE = "0.5.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
 PAPIER_GRIS = 235  # en dessous (niveau de gris du papier), le plan est une photocopie ou une photo : on étire ses gris
+ACCORD_PORTES = 0.25  # photo : barre ou surfaces à plus de 25 % de l'échelle approchée par les portes → à vérifier
 LARGEUR_PORTE = 0.83  # m : la porte intérieure courante en France (vantail de 83 cm)
 PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
@@ -79,11 +80,11 @@ class EchelleLue:
         """L'échelle d'ensemble : celle de la largeur, sinon celle de la hauteur."""
         return self.largeur if self.largeur is not None else self.hauteur
 
-    def decision(self, de_biais: bool) -> tuple[float | None, float | None, str]:
+    def decision(self, de_biais: bool, proportions_optiques: bool = False) -> tuple[float | None, float | None, str]:
         """L'échelle retenue (largeur, hauteur) et sa source, après contrôle (voir decider)."""
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
                        self.interieur_px, de_biais, self.barre if self.barre_sure else None,
-                       self.surfaces if self.surfaces_sure else None)
+                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -107,7 +108,8 @@ def _plausible(echelle: float | None, interieur: float | None, cote_max: float |
 def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_largeur: float | None,
             cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
             de_biais: bool, barre: float | None = None,
-            surfaces: float | None = None) -> tuple[float | None, float | None, str]:
+            surfaces: float | None = None, proportions_optiques: bool = False,
+            approchee: float | None = None) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -125,9 +127,16 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     la surface d'une pièce redressée est trop imprécise (jusqu'à 6 % d'écart sur l'échelle). Elle sert aussi
     de contrôle : des cotes peu sûres (une seule cote) ou une barre qu'elle contredit de plus de 3 % partent à la vérification.
 
+    Version 0.5 : `proportions_optiques` — la photo de biais a retrouvé ses vraies proportions par l'optique
+    (moteur.redressement.rapport_par_optique, ~0,1 % près en médiane) : la barre donne alors la largeur ET la
+    hauteur, et les surfaces écrites redeviennent utilisables, comme sur un plan à plat. Garde-fou propre aux photos
+    (le coloriage d'Atelya y est moins sûr) : une barre ou des surfaces qui s'écartent de plus de 25 % de l'échelle
+    approchée par les portes (`approchee`) envoient le plan à la vérification.
+
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
     (échelles à None)."""
     il, ih = interieur_px or (None, None)
+    plat = not de_biais or proportions_optiques  # les proportions de l'image sont les vraies
     if largeur or hauteur:
         if de_biais:
             bon = _plausible(largeur, il, cote_max_largeur, sure) and _plausible(hauteur, ih, cote_max_hauteur, sure)
@@ -141,11 +150,15 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     # Sans aucune cote mesurée, les « nombres en forme de cote » lus sont souvent des surfaces
     # (« 12,33 » de « 12,33 m² ») : on ne confronte alors pas la barre à leur maximum.
     controle = (cote_max_largeur, cote_max_hauteur) if (largeur or hauteur) else (None, None)
+    if de_biais and proportions_optiques and approchee:
+        # Sur une photo, une barre ou des surfaces très loin de ce que disent les portes : lecture fausse.
+        barre = barre if barre and abs(barre / approchee - 1) <= ACCORD_PORTES else None
+        surfaces = surfaces if surfaces and abs(surfaces / approchee - 1) <= ACCORD_PORTES else None
     if barre and _barre_plausible(barre, il, ih, *controle):
-        if surfaces and not de_biais and abs(surfaces / barre - 1) > ACCORD_SURFACES:
+        if surfaces and plat and abs(surfaces / barre - 1) > ACCORD_SURFACES:
             return None, None, "à vérifier"  # barre et surfaces en désaccord : un humain tranche
-        return (barre, None, "barre") if de_biais else (barre, barre, "barre")
-    if surfaces and not de_biais and _barre_plausible(surfaces, il, ih, *controle):
+        return (barre, barre, "barre") if plat else (barre, None, "barre")
+    if surfaces and plat and _barre_plausible(surfaces, il, ih, *controle):
         return surfaces, surfaces, "surfaces"
     if largeur or hauteur:
         return None, None, "à vérifier"

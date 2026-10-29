@@ -79,6 +79,14 @@ class Style:
     marges: tuple[int, int, int, int] = (170, 140, 140, 380)  # haut, bas, gauche, droite, en pixels
     rotation: float = 0.0  # degrés, appliqués à toute la page
     perspective: float = 0.0  # 0 : aucune ; 0,05 : les coins de la page bougent de 5 %
+    # Vraie photo (option --vraie-camera) : la page vue par un appareil photo, selon les lois de l'optique,
+    # au lieu de coins bougés au hasard. Focale en fraction du grand côté de la page, inclinaisons en degrés
+    # (autour de l'axe horizontal, puis vertical), décalage du centre de la photo en fraction de la page.
+    focale: float = 0.0  # 0 : pas de vraie caméra
+    inclinaison: tuple[float, float] = (0.0, 0.0)
+    centre_optique: tuple[float, float] = (0.0, 0.0)
+    focale_photo: float = 0.0  # focale en fraction du grand côté de la photo entière (0 : photo recadrée sur la page)
+    format_photo: float = 4 / 3  # grand côté / petit côté de la photo entière
     salissure: str = ""  # "", photocopie, taches, bruit, jpeg, telephone, grain
     contraste: float = 1.0  # < 1 : plus pâle ; > 1 : plus contrasté
     papier: int = 255  # le blanc du papier (230 : scanner un peu gris)

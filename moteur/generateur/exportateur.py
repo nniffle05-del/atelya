@@ -72,6 +72,8 @@ class Options:
     reglages: Path | None = None
     regles: Path | None = None
     familles: list[str] | None = None  # familles de style imposées
+    vraie_camera: bool = False  # les photos de biais suivent l'optique d'un vrai appareil (au lieu de coins bougés au hasard)
+    sans_cotes: bool = False  # aucune cote dessinée (plans d'agence) ; barre d'échelle et surfaces tirées au hasard
 
 
 @dataclass
@@ -125,6 +127,20 @@ def style_pour(graine: int, variante: int, opt: Options) -> Style:
     rng = random.Random(f"style-{graine + opt.graine_styles}-{variante}")
     famille = rng.choice(opt.familles) if opt.familles else None
     style = style_au_hasard(rng, opt.diversite, famille)
+    if opt.vraie_camera or opt.sans_cotes:
+        # Tirage à part : les styles des jeux déjà fabriqués restent identiques sans ces options.
+        r2 = random.Random(f"camera-{graine + opt.graine_styles}-{variante}")
+        if opt.sans_cotes:
+            style.cotes = style.cotes_partielles = False
+            style.echelle_graphique = r2.random() < 0.4
+            style.surfaces = r2.random() < 0.6
+        if opt.vraie_camera and style.perspective:
+            # Téléphone (objectif ~26 mm, focale ≈ 0,77 photo) tenu au-dessus de la page : focale ≈ 0,9 à 1,3 page.
+            style.focale = r2.uniform(0.9, 1.3)
+            style.focale_photo = r2.uniform(0.72, 0.82)
+            style.format_photo = 16 / 9 if r2.random() < 0.2 else 4 / 3
+            style.inclinaison = (r2.choice((-1, 1)) * r2.uniform(5.0, 25.0), r2.choice((-1, 1)) * r2.uniform(0.0, 15.0))
+            style.centre_optique = (r2.uniform(-0.08, 0.08), r2.uniform(-0.08, 0.08))
     if opt.resolution:
         style.px_par_m = opt.resolution
         style.taille_texte = round(opt.resolution * 0.2)

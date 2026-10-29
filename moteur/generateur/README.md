@@ -47,6 +47,8 @@ uv run python -m moteur.generateur valider sorties/jeu-1000
 | `--processus N` | N exemples fabriqués en même temps (mettre le nombre de cœurs) |
 | `--diversite 0..3` | 0 : plans d'architecte sages ; 3 : tous les styles, rotation, perspective, taches, JPEG |
 | `--familles` | impose des familles de style : `architecte,agence,minimaliste,scan,photo,colore,croquis` |
+| `--vraie-camera` | les photos de biais suivent l'optique d'un vrai téléphone (inclinaison, focale ~0,77 de la photo, photo non recadrée) au lieu de coins bougés au hasard |
+| `--sans-cotes` | aucune cote dessinée ; barre d'échelle (40 %) et surfaces écrites (60 %) tirées au hasard |
 | `--variantes N` | N dessins supplémentaires du même logement (autres styles), dans `niveau_k/variante_n/` |
 | `--3d` | écrit aussi le modèle 3D (désactivé par défaut : les plans 2D sont la priorité) |
 | `--refaire` | refait les exemples déjà présents au lieu de les reprendre |

@@ -38,6 +38,7 @@ def _options(args: argparse.Namespace) -> Options:
         resolution=args.resolution, diversite=args.diversite, variantes=args.variantes, modele_3d=args.modele_3d,
         masques_par_classe=args.masques_par_classe, reprise=not args.refaire, reglages=Path(args.reglages) if args.reglages else None,
         regles=Path(args.regles) if args.regles else None, familles=args.familles.split(",") if args.familles else None,
+        vraie_camera=args.vraie_camera, sans_cotes=args.sans_cotes,
     )
 
 
@@ -54,6 +55,8 @@ def _ajouter_options_generation(p: argparse.ArgumentParser) -> None:
     p.add_argument("--resolution", type=float, help="pixels par mètre imposés (sinon 60 à 130 selon le style)")
     p.add_argument("--diversite", type=int, default=2, choices=[0, 1, 2, 3], help="diversité graphique, 0 sage à 3 maximale")
     p.add_argument("--familles", help="familles de style imposées, ex. architecte,agence,scan")
+    p.add_argument("--vraie-camera", action="store_true", help="photos de biais vues par un vrai appareil (optique)")
+    p.add_argument("--sans-cotes", action="store_true", help="aucune cote dessinée (barre d'échelle, surfaces au hasard)")
     p.add_argument("--variantes", type=int, default=0, help="variantes graphiques supplémentaires par logement")
     p.add_argument("--3d", dest="modele_3d", action="store_true", help="écrit aussi modele.glb, modele.obj, construction.json")
     p.add_argument("--masques-par-classe", action="store_true", help="écrit un masque binaire par classe présente")
