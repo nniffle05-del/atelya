@@ -274,7 +274,8 @@ def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement
     lu = {"largeur": e.largeur, "hauteur": e.hauteur, "sure": e.sure, "cotes": len(e.cotes), "redresse": R is not None,
           "cote_max_largeur": e.cote_max_largeur, "cote_max_hauteur": e.cote_max_hauteur, "interieur_px": e.interieur_px,
           "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail,
-          "surfaces": e.surfaces, "surfaces_sure": e.surfaces_sure, "surfaces_detail": e.surfaces_detail}
+          "surfaces": e.surfaces, "surfaces_sure": e.surfaces_sure, "surfaces_detail": e.surfaces_detail,
+          "approchee": e.approchee}
     if f:
         f.write_text(json.dumps(lu), encoding="utf-8")
     return lu
@@ -320,6 +321,8 @@ def noter_niveau(args) -> dict:
                                    "ecart_largeur_pct": round(100 * (lx / vx - 1), 3) if lx else None,
                                    "ecart_hauteur_pct": round(100 * (ly / vy - 1), 3) if ly else None}
         resultat["echelle_a_verifier"] = not (lx or ly)
+        if not (lx or ly) and lu.get("approchee"):  # échelle approchée par les portes, pour la vérification seulement
+            resultat["echelle_lue"]["ecart_approchee_pct"] = round(100 * (lu["approchee"] / vx - 1), 1)
         if lx or ly:  # sinon : plan « à vérifier », noté avec l'échelle exacte (bilan à part)
             vx, vy = lx or ly, ly or lx
             if R is not None and not (lx and ly):  # un seul sens coté : la photo garde ses proportions
@@ -415,6 +418,8 @@ def bilan_echelle(resultats: list[dict]) -> dict:
         ec = [abs(e[k]) for e in lus for k in ("ecart_largeur_pct", "ecart_hauteur_pct") if e[k] is not None]
         pire = [max(abs(e[k]) for k in ("ecart_largeur_pct", "ecart_hauteur_pct") if e[k] is not None) for e in lus]
         n = len(rs)
+        approchees = [abs(r["echelle_lue"]["ecart_approchee_pct"]) for r in rs
+                      if r.get("echelle_a_verifier") and "ecart_approchee_pct" in r.get("echelle_lue", {})]
         return {"niveaux": n, "echelle_lue": len(lus), "a_verifier": n - len(lus),
                 "lue_pct": round(100 * len(lus) / n, 1) if n else None,
                 "ecart_pct_median": round(float(np.median(ec)), 3) if ec else None,
@@ -424,7 +429,10 @@ def bilan_echelle(resultats: list[dict]) -> dict:
                 "plus_de_3_pct": sum(p > 3 for p in pire),
                 "par_cote_d_ensemble": sum(r["echelle_lue"].get("source") == "cote d'ensemble" for r in rs if "echelle_lue" in r),
                 "par_barre": sum(r["echelle_lue"].get("source") == "barre" for r in rs if "echelle_lue" in r),
-                "par_surfaces": sum(r["echelle_lue"].get("source") == "surfaces" for r in rs if "echelle_lue" in r)}
+                "par_surfaces": sum(r["echelle_lue"].get("source") == "surfaces" for r in rs if "echelle_lue" in r),
+                # Les plans « à vérifier » : combien reçoivent une échelle approchée par les portes, et à quel point.
+                "a_verifier_avec_approchee": len(approchees),
+                "approchee_a_10_pct_pres": sum(a <= 10 for a in approchees)}
     return {"tous": part(resultats), "a_plat": part([r for r in resultats if r["perspective"] == 0]),
             "de_biais": part([r for r in resultats if r["perspective"] > 0])}
 

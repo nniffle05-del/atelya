@@ -86,6 +86,30 @@ def test_barre_d_un_plan_un_peu_de_travers_mesuree_en_entier():
     assert b.px_par_m == pytest.approx(123.0, rel=0.01)
 
 
+@pytest.mark.parametrize("metres, flou", [(2, "tourne"), (2, "grain"), (1, "tourne"), (3, "grain")])
+def test_barre_floue_mesuree_sans_le_pixel_de_trop(metres, flou):
+    """Un dessin flou (scan penché remis droit, ou grain lissé) étale les bouts de la barre d'un pixel :
+    la barre ne doit pas s'en trouver allongée (+0,4 % avant la version 0.4). Bout droit plein (1 ou 3 m)
+    ou simple trait (2 m)."""
+    from moteur.barre_echelle import lire_barre
+
+    g = np.full((300, 700), 255, np.uint8)
+    _barre(g, 100, 150, 123.0, metres)
+    if flou == "tourne":
+        for angle in (1.3, -1.3):  # penché au scan, puis remis droit comme le coloriage
+            m = cv2.getRotationMatrix2D((350.3, 150.6), angle, 1.0)
+            g = cv2.warpAffine(g, m, (700, 300), flags=cv2.INTER_LINEAR, borderValue=255)
+    else:
+        bruit = np.random.default_rng(4).normal(0, 12, g.shape)
+        g = np.clip(cv2.GaussianBlur(g.astype(float), (0, 0), 0.8) + bruit, 0, 255).astype(np.uint8)
+    xd = round(100 + metres * 123.0)
+    textes = [TexteLu("0", np.array([[92, 172], [110, 172], [110, 192], [92, 192]], float), 0.9),
+              TexteLu(f"{metres} m", np.array([[xd - 10, 172], [xd + 34, 172], [xd + 34, 192], [xd - 10, 192]], float), 0.9)]
+    b = lire_barre(g, textes)
+    assert b is not None and b.metres == metres
+    assert b.px_par_m == pytest.approx(123.0, rel=0.002)
+
+
 def test_barre_sans_second_indice_pas_sure():
     """Une barre d'un mètre toute pleine, sans « 0 » : rien ne la confirme, elle n'est pas sûre."""
     from moteur.barre_echelle import lire_barre

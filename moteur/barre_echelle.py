@@ -26,6 +26,7 @@ FORME_ZERO = re.compile(r"^[0oO]$")
 TROU_BARRE = 6  # trou toléré (pixels) dans le cadre d'une barre abîmée (grain, compression)
 CASES_ACCORD = 0.06  # les cases d'une barre font la même longueur à 6 % près
 MONTEE_MAX = 4  # on cherche la barre jusqu'à 4 hauteurs de texte au-dessus du « N m »
+BOUT_FIN = 6  # pixels de part et d'autre d'un bout de la barre où l'on compte l'encre (voir _longueur_fine)
 PENTE_BARRE = 3  # pixels de pente tolérés d'un bout à l'autre d'une barre (plan un peu de travers)
 
 
@@ -53,7 +54,7 @@ def lire_barre(gris: np.ndarray, textes: list[TexteLu]) -> BarreLue | None:
         metres = int(re.sub("[lI]", "1", trouve.group(1)))
         if not 1 <= metres <= 50:
             continue
-        barre = _barre_au_dessus(noir, t, metres, textes)
+        barre = _barre_au_dessus(gris, noir, t, metres, textes)
         if barre is not None and (meilleure is None or (barre.sure, barre.fin - barre.debut) > (meilleure.sure, meilleure.fin - meilleure.debut)):
             meilleure = barre
     if meilleure is not None and not meilleure.sure:
@@ -75,7 +76,7 @@ def _chercher_le_zero(gris: np.ndarray, barre: BarreLue) -> BarreLue:
     return barre
 
 
-def _barre_au_dessus(noir: np.ndarray, t: TexteLu, metres: int, textes: list[TexteLu]) -> BarreLue | None:
+def _barre_au_dessus(gris: np.ndarray, noir: np.ndarray, t: TexteLu, metres: int, textes: list[TexteLu]) -> BarreLue | None:
     x0, y0 = t.boite.min(axis=0)
     x1, y1 = t.boite.max(axis=0)
     h = max(4.0, y1 - y0)
@@ -111,13 +112,81 @@ def _barre_au_dessus(noir: np.ndarray, t: TexteLu, metres: int, textes: list[Tex
         bord = noir[y_haut:y_bas + 1, max(0, int(fin) - 1):int(fin) + 2].any(axis=1)
         if bord.mean() < 0.8:
             return None
-    px_par_m = (fin - debut) / metres
+    px_par_m = _longueur_fine(gris, int(debut), int(fin), y_haut, y_bas) / metres
     zero = any(FORME_ZERO.match(z.texte.strip()) and abs(z.boite[:, 0].mean() - debut) <= 1.5 * h
                and abs(z.boite[:, 1].mean() - t.boite[:, 1].mean()) <= h for z in textes)
     cases = any(_cases_regulieres(noir[y], debut, fin, px_par_m) for y in range(y_haut + 1, y_bas))
     preuves = [p for p, ok in (("« 0 » lu sous le bout gauche", zero), ("cases régulières", cases)) if ok]
     return BarreLue(round(px_par_m, 3), metres, bool(preuves), debut, fin, (y_haut + y_bas) / 2, y_bas,
                     f"barre de {metres} m ({round(fin - debut)} pixels)" + (", " + ", ".join(preuves) if preuves else ""))
+
+
+def _longueur_fine(gris: np.ndarray, debut: int, fin: int, y_haut: int, y_bas: int) -> float:
+    """La longueur de la barre au dixième de pixel près, du milieu de son trait gauche au milieu du droit.
+
+    Un dessin flou (tourné pour être remis droit, granuleux, compressé) étale chaque bout de la barre
+    sur un pixel de plus, à moitié foncé : compté en pixels « foncés », la barre gagnait souvent un pixel
+    (+0,5 % sur une barre de 200 pixels). On repère donc chaque bout là où le gris passe à mi-chemin
+    entre le papier et l'encre, ou, si la barre finit par un simple trait (dernière case vide), au
+    centre de ce trait. Le bout gauche est toujours une case pleine (la première case est noire)."""
+    x0, x1 = max(0, debut - 2 * BOUT_FIN), min(gris.shape[1], fin + 2 * BOUT_FIN + 1)
+    y0, y1 = max(0, y_haut - BOUT_FIN), min(gris.shape[0], y_bas + BOUT_FIN + 1)
+    zone = gris[y0:y1, x0:x1].astype(float)
+    papier = float(np.percentile(np.r_[zone[:, :BOUT_FIN].ravel(), zone[:, -BOUT_FIN:].ravel()], 75))
+    interieur = zone[y_haut - y0 + 2:y_bas - y0 - 1, debut - x0 + 3:debut - x0 + BOUT_FIN + 3]
+    if fin - debut < 4 * BOUT_FIN or interieur.size == 0:
+        return float(fin - debut)
+    encre = float(np.median(interieur))
+    if papier - encre < 40:
+        return float(fin - debut)
+    noir = np.clip((papier - zone) / (papier - encre), 0, 1)
+
+    def profil(x_ref: int, seuil: float = 0.5) -> np.ndarray | None:
+        # La noirceur moyenne de chaque colonne, prise dans les rangées du milieu de la barre à cet endroit
+        # (la barre peut pencher un peu : on repère ses rangées près de chaque bout).
+        # On ne garde que les rangées foncées d'un seul tenant autour du milieu de la barre (pas un texte
+        # ou un trait voisin au-dessus).
+        foncee = noir[:, x_ref - x0] > seuil
+        milieu = (y_haut + y_bas) // 2 - y0
+        if not foncee[milieu]:
+            return None
+        haut = bas = milieu
+        while haut > 0 and foncee[haut - 1]:
+            haut -= 1
+        while bas + 1 < len(foncee) and foncee[bas + 1]:
+            bas += 1
+        if bas - haut < 4:
+            return None
+        return noir[haut + 2:bas - 1].mean(axis=0)
+
+    gauche = profil(debut + 3)
+    if gauche is None:
+        return float(fin - debut)
+    xs = np.arange(debut - 3, debut + 4) - x0
+    k = next((i for i in xs if gauche[i] >= 0.5), None)
+    if k is None or gauche[k - 1] >= 0.5:
+        return float(fin - debut)
+    bord_g = k - 1 + (0.5 - gauche[k - 1]) / (gauche[k] - gauche[k - 1]) + 0.5 + x0  # milieu du 1er pixel d'encre
+
+    pleine = profil(fin - 4)
+    if pleine is not None and pleine[fin - 4 - x0] >= 0.5:  # dernière case pleine : son bord, comme à gauche
+        xs = np.arange(fin + 3, fin - 4, -1) - x0
+        k = next((i for i in xs if pleine[i] >= 0.5), None)
+        if k is None or pleine[k + 1] >= 0.5:
+            return float(fin - debut)
+        bord_d = k + (pleine[k] - 0.5) / (pleine[k] - pleine[k + 1]) - 0.5 + x0
+    else:  # dernière case vide : le centre du trait qui la ferme
+        c = fin - x0 + int(np.argmax(noir[:, fin - x0 - 1:fin - x0 + 2].sum(axis=0))) - 1
+        trait = profil(c + x0, 0.25)  # un trait fin flou n'est souvent qu'à moitié noir, sur deux colonnes
+        if trait is None:
+            return float(fin - debut)
+        poids = trait[c - 3:c + 4].copy()
+        poids[poids < 0.1] = 0
+        if poids.sum() <= 0:
+            return float(fin - debut)
+        bord_d = float((np.arange(c - 3, c + 4) * poids).sum() / poids.sum()) + x0
+    longueur = float(bord_d - bord_g)
+    return longueur if abs(longueur - (fin - debut)) <= 3 else float(fin - debut)
 
 
 def _trait_qui_finit_entre(ligne: np.ndarray, a: float, b: float, longueur_min: int) -> tuple[int, int] | None:

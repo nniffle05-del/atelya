@@ -115,3 +115,33 @@ def test_secours_par_la_cote_d_ensemble():
     assert source == "cote d'ensemble" and largeur == pytest.approx(100, rel=0.01)
     assert decider(None, None, False, 6.0, 3.1, (600, 400), False)[2] == "à vérifier"  # largeur et hauteur en désaccord
     assert decider(None, None, False, 6.0, 4.0, (600, 400), True)[2] == "à vérifier"  # photo : pas de secours
+
+
+def test_echelle_approchee_par_les_portes():
+    """Trois portes de 83 cm et une de 73 cm à 100 px par m, plus un petit morceau de porte (coloriage
+    hésitant) : l'échelle approchée est 100 px par m ; sans au moins deux portes, pas d'échelle approchée."""
+    from moteur.coloriage import MUR, PORTE
+    from moteur.echelle_plan import echelle_par_portes
+
+    col = np.zeros((400, 600), np.uint8)
+    col[50:60, 50:550] = MUR
+    for x, larg in ((80, 83), (220, 83), (360, 73), (480, 83)):
+        col[50:60, x:x + larg] = PORTE
+    col[200:210, 100:120] = PORTE  # un bout de porte de 20 px
+    assert echelle_par_portes(col) == pytest.approx(100.0, rel=0.01)
+    seule = np.zeros((400, 600), np.uint8)
+    seule[50:60, 80:163] = PORTE
+    assert echelle_par_portes(seule) is None
+
+
+def test_photocopie_pale_relue_aux_gris_etires():
+    """Une photocopie : papier gris (212), encre pâle (180) et un peu floue. Le modèle de lecture n'y voit
+    aucun nombre ; relue aux gris étirés (papier blanc, encre noire), elle redonne l'échelle."""
+    from moteur.echelle_plan import lire_echelle_plan
+
+    d = dessin_t2().astype(np.float32)
+    pale = 180 + (d / 255) * (212 - 180)
+    pale = cv2.GaussianBlur(pale, (0, 0), 0.8) + np.random.default_rng(3).normal(0, 3, pale.shape)
+    dessin = np.clip(pale, 0, 255).astype(np.uint8)
+    e = lire_echelle_plan(dessin, coloriage_t2())
+    assert e.sure and e.px_par_m == pytest.approx(S, rel=0.01)

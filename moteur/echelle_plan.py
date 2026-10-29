@@ -16,6 +16,13 @@ la mauvaise taille. Un plan sans cote lisible y part aussi, sauf s'il porte une 
 dessinée (moteur.barre_echelle, version 0.2) : elle sert alors d'échelle, si elle est sûre et que le
 logement qu'elle donne a une taille vraisemblable. À défaut de barre, les surfaces écrites dans les pièces
 (« Chambre 12,50 m² », moteur.surfaces_ecrites, version 0.3) donnent l'échelle si plusieurs pièces sont d'accord.
+
+Version 0.4 : la barre est mesurée au dixième de pixel (moteur.barre_echelle) ; les cotes d'un plan
+au papier gris (photocopie, photo) sont relues sur l'image aux gris étirés quand la première lecture
+échoue (_lire) ; et un plan qui ne porte
+aucune de ces informations reçoit une échelle « approchée » tirée de la largeur de ses portes
+(echelle_par_portes, à ±10 % près). Elle ne sert jamais à construire : le plan reste « à vérifier »,
+mais la personne qui vérifie part d'une maquette déjà presque à la bonne taille.
 """
 
 from __future__ import annotations
@@ -26,15 +33,18 @@ import cv2
 import numpy as np
 
 from moteur.barre_echelle import lire_barre
-from moteur.coloriage import MUR, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
+from moteur.coloriage import MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
 from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, lire_echelle, lire_textes
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.3.1"
+VERSION_ECHELLE = "0.4.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
+PAPIER_GRIS = 235  # en dessous (niveau de gris du papier), le plan est une photocopie ou une photo : on étire ses gris
+LARGEUR_PORTE = 0.83  # m : la porte intérieure courante en France (vantail de 83 cm)
+PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
 
 
@@ -60,6 +70,9 @@ class EchelleLue:
     surfaces: float | None = None
     surfaces_sure: bool = False
     surfaces_detail: str = ""
+    # L'échelle approchée par la largeur des portes (px par m du coloriage), pour la vérification humaine
+    # seulement : jamais utilisée pour construire (voir echelle_par_portes).
+    approchee: float | None = None
 
     @property
     def px_par_m(self) -> float | None:
@@ -144,6 +157,25 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     return None, None, "à vérifier"
 
 
+def echelle_par_portes(col: np.ndarray) -> float | None:
+    """Une échelle approchée (px par m du coloriage remis droit), tirée de la largeur des portes coloriées.
+
+    Pour un plan sans cotes, sans barre et sans surfaces écrites : aucune mesure exacte n'est possible,
+    mais les portes intérieures ont presque toutes la même largeur (73, 83 ou 93 cm ; 83 le plus
+    souvent). La largeur médiane des portes, rapportée à 83 cm, donne l'échelle à ±10 % près environ
+    (essai sur 994 niveaux de test : 78 % à 10 % près). C'est trop imprécis pour construire, mais
+    suffisant pour proposer à la personne qui vérifie une maquette presque à la bonne taille.
+    Les petits morceaux de porte (coloriage hésitant) sont écartés : moins de 60 % des grandes portes."""
+    n, _, stats, _ = cv2.connectedComponentsWithStats((col == PORTE).astype(np.uint8), connectivity=4)
+    largeurs = np.array([max(stats[i, 2], stats[i, 3]) for i in range(1, n) if min(stats[i, 2], stats[i, 3]) >= 2], float)
+    if len(largeurs) < PORTES_MIN:
+        return None
+    largeurs = largeurs[largeurs >= 0.6 * np.percentile(largeurs, 75)]
+    if len(largeurs) < PORTES_MIN:
+        return None
+    return round(float(np.median(largeurs)) / LARGEUR_PORTE, 3)
+
+
 def _barre_plausible(barre: float, il: float | None, ih: float | None, cote_max_largeur: float | None,
                      cote_max_hauteur: float | None) -> bool:
     """Le logement mesuré avec l'échelle de la barre (ou des surfaces) a-t-il une taille vraisemblable ?"""
@@ -195,7 +227,30 @@ def _lire(gris: np.ndarray) -> tuple[Echelle, list[tuple[float, bool]], list]:
             meilleure = (score, echelle, nombres, textes)
         if echelle.sure or not nombres:
             break
+    papier = float(np.percentile(gris, 60))
+    if not meilleure[1].sure and papier < PAPIER_GRIS:
+        # Photocopie ou photo : papier gris, texte pâle et flou, que le modèle de lecture ne voit souvent
+        # pas du tout (aucun nombre lu). On étire les gris (le papier redevient blanc, l'encre noire),
+        # puis on relit, telle quelle et agrandie deux fois. Cette relecture n'est gardée que si elle est
+        # sûre (deux cotes d'accord) : sur une image étirée, une cote seule est trop souvent mal lue
+        # (essai sur 1 066 niveaux : une cote seule donnait une échelle fausse de 16 %).
+        etiree = _etirer_gris(gris, papier)
+        for agrandir in (1, 2):
+            textes = lire_textes(etiree, agrandir)
+            echelle = lire_echelle(etiree, textes)
+            if echelle.sure:
+                nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+                meilleure = ((True, True, len(echelle.retenues)), echelle, nombres, textes)
+                break
     return meilleure[1], meilleure[2], meilleure[3]
+
+
+def _etirer_gris(gris: np.ndarray, papier: float) -> np.ndarray:
+    """Le plan aux gris étirés : le papier (gris clair) devient blanc, l'encre la plus foncée devient noire."""
+    encre = float(np.percentile(gris, 0.5))
+    if papier - encre < 10:
+        return gris
+    return np.clip((gris.astype(np.float32) - encre) * (255 / (papier - encre)), 0, 255).astype(np.uint8)
 
 
 def _vertical(boite: np.ndarray) -> bool:
@@ -263,7 +318,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       max(horiz) if horiz else None, max(verti) if verti else None, interieur,
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
-                      surf.detail if surf else "")
+                      surf.detail if surf else "", echelle_par_portes(col))
 
 
 def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
