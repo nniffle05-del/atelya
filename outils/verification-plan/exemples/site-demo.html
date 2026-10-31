@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Démo : l'écran de vérification ouvert dans un onglet du site</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
+    header { padding: 10px 14px; background: #0f172a; color: #fff; display: flex; gap: 12px; align-items: center; }
+    header button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 0; cursor: pointer; }
+    iframe { width: 100%; height: 100%; border: 0; }
+    #retour { padding: 8px 14px; background: #f1f5f9; border-top: 1px solid #cbd5e1; max-height: 30vh; overflow: auto; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <!--
+    Page de DÉMONSTRATION : elle imite l'onglet du site interne, pour montrer et tester le branchement.
+    Ce n'est pas le site de l'associé. Le vrai site fait la même chose avec ses propres fichiers
+    (voir BRANCHEMENT.md) :
+      1. afficher l'écran dans une <iframe> avec ?origine=<adresse du site> ;
+      2. attendre le message « pret », puis envoyer « ouvrir » avec la lecture d'Atelya et l'image ;
+      3. recevoir « valide » (le logement.json corrigé + un rapport) ou « abandon ».
+  -->
+  <header>
+    <strong>Site interne (démo) · Onglet « Plans à vérifier »</strong>
+    <span id="etat">En attente de l'écran…</span>
+  </header>
+  <iframe id="ecran" title="Écran de vérification"></iframe>
+  <div id="retour">Le résultat renvoyé par l'écran s'affichera ici.</div>
+
+  <script src="exemple-cas-test-00.js"></script>
+  <script>
+    "use strict";
+    const ADRESSE_ECRAN = new URL("../index.html", location.href);
+    const ORIGINE_ECRAN = ADRESSE_ECRAN.origin;
+    ADRESSE_ECRAN.searchParams.set("origine", location.origin);
+    const ecran = document.getElementById("ecran");
+    window.resultatRecu = null; // pour les tests automatiques
+
+    window.addEventListener("message", (ev) => {
+      if (ev.origin !== ORIGINE_ECRAN || ev.source !== ecran.contentWindow) return;
+      const m = ev.data || {};
+      if (m.type === "atelya-verification:pret") {
+        document.getElementById("etat").textContent = "Écran prêt : plan envoyé.";
+        const ex = window.EXEMPLE_VERIFICATION; // sur le vrai site : la lecture d'Atelya et l'image du plan déposé
+        ecran.contentWindow.postMessage(
+          { type: "atelya-verification:ouvrir", verification: ex.verification, plan: ex.image }, ORIGINE_ECRAN);
+      } else if (m.type === "atelya-verification:valide") {
+        window.resultatRecu = m.resultat;
+        document.getElementById("etat").textContent = `Validé (${m.resultat.statut}) : le logement part vers la 3D.`;
+        document.getElementById("retour").textContent = JSON.stringify(m.resultat, null, 2);
+      } else if (m.type === "atelya-verification:abandon") {
+        document.getElementById("etat").textContent = "Vérification abandonnée : le plan reste dans la file.";
+      }
+    });
+    ecran.src = ADRESSE_ECRAN.href;
+  </script>
+</body>
+</html>

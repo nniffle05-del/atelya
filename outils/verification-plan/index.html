@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vérification de plan — Atelya</title>
+  <style>
+    :root {
+      --fond: #f4f5f7; --panneau: #ffffff; --bord: #d9dce1; --texte: #1f2328;
+      --doux: #636c76; --accent: #2563eb; --accent-doux: #e8effd; --ok: #15803d;
+      --doute: #ea580c; --doute-doux: #fff1e6; --erreur: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--texte); background: var(--fond);
+      display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: 1fr 340px;
+      grid-template-areas: "barre barre" "bandeau panneau" "plan panneau" "etat panneau";
+    }
+    header {
+      grid-area: barre; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      padding: 8px 12px; background: var(--panneau); border-bottom: 1px solid var(--bord);
+    }
+    header h1 { font-size: 15px; margin: 0 12px 0 0; }
+    .bouton {
+      border: 1px solid var(--bord); background: var(--panneau); color: var(--texte);
+      border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit;
+    }
+    .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .espace { flex: 1; }
+    #bandeau { grid-area: bandeau; padding: 6px 12px; background: var(--doute-doux); color: #9a3412; border-bottom: 1px solid #fed7aa; }
+    #bandeau:empty { display: none; }
+    #zone { grid-area: plan; position: relative; overflow: hidden; }
+    #plan { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+    #zone.depot { outline: 3px dashed var(--accent); outline-offset: -8px; }
+    #accueil {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: var(--doux); text-align: center; padding: 24px; pointer-events: none;
+    }
+    #etat {
+      grid-area: etat; padding: 6px 12px; background: var(--panneau); border-top: 1px solid var(--bord);
+      color: var(--doux); display: flex; gap: 16px;
+    }
+    aside {
+      grid-area: panneau; background: var(--panneau); border-left: 1px solid var(--bord);
+      overflow-y: auto; padding: 12px 14px;
+    }
+    section { border-bottom: 1px solid var(--bord); padding: 10px 0 14px; }
+    section:last-child { border-bottom: 0; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--doux); margin: 0 0 8px; }
+    p { margin: 0 0 8px; }
+    .info { color: var(--doux); font-size: 13px; }
+    .erreur { color: var(--erreur); }
+    label.case { display: flex; gap: 8px; align-items: center; margin: 4px 0; cursor: pointer; }
+    .pastille { width: 14px; height: 14px; border-radius: 3px; display: inline-block; flex: none; }
+    ul.doutes { list-style: none; margin: 0; padding: 0; }
+    ul.doutes li {
+      border: 1px solid #fed7aa; background: var(--doute-doux); border-radius: 6px;
+      padding: 6px 8px; margin-bottom: 6px; cursor: pointer;
+    }
+    ul.doutes li:hover, ul.doutes li.choisi { border-color: var(--doute); }
+    ul.doutes li strong { color: #9a3412; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    td, th { padding: 4px; border-bottom: 1px solid #eef0f2; text-align: left; }
+    th { color: var(--doux); font-weight: 500; }
+    td.nb { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.douteux td:first-child { color: var(--doute); font-weight: 600; }
+    input[type=range] { width: 100%; }
+    input[type=file] { display: none; }
+    .bouton.valider { background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 600; }
+    #fond-confirmation { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 10; }
+    #fond-confirmation[hidden] { display: none; }
+    #confirmation { background: #fff; border-radius: 10px; padding: 18px 20px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    #confirmation h3 { margin: 0 0 8px; font-size: 16px; }
+    #confirmation .ligne { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+    body.comparer .corriger-seulement, body.comparer .propositions { display: none !important; }
+    #mode-corriger[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .separateur { width: 1px; align-self: stretch; background: var(--bord); margin: 0 4px; }
+    .outil[aria-pressed="true"] { background: var(--accent-doux); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    button:disabled { opacity: .4; cursor: default; }
+    .propositions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .propositions button { border: 1px solid var(--doute); background: #fff; color: #9a3412; border-radius: 12px; padding: 2px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+    .propositions button:hover { background: var(--doute); color: #fff; }
+    #fiche label { display: block; margin: 8px 0 2px; color: var(--doux); font-size: 13px; }
+    #fiche input, #fiche select { width: 100%; padding: 5px 7px; border: 1px solid var(--bord); border-radius: 6px; font: inherit; }
+    #fiche .ligne { display: flex; gap: 6px; margin-top: 6px; }
+    #fiche .ligne > * { flex: 1; }
+    #fiche button { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--accent); background: #fff; color: var(--accent); cursor: pointer; font: inherit; font-size: 13px; }
+    #fiche button.plein { background: var(--accent); color: #fff; }
+    #fiche button.danger { border-color: var(--erreur); color: var(--erreur); }
+    #coherence ul { margin: 4px 0 0; padding-left: 18px; color: var(--erreur); }
+    #coherence .ok { color: var(--ok); font-weight: 600; }
+    kbd { border: 1px solid var(--bord); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; }
+  </style>
+</head>
+<body class="comparer">
+  <header>
+    <h1>Vérification de plan</h1>
+    <label class="bouton principal" for="fichiers">Ouvrir un plan à vérifier…</label>
+    <input type="file" id="fichiers" multiple accept="application/json,.json,image/png,image/jpeg">
+    <button class="bouton" id="exemple">Voir l'exemple</button>
+    <button class="bouton" id="mode-corriger" aria-pressed="false" title="Faire apparaître les outils de correction">✎ Corriger</button>
+    <span class="corriger-seulement separateur"></span>
+    <button class="corriger-seulement bouton outil" data-outil="choisir" aria-pressed="true" title="Choisir un élément, déplacer un mur (glisser)">Choisir</button>
+    <button class="corriger-seulement bouton outil" data-outil="mur" title="Ajouter un mur : cliquer ses deux bouts">+ Mur</button>
+    <button class="corriger-seulement bouton outil" data-outil="porte" title="Ajouter une porte : cliquer sur un mur">+ Porte</button>
+    <button class="corriger-seulement bouton outil" data-outil="fenetre" title="Ajouter une fenêtre : cliquer sur un mur">+ Fenêtre</button>
+    <button class="corriger-seulement bouton outil" data-outil="porte_fenetre" title="Ajouter une porte-fenêtre : cliquer sur un mur">+ Porte-fenêtre</button>
+    <span class="corriger-seulement separateur"></span>
+    <button class="corriger-seulement bouton" id="annuler" title="Annuler (Cmd+Z)" disabled>↶ Annuler</button>
+    <button class="corriger-seulement bouton" id="refaire" title="Rétablir (Cmd+Maj+Z)" disabled>↷ Rétablir</button>
+    <span class="espace"></span>
+    <button class="bouton" id="zoom-moins" title="Dézoomer">−</button>
+    <button class="bouton" id="zoom-plus" title="Zoomer">+</button>
+    <button class="bouton" id="zoom-ajuster" title="Voir tout le plan">Ajuster</button>
+    <span class="corriger-seulement separateur"></span>
+    <button class="corriger-seulement bouton" id="abandonner" hidden title="Fermer sans rien enregistrer">Abandonner</button>
+    <button class="corriger-seulement bouton valider" id="valider" disabled title="Enregistrer le logement corrigé">✓ Valider</button>
+  </header>
+
+  <div id="bandeau"></div>
+
+  <div id="zone">
+    <canvas id="plan"></canvas>
+    <div id="accueil">Choisissez en même temps le fichier de vérification (.json) et l'image du plan,<br>
+      ou glissez-les ici. Pour essayer : « Voir l'exemple ».</div>
+  </div>
+
+  <div id="etat"><span id="consigne">Glisser pour se déplacer, molette ou <kbd>+</kbd> / <kbd>−</kbd> pour zoomer.</span><span class="espace"></span><span id="position"></span></div>
+
+  <aside>
+    <section>
+      <h2>Le plan</h2>
+      <p id="titre" class="info">Aucun plan ouvert.</p>
+      <p id="message" class="info"></p>
+    </section>
+
+    <section>
+      <h2>À vérifier <span id="nb-doutes"></span></h2>
+      <p class="info">En orange : ce dont Atelya n'est pas sûr. Un clic sur la ligne montre l'endroit sur le plan.</p>
+      <ul class="doutes" id="doutes"></ul>
+    </section>
+
+    <section id="choix" class="corriger-seulement" hidden>
+      <h2>Élément choisi</h2>
+      <div id="fiche"></div>
+    </section>
+
+    <section class="corriger-seulement">
+      <h2>Lisible par le moteur ?</h2>
+      <div id="coherence" class="info"></div>
+    </section>
+
+    <section>
+      <h2>Ce qu'Atelya a lu</h2>
+      <label class="case"><input type="checkbox" data-calque="pieces" checked><span class="pastille" style="background:#93c5fd"></span>Pièces (nom et surface)</label>
+      <label class="case"><input type="checkbox" data-calque="murs" checked><span class="pastille" style="background:#1d4ed8"></span>Murs</label>
+      <label class="case"><input type="checkbox" data-calque="ouvertures" checked>
+        <span class="pastille" style="background:#16a34a"></span>Portes
+        <span class="pastille" style="background:#0891b2"></span>Fenêtres
+        <span class="pastille" style="background:#9333ea"></span>P.-fenêtres</label>
+      <label class="case"><span class="pastille" style="background:var(--doute)"></span>À vérifier</label>
+      <p class="info" style="margin-top:8px">Transparence de la lecture (pour voir le plan dessous)</p>
+      <input type="range" id="opacite" min="0" max="100" value="70">
+    </section>
+
+    <section>
+      <h2>Pièces</h2>
+      <table>
+        <thead><tr><th>Nom</th><th class="nb">Surface</th></tr></thead>
+        <tbody id="pieces"></tbody>
+      </table>
+      <p class="info" id="resume"></p>
+    </section>
+  </aside>
+
+  <div id="fond-confirmation" hidden>
+    <div id="confirmation" role="dialog" aria-modal="true">
+      <h3 id="confirmation-titre"></h3>
+      <p id="confirmation-texte"></p>
+      <div class="ligne">
+        <button class="bouton" id="confirmation-non">Revenir corriger</button>
+        <button class="bouton valider" id="confirmation-oui">Valider quand même</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="calculs-verif.js"></script>
+  <script src="exemples/exemple-cas-test-00.js"></script>
+  <script src="verification.js"></script>
+</body>
+</html>
