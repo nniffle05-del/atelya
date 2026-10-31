@@ -32,6 +32,12 @@ Et sur une photo dont l'optique a rendu les vraies proportions, les cotes horizo
 même échelle : à plus de 8 % d'écart (essai : ≤ 3,6 % quand elles sont justes), une cote a été mal lue. Sur une telle
 photo, les surfaces écrites l'emportent sur les cotes quand elles sont sûres, et des cotes lues dans un seul sens ne
 suffisent plus : il faut les deux sens, sinon la barre, les surfaces ou la vérification humaine.
+
+Version 0.7 (étape 6-17, moins de photos envoyées en vérification) : les taches coloriées au bord de l'image et séparées
+du logement (bord de la feuille, table) sont effacées avant le garde-fou « coloriage douteux » (sans_taches_au_bord,
+appliqué par le banc) ; des cotes lues dans un seul sens sont gardées si une 2e mesure les confirme à 1 % près
+(_sens_unique_confirme) ; et sur une photo, les cotes trop petites pour une lecture d'un seul coup sont relues par
+morceaux (_lire_par_morceaux), relecture gardée seulement si elle est sûre.
 """
 
 from __future__ import annotations
@@ -42,12 +48,12 @@ import cv2
 import numpy as np
 
 from moteur.barre_echelle import lire_barre
-from moteur.coloriage import MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
-from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, lire_echelle, lire_textes
+from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
+from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle, lire_textes
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.6.0"
+VERSION_ECHELLE = "0.7.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -58,6 +64,8 @@ PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
 BORD_IMAGE = 0.03  # coloriage douteux : la bande du bord de l'image (fraction du grand côté)…
 PART_MURS_AU_BORD = 0.02  # … où se trouvent plus de 2 % des murs, portes et fenêtres coloriés
 ACCORD_OPTIQUE = 0.08  # photo aux proportions de l'optique : échelles des cotes en largeur et en hauteur à 8 % près
+ACCORD_SENS_UNIQUE = 0.01  # photo cotée dans un seul sens : la 2e mesure doit la confirmer à 1 % près
+MORCEAU, RECOUVREMENT = 1000, 200  # photo : lecture par morceaux de 1 000 pixels qui se recouvrent de 200
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
 
 
@@ -123,7 +131,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
             de_biais: bool, barre: float | None = None,
             surfaces: float | None = None, proportions_optiques: bool = False,
-            approchee: float | None = None, douteux: bool = False) -> tuple[float | None, float | None, str]:
+            approchee: float | None = None, douteux: bool = False,
+            surfaces_lues: float | None = None) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -152,6 +161,10 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     8 % l'une de l'autre aussi (ACCORD_OPTIQUE). Sur une telle photo, des surfaces sûres passent avant les cotes, et
     des cotes lues dans un seul sens sont écartées (la barre ou la vérification prennent le relais).
 
+    Version 0.7 : sur une telle photo, des cotes lues dans un seul sens sont gardées si une 2e mesure les confirme à 1 %
+    près (_sens_unique_confirme) : la cote d'ensemble rapportée au logement colorié (avec au moins deux cotes d'accord),
+    ou les surfaces écrites, même peu sûres (`surfaces_lues`).
+
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
     (échelles à None)."""
     if douteux:  # le logement colorié est faux : il ne peut plus contrôler aucun chiffre lu
@@ -168,7 +181,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             return surfaces, surfaces, "surfaces"
         if largeur and hauteur and abs(largeur / hauteur - 1) > ACCORD_OPTIQUE:
             return None, None, "à vérifier"  # les proportions sont déjà vraies : une des deux échelles vient d'une cote mal lue
-        if not (largeur and hauteur):
+        if not (largeur and hauteur) and not _sens_unique_confirme(largeur, hauteur, sure, cote_max_largeur,
+                                                                 cote_max_hauteur, interieur_px, surfaces_lues):
             largeur = hauteur = None  # cotes dans un seul sens et rien pour les confirmer : elles ne suffisent pas
     if largeur or hauteur:
         if de_biais:
@@ -203,6 +217,26 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     return None, None, "à vérifier"
 
 
+def _sens_unique_confirme(largeur: float | None, hauteur: float | None, sure: bool, cote_max_largeur: float | None,
+                          cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
+                          surfaces: float | None) -> bool:
+    """Photo aux proportions de l'optique, cotes lues dans un seul sens : une 2e mesure les confirme-t-elle à 1 % près ?
+
+    - la cote d'ensemble du même sens rapportée à la taille du logement colorié, si au moins deux cotes s'accordent
+      (une cote seule mal lue, si c'est aussi la plus grande, donnerait deux échelles fausses mais d'accord) ;
+    - ou les surfaces écrites, même jugées peu sûres : un autre nombre, lu ailleurs sur le plan.
+    Essai (étape 6-17, 28 photos réalistes cotées dans un seul sens) : 11 confirmées, toutes à moins de 0,5 % de la vraie
+    échelle ; les cotes fausses de 3 à 90 % ne le sont jamais."""
+    echelle = largeur or hauteur
+    if not echelle:
+        return False
+    il, ih = interieur_px or (None, None)
+    interieur, cote_max = (il, cote_max_largeur) if largeur else (ih, cote_max_hauteur)
+    if sure and interieur and cote_max and abs(interieur / cote_max / echelle - 1) <= ACCORD_SENS_UNIQUE:
+        return True
+    return bool(surfaces and abs(surfaces / echelle - 1) <= ACCORD_SENS_UNIQUE)
+
+
 def coloriage_douteux(col: np.ndarray) -> bool:
     """Atelya a-t-il colorié des murs jusqu'au bord de l'image (coloriage brut, avant redressement) ?
 
@@ -217,6 +251,32 @@ def coloriage_douteux(col: np.ndarray) -> bool:
     m = max(1, round(BORD_IMAGE * max(col.shape)))
     au_bord = int(bati[:m].sum() + bati[-m:].sum() + bati[m:-m, :m].sum() + bati[m:-m, -m:].sum())
     return au_bord > PART_MURS_AU_BORD * total
+
+
+def sans_taches_au_bord(col: np.ndarray) -> np.ndarray:
+    """Le coloriage sans les « murs » coloriés au bord de l'image et séparés du logement (version 0.7).
+
+    Sur une photo posée sur une table, Atelya colorie parfois le bord de la feuille, un pli ou le dessin de la table
+    en murs. Ces taches touchent la bande du bord de l'image (voir coloriage_douteux) mais ne tiennent pas au logement :
+    le logement est le plus grand morceau de bâti (murs, portes et fenêtres, qui se touchent à 2 pixels près).
+    On efface les autres morceaux qui touchent cette bande ; tout le reste du coloriage est gardé tel quel.
+    Essai (étape 6-17, coloriages de l'essai 5, 343 photos réalistes avec cotes) : sur les 30 coloriages douteux, le logement
+    ne touche jamais la bande du bord ; seules ces taches la touchent."""
+    bati = ((col >= MUR) & (col <= PORTE_FENETRE)).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(cv2.dilate(bati, np.ones((5, 5), np.uint8)), connectivity=8)
+    if n <= 2:
+        return col
+    logement = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    m = max(1, round(BORD_IMAGE * max(col.shape)))
+    bande = np.zeros(col.shape, bool)
+    bande[:m], bande[-m:], bande[:, :m], bande[:, -m:] = True, True, True, True
+    au_bord = np.unique(lab[bande & (bati > 0)])
+    effacer = np.isin(lab, [i for i in au_bord if i not in (0, logement)]) & (bati > 0)
+    if not effacer.any():
+        return col
+    propre = col.copy()
+    propre[effacer] = FOND
+    return propre
 
 
 def echelle_par_portes(col: np.ndarray) -> float | None:
@@ -273,7 +333,28 @@ def _cadre_entier(G: np.ndarray, forme: tuple[int, int], taille: tuple[int, int]
     return T @ G, (int(np.ceil(x1 - x0)), int(np.ceil(y1 - y0)))
 
 
-def _lire(gris: np.ndarray) -> tuple[Echelle, list[tuple[float, bool]], list]:
+def _lire_par_morceaux(gris: np.ndarray) -> list:
+    """Les textes d'une grande image, lus morceau par morceau (version 0.7).
+
+    Le modèle de lecture réduit toute image à 2 000 pixels de côté au plus : sur une photo de téléphone, les chiffres
+    des cotes (8 à 12 pixels de haut) deviennent alors trop petits pour être vus, même sur l'image agrandie.
+    Lus par morceaux de MORCEAU pixels agrandis deux fois, ils gardent leur taille. Les morceaux se recouvrent
+    (RECOUVREMENT pixels) pour ne couper aucun texte ; un texte lu deux fois n'est gardé qu'une fois."""
+    H, W = gris.shape
+    pas = MORCEAU - RECOUVREMENT
+    textes = []
+    for y in range(0, max(1, H - RECOUVREMENT), pas):
+        for x in range(0, max(1, W - RECOUVREMENT), pas):
+            for t in lire_textes(gris[y:y + MORCEAU, x:x + MORCEAU], 2):
+                boite = t.boite + np.array([x, y], float)
+                centre = boite.mean(axis=0)
+                if any(u.texte == t.texte and np.linalg.norm(u.boite.mean(axis=0) - centre) < 10 for u in textes):
+                    continue
+                textes.append(TexteLu(t.texte, boite, t.confiance))
+    return textes
+
+
+def _lire(gris: np.ndarray, photo: bool = False) -> tuple[Echelle, list[tuple[float, bool]], list]:
     """Comme lecture_cotes.lire_textes_et_echelle, mais sans insister quand la première lecture ne trouve
     aucun nombre en forme de cote : le plan n'a pas de cotes, les lectures suivantes (plus lentes) n'en
     trouveraient pas davantage. Rend aussi tous les nombres en forme de cote lus (valeur, vertical),
@@ -300,6 +381,17 @@ def _lire(gris: np.ndarray) -> tuple[Echelle, list[tuple[float, bool]], list]:
         for agrandir in (1, 2):
             textes = lire_textes(etiree, agrandir)
             echelle = lire_echelle(etiree, textes)
+            if echelle.sure:
+                nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+                meilleure = ((True, True, len(echelle.retenues)), echelle, nombres, textes)
+                break
+    if photo and not meilleure[1].sure and max(gris.shape) > MORCEAU:
+        # Photo de téléphone : chiffres trop petits pour une lecture d'un seul coup (voir _lire_par_morceaux).
+        # Comme pour l'image étirée, cette relecture n'est gardée que si elle est sûre (deux cotes d'accord) :
+        # sur un chiffre flou, une cote seule est souvent mal lue (« 8,79 » pour 8,30).
+        for image in (gris, _etirer_gris(gris, float(np.percentile(gris, 60)))):
+            textes = _lire_par_morceaux(image)
+            echelle = lire_echelle(image, textes)
             if echelle.sure:
                 nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
                 meilleure = ((True, True, len(echelle.retenues)), echelle, nombres, textes)
@@ -361,7 +453,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
         facteur = r
         col = redresser(coloriage, angle)
         vers_col = np.diag([r, r, 1.0])  # les deux sont tournés autour de leur centre
-    echelle, nombres, textes = _lire(vu)
+    echelle, nombres, textes = _lire(vu, photo=redressement is not None)
     barre = lire_barre(vu, textes)
     cotes = echelle.retenues + echelle.ecartees
     if redressement is not None:

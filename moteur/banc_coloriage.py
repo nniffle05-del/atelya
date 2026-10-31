@@ -38,7 +38,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
-from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan
+from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan, sans_taches_au_bord
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique,
                                  rapport_plausible)
@@ -266,9 +266,11 @@ def textes_du_plan(dessin: Path, cache: Path | None) -> list:
     return textes
 
 
-def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement | None, cache: Path | None) -> dict:
-    """L'échelle lue sur les cotes du dessin (px par m du coloriage, en largeur et en hauteur), gardée en cache."""
-    f = cache / f"{niveau.parent.name}-{niveau.name}.json" if cache else None
+def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement | None, cache: Path | None,
+                    suffixe: str = "") -> dict:
+    """L'échelle lue sur les cotes du dessin (px par m du coloriage, en largeur et en hauteur), gardée en cache.
+    `suffixe` : un coloriage nettoyé (voir sans_taches_au_bord) a son propre fichier cache."""
+    f = cache / f"{niveau.parent.name}-{niveau.name}{suffixe}.json" if cache else None
     if f and f.exists():
         return json.loads(f.read_text(encoding="utf-8"))
     e = lire_echelle_plan(np.array(Image.open(dessin).convert("L")), col, R)
@@ -299,6 +301,12 @@ def noter_niveau(args) -> dict:
     types_vrais = {p["id"]: TYPE_VERS_CLASSE.get(p["type"], 5) for n in geo["niveaux"] for p in n["pieces"]}
     resultat = {"plan": exemple.name, "niveau": idx, "perspective": float(ann["image"].get("perspective", 0) or 0),
                 "rotation": float(ann["image"].get("rotation_deg", 0) or 0)}
+    nettoye = False
+    if fichier_coloriage and coloriage_douteux(col):
+        propre = sans_taches_au_bord(col)  # taches au bord de l'image, séparées du logement (table, bord de feuille)
+        if not coloriage_douteux(propre):
+            col, nettoye = propre, True
+            resultat["coloriage_nettoye"] = True
     R = estimer_redressement(col) if redresser else None
     if R is not None:
         resultat["deformation_lue"] = round(R.deformation, 5)
@@ -324,14 +332,14 @@ def noter_niveau(args) -> dict:
     if echelle_opt is not None:
         images, cache = echelle_opt
         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
-        lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None) if dessin else {"largeur": None, "hauteur": None}
+        lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None, "-nettoye" if nettoye else "") if dessin else {"largeur": None, "hauteur": None}
         douteux = coloriage_douteux(col)  # calculé ici et non gardé en cache : il ne dépend que du coloriage brut
         if douteux:
             resultat["coloriage_douteux"] = True
         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
                                  lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
                                  lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"),
-                                 douteux)
+                                 douteux, lu.get("surfaces"))
         if R is None:
             lx = ly = lx or ly
         resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,
