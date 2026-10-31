@@ -23,6 +23,15 @@ au papier gris (photocopie, photo) sont relues sur l'image aux gris étirés qua
 aucune de ces informations reçoit une échelle « approchée » tirée de la largeur de ses portes
 (echelle_par_portes, à ±10 % près). Elle ne sert jamais à construire : le plan reste « à vérifier »,
 mais la personne qui vérifie part d'une maquette déjà presque à la bonne taille.
+
+Version 0.6 : garde-fou « coloriage douteux » (coloriage_douteux). Sur une photo posée sur une table, Atelya
+peut colorier des murs dans le bois ou les plis jusqu'au bord de la photo. Le logement colorié, ses surfaces et le
+redressement sont alors faux, et ils faussent aussi les contrôles des chiffres lus : deux erreurs se confirment.
+Un coloriage dont plus de 2 % des murs touchent le bord de l'image envoie donc l'échelle à la vérification.
+Et sur une photo dont l'optique a rendu les vraies proportions, les cotes horizontales et verticales doivent donner la
+même échelle : à plus de 8 % d'écart (essai : ≤ 3,6 % quand elles sont justes), une cote a été mal lue. Sur une telle
+photo, les surfaces écrites l'emportent sur les cotes quand elles sont sûres, et des cotes lues dans un seul sens ne
+suffisent plus : il faut les deux sens, sinon la barre, les surfaces ou la vérification humaine.
 """
 
 from __future__ import annotations
@@ -38,7 +47,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.5.0"
+VERSION_ECHELLE = "0.6.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -46,6 +55,9 @@ PAPIER_GRIS = 235  # en dessous (niveau de gris du papier), le plan est une phot
 ACCORD_PORTES = 0.25  # photo : barre ou surfaces à plus de 25 % de l'échelle approchée par les portes → à vérifier
 LARGEUR_PORTE = 0.83  # m : la porte intérieure courante en France (vantail de 83 cm)
 PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
+BORD_IMAGE = 0.03  # coloriage douteux : la bande du bord de l'image (fraction du grand côté)…
+PART_MURS_AU_BORD = 0.02  # … où se trouvent plus de 2 % des murs, portes et fenêtres coloriés
+ACCORD_OPTIQUE = 0.08  # photo aux proportions de l'optique : échelles des cotes en largeur et en hauteur à 8 % près
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
 
 
@@ -74,6 +86,8 @@ class EchelleLue:
     # L'échelle approchée par la largeur des portes (px par m du coloriage), pour la vérification humaine
     # seulement : jamais utilisée pour construire (voir echelle_par_portes).
     approchee: float | None = None
+    # Le coloriage d'Atelya colle au bord de l'image (table ou plis coloriés en murs) : voir coloriage_douteux.
+    douteux: bool = False
 
     @property
     def px_par_m(self) -> float | None:
@@ -84,7 +98,7 @@ class EchelleLue:
         """L'échelle retenue (largeur, hauteur) et sa source, après contrôle (voir decider)."""
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
                        self.interieur_px, de_biais, self.barre if self.barre_sure else None,
-                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee)
+                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee, self.douteux)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -109,7 +123,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
             de_biais: bool, barre: float | None = None,
             surfaces: float | None = None, proportions_optiques: bool = False,
-            approchee: float | None = None) -> tuple[float | None, float | None, str]:
+            approchee: float | None = None, douteux: bool = False) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -133,10 +147,29 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     (le coloriage d'Atelya y est moins sûr) : une barre ou des surfaces qui s'écartent de plus de 25 % de l'échelle
     approchée par les portes (`approchee`) envoient le plan à la vérification.
 
+    Version 0.6 : un coloriage douteux (`douteux`, voir coloriage_douteux) envoie toujours le plan à la vérification ;
+    sur une photo aux proportions de l'optique, des cotes qui donnent en largeur et en hauteur des échelles à plus de
+    8 % l'une de l'autre aussi (ACCORD_OPTIQUE). Sur une telle photo, des surfaces sûres passent avant les cotes, et
+    des cotes lues dans un seul sens sont écartées (la barre ou la vérification prennent le relais).
+
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
     (échelles à None)."""
+    if douteux:  # le logement colorié est faux : il ne peut plus contrôler aucun chiffre lu
+        return None, None, "à vérifier"
     il, ih = interieur_px or (None, None)
     plat = not de_biais or proportions_optiques  # les proportions de l'image sont les vraies
+    if de_biais and proportions_optiques and (largeur or hauteur):
+        cotes_fiables = largeur and hauteur and sure and abs(surfaces / ((largeur + hauteur) / 2) - 1) <= ACCORD_SURFACES \
+            if surfaces else False
+        if surfaces and not cotes_fiables and _barre_plausible(surfaces, *(interieur_px or (None, None)), None, None):
+            # Sur une photo, les surfaces écrites sont plus sûres que des cotes douteuses (essai 6-16 : ≤ 2,3 % d'erreur
+            # sur 202 niveaux, quand une cote mal lue sur la photo fausse l'échelle de 3 à 6 %). Des cotes sûres, lues dans
+            # les deux sens et d'accord avec les surfaces à 3 % près, restent plus précises : elles sont gardées.
+            return surfaces, surfaces, "surfaces"
+        if largeur and hauteur and abs(largeur / hauteur - 1) > ACCORD_OPTIQUE:
+            return None, None, "à vérifier"  # les proportions sont déjà vraies : une des deux échelles vient d'une cote mal lue
+        if not (largeur and hauteur):
+            largeur = hauteur = None  # cotes dans un seul sens et rien pour les confirmer : elles ne suffisent pas
     if largeur or hauteur:
         if de_biais:
             bon = _plausible(largeur, il, cote_max_largeur, sure) and _plausible(hauteur, ih, cote_max_hauteur, sure)
@@ -168,6 +201,22 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
         e = (ctrl_l + ctrl_h) / 2
         return e, e, "cote d'ensemble"
     return None, None, "à vérifier"
+
+
+def coloriage_douteux(col: np.ndarray) -> bool:
+    """Atelya a-t-il colorié des murs jusqu'au bord de l'image (coloriage brut, avant redressement) ?
+
+    Un plan dessiné ou photographié garde toujours une marge de papier ou de table autour du logement. Des murs
+    coloriés au bord de l'image viennent donc de la table, des plis ou d'un reflet pris pour des traits.
+    Essai (étape 6-16, coloriages de l'essai 4) : 0 sur 342 anciennes photos, 1 sur 1 066 anciens niveaux, et les
+    16 échelles fausses de plus de 3 % sur 342 photos réalistes toutes attrapées."""
+    bati = (col >= MUR) & (col <= PORTE_FENETRE)
+    total = int(bati.sum())
+    if not total:
+        return False
+    m = max(1, round(BORD_IMAGE * max(col.shape)))
+    au_bord = int(bati[:m].sum() + bati[-m:].sum() + bati[m:-m, :m].sum() + bati[m:-m, -m:].sum())
+    return au_bord > PART_MURS_AU_BORD * total
 
 
 def echelle_par_portes(col: np.ndarray) -> float | None:
@@ -331,7 +380,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       max(horiz) if horiz else None, max(verti) if verti else None, interieur,
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
-                      surf.detail if surf else "", echelle_par_portes(col))
+                      surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage))
 
 
 def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):

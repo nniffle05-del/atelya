@@ -23,6 +23,7 @@ from dataclasses import asdict, dataclass, field
 import cv2
 import numpy as np
 
+from moteur.generateur.photo import Realisme, capteur, composer, lumiere
 from moteur.salissure import _photocopie, _taches
 
 FAMILLES = ("architecte", "agence", "minimaliste", "scan", "photo", "colore", "croquis")
@@ -90,6 +91,7 @@ class Style:
     salissure: str = ""  # "", photocopie, taches, bruit, jpeg, telephone, grain
     contraste: float = 1.0  # < 1 : plus pâle ; > 1 : plus contrasté
     papier: int = 255  # le blanc du papier (230 : scanner un peu gris)
+    realisme: Realisme | None = None  # photo réaliste (option --photo-realiste) : table, plis, ombres, reflets
 
     def en_dict(self) -> dict:
         return asdict(self)
@@ -204,14 +206,21 @@ def style_au_hasard(rng: random.Random, diversite: int = 2, famille: str | None 
 # ---------------------------------------------------------------- salissures (pixels seulement)
 
 
-def salir(image: np.ndarray, style: Style, rng: random.Random) -> np.ndarray:
-    """L'image RGB abîmée selon le style (contraste, papier, salissure). Ne déplace aucun pixel."""
+def salir(image: np.ndarray, style: Style, rng: random.Random, page: np.ndarray | None = None,
+          plis: np.ndarray | None = None) -> np.ndarray:
+    """L'image RGB abîmée selon le style (contraste, papier, salissure). Ne déplace aucun pixel.
+
+    Photo réaliste (`style.realisme`) : `page` dit quelle part de chaque pixel est couverte par la feuille,
+    `plis` la lumière des plis ; la feuille est posée sur une table (voir moteur.generateur.photo)."""
     img = image.astype(np.float32)
     if style.papier < 255:
         img = img * (style.papier / 255)
     if style.contraste != 1.0:
         img = 128 + (img - 128) * style.contraste
     nrng = np.random.default_rng(rng.getrandbits(32))
+    r = style.realisme
+    if r is not None and page is not None:
+        img = lumiere(composer(img, page, plis, r, rng, nrng), page, r, rng, nrng)
     s = style.salissure
     if s == "photocopie":
         gris = cv2.cvtColor(_octets(img), cv2.COLOR_RGB2GRAY)
@@ -225,6 +234,8 @@ def salir(image: np.ndarray, style: Style, rng: random.Random) -> np.ndarray:
         img = img + nrng.normal(0, rng.uniform(3, 8), img.shape)
     elif s == "telephone":
         img = _eclairage(img, rng, nrng)
+        if r is not None and page is not None:
+            img = capteur(img, r, rng, nrng)
     if s in ("jpeg", "telephone") or (s and rng.random() < 0.3):
         img = _jpeg(_octets(img), rng.randint(35, 80) if s == "jpeg" else rng.randint(60, 90)).astype(np.float32)
     return _octets(img)

@@ -36,6 +36,7 @@ from moteur.dessin_plan import _police
 from moteur.generateur.annotations import CLASSES, rect_de_l_ouverture, rect_du_mur, rasteriser
 from moteur.generateur.logements import LogementGenere, Niveau, Ouverture, Piece, Rect
 from moteur.generateur.mobilier import Meuble, meubler_niveau
+from moteur.generateur.photo import plis_a_plat
 from moteur.generateur.variantes import PALETTES, Style, salir
 
 Point = tuple[float, float]
@@ -497,13 +498,15 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
     d = _Dessin(log, niveau, style, rep, meubles, avec_mobilier=True)
     d.tout()
     images: dict[str, np.ndarray] = {}
+    page, plis = _feuille(rep, style, f"photo-{log.graine}-{niveau.index}-{graine_style}")
     plan = rep.deformer(np.asarray(d.image), True, style.fond)
-    images["plan"] = salir(plan, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"))
+    images["plan"] = salir(plan, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"), page, plis)
     if style.mobilier:
         d2 = _Dessin(log, niveau, style, rep, escaliers, avec_mobilier=True)
         d2.tout()
         nu = rep.deformer(np.asarray(d2.image), True, style.fond)
-        images["plan_sans_mobilier"] = salir(nu, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"))
+        images["plan_sans_mobilier"] = salir(nu, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"),
+                                             page, plis)
     # Le bord d'une pièce et le bord de son mur tombent sur la même rangée de pixels (les polygones
     # se touchent) : le mur l'emporte, pour qu'un pixel d'une pièce porte toujours la classe de la pièce.
     d.pieces_m[d.elements > 0] = 0
@@ -515,6 +518,20 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
     bord = cv2.morphologyEx(plein, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8))
     images["contours"] = (bord * 255).astype(np.uint8)
     return Rendu(images, _annotations_pixels(log, niveau, rep, d, style, meubles), style, meubles)
+
+
+def _feuille(rep: Repere, style: Style, graine: str) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Photo réaliste : la part de chaque pixel couverte par la feuille et la lumière des plis, dans le
+    repère final (None, None sans photo réaliste). Dessinées à plat puis vues par la même matrice que le plan."""
+    if style.realisme is None or rep.identite:
+        return None, None
+    rng = random.Random(graine)
+    nrng = np.random.default_rng(rng.getrandbits(32))
+    page = rep.deformer(np.ones((rep.hauteur0, rep.largeur0), np.float32), True, 0.0)
+    plis = plis_a_plat(rep.hauteur0, rep.largeur0, style.realisme, rng, nrng)
+    if plis is not None:
+        plis = rep.deformer(plis, True, 1.0)
+    return page, plis
 
 
 def _cadre_des_murs(niveau: Niveau) -> Rect:

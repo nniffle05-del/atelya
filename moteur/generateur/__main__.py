@@ -17,6 +17,7 @@ Exemples :
   uv run python -m moteur.generateur generer --nombre 50 --types T2,T3 --surface-min 40 --surface-max 80 --diversite 3
   uv run python -m moteur.generateur generer --nombre 20 --3d --variantes 2 --masques-par-classe --resolution 80
   uv run python -m moteur.generateur tout --nombre 100 --dossier sorties/jeu-100 --processus 4
+  uv run python -m moteur.generateur generer --nombre 50 --familles photo --photo-realiste --dossier sorties/photos
   uv run python -m moteur.generateur repartir sorties/jeu-100 --parts 0.8,0.1,0.1
 """
 
@@ -38,7 +39,8 @@ def _options(args: argparse.Namespace) -> Options:
         resolution=args.resolution, diversite=args.diversite, variantes=args.variantes, modele_3d=args.modele_3d,
         masques_par_classe=args.masques_par_classe, reprise=not args.refaire, reglages=Path(args.reglages) if args.reglages else None,
         regles=Path(args.regles) if args.regles else None, familles=args.familles.split(",") if args.familles else None,
-        vraie_camera=args.vraie_camera, sans_cotes=args.sans_cotes,
+        vraie_camera=args.vraie_camera or args.photo_realiste, sans_cotes=args.sans_cotes,
+        photo_realiste=args.photo_realiste,
     )
 
 
@@ -56,6 +58,8 @@ def _ajouter_options_generation(p: argparse.ArgumentParser) -> None:
     p.add_argument("--diversite", type=int, default=2, choices=[0, 1, 2, 3], help="diversité graphique, 0 sage à 3 maximale")
     p.add_argument("--familles", help="familles de style imposées, ex. architecte,agence,scan")
     p.add_argument("--vraie-camera", action="store_true", help="photos de biais vues par un vrai appareil (optique)")
+    p.add_argument("--photo-realiste", action="store_true",
+                   help="photos « vraie caméra » sur une vraie table : plis, ombres, reflets, flou (implique --vraie-camera)")
     p.add_argument("--sans-cotes", action="store_true", help="aucune cote dessinée (barre d'échelle, surfaces au hasard)")
     p.add_argument("--variantes", type=int, default=0, help="variantes graphiques supplémentaires par logement")
     p.add_argument("--3d", dest="modele_3d", action="store_true", help="écrit aussi modele.glb, modele.obj, construction.json")

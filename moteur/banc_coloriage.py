@@ -38,7 +38,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
-from moteur.echelle_plan import decider, lire_echelle_plan
+from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique,
                                  rapport_plausible)
@@ -325,9 +325,13 @@ def noter_niveau(args) -> dict:
         images, cache = echelle_opt
         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
         lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None) if dessin else {"largeur": None, "hauteur": None}
+        douteux = coloriage_douteux(col)  # calculé ici et non gardé en cache : il ne dépend que du coloriage brut
+        if douteux:
+            resultat["coloriage_douteux"] = True
         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
                                  lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
-                                 lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"))
+                                 lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"),
+                                 douteux)
         if R is None:
             lx = ly = lx or ly
         resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,

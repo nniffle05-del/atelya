@@ -45,6 +45,7 @@ from moteur.generateur.logements import LogementGenere, en_logement, generer
 from moteur.generateur.reglages import Reglages
 from moteur.generateur.rendu import Rendu, rendre
 from moteur.generateur.validateur import Regles, Verdict, valider_dossier, valider_geometrie
+from moteur.generateur.photo import realisme_au_hasard
 from moteur.generateur.variantes import Style, style_au_hasard
 
 journal = logging.getLogger("generateur")
@@ -74,6 +75,7 @@ class Options:
     familles: list[str] | None = None  # familles de style imposées
     vraie_camera: bool = False  # les photos de biais suivent l'optique d'un vrai appareil (au lieu de coins bougés au hasard)
     sans_cotes: bool = False  # aucune cote dessinée (plans d'agence) ; barre d'échelle et surfaces tirées au hasard
+    photo_realiste: bool = False  # les photos « vraie caméra » posées sur une vraie table (plis, ombres, reflets, flou)
 
 
 @dataclass
@@ -141,6 +143,9 @@ def style_pour(graine: int, variante: int, opt: Options) -> Style:
             style.format_photo = 16 / 9 if r2.random() < 0.2 else 4 / 3
             style.inclinaison = (r2.choice((-1, 1)) * r2.uniform(5.0, 25.0), r2.choice((-1, 1)) * r2.uniform(0.0, 15.0))
             style.centre_optique = (r2.uniform(-0.08, 0.08), r2.uniform(-0.08, 0.08))
+    if opt.photo_realiste and style.focale:
+        # Encore un tirage à part : les jeux « vraie caméra » déjà fabriqués restent identiques sans cette option.
+        style.realisme = realisme_au_hasard(random.Random(f"realisme-{graine + opt.graine_styles}-{variante}"))
     if opt.resolution:
         style.px_par_m = opt.resolution
         style.taille_texte = round(opt.resolution * 0.2)

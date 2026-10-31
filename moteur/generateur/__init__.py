@@ -14,10 +14,11 @@ Chaque module fait une chose :
 - `exportateur.py`   : la fabrication d'un exemple complet, le manifeste, la répartition train/validation/test ;
 - `statistiques.py`  : les statistiques d'un jeu généré ;
 - `controle_qualite.py` : planches d'aperçu et page de contrôle visuel ;
+- `photo.py`         : la photo réaliste (table, plis, ombres, reflets, flou) de l'option --photo-realiste ;
 - `__main__.py`      : la ligne de commande (`python -m moteur.generateur`).
 
 La fabrique existante (moteur/fabrique.py) n'est pas modifiée : elle sert au banc
 de lecture, qui doit redonner exactement les mêmes plans qu'avant.
 """
 
-VERSION_GENERATEUR = "0.1.2"
+VERSION_GENERATEUR = "0.1.3"
