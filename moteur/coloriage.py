@@ -80,6 +80,7 @@ PAS_ARC_DEG = 7.5  # un mur arrondi est rendu par segments de 7,5°
 RAYON_MAX_ANGLE = 3.5  # m : plus grand rayon cherché pour un angle arrondi
 ECART_COURBE_MIN = 0.03  # m : un mur dont le milieu s'écarte plus de la corde (en plus de son épaisseur) est courbe
 RAPPORT_ARC = 0.85  # arrondi si la ligne du milieu colle au cercle bien mieux qu'à une droite
+COURT_MAX = 0.6  # m : un bout de mur droit plus court peut être un morceau d'« escalier » d'un pan coupé
 LARGEUR_MIN_OUVERTURE = 0.25
 ECART_FUSION_OUVERTURE = 0.10  # deux morceaux d'une même fenêtre séparés de moins : une seule
 SURFACE_MIN_SEPARATION = 0.4  # m² : plus petite tache de couleur qui compte comme une pièce à part
@@ -566,7 +567,12 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) 
     un arc de cercle découpé en segments de 7,5°. Ses bouts rejoignent l'axe des murs droits voisins.
     Sur un plan sans mur penché, il ne reste que des miettes : rien n'est ajouté et rien ne change."""
     couvert = np.zeros(bati.shape, np.uint8)
+    # Un pan coupé peu penché est « vu » par le suivi des murs droits comme un escalier de petits bouts
+    # de murs : ces bouts courts ne couvrent rien ici ; s'ils tombent dans un mur libre, ils sont retirés.
+    courts = [g for g in segs if g.b - g.a < max(2 * g.epaisseur, COURT_MAX * px_par_m)]
     for g in segs:
+        if any(g is c for c in courts):
+            continue
         # Le suivi des murs droits « glisse » dans un arrondi (il tolère un mur un peu tordu) : on ne compte
         # comme couvert que la partie du mur où sa bande est vraiment pleine (bouts rognés sinon).
         a, b = _bouts_pleins(bati, g)
@@ -675,7 +681,24 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) 
         pts[0] = _rattacher(pts[0], None, segs, ep)
         pts[-1] = _rattacher(pts[-1], None, segs, ep)
         libres.append(MurLibre(pts, ep, "arrondi"))
+    if libres and courts:
+        def dans_un_libre(g: Segment) -> bool:
+            c = ((g.a + g.b) / 2, g.axe) if g.horizontal else (g.axe, (g.a + g.b) / 2)
+            for l in libres:
+                for p, q in zip(l.points, l.points[1:]):
+                    if _distance_point_segment(c, p, q) <= l.epaisseur / 2 + g.epaisseur:
+                        return True
+            return False
+        absorbes = [g for g in courts if dans_un_libre(g)]
+        segs[:] = [g for g in segs if not any(g is x for x in absorbes)]
     return libres
+
+
+def _distance_point_segment(c: tuple[float, float], p: tuple[float, float], q: tuple[float, float]) -> float:
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    n = dx * dx + dy * dy
+    t = 0.0 if n == 0 else max(0.0, min(1.0, ((c[0] - p[0]) * dx + (c[1] - p[1]) * dy) / n))
+    return math.dist(c, (p[0] + t * dx, p[1] + t * dy))
 
 
 # ---------------------------------------------------------------- 4. les ouvertures
