@@ -1,0 +1,116 @@
+{
+ "pas": 27500,
+ "minutes": 121.1,
+ "minutes_de_pause_chaleur": 0.0,
+ "dessins_anciens": 11238,
+ "photos_apprises": 4944,
+ "plans_photos": 4603,
+ "dessins_monde": 3794,
+ "reglages": {
+  "jeu": "donnees\\jeu-10000",
+  "jeu_photos": [
+   "donnees\\photos-app-cotes",
+   "donnees\\photos-app-sans-cotes",
+   "donnees\\photos-reel-cotes",
+   "donnees\\photos-reel-sans-cotes"
+  ],
+  "jeu_monde": [
+   "donnees\\monde-6-19"
+  ],
+  "reprendre": "resultats-essai-5\\atelya-essai-4.pt",
+  "sortie": "resultats-essai-6",
+  "part_photos": 0.25,
+  "part_monde": 0.4,
+  "part_coherence": 0.5,
+  "poids_coherence": 1.0,
+  "nb_val": 150,
+  "recul_max": 0.5,
+  "cote": 768,
+  "morceau": 512,
+  "debord": 0.5,
+  "lot": 4,
+  "lr": 0.0003,
+  "minutes": 120.0,
+  "pas_par_tour": 500,
+  "processus": 1,
+  "temp_max": 88,
+  "graine": 6
+ },
+ "machine": "NVIDIA GeForce RTX 2070",
+ "memoire_gpu_max_go": 3.99,
+ "garde": false,
+ "essai5_meme_controle": {
+  "anciens": {
+   "pixels_justes_pct": 99.0,
+   "iou_moyen_pct": 89.2,
+   "iou_par_classe_pct": {
+    "fond": 99.7,
+    "mur": 93.3,
+    "porte": 78.8,
+    "fenetre": 86.2,
+    "porte-fenetre": 71.5,
+    "sejour": 98.6,
+    "cuisine": 92.4,
+    "chambre": 97.0,
+    "salle d'eau": 94.8,
+    "wc": 85.5,
+    "entree": 96.8,
+    "degagement": 94.3,
+    "placard": 82.9,
+    "buanderie": 76.8,
+    "bureau": 81.6,
+    "escalier": 96.8
+   },
+   "taches_marges_pct": 0.01,
+   "plans_avec_taches_pct": 6.9
+  },
+  "photos": {
+   "pixels_justes_pct": 99.4,
+   "iou_moyen_pct": 84.0,
+   "iou_par_classe_pct": {
+    "fond": 99.9,
+    "mur": 92.7,
+    "porte": 70.4,
+    "fenetre": 87.7,
+    "porte-fenetre": 70.3,
+    "sejour": 98.4,
+    "cuisine": 85.5,
+    "chambre": 96.8,
+    "salle d'eau": 91.8,
+    "wc": 73.0,
+    "entree": 94.2,
+    "degagement": 90.0,
+    "placard": 72.4,
+    "buanderie": 56.3,
+    "bureau": 68.2,
+    "escalier": 95.6
+   },
+   "taches_marges_pct": 0.01,
+   "plans_avec_taches_pct": 7.3
+  },
+  "monde": {
+   "pixels_justes_pct": 84.0,
+   "iou_moyen_pct": 43.9,
+   "iou_par_classe_pct": {
+    "fond": 90.0,
+    "mur": 37.8,
+    "porte": 32.2,
+    "fenetre": 52.1,
+    "porte-fenetre": 27.3,
+    "sejour": 60.2,
+    "cuisine": 59.6,
+    "chambre": 61.0,
+    "salle d'eau": 50.7,
+    "wc": 50.7,
+    "entree": 54.2,
+    "degagement": 42.7,
+    "placard": 28.0,
+    "buanderie": 32.8,
+    "bureau": 13.4,
+    "escalier": 9.1
+   },
+   "taches_marges_pct": 2.03,
+   "plans_avec_taches_pct": 39.0
+  }
+ }
+}

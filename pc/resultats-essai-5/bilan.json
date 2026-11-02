@@ -1,0 +1,135 @@
+{
+ "pas": 37500,
+ "minutes": 120.7,
+ "minutes_de_pause_chaleur": 0.0,
+ "dessins_anciens": 11238,
+ "photos_apprises": 4944,
+ "plans_photos": 4603,
+ "reglages": {
+  "jeu": "donnees\\jeu-10000",
+  "jeu_photos": [
+   "donnees\\photos-app-cotes",
+   "donnees\\photos-app-sans-cotes",
+   "donnees\\photos-reel-cotes",
+   "donnees\\photos-reel-sans-cotes"
+  ],
+  "reprendre": "resultats-essai-4\\atelya-essai-4.pt",
+  "sortie": "resultats-essai-5",
+  "part_photos": 0.35,
+  "nb_val": 150,
+  "recul_max": 0.5,
+  "cote": 768,
+  "morceau": 512,
+  "debord": 0.5,
+  "lot": 4,
+  "lr": 0.0003,
+  "minutes": 120.0,
+  "pas_par_tour": 500,
+  "processus": 6,
+  "temp_max": 88,
+  "graine": 4
+ },
+ "machine": "NVIDIA GeForce RTX 2070",
+ "memoire_gpu_max_go": 2.02,
+ "garde": true,
+ "essai4": {
+  "anciens": {
+   "pixels_justes_pct": 99.0,
+   "iou_moyen_pct": 89.2,
+   "iou_par_classe_pct": {
+    "fond": 99.7,
+    "mur": 93.3,
+    "porte": 78.8,
+    "fenetre": 86.2,
+    "porte-fenetre": 71.5,
+    "sejour": 98.6,
+    "cuisine": 92.4,
+    "chambre": 97.0,
+    "salle d'eau": 94.8,
+    "wc": 85.5,
+    "entree": 96.8,
+    "degagement": 94.3,
+    "placard": 82.9,
+    "buanderie": 76.8,
+    "bureau": 81.6,
+    "escalier": 96.8
+   },
+   "taches_marges_pct": 0.01,
+   "plans_avec_taches_pct": 6.9
+  },
+  "photos": {
+   "pixels_justes_pct": 99.4,
+   "iou_moyen_pct": 84.0,
+   "iou_par_classe_pct": {
+    "fond": 99.9,
+    "mur": 92.7,
+    "porte": 70.4,
+    "fenetre": 87.7,
+    "porte-fenetre": 70.3,
+    "sejour": 98.4,
+    "cuisine": 85.5,
+    "chambre": 96.8,
+    "salle d'eau": 91.8,
+    "wc": 73.0,
+    "entree": 94.2,
+    "degagement": 90.0,
+    "placard": 72.4,
+    "buanderie": 56.3,
+    "bureau": 68.2,
+    "escalier": 95.6
+   },
+   "taches_marges_pct": 0.01,
+   "plans_avec_taches_pct": 7.3
+  }
+ },
+ "essai2_meme_controle": {
+  "anciens": {
+   "pixels_justes_pct": 98.9,
+   "iou_moyen_pct": 86.4,
+   "iou_par_classe_pct": {
+    "fond": 99.7,
+    "mur": 93.1,
+    "porte": 77.5,
+    "fenetre": 86.3,
+    "porte-fenetre": 70.2,
+    "sejour": 98.4,
+    "cuisine": 90.6,
+    "chambre": 96.6,
+    "salle d'eau": 93.4,
+    "wc": 79.3,
+    "entree": 95.3,
+    "degagement": 92.8,
+    "placard": 78.1,
+    "buanderie": 70.6,
+    "bureau": 65.8,
+    "escalier": 95.3
+   },
+   "taches_marges_pct": 0.02,
+   "plans_avec_taches_pct": 8.0
+  },
+  "photos": {
+   "pixels_justes_pct": 81.0,
+   "iou_moyen_pct": 51.6,
+   "iou_par_classe_pct": {
+    "fond": 79.6,
+    "mur": 14.1,
+    "porte": 52.9,
+    "fenetre": 81.9,
+    "porte-fenetre": 58.2,
+    "sejour": 71.2,
+    "cuisine": 62.8,
+    "chambre": 72.9,
+    "salle d'eau": 52.5,
+    "wc": 43.3,
+    "entree": 82.2,
+    "degagement": 34.6,
+    "placard": 49.2,
+    "buanderie": 32.4,
+    "bureau": 8.7,
+    "escalier": 28.5
+   },
+   "taches_marges_pct": 21.07,
+   "plans_avec_taches_pct": 48.2
+  }
+ }
+}

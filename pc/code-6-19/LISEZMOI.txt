@@ -1,0 +1,6 @@
+Étape 6-14 (photos de biais sans cotes) — code pour le PC.
+À dézipper dans D:\Modélisation immobilière\atelya (dossier code-6-14).
+Contenu : le moteur complet (avec le générateur « vraie caméra » et les proportions par l'optique),
+scripts\tout_en_test.py (range un jeu entier en « test »), scripts\verifier_jeu.py + empreintes-psc.txt
+(vérifie que les 316 plans refabriqués sur le PC sont identiques à ceux du cloud).
+Rien à installer : les outils sont déjà dans atelya\.venv.

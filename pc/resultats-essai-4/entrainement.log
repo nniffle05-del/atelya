@@ -1,0 +1,274 @@
+﻿Atelya, essai 4 : calcul sur NVIDIA GeForce RTX 2070
+  apprentissage : repris du cache apprentissage-8219-sm.pkl
+  controle : repris du cache controle-997.pkl
+  photos-apprentissage : repris du cache photos-apprentissage-1147-sm.pkl
+  photos-controle : repris du cache photos-controle-141.pkl
+  photos-apprentissage : repris du cache photos-apprentissage-1151-sm.pkl
+  photos-controle : repris du cache photos-controle-137.pkl
+Lecture : 11238 dessins anciens, 2472 photos ; contrôle 1079 anciens, 311 photos
+Départ (essai 2) anciens : IoU moyen 82.3%  murs 93.4%  portes 76.2%  fenêtres 84.9%  taches marges 9.3%
+Départ (essai 2) photos  : IoU moyen 52.3%  murs 86.3%  portes 59.0%  fenêtres 82.1%  taches marges 20.0%
+[  1.6 min] pas    500  perte 0.206  GPU 81 °C
+    anciens : IoU moyen 75.7%  murs 93.1%  portes 70.2%  fenêtres 79.9%  taches marges 29.3%
+    photos  : IoU moyen 59.4%  murs 89.9%  portes 55.2%  fenêtres 80.9%  taches marges 11.3%
+    (recul sur les anciens plans : 75.7 < 81.8, pas gardé)
+[  3.2 min] pas   1000  perte 0.196  GPU 82 °C
+    anciens : IoU moyen 78.3%  murs 93.3%  portes 76.4%  fenêtres 83.5%  taches marges 10.0%
+    photos  : IoU moyen 62.2%  murs 92.0%  portes 60.5%  fenêtres 85.8%  taches marges 14.7%
+    (recul sur les anciens plans : 78.3 < 81.8, pas gardé)
+[  4.9 min] pas   1500  perte 0.195  GPU 82 °C
+    anciens : IoU moyen 71.5%  murs 92.4%  portes 68.2%  fenêtres 75.7%  taches marges 28.0%
+    photos  : IoU moyen 58.6%  murs 90.8%  portes 54.6%  fenêtres 81.5%  taches marges 6.0%
+    (recul sur les anciens plans : 71.5 < 81.8, pas gardé)
+[  6.5 min] pas   2000  perte 0.179  GPU 82 °C
+    anciens : IoU moyen 78.1%  murs 93.1%  portes 76.2%  fenêtres 82.6%  taches marges 16.7%
+    photos  : IoU moyen 65.9%  murs 91.9%  portes 59.2%  fenêtres 85.6%  taches marges 1.3%
+    (recul sur les anciens plans : 78.1 < 81.8, pas gardé)
+[  8.2 min] pas   2500  perte 0.193  GPU 83 °C
+    anciens : IoU moyen 75.9%  murs 93.3%  portes 71.1%  fenêtres 84.3%  taches marges 5.3%
+    photos  : IoU moyen 63.3%  murs 91.4%  portes 59.3%  fenêtres 86.5%  taches marges 2.0%
+    (recul sur les anciens plans : 75.9 < 81.8, pas gardé)
+[  9.9 min] pas   3000  perte 0.172  GPU 81 °C
+    anciens : IoU moyen 77.1%  murs 93.1%  portes 75.4%  fenêtres 84.0%  taches marges 18.7%
+    photos  : IoU moyen 67.1%  murs 91.2%  portes 60.2%  fenêtres 86.4%  taches marges 10.0%
+    (recul sur les anciens plans : 77.1 < 81.8, pas gardé)
+[ 11.5 min] pas   3500  perte 0.165  GPU 83 °C
+    anciens : IoU moyen 72.3%  murs 93.1%  portes 73.4%  fenêtres 81.0%  taches marges 21.3%
+    photos  : IoU moyen 66.4%  murs 91.6%  portes 57.5%  fenêtres 85.0%  taches marges 4.0%
+    (recul sur les anciens plans : 72.3 < 81.8, pas gardé)
+[ 13.2 min] pas   4000  perte 0.179  GPU 81 °C
+    anciens : IoU moyen 79.1%  murs 93.1%  portes 76.2%  fenêtres 81.9%  taches marges 17.3%
+    photos  : IoU moyen 68.0%  murs 92.0%  portes 63.1%  fenêtres 86.3%  taches marges 18.7%
+    (recul sur les anciens plans : 79.1 < 81.8, pas gardé)
+[ 14.8 min] pas   4500  perte 0.171  GPU 82 °C
+    anciens : IoU moyen 80.8%  murs 93.1%  portes 77.5%  fenêtres 82.4%  taches marges 14.0%
+    photos  : IoU moyen 67.4%  murs 92.0%  portes 62.6%  fenêtres 84.9%  taches marges 5.3%
+    (recul sur les anciens plans : 80.8 < 81.8, pas gardé)
+[ 16.5 min] pas   5000  perte 0.176  GPU 82 °C
+    anciens : IoU moyen 78.0%  murs 93.0%  portes 69.8%  fenêtres 82.0%  taches marges 18.7%
+    photos  : IoU moyen 66.7%  murs 91.7%  portes 60.0%  fenêtres 85.3%  taches marges 0.7%
+    (recul sur les anciens plans : 78.0 < 81.8, pas gardé)
+[ 18.2 min] pas   5500  perte 0.175  GPU 81 °C
+    anciens : IoU moyen 81.9%  murs 93.2%  portes 73.6%  fenêtres 81.9%  taches marges 18.0%
+    photos  : IoU moyen 69.1%  murs 91.6%  portes 61.2%  fenêtres 85.4%  taches marges 5.3%
+    -> gardé
+[ 19.8 min] pas   6000  perte 0.163  GPU 82 °C
+    anciens : IoU moyen 80.0%  murs 93.3%  portes 76.2%  fenêtres 82.7%  taches marges 18.7%
+    photos  : IoU moyen 67.1%  murs 92.3%  portes 64.1%  fenêtres 85.9%  taches marges 0.7%
+    (recul sur les anciens plans : 80.0 < 81.8, pas gardé)
+[ 21.5 min] pas   6500  perte 0.172  GPU 81 °C
+    anciens : IoU moyen 81.8%  murs 93.2%  portes 72.2%  fenêtres 82.4%  taches marges 21.3%
+    photos  : IoU moyen 69.4%  murs 92.1%  portes 56.8%  fenêtres 86.1%  taches marges 2.7%
+    -> gardé
+[ 23.2 min] pas   7000  perte 0.170  GPU 82 °C
+    anciens : IoU moyen 78.5%  murs 93.3%  portes 76.5%  fenêtres 84.3%  taches marges 14.7%
+    photos  : IoU moyen 67.5%  murs 91.3%  portes 57.2%  fenêtres 86.2%  taches marges 19.3%
+    (recul sur les anciens plans : 78.5 < 81.8, pas gardé)
+[ 24.8 min] pas   7500  perte 0.154  GPU 81 °C
+    anciens : IoU moyen 82.1%  murs 93.5%  portes 76.5%  fenêtres 85.1%  taches marges 6.7%
+    photos  : IoU moyen 70.4%  murs 92.2%  portes 62.8%  fenêtres 86.7%  taches marges 0.7%
+    -> gardé
+[ 26.5 min] pas   8000  perte 0.172  GPU 81 °C
+    anciens : IoU moyen 82.3%  murs 93.4%  portes 78.4%  fenêtres 83.5%  taches marges 10.0%
+    photos  : IoU moyen 70.4%  murs 92.2%  portes 65.1%  fenêtres 86.9%  taches marges 4.7%
+[ 28.1 min] pas   8500  perte 0.156  GPU 82 °C
+    anciens : IoU moyen 80.1%  murs 93.3%  portes 74.0%  fenêtres 82.7%  taches marges 14.7%
+    photos  : IoU moyen 70.9%  murs 92.3%  portes 59.2%  fenêtres 85.3%  taches marges 4.7%
+    (recul sur les anciens plans : 80.1 < 81.8, pas gardé)
+[ 29.8 min] pas   9000  perte 0.165  GPU 81 °C
+    anciens : IoU moyen 81.1%  murs 93.4%  portes 73.5%  fenêtres 84.0%  taches marges 16.7%
+    photos  : IoU moyen 69.4%  murs 92.2%  portes 61.0%  fenêtres 86.1%  taches marges 2.0%
+    (recul sur les anciens plans : 81.1 < 81.8, pas gardé)
+[ 31.5 min] pas   9500  perte 0.155  GPU 82 °C
+    anciens : IoU moyen 77.8%  murs 93.3%  portes 78.4%  fenêtres 84.1%  taches marges 14.7%
+    photos  : IoU moyen 67.3%  murs 92.6%  portes 64.0%  fenêtres 87.1%  taches marges 0.7%
+    (recul sur les anciens plans : 77.8 < 81.8, pas gardé)
+[ 33.1 min] pas  10000  perte 0.152  GPU 83 °C
+    anciens : IoU moyen 81.0%  murs 93.1%  portes 74.5%  fenêtres 82.1%  taches marges 22.0%
+    photos  : IoU moyen 69.0%  murs 91.9%  portes 61.6%  fenêtres 84.7%  taches marges 1.3%
+    (recul sur les anciens plans : 81.0 < 81.8, pas gardé)
+[ 34.8 min] pas  10500  perte 0.154  GPU 81 °C
+    anciens : IoU moyen 82.1%  murs 93.2%  portes 75.5%  fenêtres 81.7%  taches marges 15.3%
+    photos  : IoU moyen 72.7%  murs 92.3%  portes 62.9%  fenêtres 85.6%  taches marges 0.0%
+    -> gardé
+[ 36.4 min] pas  11000  perte 0.155  GPU 83 °C
+    anciens : IoU moyen 83.4%  murs 93.3%  portes 77.4%  fenêtres 83.2%  taches marges 15.3%
+    photos  : IoU moyen 72.6%  murs 92.0%  portes 65.1%  fenêtres 86.6%  taches marges 3.3%
+[ 38.1 min] pas  11500  perte 0.148  GPU 81 °C
+    anciens : IoU moyen 79.6%  murs 93.2%  portes 75.1%  fenêtres 82.1%  taches marges 22.7%
+    photos  : IoU moyen 68.4%  murs 91.7%  portes 64.0%  fenêtres 83.3%  taches marges 3.3%
+    (recul sur les anciens plans : 79.6 < 81.8, pas gardé)
+[ 39.8 min] pas  12000  perte 0.149  GPU 81 °C
+    anciens : IoU moyen 81.4%  murs 93.2%  portes 75.0%  fenêtres 83.6%  taches marges 11.3%
+    photos  : IoU moyen 72.4%  murs 92.0%  portes 63.9%  fenêtres 87.7%  taches marges 5.3%
+    (recul sur les anciens plans : 81.4 < 81.8, pas gardé)
+[ 41.4 min] pas  12500  perte 0.160  GPU 82 °C
+    anciens : IoU moyen 82.5%  murs 93.5%  portes 72.0%  fenêtres 84.1%  taches marges 17.3%
+    photos  : IoU moyen 71.4%  murs 92.3%  portes 59.5%  fenêtres 86.6%  taches marges 6.0%
+[ 43.1 min] pas  13000  perte 0.151  GPU 82 °C
+    anciens : IoU moyen 80.5%  murs 93.3%  portes 78.4%  fenêtres 84.9%  taches marges 15.3%
+    photos  : IoU moyen 72.2%  murs 92.0%  portes 63.1%  fenêtres 86.7%  taches marges 6.7%
+    (recul sur les anciens plans : 80.5 < 81.8, pas gardé)
+[ 44.7 min] pas  13500  perte 0.147  GPU 82 °C
+    anciens : IoU moyen 83.8%  murs 93.5%  portes 75.7%  fenêtres 83.9%  taches marges 11.3%
+    photos  : IoU moyen 73.2%  murs 92.6%  portes 64.7%  fenêtres 87.8%  taches marges 1.3%
+    -> gardé
+[ 46.4 min] pas  14000  perte 0.140  GPU 83 °C
+    anciens : IoU moyen 85.3%  murs 93.4%  portes 78.1%  fenêtres 83.8%  taches marges 14.7%
+    photos  : IoU moyen 73.7%  murs 92.4%  portes 65.4%  fenêtres 86.8%  taches marges 5.3%
+    -> gardé
+[ 48.1 min] pas  14500  perte 0.143  GPU 81 °C
+    anciens : IoU moyen 79.9%  murs 93.4%  portes 73.3%  fenêtres 83.6%  taches marges 19.3%
+    photos  : IoU moyen 72.7%  murs 92.3%  portes 61.7%  fenêtres 86.0%  taches marges 27.3%
+    (recul sur les anciens plans : 79.9 < 81.8, pas gardé)
+[ 49.7 min] pas  15000  perte 0.137  GPU 83 °C
+    anciens : IoU moyen 84.9%  murs 93.6%  portes 75.4%  fenêtres 84.1%  taches marges 15.3%
+    photos  : IoU moyen 74.0%  murs 92.6%  portes 62.5%  fenêtres 87.2%  taches marges 0.0%
+    -> gardé
+[ 51.4 min] pas  15500  perte 0.142  GPU 82 °C
+    anciens : IoU moyen 82.9%  murs 93.4%  portes 77.5%  fenêtres 83.0%  taches marges 20.0%
+    photos  : IoU moyen 74.7%  murs 92.7%  portes 65.6%  fenêtres 87.1%  taches marges 0.0%
+    -> gardé
+[ 53.0 min] pas  16000  perte 0.132  GPU 82 °C
+    anciens : IoU moyen 82.0%  murs 93.4%  portes 77.9%  fenêtres 81.1%  taches marges 16.7%
+    photos  : IoU moyen 75.8%  murs 92.3%  portes 65.9%  fenêtres 85.5%  taches marges 0.0%
+    -> gardé
+[ 54.7 min] pas  16500  perte 0.128  GPU 82 °C
+    anciens : IoU moyen 82.9%  murs 93.5%  portes 77.7%  fenêtres 83.8%  taches marges 10.0%
+    photos  : IoU moyen 74.1%  murs 92.8%  portes 64.2%  fenêtres 87.7%  taches marges 0.0%
+[ 56.4 min] pas  17000  perte 0.142  GPU 82 °C
+    anciens : IoU moyen 82.8%  murs 93.4%  portes 75.0%  fenêtres 83.5%  taches marges 16.0%
+    photos  : IoU moyen 74.0%  murs 92.6%  portes 63.8%  fenêtres 86.2%  taches marges 5.3%
+[ 58.0 min] pas  17500  perte 0.123  GPU 82 °C
+    anciens : IoU moyen 84.4%  murs 93.6%  portes 74.6%  fenêtres 84.4%  taches marges 14.0%
+    photos  : IoU moyen 75.6%  murs 92.7%  portes 63.2%  fenêtres 87.4%  taches marges 0.0%
+[ 59.6 min] pas  18000  perte 0.121  GPU 84 °C
+    anciens : IoU moyen 83.9%  murs 93.5%  portes 78.2%  fenêtres 83.7%  taches marges 16.7%
+    photos  : IoU moyen 71.6%  murs 92.7%  portes 65.0%  fenêtres 86.1%  taches marges 1.3%
+[ 61.3 min] pas  18500  perte 0.132  GPU 81 °C
+    anciens : IoU moyen 85.6%  murs 93.5%  portes 77.5%  fenêtres 84.1%  taches marges 13.3%
+    photos  : IoU moyen 74.3%  murs 92.6%  portes 63.5%  fenêtres 86.6%  taches marges 0.7%
+[ 63.0 min] pas  19000  perte 0.118  GPU 82 °C
+    anciens : IoU moyen 85.6%  murs 93.4%  portes 76.3%  fenêtres 83.5%  taches marges 17.3%
+    photos  : IoU moyen 74.4%  murs 92.4%  portes 63.1%  fenêtres 87.3%  taches marges 1.3%
+[ 64.6 min] pas  19500  perte 0.120  GPU 82 °C
+    anciens : IoU moyen 86.8%  murs 93.5%  portes 77.7%  fenêtres 83.9%  taches marges 12.7%
+    photos  : IoU moyen 75.0%  murs 92.5%  portes 64.6%  fenêtres 87.1%  taches marges 5.3%
+[ 66.3 min] pas  20000  perte 0.117  GPU 81 °C
+    anciens : IoU moyen 81.4%  murs 93.5%  portes 77.8%  fenêtres 83.6%  taches marges 10.0%
+    photos  : IoU moyen 73.7%  murs 92.3%  portes 63.2%  fenêtres 86.7%  taches marges 0.7%
+    (recul sur les anciens plans : 81.4 < 81.8, pas gardé)
+[ 67.9 min] pas  20500  perte 0.125  GPU 82 °C
+    anciens : IoU moyen 81.4%  murs 93.5%  portes 78.5%  fenêtres 83.0%  taches marges 16.0%
+    photos  : IoU moyen 75.0%  murs 92.3%  portes 65.6%  fenêtres 87.0%  taches marges 1.3%
+    (recul sur les anciens plans : 81.4 < 81.8, pas gardé)
+[ 69.6 min] pas  21000  perte 0.119  GPU 82 °C
+    anciens : IoU moyen 84.2%  murs 93.3%  portes 76.5%  fenêtres 83.4%  taches marges 13.3%
+    photos  : IoU moyen 74.2%  murs 92.4%  portes 64.6%  fenêtres 85.9%  taches marges 2.7%
+[ 71.3 min] pas  21500  perte 0.119  GPU 81 °C
+    anciens : IoU moyen 84.3%  murs 93.4%  portes 76.6%  fenêtres 84.2%  taches marges 13.3%
+    photos  : IoU moyen 74.1%  murs 92.5%  portes 64.4%  fenêtres 87.1%  taches marges 4.7%
+[ 72.9 min] pas  22000  perte 0.120  GPU 82 °C
+    anciens : IoU moyen 85.5%  murs 93.6%  portes 75.3%  fenêtres 83.6%  taches marges 11.3%
+    photos  : IoU moyen 74.2%  murs 92.4%  portes 62.6%  fenêtres 86.9%  taches marges 2.0%
+[ 74.6 min] pas  22500  perte 0.122  GPU 82 °C
+    anciens : IoU moyen 85.0%  murs 93.4%  portes 79.4%  fenêtres 84.4%  taches marges 15.3%
+    photos  : IoU moyen 74.7%  murs 92.8%  portes 66.9%  fenêtres 86.9%  taches marges 6.0%
+[ 76.3 min] pas  23000  perte 0.115  GPU 82 °C
+    anciens : IoU moyen 85.7%  murs 93.6%  portes 78.5%  fenêtres 85.0%  taches marges 14.0%
+    photos  : IoU moyen 75.9%  murs 92.8%  portes 65.7%  fenêtres 87.6%  taches marges 6.0%
+    -> gardé
+[ 77.9 min] pas  23500  perte 0.127  GPU 82 °C
+    anciens : IoU moyen 86.5%  murs 93.6%  portes 77.9%  fenêtres 84.6%  taches marges 12.7%
+    photos  : IoU moyen 76.0%  murs 92.9%  portes 65.7%  fenêtres 87.6%  taches marges 1.3%
+    -> gardé
+[ 79.6 min] pas  24000  perte 0.114  GPU 82 °C
+    anciens : IoU moyen 84.7%  murs 93.5%  portes 77.9%  fenêtres 84.2%  taches marges 10.0%
+    photos  : IoU moyen 76.8%  murs 92.7%  portes 65.1%  fenêtres 87.2%  taches marges 1.3%
+    -> gardé
+[ 81.2 min] pas  24500  perte 0.112  GPU 82 °C
+    anciens : IoU moyen 86.2%  murs 93.6%  portes 78.9%  fenêtres 84.6%  taches marges 12.0%
+    photos  : IoU moyen 75.0%  murs 92.7%  portes 65.4%  fenêtres 87.5%  taches marges 3.3%
+[ 82.9 min] pas  25000  perte 0.108  GPU 82 °C
+    anciens : IoU moyen 85.9%  murs 93.5%  portes 78.2%  fenêtres 84.4%  taches marges 12.7%
+    photos  : IoU moyen 76.0%  murs 92.6%  portes 65.7%  fenêtres 87.8%  taches marges 1.3%
+[ 84.6 min] pas  25500  perte 0.107  GPU 82 °C
+    anciens : IoU moyen 84.6%  murs 93.6%  portes 78.5%  fenêtres 85.2%  taches marges 10.0%
+    photos  : IoU moyen 75.6%  murs 92.8%  portes 66.5%  fenêtres 88.3%  taches marges 2.0%
+[ 86.2 min] pas  26000  perte 0.114  GPU 81 °C
+    anciens : IoU moyen 86.9%  murs 93.7%  portes 79.3%  fenêtres 84.8%  taches marges 10.0%
+    photos  : IoU moyen 76.0%  murs 92.9%  portes 66.2%  fenêtres 87.8%  taches marges 4.7%
+[ 87.9 min] pas  26500  perte 0.114  GPU 83 °C
+    anciens : IoU moyen 85.9%  murs 93.7%  portes 78.3%  fenêtres 85.0%  taches marges 8.7%
+    photos  : IoU moyen 75.4%  murs 93.0%  portes 65.5%  fenêtres 87.7%  taches marges 0.0%
+[ 89.6 min] pas  27000  perte 0.106  GPU 81 °C
+    anciens : IoU moyen 85.0%  murs 93.6%  portes 77.1%  fenêtres 82.8%  taches marges 15.3%
+    photos  : IoU moyen 76.7%  murs 92.8%  portes 65.2%  fenêtres 86.5%  taches marges 3.3%
+[ 91.3 min] pas  27500  perte 0.107  GPU 77 °C
+    anciens : IoU moyen 87.1%  murs 93.7%  portes 79.0%  fenêtres 84.6%  taches marges 12.7%
+    photos  : IoU moyen 76.4%  murs 92.7%  portes 66.6%  fenêtres 87.8%  taches marges 2.0%
+[ 92.9 min] pas  28000  perte 0.102  GPU 79 °C
+    anciens : IoU moyen 88.0%  murs 93.6%  portes 78.6%  fenêtres 84.7%  taches marges 12.0%
+    photos  : IoU moyen 77.6%  murs 92.7%  portes 65.9%  fenêtres 87.5%  taches marges 2.0%
+    -> gardé
+[ 94.4 min] pas  28500  perte 0.101  GPU 78 °C
+    anciens : IoU moyen 87.5%  murs 93.6%  portes 78.4%  fenêtres 85.0%  taches marges 12.7%
+    photos  : IoU moyen 76.8%  murs 92.8%  portes 66.2%  fenêtres 88.0%  taches marges 0.7%
+[ 95.9 min] pas  29000  perte 0.112  GPU 80 °C
+    anciens : IoU moyen 87.3%  murs 93.4%  portes 78.3%  fenêtres 84.3%  taches marges 12.7%
+    photos  : IoU moyen 77.2%  murs 92.4%  portes 65.8%  fenêtres 87.9%  taches marges 3.3%
+[ 97.5 min] pas  29500  perte 0.106  GPU 80 °C
+    anciens : IoU moyen 86.6%  murs 93.5%  portes 78.9%  fenêtres 84.7%  taches marges 13.3%
+    photos  : IoU moyen 77.6%  murs 92.6%  portes 66.7%  fenêtres 88.0%  taches marges 4.7%
+[ 99.0 min] pas  30000  perte 0.108  GPU 79 °C
+    anciens : IoU moyen 87.2%  murs 93.6%  portes 78.2%  fenêtres 84.1%  taches marges 10.7%
+    photos  : IoU moyen 77.0%  murs 92.7%  portes 66.2%  fenêtres 87.9%  taches marges 2.7%
+[100.9 min] pas  30500  perte 0.109  GPU 79 °C
+    anciens : IoU moyen 86.7%  murs 93.6%  portes 78.7%  fenêtres 84.1%  taches marges 13.3%
+    photos  : IoU moyen 76.3%  murs 92.8%  portes 67.0%  fenêtres 87.8%  taches marges 3.3%
+[102.4 min] pas  31000  perte 0.106  GPU 78 °C
+    anciens : IoU moyen 87.3%  murs 93.6%  portes 78.6%  fenêtres 84.8%  taches marges 10.0%
+    photos  : IoU moyen 78.2%  murs 92.7%  portes 66.8%  fenêtres 87.6%  taches marges 2.0%
+    -> gardé
+[104.0 min] pas  31500  perte 0.109  GPU 78 °C
+    anciens : IoU moyen 87.0%  murs 93.6%  portes 79.0%  fenêtres 85.0%  taches marges 7.3%
+    photos  : IoU moyen 76.6%  murs 92.8%  portes 65.5%  fenêtres 87.6%  taches marges 0.0%
+[105.5 min] pas  32000  perte 0.110  GPU 79 °C
+    anciens : IoU moyen 88.2%  murs 93.6%  portes 79.6%  fenêtres 85.0%  taches marges 10.7%
+    photos  : IoU moyen 77.4%  murs 92.7%  portes 67.5%  fenêtres 87.9%  taches marges 2.7%
+[107.0 min] pas  32500  perte 0.100  GPU 78 °C
+    anciens : IoU moyen 87.8%  murs 93.5%  portes 78.5%  fenêtres 84.7%  taches marges 10.0%
+    photos  : IoU moyen 77.4%  murs 92.6%  portes 66.9%  fenêtres 87.6%  taches marges 2.0%
+[108.6 min] pas  33000  perte 0.108  GPU 78 °C
+    anciens : IoU moyen 87.0%  murs 93.6%  portes 77.4%  fenêtres 84.4%  taches marges 8.7%
+    photos  : IoU moyen 77.6%  murs 92.8%  portes 65.0%  fenêtres 87.1%  taches marges 1.3%
+[110.1 min] pas  33500  perte 0.115  GPU 78 °C
+    anciens : IoU moyen 86.8%  murs 93.6%  portes 78.5%  fenêtres 84.7%  taches marges 10.0%
+    photos  : IoU moyen 77.6%  murs 92.6%  portes 67.0%  fenêtres 87.8%  taches marges 0.7%
+[111.7 min] pas  34000  perte 0.106  GPU 77 °C
+    anciens : IoU moyen 87.7%  murs 93.6%  portes 78.6%  fenêtres 85.1%  taches marges 10.0%
+    photos  : IoU moyen 78.1%  murs 92.6%  portes 66.4%  fenêtres 88.2%  taches marges 1.3%
+[113.2 min] pas  34500  perte 0.101  GPU 78 °C
+    anciens : IoU moyen 87.4%  murs 93.6%  portes 78.5%  fenêtres 85.2%  taches marges 8.7%
+    photos  : IoU moyen 78.4%  murs 92.7%  portes 66.3%  fenêtres 88.2%  taches marges 1.3%
+    -> gardé
+[114.7 min] pas  35000  perte 0.105  GPU 78 °C
+    anciens : IoU moyen 87.4%  murs 93.5%  portes 78.8%  fenêtres 84.4%  taches marges 12.0%
+    photos  : IoU moyen 78.0%  murs 92.7%  portes 66.6%  fenêtres 87.5%  taches marges 2.0%
+[116.3 min] pas  35500  perte 0.107  GPU 79 °C
+    anciens : IoU moyen 87.2%  murs 93.6%  portes 78.9%  fenêtres 84.5%  taches marges 12.0%
+    photos  : IoU moyen 77.8%  murs 92.8%  portes 67.0%  fenêtres 87.5%  taches marges 3.3%
+[117.8 min] pas  36000  perte 0.105  GPU 78 °C
+    anciens : IoU moyen 87.8%  murs 93.6%  portes 77.9%  fenêtres 84.9%  taches marges 12.0%
+    photos  : IoU moyen 77.8%  murs 92.8%  portes 65.3%  fenêtres 87.9%  taches marges 2.7%
+[119.3 min] pas  36500  perte 0.100  GPU 78 °C
+    anciens : IoU moyen 87.4%  murs 93.6%  portes 79.6%  fenêtres 84.5%  taches marges 12.7%
+    photos  : IoU moyen 76.8%  murs 92.8%  portes 66.8%  fenêtres 87.7%  taches marges 4.7%
+[120.8 min] pas  37000  perte 0.098  GPU 80 °C
+    anciens : IoU moyen 87.3%  murs 93.6%  portes 77.9%  fenêtres 84.0%  taches marges 10.0%
+    photos  : IoU moyen 78.0%  murs 92.7%  portes 65.6%  fenêtres 87.1%  taches marges 2.0%
+BILAN essai2_meme_controle anciens : IoU moyen 81.8%  murs 92.8%  portes 75.5%  fenêtres 85.5%  taches marges 10.1%
+BILAN essai2_meme_controle photos  : IoU moyen 55.4%  murs 87.6%  portes 59.7%  fenêtres 82.2%  taches marges 16.1%
+BILAN essai4 anciens : IoU moyen 86.4%  murs 93.1%  portes 77.5%  fenêtres 86.3%  taches marges 8.0%
+BILAN essai4 photos  : IoU moyen 79.4%  murs 92.9%  portes 67.1%  fenêtres 88.3%  taches marges 1.0%
+CODE=0

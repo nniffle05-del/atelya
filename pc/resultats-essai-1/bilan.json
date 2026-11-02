@@ -1,0 +1,43 @@
+{
+ "meilleure_note": {
+  "pixels_justes_pct": 90.9,
+  "iou_moyen_pct": 69.9,
+  "iou_par_classe_pct": {
+   "fond": 90.6,
+   "mur": 89.5,
+   "porte": 76.6,
+   "fenetre": 85.1,
+   "porte-fenetre": 71.9,
+   "sejour": 69.2,
+   "cuisine": 27.7,
+   "chambre": 79.8,
+   "salle d'eau": 82.5,
+   "wc": 72.4,
+   "entree": 82.9,
+   "degagement": 72.7,
+   "placard": 65.1,
+   "buanderie": 43.8,
+   "bureau": 11.6,
+   "escalier": 97.5
+  }
+ },
+ "pas": 9000,
+ "minutes": 25.3,
+ "plans_appris": 1000,
+ "plans_controle": 150,
+ "reglages": {
+  "jeu": "donnees\\jeu-10000",
+  "sortie": "sorties\\essai-1",
+  "nb_train": 1000,
+  "nb_val": 150,
+  "cote": 768,
+  "morceau": 384,
+  "lot": 8,
+  "base": 32,
+  "minutes": 25.0,
+  "pas_par_tour": 250,
+  "graine": 1
+ },
+ "machine": "NVIDIA GeForce RTX 2070",
+ "memoire_gpu_max_go": 1.97
+}

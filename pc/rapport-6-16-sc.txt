@@ -1,0 +1,27 @@
+Étape 6-16 — banc de l'essai 4 sur le jeu test RÉALISTE SANS COTES (banc-6-16-reel-sc-e4)
+(comparaison : ancien banc banc-6-15-psc-e4seul, mêmes plans en photos « vraie caméra » non réalistes)
+
+                         réaliste 6-16        ancien 6-15
+Niveaux notés            342 (1 raté)         342 (0 raté)
+Murs justes              15,8 %               70,8 %
+Ouvertures justes        18,4 %               78,3 %
+Pièces trouvées          24,2 %               93,5 %
+Pièces bon type          22,1 %               86,9 %
+Plans parfaits           4,1 %                19,6 %
+Échelle lue              96 / 342 (28,1 %)    208 / 342 (60,8 %)
+Erreurs d'échelle > 3 %  16                   0
+Niveaux « à vérifier »   246                  134
+Hors-tout (médiane)      7,5 m d'écart        3,6 cm
+
+Erreurs d'échelle > 3 % (plan, niveau, écart, source) :
+020033 0 4,2 % surfaces | 020063 0 20,8 % barre | 020073 0 7,2 % surfaces | 020082 0 4,8 % surfaces
+020084 0 4,9 % surfaces | 020094 0 6,7 % surfaces | 020155 0 6,4 % surfaces | 020168 0 5,9 % surfaces
+020191 0 15,4 % barre  | 020213 0 3,1 % barre    | 020258 0 4,1 % barre    | 020259 0 8,0 % surfaces
+020294 0 4,8 % surfaces | 020301 0 6,7 % surfaces | 020303 0 5,3 % surfaces | 020305 0 4,7 % barre
+(sources : 0 cote, 5 barre, 11 surfaces)
+
+Observation : le coloriage lui-même tient plutôt bien (sur 60 niveaux, 79 % des pixels du plan
+justes en moyenne, la plupart > 90 %, environ 1 sur 4 très mauvais < 40 %). La chute vient
+surtout de l'étape suivante du banc : beaucoup de murs « en trop » (11 575 contre 129) et un
+hors-tout faux de plusieurs mètres → le redressement / la lecture de la feuille posée sur la
+table semble se tromper. À regarder avant de conclure que le modèle est mauvais.

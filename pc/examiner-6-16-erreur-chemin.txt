@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "D:\Modélisation immobilière\atelya\code-6-16\examiner.py", line 17, in <module>
+    col = np.array(Image.open(COL / plan / f"niveau_{niv}.png"), np.uint8)
+                   ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Modélisation immobilière\atelya\.venv\Lib\site-packages\PIL\Image.py", line 3654, in open
+    fp = builtins.open(filename, "rb")
+FileNotFoundError: [Errno 2] No such file or directory: '..\\coloriages-reel-cotes-e5\\050079\\niveau_1.png'

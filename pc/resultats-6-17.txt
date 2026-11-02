@@ -1,0 +1,47 @@
+RÉSULTATS 6-17 : lecture par morceaux, taches au bord, cotes dans un seul sens confirmées (avant 6-16 -> après 6-17)
+
+== reel-cotes : banc-6-16-reel-cotes-e5c -> banc-6-17-reel-cotes-e5 (343 niveaux)
+  échelle lue        : 248 (72.3 %) -> 282 (82.2 %)
+  à vérifier         : 95 -> 61
+  plus de 3 %        : 0 -> 0
+  murs justes %      : 78.1 -> 78.3 (+0.2)
+  ouvertures justes %: 85.1 -> 85.1 (+0.0)
+  pièces trouvées %  : 95.2 -> 95.2 (+0.0)
+  bon type %         : 91.2 -> 91.2 (+0.0)
+  parfaits %         : 26.8 -> 26.2 (-0.6)
+  coloriages nettoyés: 0 -> 30
+
+== reel-sc : banc-6-16-reel-sc-e5 -> banc-6-17-reel-sc-e5 (342 niveaux)
+  échelle lue        : 148 (43.3 %) -> 162 (47.4 %)
+  à vérifier         : 194 -> 180
+  plus de 3 %        : 0 -> 0
+  murs justes %      : 71.6 -> 71.6 (+0.0)
+  ouvertures justes %: 81.4 -> 81.2 (-0.2)
+  pièces trouvées %  : 93.9 -> 93.8 (-0.1)
+  bon type %         : 88.8 -> 88.8 (+0.0)
+  parfaits %         : 20.8 -> 20.8 (+0.0)
+  coloriages nettoyés: 0 -> 27
+
+== psc : banc-6-16-psc-e5 -> banc-6-17-psc-e5 (342 niveaux)
+  échelle lue        : 207 (60.5 %) -> 207 (60.5 %)
+  à vérifier         : 135 -> 135
+  plus de 3 %        : 0 -> 0
+  murs justes %      : 75.9 -> 75.9 (+0.0)
+  ouvertures justes %: 85.9 -> 85.9 (+0.0)
+  pièces trouvées %  : 94.4 -> 94.4 (+0.0)
+  bon type %         : 90.3 -> 90.3 (+0.0)
+  parfaits %         : 26.6 -> 26.6 (+0.0)
+  coloriages nettoyés: 0 -> 0
+
+== apres : banc-6-16-apres-e5 -> banc-6-17-apres-e5 (1066 niveaux)
+  échelle lue        : 1008 (94.6 %) -> 1010 (94.7 %)
+  à vérifier         : 58 -> 56
+  plus de 3 %        : 0 -> 0
+  murs justes %      : 90.8 -> 90.7 (-0.1)
+  ouvertures justes %: 92.1 -> 92.0 (-0.1)
+  pièces trouvées %  : 99.0 -> 99.0 (+0.0)
+  bon type %         : 97.4 -> 97.4 (+0.0)
+  parfaits %         : 53.2 -> 53.3 (+0.1)
+  coloriages nettoyés: 0 -> 2
+
+ERREURS > 3 % APRÈS, tous jeux : 0 OK

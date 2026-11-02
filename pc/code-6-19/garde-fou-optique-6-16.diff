@@ -1,0 +1,55 @@
+diff --git a/moteur/echelle_plan.py b/moteur/echelle_plan.py
+index 2b16e3e..054573b 100644
+--- a/moteur/echelle_plan.py
++++ b/moteur/echelle_plan.py
+@@ -28,6 +28,8 @@ Version 0.6 : garde-fou « coloriage douteux » (coloriage_douteux). Sur une pho
+ peut colorier des murs dans le bois ou les plis jusqu'au bord de la photo. Le logement colorié, ses surfaces et le
+ redressement sont alors faux, et ils faussent aussi les contrôles des chiffres lus : deux erreurs se confirment.
+ Un coloriage dont plus de 2 % des murs touchent le bord de l'image envoie donc l'échelle à la vérification.
++Et sur une photo dont l'optique a rendu les vraies proportions, les cotes horizontales et verticales doivent donner la
++même échelle : à plus de 8 % d'écart (essai : ≤ 3,6 % quand elles sont justes), une cote a été mal lue.
+ """
+ 
+ from __future__ import annotations
+@@ -53,6 +55,7 @@ LARGEUR_PORTE = 0.83  # m : la porte intérieure courante en France (vantail de
+ PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
+ BORD_IMAGE = 0.03  # coloriage douteux : la bande du bord de l'image (fraction du grand côté)…
+ PART_MURS_AU_BORD = 0.02  # … où se trouvent plus de 2 % des murs, portes et fenêtres coloriés
++ACCORD_OPTIQUE = 0.08  # photo aux proportions de l'optique : échelles des cotes en largeur et en hauteur à 8 % près
+ LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
+ 
+ 
+@@ -142,7 +145,9 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
+     (le coloriage d'Atelya y est moins sûr) : une barre ou des surfaces qui s'écartent de plus de 25 % de l'échelle
+     approchée par les portes (`approchee`) envoient le plan à la vérification.
+ 
+-    Version 0.6 : un coloriage douteux (`douteux`, voir coloriage_douteux) envoie toujours le plan à la vérification.
++    Version 0.6 : un coloriage douteux (`douteux`, voir coloriage_douteux) envoie toujours le plan à la vérification ;
++    sur une photo aux proportions de l'optique, des cotes qui donnent en largeur et en hauteur des échelles à plus de
++    8 % l'une de l'autre aussi (ACCORD_OPTIQUE).
+ 
+     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
+     (échelles à None)."""
+@@ -150,6 +155,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
+         return None, None, "à vérifier"
+     il, ih = interieur_px or (None, None)
+     plat = not de_biais or proportions_optiques  # les proportions de l'image sont les vraies
++    if largeur and hauteur and de_biais and proportions_optiques and abs(largeur / hauteur - 1) > ACCORD_OPTIQUE:
++        return None, None, "à vérifier"  # les proportions sont déjà vraies : une des deux échelles vient d'une cote mal lue
+     if largeur or hauteur:
+         if de_biais:
+             bon = _plausible(largeur, il, cote_max_largeur, sure) and _plausible(hauteur, ih, cote_max_hauteur, sure)
+diff --git a/tests/test_coloriage_douteux.py b/tests/test_coloriage_douteux.py
+index 31cff23..144872b 100644
+--- a/tests/test_coloriage_douteux.py
++++ b/tests/test_coloriage_douteux.py
+@@ -32,3 +32,9 @@ def test_douteux_envoie_toujours_a_la_verification():
+     # des cotes sûres, une barre et des surfaces d'accord : sans le garde-fou, l'échelle serait retenue
+     assert decider(100.0, 100.0, True, None, None, None, False)[2] == "cotes"
+     assert decider(100.0, 100.0, True, None, None, None, False, 100.0, 100.0, douteux=True) == (None, None, "à vérifier")
++
++
++def test_photo_optique_largeur_et_hauteur_en_desaccord():
++    # proportions déjà vraies (optique) : 32 px/m en largeur et 5,7 en hauteur, une cote a été mal lue (cas 050314)
++    assert decider(32.06, 5.68, True, None, None, None, True, proportions_optiques=True) == (None, None, "à vérifier")
++    assert decider(32.06, 31.5, True, None, None, None, True, proportions_optiques=True)[2] == "cotes"

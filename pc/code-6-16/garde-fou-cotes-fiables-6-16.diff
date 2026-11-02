@@ -1,0 +1,34 @@
+diff --git a/moteur/echelle_plan.py b/moteur/echelle_plan.py
+index 78494bf..08d957e 100644
+--- a/moteur/echelle_plan.py
++++ b/moteur/echelle_plan.py
+@@ -159,9 +159,12 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
+     il, ih = interieur_px or (None, None)
+     plat = not de_biais or proportions_optiques  # les proportions de l'image sont les vraies
+     if de_biais and proportions_optiques and (largeur or hauteur):
+-        if surfaces and _barre_plausible(surfaces, *(interieur_px or (None, None)), None, None):
+-            # Sur une photo, les surfaces écrites sont plus sûres que les cotes (essai 6-16 : ≤ 2,3 % d'erreur sur 202
+-            # niveaux, quand une cote mal lue sur la photo fausse l'échelle de 3 à 6 %) : elles l'emportent.
++        cotes_fiables = largeur and hauteur and sure and abs(surfaces / ((largeur + hauteur) / 2) - 1) <= ACCORD_SURFACES \
++            if surfaces else False
++        if surfaces and not cotes_fiables and _barre_plausible(surfaces, *(interieur_px or (None, None)), None, None):
++            # Sur une photo, les surfaces écrites sont plus sûres que des cotes douteuses (essai 6-16 : ≤ 2,3 % d'erreur
++            # sur 202 niveaux, quand une cote mal lue sur la photo fausse l'échelle de 3 à 6 %). Des cotes sûres, lues dans
++            # les deux sens et d'accord avec les surfaces à 3 % près, restent plus précises : elles sont gardées.
+             return surfaces, surfaces, "surfaces"
+         if largeur and hauteur and abs(largeur / hauteur - 1) > ACCORD_OPTIQUE:
+             return None, None, "à vérifier"  # les proportions sont déjà vraies : une des deux échelles vient d'une cote mal lue
+diff --git a/tests/test_coloriage_douteux.py b/tests/test_coloriage_douteux.py
+index 9f14818..3ebd8a3 100644
+--- a/tests/test_coloriage_douteux.py
++++ b/tests/test_coloriage_douteux.py
+@@ -50,3 +50,9 @@ def test_photo_optique_cotes_dans_un_seul_sens_ecartees():
+     assert decider(45.94, None, True, 3.05, 3.13, (329.0, 287.0), True, None, None, True) == (None, None, "à vérifier")
+     # la même chose sur un plan à plat reste lue (le cas des photos seulement)
+     assert decider(45.94, None, True, 3.05, 3.13, (329.0, 287.0), False)[2] == "cotes"
++
++
++def test_photo_optique_cotes_fiables_gardees():
++    # cotes sûres dans les deux sens, d'accord à moins de 3 % avec les surfaces : on garde les cotes (plus précises)
++    r = decider(40.0, 40.4, True, 7.8, 6.7, (316.0, 271.0), True, None, 40.9, True)
++    assert r[2] == "cotes" and abs(r[0] - 40.0) < 1e-9

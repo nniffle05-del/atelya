@@ -1,0 +1,19 @@
+[project]
+name = "moteur-3d"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "onnxruntime>=1.31.0",
+    "opencv-python-headless>=5.0.0.93",
+    "pydantic>=2.14.1",
+    "rapidocr>=3.10.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

@@ -1,0 +1,71 @@
+Atelya, essai 3 : calcul sur NVIDIA GeForce RTX 2070
+  apprentissage : repris du cache apprentissage-8219-sm.pkl
+  controle : repris du cache controle-997.pkl
+Lecture : 11238 dessins ; petites pièces (38 s) : wc 4847, placard 4490, buanderie 1994, bureau 390
+Poids : fond 0.32, mur 1.11, porte 4.11, fenetre 3.78, porte-fenetre 4.99, sejour 0.64, cuisine 2.73, chambre 0.82, salle d'eau 1.43, wc 9.90, entree 1.71, degagement 1.97, placard 9.74, buanderie 11.98, bureau 15.49, escalier 4.39
+Départ (essai 2) : IoU moyen 82.3%  wc 69.9%  placard 63.8%  buanderie 63.1%  bureau 46.8%
+[  1.4 min] pas    500  perte 0.265  IoU moyen 71.3%  murs 92.6%  wc 64.4%  placard 56.9%  buanderie 32.9%  bureau 9.8%  GPU 80 °C
+[  2.8 min] pas   1000  perte 0.252  IoU moyen 77.3%  murs 92.9%  wc 72.1%  placard 58.8%  buanderie 55.4%  bureau 12.1%  GPU 81 °C
+[  4.3 min] pas   1500  perte 0.222  IoU moyen 73.4%  murs 92.9%  wc 66.0%  placard 56.6%  buanderie 25.6%  bureau 16.2%  GPU 82 °C
+[  5.7 min] pas   2000  perte 0.216  IoU moyen 76.7%  murs 92.6%  wc 75.7%  placard 59.0%  buanderie 51.6%  bureau 11.2%  GPU 81 °C
+[  7.2 min] pas   2500  perte 0.235  IoU moyen 77.9%  murs 92.9%  wc 76.8%  placard 62.1%  buanderie 54.9%  bureau 14.5%  GPU 82 °C
+[  8.6 min] pas   3000  perte 0.210  IoU moyen 75.1%  murs 92.9%  wc 67.9%  placard 61.4%  buanderie 45.1%  bureau 10.9%  GPU 80 °C
+[ 10.1 min] pas   3500  perte 0.202  IoU moyen 77.7%  murs 93.0%  wc 75.3%  placard 65.6%  buanderie 40.9%  bureau 18.2%  GPU 82 °C
+[ 11.5 min] pas   4000  perte 0.211  IoU moyen 75.9%  murs 93.1%  wc 72.2%  placard 59.1%  buanderie 36.6%  bureau 19.1%  GPU 83 °C
+[ 12.9 min] pas   4500  perte 0.207  IoU moyen 77.7%  murs 93.1%  wc 75.0%  placard 65.0%  buanderie 43.8%  bureau 17.8%  GPU 81 °C
+[ 14.4 min] pas   5000  perte 0.200  IoU moyen 78.1%  murs 92.9%  wc 79.7%  placard 68.4%  buanderie 44.0%  bureau 19.8%  GPU 81 °C
+[ 15.8 min] pas   5500  perte 0.202  IoU moyen 78.9%  murs 93.0%  wc 82.1%  placard 73.5%  buanderie 51.8%  bureau 15.6%  GPU 82 °C
+[ 17.3 min] pas   6000  perte 0.204  IoU moyen 77.7%  murs 92.9%  wc 77.2%  placard 65.2%  buanderie 42.7%  bureau 17.0%  GPU 81 °C
+[ 18.7 min] pas   6500  perte 0.205  IoU moyen 77.9%  murs 93.1%  wc 77.3%  placard 64.6%  buanderie 51.3%  bureau 15.8%  GPU 80 °C
+[ 20.2 min] pas   7000  perte 0.183  IoU moyen 77.8%  murs 93.1%  wc 81.9%  placard 66.7%  buanderie 57.5%  bureau 14.2%  GPU 83 °C
+[ 21.6 min] pas   7500  perte 0.178  IoU moyen 80.1%  murs 93.2%  wc 81.7%  placard 66.4%  buanderie 60.8%  bureau 19.8%  GPU 80 °C
+[ 23.1 min] pas   8000  perte 0.188  IoU moyen 75.1%  murs 92.9%  wc 76.5%  placard 62.9%  buanderie 59.6%  bureau 10.8%  GPU 81 °C
+[ 24.5 min] pas   8500  perte 0.161  IoU moyen 79.3%  murs 92.8%  wc 79.0%  placard 65.0%  buanderie 57.8%  bureau 19.5%  GPU 81 °C
+[ 26.0 min] pas   9000  perte 0.169  IoU moyen 78.8%  murs 92.8%  wc 79.3%  placard 66.2%  buanderie 46.8%  bureau 22.0%  GPU 82 °C
+[ 27.4 min] pas   9500  perte 0.155  IoU moyen 81.2%  murs 93.1%  wc 83.1%  placard 69.3%  buanderie 59.7%  bureau 30.5%  GPU 83 °C
+[ 28.9 min] pas  10000  perte 0.173  IoU moyen 78.7%  murs 93.1%  wc 86.7%  placard 73.3%  buanderie 41.7%  bureau 14.9%  GPU 80 °C
+[ 30.3 min] pas  10500  perte 0.170  IoU moyen 78.6%  murs 92.9%  wc 79.1%  placard 59.0%  buanderie 49.2%  bureau 21.9%  GPU 82 °C
+[ 31.7 min] pas  11000  perte 0.153  IoU moyen 79.0%  murs 92.8%  wc 87.5%  placard 74.8%  buanderie 52.4%  bureau 12.7%  GPU 84 °C
+[ 33.2 min] pas  11500  perte 0.159  IoU moyen 80.7%  murs 92.8%  wc 86.9%  placard 73.0%  buanderie 57.9%  bureau 24.3%  GPU 81 °C
+[ 34.6 min] pas  12000  perte 0.159  IoU moyen 78.3%  murs 92.9%  wc 82.7%  placard 69.2%  buanderie 36.3%  bureau 17.3%  GPU 81 °C
+[ 36.0 min] pas  12500  perte 0.144  IoU moyen 80.4%  murs 93.0%  wc 82.7%  placard 69.2%  buanderie 55.1%  bureau 25.6%  GPU 81 °C
+[ 37.5 min] pas  13000  perte 0.157  IoU moyen 80.5%  murs 93.0%  wc 76.8%  placard 69.9%  buanderie 62.3%  bureau 28.4%  GPU 82 °C
+[ 38.9 min] pas  13500  perte 0.149  IoU moyen 81.9%  murs 93.2%  wc 84.2%  placard 75.1%  buanderie 48.4%  bureau 35.0%  GPU 82 °C
+[ 40.4 min] pas  14000  perte 0.147  IoU moyen 82.3%  murs 93.2%  wc 86.0%  placard 75.0%  buanderie 56.5%  bureau 31.3%  GPU 82 °C
+[ 41.8 min] pas  14500  perte 0.146  IoU moyen 82.4%  murs 93.2%  wc 87.2%  placard 77.5%  buanderie 51.4%  bureau 31.1%  GPU 80 °C
+[ 43.3 min] pas  15000  perte 0.141  IoU moyen 81.2%  murs 93.1%  wc 87.3%  placard 74.8%  buanderie 55.0%  bureau 24.2%  GPU 80 °C
+[ 44.7 min] pas  15500  perte 0.141  IoU moyen 81.4%  murs 93.2%  wc 85.4%  placard 78.5%  buanderie 57.7%  bureau 17.9%  GPU 81 °C
+[ 46.1 min] pas  16000  perte 0.156  IoU moyen 79.8%  murs 92.9%  wc 81.8%  placard 78.7%  buanderie 45.9%  bureau 18.5%  GPU 81 °C
+[ 47.5 min] pas  16500  perte 0.131  IoU moyen 83.3%  murs 93.3%  wc 84.2%  placard 75.1%  buanderie 66.2%  bureau 31.8%  GPU 81 °C
+[ 49.0 min] pas  17000  perte 0.131  IoU moyen 80.8%  murs 93.2%  wc 83.0%  placard 75.9%  buanderie 50.7%  bureau 19.9%  GPU 81 °C
+[ 50.4 min] pas  17500  perte 0.130  IoU moyen 84.4%  murs 93.1%  wc 86.5%  placard 76.7%  buanderie 68.5%  bureau 33.1%  GPU 80 °C
+[ 51.9 min] pas  18000  perte 0.120  IoU moyen 83.0%  murs 93.1%  wc 85.0%  placard 76.5%  buanderie 63.4%  bureau 29.9%  GPU 80 °C
+[ 53.3 min] pas  18500  perte 0.121  IoU moyen 83.6%  murs 93.1%  wc 86.4%  placard 76.9%  buanderie 65.7%  bureau 30.0%  GPU 81 °C
+[ 54.7 min] pas  19000  perte 0.131  IoU moyen 80.6%  murs 93.2%  wc 83.3%  placard 72.5%  buanderie 60.6%  bureau 15.1%  GPU 82 °C
+[ 56.1 min] pas  19500  perte 0.130  IoU moyen 84.2%  murs 93.1%  wc 83.2%  placard 73.1%  buanderie 69.1%  bureau 41.5%  GPU 83 °C
+[ 57.6 min] pas  20000  perte 0.117  IoU moyen 83.2%  murs 93.0%  wc 87.6%  placard 78.0%  buanderie 58.1%  bureau 32.5%  GPU 81 °C
+[ 59.0 min] pas  20500  perte 0.123  IoU moyen 83.4%  murs 93.3%  wc 85.5%  placard 78.3%  buanderie 55.1%  bureau 35.3%  GPU 80 °C
+[ 60.5 min] pas  21000  perte 0.113  IoU moyen 83.9%  murs 93.2%  wc 86.4%  placard 76.2%  buanderie 58.1%  bureau 36.1%  GPU 82 °C
+[ 61.9 min] pas  21500  perte 0.114  IoU moyen 83.3%  murs 93.2%  wc 84.3%  placard 75.2%  buanderie 54.5%  bureau 35.4%  GPU 81 °C
+[ 63.3 min] pas  22000  perte 0.106  IoU moyen 84.0%  murs 93.2%  wc 89.3%  placard 81.0%  buanderie 51.6%  bureau 38.0%  GPU 82 °C
+[ 64.8 min] pas  22500  perte 0.116  IoU moyen 84.0%  murs 93.1%  wc 88.3%  placard 78.3%  buanderie 57.2%  bureau 33.0%  GPU 80 °C
+[ 66.2 min] pas  23000  perte 0.113  IoU moyen 83.8%  murs 93.2%  wc 90.6%  placard 81.9%  buanderie 52.9%  bureau 31.0%  GPU 83 °C
+[ 67.6 min] pas  23500  perte 0.104  IoU moyen 83.7%  murs 93.1%  wc 85.7%  placard 77.1%  buanderie 63.0%  bureau 29.3%  GPU 81 °C
+[ 69.0 min] pas  24000  perte 0.110  IoU moyen 83.5%  murs 93.2%  wc 87.3%  placard 80.0%  buanderie 53.0%  bureau 34.4%  GPU 82 °C
+[ 70.5 min] pas  24500  perte 0.110  IoU moyen 85.0%  murs 93.2%  wc 88.5%  placard 80.1%  buanderie 63.5%  bureau 37.5%  GPU 81 °C
+[ 71.9 min] pas  25000  perte 0.108  IoU moyen 84.5%  murs 93.2%  wc 85.0%  placard 78.0%  buanderie 63.9%  bureau 37.4%  GPU 80 °C
+[ 73.3 min] pas  25500  perte 0.112  IoU moyen 83.7%  murs 93.2%  wc 87.1%  placard 80.1%  buanderie 58.2%  bureau 29.9%  GPU 81 °C
+[ 74.8 min] pas  26000  perte 0.104  IoU moyen 84.1%  murs 93.3%  wc 85.1%  placard 76.5%  buanderie 62.5%  bureau 31.2%  GPU 81 °C
+[ 76.2 min] pas  26500  perte 0.115  IoU moyen 84.6%  murs 93.3%  wc 88.9%  placard 80.0%  buanderie 64.8%  bureau 31.5%  GPU 81 °C
+[ 77.6 min] pas  27000  perte 0.103  IoU moyen 84.3%  murs 93.3%  wc 88.0%  placard 79.3%  buanderie 61.2%  bureau 32.4%  GPU 81 °C
+[ 79.1 min] pas  27500  perte 0.112  IoU moyen 85.4%  murs 93.2%  wc 88.5%  placard 80.7%  buanderie 64.9%  bureau 44.6%  GPU 83 °C
+[ 80.5 min] pas  28000  perte 0.107  IoU moyen 84.6%  murs 93.2%  wc 89.2%  placard 82.3%  buanderie 62.8%  bureau 35.2%  GPU 82 °C
+[ 81.9 min] pas  28500  perte 0.102  IoU moyen 84.8%  murs 93.2%  wc 89.9%  placard 82.2%  buanderie 62.2%  bureau 36.4%  GPU 80 °C
+[ 83.4 min] pas  29000  perte 0.102  IoU moyen 84.5%  murs 93.3%  wc 87.9%  placard 80.4%  buanderie 59.2%  bureau 36.1%  GPU 80 °C
+[ 84.8 min] pas  29500  perte 0.105  IoU moyen 84.4%  murs 93.2%  wc 89.0%  placard 80.8%  buanderie 60.5%  bureau 34.4%  GPU 81 °C
+[ 86.2 min] pas  30000  perte 0.106  IoU moyen 84.8%  murs 93.3%  wc 90.0%  placard 81.8%  buanderie 62.9%  bureau 33.5%  GPU 82 °C
+[ 87.7 min] pas  30500  perte 0.105  IoU moyen 85.2%  murs 93.3%  wc 89.7%  placard 82.1%  buanderie 65.4%  bureau 36.3%  GPU 83 °C
+[ 89.1 min] pas  31000  perte 0.105  IoU moyen 85.4%  murs 93.3%  wc 89.3%  placard 81.9%  buanderie 65.7%  bureau 40.9%  GPU 82 °C
+[ 90.5 min] pas  31500  perte 0.108  IoU moyen 85.4%  murs 93.4%  wc 89.2%  placard 81.8%  buanderie 61.3%  bureau 42.7%  GPU 81 °C
+ESSAI PRECEDENT {"pixels_justes_pct": 98.6, "iou_moyen_pct": 81.8, "iou_par_classe_pct": {"fond": 99.7, "mur": 92.8, "porte": 75.5, "fenetre": 85.5, "porte-fenetre": 70.6, "sejour": 98.2, "cuisine": 84.1, "chambre": 95.8, "salle d'eau": 91.6, "wc": 70.2, "entree": 92.6, "degagement": 88.8, "placard": 70.9, "buanderie": 55.8, "bureau": 41.7, "escalier": 95.1}, "taches_marges_pct": 0.02, "plans_avec_taches_pct": 10.1}
+BILAN {"pixels_justes_pct": 98.7, "iou_moyen_pct": 85.0, "iou_par_classe_pct": {"fond": 99.7, "mur": 92.7, "porte": 76.8, "fenetre": 85.5, "porte-fenetre": 67.5, "sejour": 98.3, "cuisine": 91.4, "chambre": 96.0, "salle d'eau": 94.6, "wc": 85.2, "entree": 94.8, "degagement": 90.5, "placard": 81.7, "buanderie": 65.0, "bureau": 44.1, "escalier": 96.0}, "taches_marges_pct": 0.04, "plans_avec_taches_pct": 17.3}

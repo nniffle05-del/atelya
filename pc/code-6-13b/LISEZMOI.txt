@@ -1,0 +1,6 @@
+Étape 6-13 (affiner l'échelle d'Atelya) : code du moteur pour la note sur le PC.
+Contient seulement les fichiers du moteur utiles au banc de note (moteur/banc_coloriage.py et ce qu'il importe).
+Version : commit Mac d1cf6f6 + changements 6-13 (barre_echelle.py, echelle_plan.py 0.4.0, banc_coloriage.py).
+Outils Python nécessaires (même versions que sur le Mac) : opencv-python-headless, rapidocr, onnxruntime, pydantic, pillow, numpy.
+Commande (depuis ce dossier) :
+  python -m moteur.banc_coloriage <jeu> --coloriages <dossier exemples des coloriages Atelya> --echelle lue --processus 5 --sortie <sortie>

@@ -1,0 +1,174 @@
+diff --git a/moteur/banc_coloriage.py b/moteur/banc_coloriage.py
+index 55899a1..9906cc8 100644
+--- a/moteur/banc_coloriage.py
++++ b/moteur/banc_coloriage.py
+@@ -38,7 +38,7 @@ import numpy as np
+ from PIL import Image
+ 
+ from moteur.coloriage import PIECES, lire_coloriage
+-from moteur.echelle_plan import decider, lire_echelle_plan
++from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan
+ from moteur.noms_pieces import lire_textes, noms_depuis_textes
+ from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique,
+                                  rapport_plausible)
+@@ -325,9 +325,13 @@ def noter_niveau(args) -> dict:
+         images, cache = echelle_opt
+         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
+         lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None) if dessin else {"largeur": None, "hauteur": None}
++        douteux = coloriage_douteux(col)  # calculé ici et non gardé en cache : il ne dépend que du coloriage brut
++        if douteux:
++            resultat["coloriage_douteux"] = True
+         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
+                                  lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
+-                                 lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"))
++                                 lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"),
++                                 douteux)
+         if R is None:
+             lx = ly = lx or ly
+         resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,
+diff --git a/moteur/echelle_plan.py b/moteur/echelle_plan.py
+index 1e53f12..2b16e3e 100644
+--- a/moteur/echelle_plan.py
++++ b/moteur/echelle_plan.py
+@@ -23,6 +23,11 @@ au papier gris (photocopie, photo) sont relues sur l'image aux gris étirés qua
+ aucune de ces informations reçoit une échelle « approchée » tirée de la largeur de ses portes
+ (echelle_par_portes, à ±10 % près). Elle ne sert jamais à construire : le plan reste « à vérifier »,
+ mais la personne qui vérifie part d'une maquette déjà presque à la bonne taille.
++
++Version 0.6 : garde-fou « coloriage douteux » (coloriage_douteux). Sur une photo posée sur une table, Atelya
++peut colorier des murs dans le bois ou les plis jusqu'au bord de la photo. Le logement colorié, ses surfaces et le
++redressement sont alors faux, et ils faussent aussi les contrôles des chiffres lus : deux erreurs se confirment.
++Un coloriage dont plus de 2 % des murs touchent le bord de l'image envoie donc l'échelle à la vérification.
+ """
+ 
+ from __future__ import annotations
+@@ -38,7 +43,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
+ from moteur.redressement import Redressement
+ from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
+ 
+-VERSION_ECHELLE = "0.5.0"
++VERSION_ECHELLE = "0.6.0"
+ ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
+ ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
+ ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
+@@ -46,6 +51,8 @@ PAPIER_GRIS = 235  # en dessous (niveau de gris du papier), le plan est une phot
+ ACCORD_PORTES = 0.25  # photo : barre ou surfaces à plus de 25 % de l'échelle approchée par les portes → à vérifier
+ LARGEUR_PORTE = 0.83  # m : la porte intérieure courante en France (vantail de 83 cm)
+ PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
++BORD_IMAGE = 0.03  # coloriage douteux : la bande du bord de l'image (fraction du grand côté)…
++PART_MURS_AU_BORD = 0.02  # … où se trouvent plus de 2 % des murs, portes et fenêtres coloriés
+ LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
+ 
+ 
+@@ -74,6 +81,8 @@ class EchelleLue:
+     # L'échelle approchée par la largeur des portes (px par m du coloriage), pour la vérification humaine
+     # seulement : jamais utilisée pour construire (voir echelle_par_portes).
+     approchee: float | None = None
++    # Le coloriage d'Atelya colle au bord de l'image (table ou plis coloriés en murs) : voir coloriage_douteux.
++    douteux: bool = False
+ 
+     @property
+     def px_par_m(self) -> float | None:
+@@ -84,7 +93,7 @@ class EchelleLue:
+         """L'échelle retenue (largeur, hauteur) et sa source, après contrôle (voir decider)."""
+         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
+                        self.interieur_px, de_biais, self.barre if self.barre_sure else None,
+-                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee)
++                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee, self.douteux)
+ 
+ 
+ def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
+@@ -109,7 +118,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
+             cote_max_hauteur: float | None, interieur_px: tuple[float, float] | None,
+             de_biais: bool, barre: float | None = None,
+             surfaces: float | None = None, proportions_optiques: bool = False,
+-            approchee: float | None = None) -> tuple[float | None, float | None, str]:
++            approchee: float | None = None, douteux: bool = False) -> tuple[float | None, float | None, str]:
+     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
+ 
+     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
+@@ -133,8 +142,12 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
+     (le coloriage d'Atelya y est moins sûr) : une barre ou des surfaces qui s'écartent de plus de 25 % de l'échelle
+     approchée par les portes (`approchee`) envoient le plan à la vérification.
+ 
++    Version 0.6 : un coloriage douteux (`douteux`, voir coloriage_douteux) envoie toujours le plan à la vérification.
++
+     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
+     (échelles à None)."""
++    if douteux:  # le logement colorié est faux : il ne peut plus contrôler aucun chiffre lu
++        return None, None, "à vérifier"
+     il, ih = interieur_px or (None, None)
+     plat = not de_biais or proportions_optiques  # les proportions de l'image sont les vraies
+     if largeur or hauteur:
+@@ -170,6 +183,22 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
+     return None, None, "à vérifier"
+ 
+ 
++def coloriage_douteux(col: np.ndarray) -> bool:
++    """Atelya a-t-il colorié des murs jusqu'au bord de l'image (coloriage brut, avant redressement) ?
++
++    Un plan dessiné ou photographié garde toujours une marge de papier ou de table autour du logement. Des murs
++    coloriés au bord de l'image viennent donc de la table, des plis ou d'un reflet pris pour des traits.
++    Essai (étape 6-16, coloriages de l'essai 4) : 0 sur 342 anciennes photos, 1 sur 1 066 anciens niveaux, et les
++    16 échelles fausses de plus de 3 % sur 342 photos réalistes toutes attrapées."""
++    bati = (col >= MUR) & (col <= PORTE_FENETRE)
++    total = int(bati.sum())
++    if not total:
++        return False
++    m = max(1, round(BORD_IMAGE * max(col.shape)))
++    au_bord = int(bati[:m].sum() + bati[-m:].sum() + bati[m:-m, :m].sum() + bati[m:-m, -m:].sum())
++    return au_bord > PART_MURS_AU_BORD * total
++
++
+ def echelle_par_portes(col: np.ndarray) -> float | None:
+     """Une échelle approchée (px par m du coloriage remis droit), tirée de la largeur des portes coloriées.
+ 
+@@ -331,7 +360,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
+                       max(horiz) if horiz else None, max(verti) if verti else None, interieur,
+                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
+                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
+-                      surf.detail if surf else "", echelle_par_portes(col))
++                      surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage))
+ 
+ 
+ def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
+diff --git a/tests/test_coloriage_douteux.py b/tests/test_coloriage_douteux.py
+new file mode 100644
+index 0000000..31cff23
+--- /dev/null
++++ b/tests/test_coloriage_douteux.py
+@@ -0,0 +1,34 @@
++"""Garde-fou « coloriage douteux » de moteur.echelle_plan (étape 6-16)."""
++
++import numpy as np
++
++from moteur.coloriage import MUR
++from moteur.echelle_plan import coloriage_douteux, decider
++
++
++def _logement(col: np.ndarray, x0: int, y0: int, x1: int, y1: int) -> None:
++    col[y0:y0 + 6, x0:x1] = col[y1 - 6:y1, x0:x1] = MUR
++    col[y0:y1, x0:x0 + 6] = col[y0:y1, x1 - 6:x1] = MUR
++
++
++def test_un_plan_avec_sa_marge_n_est_pas_douteux():
++    col = np.zeros((600, 800), np.uint8)
++    _logement(col, 150, 100, 650, 500)
++    assert not coloriage_douteux(col)
++
++
++def test_des_murs_colories_jusqu_au_bord_sont_douteux():
++    col = np.zeros((600, 800), np.uint8)
++    _logement(col, 150, 100, 650, 500)
++    col[:, :8] = MUR  # le bord de la table pris pour un mur
++    assert coloriage_douteux(col)
++
++
++def test_un_coloriage_vide_n_est_pas_douteux():
++    assert not coloriage_douteux(np.zeros((100, 100), np.uint8))
++
++
++def test_douteux_envoie_toujours_a_la_verification():
++    # des cotes sûres, une barre et des surfaces d'accord : sans le garde-fou, l'échelle serait retenue
++    assert decider(100.0, 100.0, True, None, None, None, False)[2] == "cotes"
++    assert decider(100.0, 100.0, True, None, None, None, False, 100.0, 100.0, douteux=True) == (None, None, "à vérifier")

@@ -1,0 +1,82 @@
+{
+ "meilleure_note": {
+  "pixels_justes_pct": 98.7,
+  "iou_moyen_pct": 85.0,
+  "iou_par_classe_pct": {
+   "fond": 99.7,
+   "mur": 92.7,
+   "porte": 76.8,
+   "fenetre": 85.5,
+   "porte-fenetre": 67.5,
+   "sejour": 98.3,
+   "cuisine": 91.4,
+   "chambre": 96.0,
+   "salle d'eau": 94.6,
+   "wc": 85.2,
+   "entree": 94.8,
+   "degagement": 90.5,
+   "placard": 81.7,
+   "buanderie": 65.0,
+   "bureau": 44.1,
+   "escalier": 96.0
+  },
+  "taches_marges_pct": 0.04,
+  "plans_avec_taches_pct": 17.3
+ },
+ "pas": 31500,
+ "minutes": 91.6,
+ "minutes_de_pause_chaleur": 0.0,
+ "plans_appris": 8219,
+ "dessins_avec_petites_pieces": {
+  "wc": 4847,
+  "placard": 4490,
+  "buanderie": 1994,
+  "bureau": 390
+ },
+ "reglages": {
+  "jeu": "donnees\\jeu-10000",
+  "reprendre": "resultats-essai-2\\atelya-essai-2.pt",
+  "sortie": "resultats-essai-3",
+  "nb_train": 0,
+  "nb_val": 150,
+  "nb_val_final": 0,
+  "cote": 768,
+  "morceau": 512,
+  "debord": 0.5,
+  "lot": 4,
+  "cible": 0.5,
+  "renfort": 2.5,
+  "lr": 0.0003,
+  "minutes": 90.0,
+  "pas_par_tour": 500,
+  "processus": 6,
+  "temp_max": 88,
+  "comparer": "resultats-essai-2\\atelya-essai-2.pt",
+  "graine": 3
+ },
+ "machine": "NVIDIA GeForce RTX 2070",
+ "essai_precedent_meme_controle": {
+  "pixels_justes_pct": 98.6,
+  "iou_moyen_pct": 81.8,
+  "iou_par_classe_pct": {
+   "fond": 99.7,
+   "mur": 92.8,
+   "porte": 75.5,
+   "fenetre": 85.5,
+   "porte-fenetre": 70.6,
+   "sejour": 98.2,
+   "cuisine": 84.1,
+   "chambre": 95.8,
+   "salle d'eau": 91.6,
+   "wc": 70.2,
+   "entree": 92.6,
+   "degagement": 88.8,
+   "placard": 70.9,
+   "buanderie": 55.8,
+   "bureau": 41.7,
+   "escalier": 95.1
+  },
+  "taches_marges_pct": 0.02,
+  "plans_avec_taches_pct": 10.1
+ }
+}

@@ -1,0 +1,190 @@
+{
+ "050079:1": {
+  "vraie_largeur": 40.338564117588,
+  "vraie_hauteur": 40.31143270291006,
+  "lue_largeur": 38.6803174482292,
+  "lue_hauteur": null,
+  "sure": true,
+  "rapport_optique": 1.0074606933441337,
+  "cote_max": [
+   7.8,
+   null
+  ],
+  "interieur_px": [
+   316.0,
+   271.0
+  ],
+  "barre": null,
+  "surfaces": 40.175,
+  "surfaces_sure": true,
+  "approchee": 39.759,
+  "douteux": false,
+  "cotes": [
+   {
+    "valeur": 1.65,
+    "px": 174.99,
+    "verticale": "False",
+    "px_par_m_dessin": 106.056,
+    "texte": "TexteLu(texte='1.65', boite=array([[ 580.79229736, 1519.40979004],\n       [ 631.15625   , 1519.40979004],\n       [ 631.15625   , 1548.1784668 ],\n       [ 580.79229736, 1548.1784668 ]]), confiance=0.98928)",
+    "bouts": [
+     [
+      517.5074626865671,
+      1515
+     ],
+     [
+      692.5,
+      1515
+     ]
+    ]
+   },
+   {
+    "valeur": 1.25,
+    "px": 131.0,
+    "verticale": "False",
+    "px_par_m_dessin": 104.8,
+    "texte": "TexteLu(texte='1.25', boite=array([[ 751.17236328, 1520.4753418 ],\n       [ 801.53625488, 1520.4753418 ],\n       [ 801.53625488, 1547.11291504],\n       [ 751.17236328, 1547.11291504]]), confiance=0.99592)",
+    "bouts": [
+     [
+      711.0,
+      1512
+     ],
+     [
+      842.0,
+      1512
+     ]
+    ]
+   },
+   {
+    "valeur": 7.8,
+    "px": 854.57,
+    "verticale": "False",
+    "px_par_m_dessin": 109.561,
+    "texte": "TexteLu(texte='7.80', boite=array([[917.26611328, 575.37255859],\n       [967.63000488, 575.37255859],\n       [967.63000488, 604.14123535],\n       [917.26611328, 604.14123535]]), confiance=0.91432)",
+    "bouts": [
+     [
+      515.9473684210526,
+      611
+     ],
+     [
+      1370.5217391304348,
+      611
+     ]
+    ]
+   }
+  ]
+ },
+ "050161:1": {
+  "vraie_largeur": 48.90868634055854,
+  "vraie_hauteur": 48.91394724987452,
+  "lue_largeur": 45.937690262956195,
+  "lue_hauteur": null,
+  "sure": true,
+  "rapport_optique": 1.0381494089737802,
+  "cote_max": [
+   3.05,
+   3.13
+  ],
+  "interieur_px": [
+   329.0,
+   287.0
+  ],
+  "barre": null,
+  "surfaces": null,
+  "surfaces_sure": false,
+  "approchee": 48.193,
+  "douteux": false,
+  "cotes": [
+   {
+    "valeur": 0.78,
+    "px": 94.4,
+    "verticale": "False",
+    "px_par_m_dessin": 121.031,
+    "texte": "TexteLu(texte='0.78', boite=array([[ 842.0413208 , 1225.90905762],\n       [ 898.65924072, 1225.90905762],\n       [ 898.65924072, 1257.1270752 ],\n       [ 842.0413208 , 1257.1270752 ]]), confiance=0.70012)",
+    "bouts": [
+     [
+      823.4057971014493,
+      1219
+     ],
+     [
+      917.8103448275862,
+      1219
+     ]
+    ]
+   },
+   {
+    "valeur": 1.18,
+    "px": 143.0,
+    "verticale": "False",
+    "px_par_m_dessin": 121.186,
+    "texte": "TexteLu(texte='1.18', boite=array([[1184.15820312, 1225.90905762],\n       [1232.34375   , 1225.90905762],\n       [1232.34375   , 1257.1270752 ],\n       [1184.15820312, 1257.1270752 ]]), confiance=0.77483)",
+    "bouts": [
+     [
+      1136.0,
+      1219
+     ],
+     [
+      1279.0,
+      1219
+     ]
+    ]
+   }
+  ]
+ },
+ "050297:0": {
+  "vraie_largeur": 42.432917678455844,
+  "vraie_hauteur": 42.12985720621579,
+  "lue_largeur": 41.142117853624924,
+  "lue_hauteur": 41.82528282852545,
+  "sure": false,
+  "rapport_optique": 1.0303153116579782,
+  "cote_max": [
+   7.3,
+   4.25
+  ],
+  "interieur_px": [
+   309.0,
+   181.0
+  ],
+  "barre": null,
+  "surfaces": 41.94,
+  "surfaces_sure": true,
+  "approchee": 46.988,
+  "douteux": false,
+  "cotes": [
+   {
+    "valeur": 4.25,
+    "px": 383.98,
+    "verticale": "True",
+    "px_par_m_dessin": 90.349,
+    "texte": "TexteLu(texte='4,25', boite=array([[166., 587.],\n       [193., 587.],\n       [193., 635.],\n       [166., 635.]]), confiance=0.92302)",
+    "bouts": [
+     [
+      202,
+      418.5
+     ],
+     [
+      202,
+      802.483870967742
+     ]
+    ]
+   },
+   {
+    "valeur": 2.05,
+    "px": 182.19,
+    "verticale": "False",
+    "px_par_m_dessin": 88.873,
+    "texte": "TexteLu(texte='2.05', boite=array([[823., 887.],\n       [870., 887.],\n       [870., 914.],\n       [823., 914.]]), confiance=0.89304)",
+    "bouts": [
+     [
+      756.0,
+      878
+     ],
+     [
+      938.1904761904761,
+      878
+     ]
+    ]
+   }
+  ]
+ }
+}
