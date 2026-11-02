@@ -482,6 +482,16 @@ def _boite_mur(m: dict) -> list[float]:
     return [min(x1, x2) - e, min(y1, y2) - e, max(x1, x2) + e, max(y1, y2) + e]
 
 
+def _boite_mur_vrai(mv: dict, ident: str) -> list[float]:
+    """Boîte d'un mur vrai ; un mur arrondi (« M_arrondi1 ») est fait de morceaux « M_arrondi1-k »."""
+    if ident in mv:
+        return _boite_mur(mv[ident])
+    boites = [_boite_mur(m) for k, m in mv.items() if k.startswith(ident + "-")]
+    if not boites:
+        return [0.0, 0.0, 0.0, 0.0]
+    return [min(b[0] for b in boites), min(b[1] for b in boites), max(b[2] for b in boites), max(b[3] for b in boites)]
+
+
 def zones_des_erreurs(vrai: dict, r: dict) -> list[dict]:
     """Où sont les vraies erreurs de lecture (repère du logement vrai, en m), et si elles sont graves."""
     mv = {m["id"]: m for m in vrai["murs"]}
@@ -490,7 +500,7 @@ def zones_des_erreurs(vrai: dict, r: dict) -> list[dict]:
         if m.get("juste"):
             continue
         grave = not m["trouve"] or m["bouts"] > MUR_GRAVE_BOUTS or m["axe"] > MUR_GRAVE_AXE
-        zones.append({"quoi": "mur", "id": m["vrai"], "grave": grave, "zone": _boite_mur(mv[m["vrai"]])})
+        zones.append({"quoi": "mur", "id": m["vrai"], "grave": grave, "zone": _boite_mur_vrai(mv, m["vrai"])})
     for o in r["ouvertures"]:
         if o.get("juste"):
             continue
