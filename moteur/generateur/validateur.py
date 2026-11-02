@@ -311,8 +311,10 @@ def valider_dossier(dossier: Path, regles: Regles | None = None, v: Verdict | No
         else:
             noms = {n["name"] for n in gltf["nodes"]}
             murs_attendus = {m["id"] for n in geo["niveaux"] for m in n["murs"]}
-            if not murs_attendus <= noms:
-                v.erreurs.append(f"modele.glb : murs absents de la 3D : {sorted(murs_attendus - noms)[:5]}")
+            # un mur arrondi (A3) est posé en 3D par morceaux : M_arrondi1-0, M_arrondi1-1, …
+            absents = {m for m in murs_attendus - noms if not any(n.startswith(f"{m}-") for n in noms)}
+            if absents:
+                v.erreurs.append(f"modele.glb : murs absents de la 3D : {sorted(absents)[:5]}")
         constr = dossier / "construction.json"
         if constr.exists():
             from moteur.generateur.modele3d import emprise_des_murs
