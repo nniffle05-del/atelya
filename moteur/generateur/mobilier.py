@@ -93,7 +93,7 @@ def _contre_un_mur(piece: Piece, lx: int, ly: int, interdits: list[Rect], poses:
 def meubler(piece: Piece, niveau: Niveau, rng: random.Random) -> list[Meuble]:
     """Les meubles d'une pièce, selon sa sorte (liste vide pour un placard ou un dégagement)."""
     r = piece.rect
-    interdits = _zones_de_battement(piece, niveau.ouvertures)
+    interdits = _zones_de_battement(piece, niveau.ouvertures) + list(piece.interdits)
     poses: list[Rect] = []
     meubles: list[Meuble] = []
 

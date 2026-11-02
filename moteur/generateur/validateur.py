@@ -26,7 +26,7 @@ import cv2
 import numpy as np
 
 from moteur.generateur.annotations import CLASSES, pieces_le_long, rect_de_l_ouverture, rect_du_mur, rasteriser
-from moteur.generateur.logements import LogementGenere, Niveau, Rect
+from moteur.generateur.logements import LogementGenere, Niveau, Rect, contour_piece, surface_piece
 
 
 @dataclass
@@ -95,10 +95,16 @@ def valider_niveau(log: LogementGenere, niveau: Niveau, regles: Regles, v: Verdi
             continue
         if min(r.largeur, r.hauteur) / 1000 < regles.cote_min_piece:
             v.erreurs.append(f"{n} : pièce {p.id} trop étroite ({min(r.largeur, r.hauteur) / 1000:.2f} m)")
-        s = r.surface / 1e6
+        s = surface_piece(p) / 1e6
         if not regles.surface_min_piece <= s <= regles.surface_max_piece:
             v.erreurs.append(f"{n} : pièce {p.id} de surface invraisemblable ({s:.2f} m²)")
-        if not _dans_contour(r, niveau.coins):
+        if p.contour:  # A3 : angle coupé : les sommets du contour, un peu rentrés vers le centre
+            cx = sum(x for x, _ in p.contour) / len(p.contour)
+            cy = sum(y for _, y in p.contour) / len(p.contour)
+            pts = [(x + (cx - x) * 0.01, y + (cy - y) * 0.01) for x, y in contour_piece(p)]
+            if not all(_point_dans(q, niveau.coins) for q in pts):
+                v.erreurs.append(f"{n} : pièce {p.id} hors de l'enveloppe")
+        elif not _dans_contour(r, niveau.coins):
             v.erreurs.append(f"{n} : pièce {p.id} hors de l'enveloppe")
     for i, a in enumerate(pieces):
         for b in pieces[i + 1:]:
@@ -150,7 +156,7 @@ def valider_niveau(log: LogementGenere, niveau: Niveau, regles: Regles, v: Verdi
                 v.erreurs.append(f"{n} : les ouvertures {a.id} et {b.id} se chevauchent sur le mur {mid}")
     # Surfaces : la somme des pièces + les murs intérieurs ≈ l'enveloppe.
     emprise = abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(niveau.coins, niveau.coins[1:] + niveau.coins[:1]))) / 2
-    habitable = sum(p.rect.surface for p in pieces)
+    habitable = sum(surface_piece(p) for p in pieces)
     murs_int = sum(rect_du_mur(m).surface for m in interieurs)
     if abs(emprise - habitable - murs_int) / emprise * 100 > regles.ecart_surface_pct:
         v.erreurs.append(f"{n} : surfaces incohérentes (enveloppe {emprise / 1e6:.2f}, pièces {habitable / 1e6:.2f}, "
@@ -186,6 +192,16 @@ def valider_geometrie(log: LogementGenere, geometrie: dict, regles: Regles | Non
 
 def _aire(poly: list[list[float]]) -> float:
     return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]))) / 2
+
+
+def _centre_gravite(poly: list[list[float]]) -> tuple[float, float]:
+    a = cx = cy = 0.0
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        k = x1 * y2 - x2 * y1
+        a += k; cx += (x1 + x2) * k; cy += (y1 + y2) * k
+    if abs(a) < 1e-9:
+        return sum(q[0] for q in poly) / len(poly), sum(q[1] for q in poly) / len(poly)
+    return cx / (3 * a), cy / (3 * a)
 
 
 def chemin_du_plan(dn: Path) -> Path | None:
@@ -259,8 +275,11 @@ def valider_dossier(dossier: Path, regles: Regles | None = None, v: Verdict | No
             if attendu > 0 and abs(compte - attendu) / attendu * 100 > regles.ecart_masque_pct:
                 v.erreurs.append(f"{dn.name} : masque de la pièce {p['id']} ({compte} px) ≠ annotation ({attendu:.0f} px)")
             # Le masque sémantique dit la même classe au centre de la pièce.
-            cx = int(sum(q[0] for q in p["polygone_px"]) / 4)
-            cy = int(sum(q[1] for q in p["polygone_px"]) / 4)
+            if len(p["polygone_px"]) == 4:
+                cx = int(sum(q[0] for q in p["polygone_px"]) / 4)
+                cy = int(sum(q[1] for q in p["polygone_px"]) / 4)
+            else:  # A3 : pièce à angle coupé : le centre de gravité de la surface
+                cx, cy = (int(v) for v in _centre_gravite(p["polygone_px"]))
             if 0 <= cy < sem.shape[0] and 0 <= cx < sem.shape[1] and sem[cy, cx] != p["classe"]:
                 if not (niveau["index"] > 0 and p["classe"] == CLASSES["escalier"]):
                     v.erreurs.append(f"{dn.name} : classe {sem[cy, cx]} au centre de {p['id']} (attendu {p['classe']})")

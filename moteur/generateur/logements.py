@@ -64,6 +64,10 @@ class Piece:
     cible: float  # surface visée, en m²
     rect: Rect | None = None
     id: str = ""
+    # Étape A3 (--biais) : contour réel quand un angle de la pièce est coupé (pan coupé, angle arrondi) ;
+    # None = le rectangle. `interdits` : zones où rien ne se pose (le coin coupé).
+    contour: list[tuple[float, float]] | None = None
+    interdits: list[Rect] = field(default_factory=list)
 
 
 @dataclass
@@ -82,6 +86,25 @@ class Mur:
     epaisseur: int
     dehors: int = 0
     porteur: bool = False
+    id: str = ""
+    coupe_debut: bool = False  # A3 : ce bout s'arrête sur un mur en biais (pas de rallonge d'angle)
+    coupe_fin: bool = False
+
+
+@dataclass
+class MurLibre:
+    """Étape A3 : un mur extérieur en biais (pan coupé) ou arrondi, à la place d'un angle du logement.
+
+    `axe` : la ligne au milieu du mur (2 points pour un pan coupé, une suite de points pour un arrondi) ;
+    `polygone` : la surface exacte occupée par le mur (raccords avec les deux murs voisins compris).
+    """
+
+    forme: str  # biais, arrondi
+    axe: list[tuple[float, float]]
+    polygone: list[tuple[float, float]]
+    epaisseur: int
+    dehors: int = 1
+    porteur: bool = True
     id: str = ""
 
 
@@ -112,6 +135,7 @@ class Niveau:
     ouvertures: list[Ouverture] = field(default_factory=list)
     z_sol: int = 0  # altitude du sol fini, en mm
     hsp: int = 2500
+    murs_libres: list[MurLibre] = field(default_factory=list)  # A3 : murs en biais / arrondis
 
     @property
     def cadre(self) -> Rect:
@@ -121,7 +145,24 @@ class Niveau:
 
     @property
     def surface(self) -> float:
-        return round(sum(p.rect.surface for p in self.pieces) / 1e6, 2)
+        return round(sum(surface_piece(p) for p in self.pieces) / 1e6, 2)
+
+
+def contour_piece(p: Piece) -> list[tuple[float, float]]:
+    """Le contour de la pièce, en mm (sens direct) : son rectangle, ou son contour coupé (A3)."""
+    if p.contour:
+        return list(p.contour)
+    r = p.rect
+    return [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
+
+
+def aire(poly: list[tuple[float, float]]) -> float:
+    return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]))) / 2
+
+
+def surface_piece(p: Piece) -> float:
+    """La surface de la pièce en mm² (celle du rectangle s'il n'y a pas d'angle coupé : rien ne change)."""
+    return aire(p.contour) if p.contour else p.rect.surface
 
 
 @dataclass
@@ -1019,12 +1060,11 @@ def en_logement(log: LogementGenere, niveau: Niveau) -> dict:
 
     pieces = []
     for p in sorted(niveau.pieces, key=lambda p: (-p.rect.y1, p.rect.x0)):
-        r = p.rect
         pieces.append({
             "id": p.id,
             "nom": p.nom,
-            "contour": [[_m(r.x0), _m(r.y0)], [_m(r.x1), _m(r.y0)], [_m(r.x1), _m(r.y1)], [_m(r.x0), _m(r.y1)]],
-            "surface": round(r.surface / 1e6, 2),
+            "contour": [[_m(x), _m(y)] for x, y in contour_piece(p)],
+            "surface": round(surface_piece(p) / 1e6, 2),
             "statut": "mesure",
             "source": source,
         })
@@ -1037,6 +1077,11 @@ def en_logement(log: LogementGenere, niveau: Niveau) -> dict:
             {"id": m.id, "debut": point(m, m.debut), "fin": point(m, m.fin), "epaisseur": _m(m.epaisseur),
              "statut": "mesure", "source": source}
             for m in niveau.murs
+        ] + [
+            # A3 : un mur en biais = 1 segment ; un mur arrondi = une suite de petits segments droits.
+            {"id": f"{m.id}-{k}" if len(m.axe) > 2 else m.id, "debut": [_m(a[0]), _m(a[1])], "fin": [_m(b[0]), _m(b[1])],
+             "epaisseur": _m(m.epaisseur), "statut": "mesure", "source": source}
+            for m in niveau.murs_libres for k, (a, b) in enumerate(zip(m.axe, m.axe[1:]))
         ],
         "ouvertures": [
             {"id": o.id, "type": o.type, "mur": o.mur.id, "position": _m(o.u0 - o.mur.debut),

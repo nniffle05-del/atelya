@@ -78,6 +78,7 @@ class Options:
     sans_cotes: bool = False  # aucune cote dessinée (plans d'agence) ; barre d'échelle et surfaces tirées au hasard
     styles_monde: bool = False  # styles des vrais plans français (sols, traits fins, lettres A-D, capture…) et styles absurdes
     photo_realiste: bool = False  # les photos « vraie caméra » posées sur une vraie table (plis, ombres, reflets, flou)
+    biais: bool = False  # A3 : pans coupés et angles arrondis (murs qui ne sont ni horizontaux ni verticaux)
 
 
 @dataclass
@@ -177,6 +178,11 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
     except RuntimeError as e:
         journal.warning("graine %d : %s", graine, e)
         return Resultat(graine, ident, "echec", time.perf_counter() - debut, [str(e)])
+    biais_faits = None
+    if opt.biais:
+        # Tirage à part : sans --biais, le logement reste exactement le même.
+        from moteur.generateur.biais import couper_angles
+        biais_faits = couper_angles(log, random.Random(f"biais-{graine}"))
     if opt.types and log.type not in opt.types:
         return Resultat(graine, ident, "hors_filtre", time.perf_counter() - debut)
     if not (opt.surface_min <= log.surface <= opt.surface_max) or not (opt.pieces_min <= len(log.pieces) <= opt.pieces_max):
@@ -223,7 +229,7 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
         "empreinte": empreinte(log), "signature": signature(log, geometrie).en_dict(),
         "fichiers": fichiers, "octets": taille, "version_generateur": VERSION_GENERATEUR,
         "accepte": verdict.accepte, "erreurs": verdict.erreurs, "avertissements": verdict.avertissements,
-        "modele_3d": bilan_3d, "essais": log.essais, "duree_s": round(time.perf_counter() - debut, 3),
+        "modele_3d": bilan_3d, "essais": log.essais, **({"biais": biais_faits} if opt.biais else {}), "duree_s": round(time.perf_counter() - debut, 3),
     }
     ecrire_json(dossier / "manifeste.json", entree)
     statut = "accepte" if verdict.accepte else "rejete"
