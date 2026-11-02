@@ -88,8 +88,77 @@ def _chaines(murs: list[dict]) -> list[dict]:
     return groupes
 
 
+ANGLE_DROIT_MAX = 3.0  # degrés : au-delà, un mur est « libre » (en biais ou morceau d'arrondi), noté à part (A3)
+
+
+def _est_libre(m: dict) -> bool:
+    (x1, y1), (x2, y2) = m["debut"], m["fin"]
+    a = abs(math.degrees(math.atan2(y2 - y1, x2 - x1))) % 90
+    return min(a, 90 - a) > ANGLE_DROIT_MAX
+
+
+def _groupe_libre(ident: str) -> str:
+    """Les petits segments d'un même mur arrondi (« M_arrondi1-0 », « -1 »…) forment un seul mur."""
+    return ident.rsplit("-", 1)[0] if "-" in ident else ident
+
+
+def _distance_segments(p: tuple[float, float], segs: list[dict]) -> tuple[float, float | None]:
+    """Distance du point p au plus proche des segments, et l'épaisseur de ce segment."""
+    meilleur, ep = float("inf"), None
+    for m in segs:
+        (ax, ay), (bx, by) = m["debut"], m["fin"]
+        dx, dy = bx - ax, by - ay
+        l2 = dx * dx + dy * dy or 1e-12
+        t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / l2))
+        d = math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy)
+        if d < meilleur:
+            meilleur, ep = d, m["epaisseur"]
+    return meilleur, ep
+
+
+def comparer_murs_libres(vrais: list[dict], lus: list[dict]) -> tuple[list[dict], int]:
+    """A3 : chaque mur vrai en biais ou arrondi est suivi tous les 5 cm le long de son axe ; on cherche
+    à quelle distance passe l'axe des murs libres lus. Trouvé : la moitié des points à moins de 15 cm ;
+    juste : 90 % des points à moins de AXE_JUSTE + 5 cm, épaisseur à EPAISSEUR_JUSTE près, et toute la
+    longueur couverte (bouts compris, à BOUT_JUSTE près). Les murs lus qu'aucun vrai n'explique sont en trop."""
+    groupes: dict[str, list[dict]] = {}
+    for m in vrais:
+        groupes.setdefault(_groupe_libre(m["id"]), []).append(m)
+    sortie, utiles = [], set()
+    for ident, segs in groupes.items():
+        pts = []
+        for m in segs:
+            (ax, ay), (bx, by) = m["debut"], m["fin"]
+            n = max(2, int(math.dist((ax, ay), (bx, by)) / 0.05))
+            pts += [(ax + (bx - ax) * k / n, ay + (by - ay) * k / n) for k in range(n + 1)]
+        if not lus:
+            sortie.append({"vrai": ident, "trouve": False, "libre": True})
+            continue
+        res = [_distance_segments(p, lus) for p in pts]
+        d = np.array([r[0] for r in res])
+        if np.median(d) > 0.15:
+            sortie.append({"vrai": ident, "trouve": False, "libre": True})
+            continue
+        for k, m in enumerate(lus):
+            if any(_distance_segments(q, segs)[0] <= 0.15 for q in (m["debut"], m["fin"])):
+                utiles.add(k)
+        ep_lu = float(np.median([r[1] for r, dd in zip(res, d) if dd <= 0.15]))
+        e = {"vrai": ident, "trouve": True, "libre": True, "axe": float(np.percentile(d, 90)),
+             "epaisseur": abs(ep_lu - segs[0]["epaisseur"]),
+             "bouts": float(max(d[0], d[-1]))}
+        e["juste"] = e["axe"] <= AXE_JUSTE + 0.05 and e["epaisseur"] <= EPAISSEUR_JUSTE and e["bouts"] <= BOUT_JUSTE
+        sortie.append(e)
+    return sortie, len(lus) - len(utiles)
+
+
 def comparer_murs(vrais: list[dict], lus: list[dict]) -> list[dict]:
-    """Chaque mur vrai est noté sur sa ligne de murs : trouvée ou non, écart d'axe, d'épaisseur, de bouts."""
+    """Chaque mur vrai est noté sur sa ligne de murs : trouvée ou non, écart d'axe, d'épaisseur, de bouts.
+    A3 : les murs en biais ou arrondis sont notés à part (comparer_murs_libres) ; sans eux, rien ne change."""
+    lv, ll = [m for m in vrais if _est_libre(m)], [m for m in lus if _est_libre(m)]
+    if lv or ll:
+        droits, trop = comparer_murs([m for m in vrais if not _est_libre(m)], [m for m in lus if not _est_libre(m)])
+        libres, trop_l = comparer_murs_libres(lv, ll)
+        return droits + libres, trop + trop_l
     cv, cl = _chaines(vrais), _chaines(lus)
     candidats = []
     for i, v in enumerate(cv):
@@ -529,7 +598,11 @@ def bilan(resultats: list[dict]) -> dict:
                  "ecart_axe_cm_moyen": moy_cm([m["axe"] for m in mt]), "ecart_axe_cm_median": med_cm([m["axe"] for m in mt]),
                  "ecart_epaisseur_cm_moyen": moy_cm([m["epaisseur"] for m in mt]),
                  "ecart_bouts_cm_moyen": moy_cm([m["bouts"] for m in mt]), "ecart_bouts_cm_median": med_cm([m["bouts"] for m in mt]),
-                 "en_trop": sum(r["murs_en_trop"] for r in ok)},
+                 "en_trop": sum(r["murs_en_trop"] for r in ok),
+                 # A3 : les murs en biais / arrondis seuls (absent s'il n'y en a aucun)
+                 **({"libres": {"nombre": len(ml), "trouves_pct": pct(sum(m["trouve"] for m in ml), len(ml)),
+                                "justes_pct": pct(sum(m.get("juste", False) for m in ml), len(ml))}}
+                    if (ml := [m for m in murs if m.get("libre")]) else {})},
         "ouvertures": {"nombre": len(ouv), "trouvees_pct": pct(len(ot), len(ouv)), "justes_pct": pct(sum(o["juste"] for o in ot), len(ouv)),
                        "bon_type_pct": pct(sum(o["bon_type"] for o in ot), len(ot)),
                        "ecart_largeur_cm_moyen": moy_cm([o["largeur"] for o in ot]),
