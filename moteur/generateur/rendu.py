@@ -37,6 +37,7 @@ from moteur.generateur.annotations import CLASSES, rect_de_l_ouverture, rect_du_
 from moteur.generateur.logements import LogementGenere, Niveau, Ouverture, Piece, Rect
 from moteur.generateur.mobilier import Meuble, meubler_niveau
 from moteur.generateur.photo import plis_a_plat
+from moteur.generateur import variete as V
 from moteur.generateur.variantes import PALETTES, Style, salir
 
 Point = tuple[float, float]
@@ -231,6 +232,9 @@ class _Dessin:
             contour = [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
             if self.style.pieces_colorees:
                 self.d.polygon(self.poly_px(contour), fill=palette.get(p.sorte, (240, 240, 240)))
+            v = self.style.variete
+            if v is not None and v.sols.get(p.sorte):
+                V.sol(self, p, v.sols[p.sorte], v)
             self.remplir_masque(self.semantique, contour, CLASSES[p.sorte])
             self.remplir_masque(self.pieces_m, contour, self.ids_pieces[p.id])
             if self.niv.index > 0 and p.sorte == "escalier":
@@ -288,7 +292,10 @@ class _Dessin:
         for m in self.niv.murs:
             r = rect_du_mur(m)
             contour = [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
-            self.d.polygon(self.poly_px(contour), fill=st.murs)
+            if st.variete is not None:
+                V.mur(self, m, contour, st.variete)
+            else:
+                self.d.polygon(self.poly_px(contour), fill=st.murs)
             self.remplir_masque(self.semantique, contour, CLASSES["mur"])
             self.remplir_masque(self.elements, contour, self.ids_elements[m.id])
             self.remplir_masque(self.hauteur, contour, min(self.niv.hsp, 65535))
@@ -367,28 +374,37 @@ class _Dessin:
         if (fin - debut) % 360 > 180:
             debut, fin = fin, debut
         clair = tuple(min(c + 60, 170) for c in couleur)
+        if self.style.variete is not None and self.style.variete.arcs_pointilles:
+            V.arc_pointille(self, (cx - r, cy - r, cx + r, cy + r), debut, fin, clair, max(1, self.fin // 2))
+            return
         self.d.arc((cx - r, cy - r, cx + r, cy + r), debut, fin, fill=clair, width=max(1, self.fin // 2))
 
     # ---- textes ----
 
     def noms(self) -> None:
         st = self.style
+        v = st.variete
         taille = st.taille_texte
+        couleur = v.couleur_noms if v is not None and v.couleur_noms else st.textes
         for p in self.niv.pieces:
             r = p.rect
             cx, cy = self.px((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2)
             place = r.largeur * self.rep.s * 0.9
+            nom = p.nom.upper() if v is not None and v.majuscules else p.nom
+            surface = f"{_fr(r.surface / 1e6)} m²"
+            if v is not None and v.parentheses:
+                surface = f"({surface})"
             t = taille
-            while t > 9 and _police(st.police, t).getlength(p.nom) > place:
+            while t > 9 and _police(st.police, t).getlength(nom) > place:
                 t -= 1
             if st.noms and st.surfaces and r.hauteur * self.rep.s > 2.6 * taille:
-                self.texte((cx, cy - taille * 0.6), p.nom, t, st.textes)
-                self.texte((cx, cy + taille * 0.6), f"{_fr(r.surface / 1e6)} m²", max(8, taille - 2),
-                           tuple(min(c + 60, 150) for c in st.textes))
+                self.texte((cx, cy - taille * 0.6), nom, t, couleur)
+                self.texte((cx, cy + taille * 0.6), surface, max(8, taille - 2),
+                           tuple(min(c + 60, 150) for c in couleur))
             elif st.noms:
-                self.texte((cx, cy), p.nom, t, st.textes)
+                self.texte((cx, cy), nom, t, couleur)
             elif st.surfaces:
-                self.texte((cx, cy), f"{_fr(r.surface / 1e6)} m²", max(8, taille - 2), st.textes)
+                self.texte((cx, cy), surface, max(8, taille - 2), couleur)
 
     def cotes(self) -> None:
         rep, st = self.rep, self.style
@@ -474,6 +490,11 @@ class _Dessin:
         self.murs()
         if st.noms or st.surfaces:
             self.noms()
+        if st.variete is not None:
+            if st.variete.lettres:
+                V.lettres(self, st.variete)
+            if st.variete.symboles_neuf:
+                V.symboles_neuf(self, st.variete, random.Random(f"neuf-{self.log.graine}-{self.niv.index}"))
         if st.cotes:
             self.cotes()
         if st.echelle_graphique:
@@ -509,6 +530,10 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
                                              page, plis)
     # Le bord d'une pièce et le bord de son mur tombent sur la même rangée de pixels (les polygones
     # se touchent) : le mur l'emporte, pour qu'un pixel d'une pièce porte toujours la classe de la pièce.
+    v = style.variete
+    if v is not None and (v.capture or v.filigrane or v.agrandi > 1.0):
+        for nom in [n for n in images if n.startswith("plan")]:
+            images[nom] = V.capture(images[nom], d.semantique, v, random.Random(f"capture-{log.graine}-{niveau.index}-{graine_style}"))
     d.pieces_m[d.elements > 0] = 0
     images["masque_semantique"] = d.semantique
     images["masque_pieces"] = d.pieces_m

@@ -40,7 +40,7 @@ def _options(args: argparse.Namespace) -> Options:
         masques_par_classe=args.masques_par_classe, reprise=not args.refaire, reglages=Path(args.reglages) if args.reglages else None,
         regles=Path(args.regles) if args.regles else None, familles=args.familles.split(",") if args.familles else None,
         vraie_camera=args.vraie_camera or args.photo_realiste, sans_cotes=args.sans_cotes,
-        photo_realiste=args.photo_realiste,
+        photo_realiste=args.photo_realiste, styles_monde=args.styles_monde,
     )
 
 
@@ -60,6 +60,8 @@ def _ajouter_options_generation(p: argparse.ArgumentParser) -> None:
     p.add_argument("--vraie-camera", action="store_true", help="photos de biais vues par un vrai appareil (optique)")
     p.add_argument("--photo-realiste", action="store_true",
                    help="photos « vraie caméra » sur une vraie table : plis, ombres, reflets, flou (implique --vraie-camera)")
+    p.add_argument("--styles-monde", action="store_true",
+                   help="styles des vrais plans (sols dessinés, traits fins, gris clair, lettres A-D, capture, symboles du neuf) + styles absurdes")
     p.add_argument("--sans-cotes", action="store_true", help="aucune cote dessinée (barre d'échelle, surfaces au hasard)")
     p.add_argument("--variantes", type=int, default=0, help="variantes graphiques supplémentaires par logement")
     p.add_argument("--3d", dest="modele_3d", action="store_true", help="écrit aussi modele.glb, modele.obj, construction.json")

@@ -46,6 +46,7 @@ from moteur.generateur.reglages import Reglages
 from moteur.generateur.rendu import Rendu, rendre
 from moteur.generateur.validateur import Regles, Verdict, valider_dossier, valider_geometrie
 from moteur.generateur.photo import realisme_au_hasard
+from moteur.generateur.variete import appliquer_couleurs, variete_au_hasard
 from moteur.generateur.variantes import Style, style_au_hasard
 
 journal = logging.getLogger("generateur")
@@ -75,6 +76,7 @@ class Options:
     familles: list[str] | None = None  # familles de style imposées
     vraie_camera: bool = False  # les photos de biais suivent l'optique d'un vrai appareil (au lieu de coins bougés au hasard)
     sans_cotes: bool = False  # aucune cote dessinée (plans d'agence) ; barre d'échelle et surfaces tirées au hasard
+    styles_monde: bool = False  # styles des vrais plans français (sols, traits fins, lettres A-D, capture…) et styles absurdes
     photo_realiste: bool = False  # les photos « vraie caméra » posées sur une vraie table (plis, ombres, reflets, flou)
 
 
@@ -146,6 +148,11 @@ def style_pour(graine: int, variante: int, opt: Options) -> Style:
     if opt.photo_realiste and style.focale:
         # Encore un tirage à part : les jeux « vraie caméra » déjà fabriqués restent identiques sans cette option.
         style.realisme = realisme_au_hasard(random.Random(f"realisme-{graine + opt.graine_styles}-{variante}"))
+    if opt.styles_monde:
+        # Tirage à part, comme pour les options précédentes : sans --styles-monde, rien ne change.
+        r3 = random.Random(f"monde-{graine + opt.graine_styles}-{variante}")
+        style.variete = variete_au_hasard(r3)
+        appliquer_couleurs(style, style.variete, r3)
     if opt.resolution:
         style.px_par_m = opt.resolution
         style.taille_texte = round(opt.resolution * 0.2)

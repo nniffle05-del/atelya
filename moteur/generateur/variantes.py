@@ -24,6 +24,7 @@ import cv2
 import numpy as np
 
 from moteur.generateur.photo import Realisme, capteur, composer, lumiere
+from moteur.generateur.variete import Variete
 from moteur.salissure import _photocopie, _taches
 
 FAMILLES = ("architecte", "agence", "minimaliste", "scan", "photo", "colore", "croquis")
@@ -91,6 +92,7 @@ class Style:
     salissure: str = ""  # "", photocopie, taches, bruit, jpeg, telephone, grain
     contraste: float = 1.0  # < 1 : plus pâle ; > 1 : plus contrasté
     papier: int = 255  # le blanc du papier (230 : scanner un peu gris)
+    variete: Variete | None = None  # styles du monde (option --styles-monde) : sols, murs autrement, lettres, capture…
     realisme: Realisme | None = None  # photo réaliste (option --photo-realiste) : table, plis, ombres, reflets
 
     def en_dict(self) -> dict:
