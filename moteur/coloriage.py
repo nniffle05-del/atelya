@@ -32,7 +32,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.3.0"
+VERSION_COLORIAGE = "0.3.1"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -759,6 +759,6 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
                 "hauteur_sous_plafond": hsp, "murs": murs, "ouvertures": sortie_ouv, "pieces": sortie_pieces}
     Logement.model_validate(logement)
     details = {"version": VERSION_COLORIAGE, "angle_deg": round(angle, 3), "px_par_m": px_par_m,
-               "redresse": redressement is not None,
+               "redresse": redressement is not None, "origine_px": [ox, oy],
                "types_pieces": types_pieces, "pieces_nom_lu": noms_lus}
     return logement, details
