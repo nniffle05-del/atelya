@@ -560,6 +560,29 @@ def _angle_arrondi(xs: np.ndarray, ys: np.ndarray, segs: list[Segment], px_par_m
     return gh, gv, (kx, ky), (s1, s2), r, e
 
 
+def _bord_exterieur_courbe(bati: np.ndarray, dehors: np.ndarray, gh: Segment, gv: Segment,
+                           signes: tuple[int, int], px_par_m: float) -> bool:
+    """Le bord EXTÉRIEUR de l'angle (côté dehors) est-il un arc de cercle ? Le suivi des murs droits mange
+    les bouts d'un arrondi épais, mais pas son bord extérieur, qui reste entier : un pan coupé y laisse une
+    droite, un arrondi un quart de cercle tangent aux deux faces extérieures."""
+    s1, s2 = signes
+    fx, fy = gv.axe - s1 * gv.epaisseur / 2, gh.axe - s2 * gh.epaisseur / 2  # faces extérieures
+    bord = bati & cv2.dilate(dehors.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    ys, xs = np.nonzero(bord)
+    xs, ys = xs + 0.5, ys + 0.5
+    u, v = (xs - fx) * s1, (ys - fy) * s2
+    loin = RAYON_MAX_ANGLE * px_par_m
+    dans = (u > 2) & (v > 2) & (u < loin) & (v < loin)
+    if dans.sum() < 12:
+        return False
+    xs, ys = xs[dans], ys[dans]
+    vx, vy, x0, y0 = (float(q) for q in cv2.fitLine(np.stack([xs, ys], 1).astype(np.float32), cv2.DIST_L2, 0, 0.01, 0.01).ravel())
+    e_ligne = float(np.sqrt(np.mean((-(xs - x0) * vy + (ys - y0) * vx) ** 2)))
+    e_cercle = min(float(np.sqrt(np.mean((np.hypot(xs - fx - s1 * R, ys - fy - s2 * R) - R) ** 2)))
+                   for R in np.arange(0.3 * px_par_m, loin, 0.5))
+    return e_ligne > 1.0 and e_cercle < 0.5 * e_ligne
+
+
 def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) -> list[MurLibre]:
     """A3 : les murs en biais et arrondis, dans le bâti que les murs droits trouvés n'expliquent pas.
 
@@ -581,6 +604,7 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) 
         cv2.rectangle(couvert, (int(math.floor(x0)) - 2, int(math.floor(y0)) - 2),
                       (int(math.ceil(x1)) + 1, int(math.ceil(y1)) + 1), 1, -1)
     reste = (bati & (couvert == 0)).astype(np.uint8)
+    dehors = dehors_du_logement(bati)
     reste = cv2.morphologyEx(reste, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     n, etiq, stats, _ = cv2.connectedComponentsWithStats(reste, connectivity=8)
     long_min = LONGUEUR_MIN_LIBRE * px_par_m
@@ -605,7 +629,8 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) 
             # écart moyen par tranche, le long de la droite ou du cercle.
             e_ligne = _ecart_milieu(t, dperp)
             e_arc = _ecart_milieu(np.arctan2(ys - cy, xs - cx), np.hypot(xs - cx, ys - cy) - r)
-            if e_arc < RAPPORT_ARC * e_ligne and e_ligne > 0.6 and longueur >= 0.25 * px_par_m:
+            courbe_dehors = _bord_exterieur_courbe(bati, dehors, gh, gv, (s1, s2), px_par_m)
+            if (e_arc < RAPPORT_ARC * e_ligne and e_ligne > 0.6 or courbe_dehors) and longueur >= 0.25 * px_par_m:
                 rr = np.hypot(xs - cx, ys - cy)
                 ep = float(np.percentile(rr, 98) - np.percentile(rr, 2)) + 1.0
                 nb = max(2, round(90 / PAS_ARC_DEG))
