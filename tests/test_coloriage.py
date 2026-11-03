@@ -71,3 +71,13 @@ def test_comparaison_parfaite_avec_soi_meme():
     assert all(m["juste"] for m in r["murs"])
     assert all(o["juste"] for o in r["ouvertures"])
     assert r["hors_tout"] == 0
+
+
+def test_coin_un_peu_arrondi_reste_un_angle_droit():
+    """A3 (0.4.1) : un coloriage bruité qui arrondit un peu un coin de mur (rayon ~30 cm) ne crée pas de mur
+    courbe fait de douze bouts de 4 cm : c'est un angle droit (les vrais angles arrondis font 0,8 m et plus)."""
+    from pathlib import Path
+    from PIL import Image
+    col = np.array(Image.open(Path(__file__).parent / "donnees" / "coin-arrondi-bruite.png"), np.uint8)
+    _, d = lire_coloriage(col, 44.956)
+    assert d["murs_libres"] == []

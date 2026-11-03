@@ -33,7 +33,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.4.0"
+VERSION_COLORIAGE = "0.4.1"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -78,6 +78,8 @@ LONGUEUR_MIN_LIBRE = 0.45  # m : plus court, c'est un reste d'angle, pas un mur
 ANGLE_MIN_LIBRE = 8.0  # degrés : un « biais » plus proche de l'horizontale ou de la verticale est un reste de mur droit
 PAS_ARC_DEG = 7.5  # un mur arrondi est rendu par segments de 7,5°
 RAYON_MAX_ANGLE = 3.5  # m : plus grand rayon cherché pour un angle arrondi
+RAYON_MIN_ANGLE = 0.5  # m (axe) : un « arrondi » plus serré est un coin de mur mal colorié, pas un mur courbe
+# (les angles arrondis des plans ont un rayon intérieur de 0,8 m et plus)
 ECART_COURBE_MIN = 0.03  # m : un mur dont le milieu s'écarte plus de la corde (en plus de son épaisseur) est courbe
 RAPPORT_ARC = 0.85  # arrondi si la ligne du milieu colle au cercle bien mieux qu'à une droite
 COURT_MAX = 0.6  # m : un bout de mur droit plus court peut être un morceau d'« escalier » d'un pan coupé
@@ -557,6 +559,8 @@ def _angle_arrondi(xs: np.ndarray, ys: np.ndarray, segs: list[Segment], px_par_m
         if meilleur is None or e < meilleur[0]:
             meilleur = (e, float(r))
     e, r = meilleur
+    if r < RAYON_MIN_ANGLE * px_par_m:
+        return None  # coin juste un peu arrondi par le coloriage : c'est un angle droit
     return gh, gv, (kx, ky), (s1, s2), r, e
 
 
@@ -579,7 +583,7 @@ def _bord_exterieur_courbe(bati: np.ndarray, dehors: np.ndarray, gh: Segment, gv
     vx, vy, x0, y0 = (float(q) for q in cv2.fitLine(np.stack([xs, ys], 1).astype(np.float32), cv2.DIST_L2, 0, 0.01, 0.01).ravel())
     e_ligne = float(np.sqrt(np.mean((-(xs - x0) * vy + (ys - y0) * vx) ** 2)))
     e_cercle = min(float(np.sqrt(np.mean((np.hypot(xs - fx - s1 * R, ys - fy - s2 * R) - R) ** 2)))
-                   for R in np.arange(0.3 * px_par_m, loin, 0.5))
+                   for R in np.arange(RAYON_MIN_ANGLE * px_par_m, loin, 0.5))
     return e_ligne > 1.0 and e_cercle < 0.5 * e_ligne
 
 
@@ -694,7 +698,7 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) 
         rr = np.hypot(xs - cx, ys - cy)
         ep = float(np.percentile(rr, 98) - np.percentile(rr, 2)) + 1.0
         r = float((np.percentile(rr, 98) + np.percentile(rr, 2)) / 2)
-        if ep < EPAISSEUR_MIN * px_par_m or r > 20 * px_par_m or float(np.std(rr - r)) > 0.5 * ep:
+        if ep < EPAISSEUR_MIN * px_par_m or r > 20 * px_par_m or r < RAYON_MIN_ANGLE * px_par_m or float(np.std(rr - r)) > 0.5 * ep:
             continue
         ang = np.arctan2(ys - cy, xs - cx)
         milieu = math.atan2(float(np.mean(np.sin(ang))), float(np.mean(np.cos(ang))))
