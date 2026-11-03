@@ -350,10 +350,11 @@ def preparer_niveau(pdf: Path, jeu: Path, sortie: Path) -> dict:
     h, w = page.image.shape[:2]
     # mètres → pixels de l'image rendue : (mm → points à plat) puis rotation de l'affichage puis points → pixels
     A = _matrice_affichage(info["rotation"], info["page_pt"])
-    M = np.diag([page.px_par_pt, page.px_par_pt, 1.0]) @ A @ np.array(info["matrice_mm_vers_pt"]) @ np.diag([1000, 1000, 1.0])
+    T = np.array([[1, 0, -page.origine_px[0]], [0, 1, -page.origine_px[1]], [0, 0, 1]], float)  # recadrage
+    M = T @ np.diag([page.px_par_pt, page.px_par_pt, 1.0]) @ A @ np.array(info["matrice_mm_vers_pt"]) @ np.diag([1000, 1000, 1.0])
     # la vérité pixel par pixel : masque du générateur (pixels de son image) → pixels de l'image rendue
     k, (ox, oy) = info["pt_par_px_image"], info["decalage_pt"]
-    P = np.diag([page.px_par_pt, page.px_par_pt, 1.0]) @ A @ np.array([[k, 0, ox], [0, k, oy], [0, 0, 1]])
+    P = T @ np.diag([page.px_par_pt, page.px_par_pt, 1.0]) @ A @ np.array([[k, 0, ox], [0, k, oy], [0, 0, 1]])
     from moteur.images import lire_image
 
     masque = lire_image(pdf.parent / "masque_semantique.png", cv2.IMREAD_UNCHANGED)
@@ -373,7 +374,8 @@ def preparer_niveau(pdf: Path, jeu: Path, sortie: Path) -> dict:
                   "perspective": 0.0, "matrice_m_vers_px": M.round(9).tolist(), "a_plat": True},
         "murs": [{"polygone_px": polygone}],  # seulement le cadre du logement (sert au centre, si redressement)
         "pdf": {**{c: info[c] for c in ("sorte", "echelle_vraie", "echelle_ecrite", "reduction", "rotation", "format")},
-                "page": pages[0], "nature": page.nature, "px_par_pt": page.px_par_pt},
+                "page": pages[0], "nature": page.nature, "px_par_pt": page.px_par_pt,
+                "origine_px": list(page.origine_px), "a_plat": page.a_plat},
     }
     (dest / niv / "annotations.json").write_text(json.dumps(annotations, ensure_ascii=False, indent=1), encoding="utf-8")
     if page.textes is not None:

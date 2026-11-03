@@ -90,7 +90,7 @@ def pdf_t2(tmp_path):
 
 
 def test_textes_exacts_dans_le_bon_sens(pdf_t2):
-    page = L.lire_page(pdf_t2, 1)
+    page = L.lire_page(pdf_t2, 1, recadrer=False)
     assert page.nature == "vectorielle"
     lus = {t.texte: t for t in page.textes}
     assert {"4,60", "2,90", "7,60", "5,00", "1,90", "3,00", "Séjour", "22,08 m²", "Salle d'eau"} <= set(lus)
@@ -116,7 +116,7 @@ def test_texte_vertical_ecrit_de_haut_en_bas(tmp_path):
 
 
 def test_echelle_exacte_sans_ocr(pdf_t2):
-    page = L.lire_page(pdf_t2, 1)
+    page = L.lire_page(pdf_t2, 1, recadrer=False)
     gris = page.image[:, :, 1]
     echelle = lire_echelle(gris, page.textes)
     attendu = S * page.px_par_pt  # pixels de l'image par mètre
@@ -132,7 +132,7 @@ def test_lire_echelle_plan_avec_les_textes_du_pdf(pdf_t2, monkeypatch):
         raise AssertionError("l'OCR ne doit pas être lancé sur un PDF vectoriel")
 
     monkeypatch.setattr(E, "lire_textes", interdit)
-    page = L.lire_page(pdf_t2, 1)
+    page = L.lire_page(pdf_t2, 1, recadrer=False)
     col = coloriage_parfait(page.image.shape[:2], page.px_par_pt)
     e = lire_echelle_plan(page.image[:, :, ::-1], col, angle=0.0, textes=page.textes)
     attendu = S * page.px_par_pt / 2  # pixels du coloriage par mètre
@@ -145,7 +145,7 @@ def test_lire_echelle_plan_avec_les_textes_du_pdf(pdf_t2, monkeypatch):
 
 def test_textes_suivent_le_dessin_tourne(pdf_t2):
     """Si le coloriage est vu un peu penché, le dessin est tourné : les textes doivent tourner avec lui."""
-    page = L.lire_page(pdf_t2, 1)
+    page = L.lire_page(pdf_t2, 1, recadrer=False)
     col = coloriage_parfait(page.image.shape[:2], page.px_par_pt)
     e = lire_echelle_plan(page.image[:, :, ::-1], col, angle=0.0, textes=page.textes)
     e_tourne = lire_echelle_plan(page.image[:, :, ::-1], col, angle=0.3, textes=page.textes)
@@ -153,7 +153,7 @@ def test_textes_suivent_le_dessin_tourne(pdf_t2):
 
 
 def test_noms_des_pieces(pdf_t2):
-    page = L.lire_page(pdf_t2, 1)
+    page = L.lire_page(pdf_t2, 1, recadrer=False)
     noms = noms_depuis_textes(L.pour_les_noms(page.textes))
     assert sorted(n.type for n in noms) == ["chambre", "salle_d_eau", "sejour"]
     assert sorted(v for v, _, _ in surfaces_dans_textes(page.textes)) == [5.51, 8.70, 22.08]
@@ -197,9 +197,9 @@ def test_decider_avec_l_echelle_ecrite():
     from moteur.echelle_plan import decider
 
     vrai, interieur = 100.0, (760.0, 500.0)
-    # sans rien d'autre : il faut les portes pour la confirmer
+    # seule, même avec des portes d'accord : vérification (banc A2-6 : les portes ont « confirmé » une page réduite)
     assert decider(None, None, False, None, None, interieur, False, ecrite=vrai)[2] == "à vérifier"
-    assert decider(None, None, False, None, None, interieur, False, approchee=108, ecrite=vrai) == (vrai, vrai, "échelle écrite")
+    assert decider(None, None, False, None, None, interieur, False, approchee=108, ecrite=vrai)[2] == "à vérifier"
     # page A3 réduite en A4 (× 0,71) : les portes et les surfaces la contredisent
     assert decider(None, None, False, None, None, interieur, False, approchee=vrai, ecrite=71)[2] == "à vérifier"
     # … mais les surfaces, dessinées, ont rapetissé avec la page : elles restent justes et décident
@@ -218,7 +218,7 @@ def test_decider_avec_l_echelle_ecrite():
 def _lire(tmp_path, nom, s=S, **options):
     doc = DocumentPdf()
     plan_t2(doc.page(), cotes=False, s=s, **options)
-    page = L.lire_page(doc.enregistrer(tmp_path / nom), 1)
+    page = L.lire_page(doc.enregistrer(tmp_path / nom), 1, recadrer=False)
     col = coloriage_parfait(page.image.shape[:2], page.px_par_pt, s=s, portes=True)
     e = lire_echelle_plan(page.image[:, :, ::-1], col, angle=0.0, textes=page.textes, px_par_pt=page.px_par_pt)
     return e, s * page.px_par_pt / 2  # échelle lue, vraie échelle du coloriage
@@ -232,10 +232,10 @@ def test_plan_sans_cotes_lu_par_son_echelle_ecrite(tmp_path):
     assert largeur == pytest.approx(vrai, rel=0.001) and hauteur == largeur
 
 
-def test_plan_sans_cotes_ni_surfaces_confirme_par_les_portes(tmp_path):
+def test_plan_sans_cotes_ni_surfaces_part_en_verification(tmp_path):
+    """« 1/50 » seul, sans rien pour le confirmer : la page a pu être réduite à l'impression → vérification."""
     e, vrai = _lire(tmp_path, "nu.pdf", surfaces=False, echelle="Éch. 1/50")
-    largeur, _, source = e.decision(de_biais=False)
-    assert source == "échelle écrite" and largeur == pytest.approx(vrai, rel=0.001)
+    assert e.ecrite == pytest.approx(vrai, rel=0.001) and e.decision(de_biais=False)[2] == "à vérifier"
 
 
 def test_page_reduite_a_l_impression(tmp_path):
@@ -247,3 +247,26 @@ def test_page_reduite_a_l_impression(tmp_path):
     assert e.ecrite is not None and source == "surfaces" and largeur == pytest.approx(vrai, rel=0.02)
     e, _ = _lire(tmp_path, "reduit-nu.pdf", s=S * 0.707, surfaces=False, echelle="Échelle 1/50")
     assert e.decision(de_biais=False)[2] == "à vérifier"
+
+
+@pytest.mark.parametrize("rotation", [0, 90])
+def test_recadrage_sur_la_zone_dessinee(tmp_path, rotation):
+    """A2-6 : l'image est coupée autour du dessin (Atelya voit le logement en plus grand) ; les textes suivent."""
+    doc = DocumentPdf()
+    p = doc.page()
+    p.rectangle(10, 10, 575, 822, plein=False)  # cadre de la page : ignoré
+    plan_t2(p)
+    p.rotation = rotation
+    chemin = doc.enregistrer(tmp_path / f"cadre-{rotation}.pdf")
+    entiere, coupee = L.lire_page(chemin, 1, recadrer=False), L.lire_page(chemin, 1)
+    assert coupee.image.size < 0.6 * entiere.image.size and coupee.a_plat
+    x0, y0 = coupee.origine_px
+    h, w = coupee.image.shape[:2]
+    assert np.array_equal(coupee.image, entiere.image[y0:y0 + h, x0:x0 + w])
+    a = {t.texte: t.boite for t in entiere.textes}
+    for t in coupee.textes:
+        assert np.allclose(t.boite + [x0, y0], a[t.texte])
+    # tout le dessin (murs, cotes et leurs textes) est dans l'image coupée
+    for nom in ("4,60", "5,00", "Séjour"):
+        b = {t.texte: t.boite for t in coupee.textes}[nom]
+        assert b.min() >= 0 and b[:, 0].max() <= w and b[:, 1].max() <= h

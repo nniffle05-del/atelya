@@ -391,7 +391,9 @@ def noter_niveau(args) -> dict:
         if not coloriage_douteux(propre):
             col, nettoye = propre, True
             resultat["coloriage_nettoye"] = True
-    R = estimer_redressement(col) if redresser else None
+    # Étape A2-6 : une page de PDF vectoriel ou piégé est à plat par construction (jamais photographiée de biais).
+    a_plat_pdf = bool(ann.get("pdf", {}).get("a_plat"))
+    R = estimer_redressement(col) if redresser and not a_plat_pdf else None
     if R is not None:
         resultat["deformation_lue"] = round(R.deformation, 5)
     if R is not None and not R.de_biais:

@@ -1,8 +1,10 @@
 # Etape A2-6 : banc de la lecture des PDF (PC).
 # A lancer depuis le depot atelya-code :  powershell -ExecutionPolicy Bypass -File pc\a2\banc-a2.ps1 -Phase tout
 # Phases : fabriquer, preparer, colorier, pdf, images-cache, images, ocr, tout. -Nombre N : seulement N plans (essai).
+# -Depuis <phase> : reprendre a cette phase et faire toutes les suivantes (apres un arret).
+# -Sans 'images-cache,images' : sauter ces phases.
 # Chemins RELATIFS partout (piege des accents de « Modelisation immobiliere »). Arret au premier code different de 0.
-param([string]$Phase = 'tout', [int]$Nombre = 0)
+param([string]$Phase = 'tout', [int]$Nombre = 0, [string]$Depuis = '', [string]$Sans = '')
 $ErrorActionPreference = 'Continue'
 $env:PYTHONIOENCODING = 'utf-8'
 $env:OMP_NUM_THREADS = '1'
@@ -14,6 +16,12 @@ if (-not (Test-Path "$A\jeu-test-6-13\repartition.json")) { Write-Output "PLANTE
 $S = if ($Nombre) { "-essai$Nombre" } else { '' }
 $N = if ($Nombre) { @('--nombre', "$Nombre") } else { @() }
 $suivi = "$A\banc-a2$S.suivi"
+$ordre = @('fabriquer', 'preparer', 'colorier', 'pdf', 'images-cache', 'images', 'ocr')
+function Faire($p) {
+    if ($Sans -and ($Sans -split ',') -contains $p) { return $false }
+    if ($Depuis) { return [array]::IndexOf($ordre, $p) -ge [array]::IndexOf($ordre, $Depuis) }
+    return $Phase -in $p, 'tout'
+}
 function Note($t) { "$(Get-Date -Format 'HH:mm:ss') $t" | Add-Content $suivi -Encoding UTF8; Write-Output $t }
 function Verifier($quoi) {
     if ($LASTEXITCODE -ne 0) { Note "PLANTE : $quoi (code=$LASTEXITCODE)"; exit 1 }
@@ -26,17 +34,17 @@ function Banc($jeu, $coloriages, $sortie, $options) {
     Verifier "banc $sortie"
 }
 
-if ($Phase -in 'fabriquer', 'tout') {
+if (Faire 'fabriquer') {
     Note "fabriquer les PDF du jeu de test -> pdf-test-a2$S"
     & $py -m moteur.generateur.plan_pdf --jeu "$A\jeu-test-6-13" --sortie "$A\pdf-test-a2$S" @N *> "$A\pdf-test-a2$S.log"
     Verifier 'fabriquer'
 }
-if ($Phase -in 'preparer', 'tout') {
+if (Faire 'preparer') {
     Note "preparer les PDF pour le banc (tri, page, image 300 dpi, textes) -> jeu-pdf-a2$S"
     & $py -m moteur.generateur.plan_pdf --jeu "$A\jeu-test-6-13" --preparer "$A\pdf-test-a2$S" --sortie "$A\jeu-pdf-a2$S" --processus 5 @N *> "$A\jeu-pdf-a2$S.log"
     Verifier 'preparer'
 }
-if ($Phase -in 'colorier', 'tout') {
+if (Faire 'colorier') {
     Note "colorier les PDF avec l'essai 5 (4 angles, carte des doutes) -> coloriages-a2-pdf$S"
     Push-Location $A
     & '.\.venv\Scripts\python.exe' colorier_angles_a3.py --jeu "jeu-pdf-a2$S" --partie test --modele 'resultats-essai-5\atelya-essai-4.pt' --sortie "coloriages-a2-pdf$S" @N *> "coloriages-a2-pdf$S.log"
@@ -45,23 +53,23 @@ if ($Phase -in 'colorier', 'tout') {
     if ($code -ne 0) { Note "PLANTE : colorier (code=$code)"; exit 1 }
     Note '  fin colorier code=0'
 }
-if ($Phase -in 'pdf', 'tout') {
+if (Faire 'pdf') {
     # Les PDF : textes exacts et echelle ecrite sur les pages vectorielles, OCR sur les pages piegees et scannees.
     Banc "$A\jeu-pdf-a2$S" "$A\coloriages-a2-pdf$S\exemples" "$A\banc-a2-pdf$S" @('--partie', 'test', '--textes-pdf')
 }
-if ($Phase -in 'images-cache', 'tout') {
+if (Faire 'images-cache') {
     # Non-recul sur les images, rapide : memes coloriages et memes echelles lues (cache) que banc-v041-apres-e5.
     $b = "$A\banc-a2-images-cache$S"
     New-Item -ItemType Directory -Force $b | Out-Null
     if (-not (Test-Path "$b\echelles-lues")) { Copy-Item "$A\banc-v041-apres-e5\echelles-lues" "$b\echelles-lues" -Recurse }
     Banc "$A\jeu-test-6-13" "$A\coloriages-a1-apres\exemples" $b @('--partie', 'test')
 }
-if ($Phase -in 'images', 'tout') {
+if (Faire 'images') {
     # Non-recul sur les images, complet : echelles relues (OCR) avec le nouveau code, sans cache.
     Banc "$A\jeu-test-6-13" "$A\coloriages-a1-apres\exemples" "$A\banc-a2-images$S" @('--partie', 'test')
 }
-if ($Phase -in 'ocr', 'tout') {
+if (Faire 'ocr') {
     # Les memes images des pages vectorielles, lues par l'OCR au lieu des textes du PDF : ce que les textes exacts apportent.
     Banc "$A\jeu-pdf-a2$S" "$A\coloriages-a2-pdf$S\exemples" "$A\banc-a2-ocr$S" @('--partie', 'vecto')
 }
-Note "FINI $Phase"
+Note "FINI $Phase $Depuis (sans $Sans)"

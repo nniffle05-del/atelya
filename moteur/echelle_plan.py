@@ -49,8 +49,9 @@ Mais un PDF imprimé « ajusté à la page » garde son « 1/50 » écrit sans p
 est 0,71 fois trop petit). Les cotes, la barre et les surfaces, elles, rapetissent AVEC le dessin et restent justes.
 D'où la règle (decider, `ecrite`) : les mesures prises sur le dessin passent toujours avant elle, et en cas de désaccord
 (plus de 3 %) elle est simplement ignorée (aucun recul par rapport à la version 0.8) ; d'accord avec la barre ou les
-surfaces, c'est elle qui sert (plus précise) ; seule, il faut que la largeur des portes la confirme à 15 % près (une page
-réduite ou agrandie s'en écarte de 29 % au moins), sinon le plan part à la vérification.
+surfaces, c'est elle qui sert (plus précise) ; seule, le plan part à la vérification. (Au départ, la largeur des portes
+la confirmait à 15 % près ; banc A2-6 : 10 justes mais 1 fausse de 41 % sur une page réduite, les portes coloriées
+étant elles-mêmes fausses de 28 % : supprimé.)
 """
 
 from __future__ import annotations
@@ -66,7 +67,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.9.0"
+VERSION_ECHELLE = "0.9.1"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -77,7 +78,6 @@ PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
 BORD_IMAGE = 0.03  # coloriage douteux : la bande du bord de l'image (fraction du grand côté)…
 PART_MURS_AU_BORD = 0.02  # … où se trouvent plus de 2 % des murs, portes et fenêtres coloriés
 ACCORD_OPTIQUE = 0.08  # photo aux proportions de l'optique : échelles des cotes en largeur et en hauteur à 8 % près
-ACCORD_ECRITE_PORTES = 0.15  # échelle écrite seule : la largeur des portes doit la confirmer à 15 % près
 ACCORD_SENS_UNIQUE = 0.01  # photo cotée dans un seul sens : la 2e mesure doit la confirmer à 1 % près
 MORCEAU, RECOUVREMENT = 1000, 200  # photo : lecture par morceaux de 1 000 pixels qui se recouvrent de 200
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
@@ -186,7 +186,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     Version 0.9 : `ecrite`, l'échelle écrite d'un PDF (« 1/50 »), plan à plat seulement. Les cotes passent avant elle.
     Sans cotes utilisables : d'accord à 3 % près avec la barre ou les surfaces, c'est elle qui sert (la plus précise dans
     un PDF) ; en désaccord, elle est ignorée (page réduite à l'impression : la barre et les surfaces, dessinées, restent
-    justes) ; seule, il faut que la largeur des portes la confirme à 15 % près, sinon vérification.
+    justes) ; seule, vérification (les portes ne suffisent pas à la confirmer : banc A2-6, 1 erreur de 41 %).
 
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « échelle écrite », « cote d'ensemble »
     ou « à vérifier »
@@ -234,9 +234,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     if ecrite and not de_biais and _barre_plausible(ecrite, il, ih, *controle):
         if surfaces and plat and abs(surfaces / ecrite - 1) <= ACCORD_SURFACES:
             return ecrite, ecrite, "échelle écrite"  # confirmée par les surfaces, et plus précise qu'elles
-        if not surfaces and approchee and abs(approchee / ecrite - 1) <= ACCORD_ECRITE_PORTES:
-            return ecrite, ecrite, "échelle écrite"
         # sinon : contredite par les surfaces (page réduite ?) → les surfaces décident plus bas ; ou rien ne la confirme
+        # (la largeur des portes ne suffit pas : elle peut se tromper de 28 % et « confirmer » une page réduite)
     if surfaces and plat and _barre_plausible(surfaces, il, ih, *controle):
         return surfaces, surfaces, "surfaces"
     if largeur or hauteur:

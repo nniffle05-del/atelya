@@ -40,7 +40,8 @@ from moteur.lecture_cotes import TexteLu
 VERSION_LECTURE_PDF = "0.3.0"
 
 SEGMENTS_DESSIN = 20  # au moins ce nombre de segments de traits pour parler de « dessin »
-LONGUEUR_DESSIN = 1.5  # et une longueur totale ≥ 1,5 fois le tour de la page (un cadre seul = 1)
+LONGUEUR_DESSIN = 0.75  # et une longueur totale ≥ 0,75 fois le tour de la page (A2-6 : 1,5 ratait 1,6 % des petits
+# logements dessinés sur A3 ; un cadre de page seul est déjà écarté par SEGMENTS_DESSIN : il n'a que 4 traits)
 TEXTE_PAR_SEGMENT_MAX = 4.0  # au-delà de 4 lettres par segment : page de texte ou tableau, pas un plan
 PART_ILLISIBLE_MAX = 0.3  # plus de 30 % de caractères illisibles → textes inutilisables
 CARACTERES_MIN = 4  # un dessin avec moins de 4 caractères lisibles : textes perdus (piégée)
@@ -276,20 +277,68 @@ class PagePdfLue:
     numero: int
     nature: str
     raison: str
-    image: np.ndarray  # BGR, format OpenCV
+    image: np.ndarray  # BGR, format OpenCV (recadrée sur la zone dessinée, voir zone_dessinee)
     px_par_pt: float
     textes: list[TexteLu] | None
+    origine_px: tuple[int, int] = (0, 0)  # où commence l'image recadrée, en pixels de la page entière rendue
+    # La page est à plat par construction (dessin vectoriel, piégé ou non) : jamais de redressement de perspective.
+    # Une page scannée peut être la photo d'un plan rangée dans un PDF : elle garde le redressement habituel.
+    a_plat: bool = False
+
+
+CADRE_PAGE = 0.9  # un trait ou un rectangle qui fait 90 % de la page : le cadre, pas le dessin
+MARGE_RECADRAGE = 0.04  # marge gardée autour de la zone dessinée (part de son grand côté) …
+MARGE_RECADRAGE_PT = 15.0  # … plus 15 points (5 mm), pour les textes des cotes posés à côté de leurs traits
+
+
+def zone_dessinee(page) -> tuple[float, float, float, float] | None:
+    """La zone de la page où se trouve le dessin (points, page affichée, origine en haut à gauche), marge comprise.
+
+    Pourquoi (étape A2-6) : Atelya réduit toute l'image à 768 pixels avant de la colorier. Sur une page A3 aux
+    grandes marges, le logement n'occupait que 44 % de l'image (68 % sur les plans en image) : Atelya le voyait
+    1,5 fois plus petit et le lisait moins bien (murs justes 90,7 → 82,2 %). On garde donc seulement la zone des
+    traits et des images, sans le cadre de la page ; les textes loin du dessin (cartouche) n'y sont pas nécessaires :
+    leurs valeurs restent lues (échelle écrite), seule l'image est recadrée."""
+    x0p, y0p = page.bbox[0], page.bbox[1]
+    l, h = page.width, page.height
+    boites = []
+    for o in list(page.lines) + list(page.rects) + list(page.curves) + list(page.images):
+        a, b, c, d = o["x0"] - x0p, o["top"] - y0p, o["x1"] - x0p, o["bottom"] - y0p
+        if c - a >= CADRE_PAGE * l or d - b >= CADRE_PAGE * h:
+            continue
+        boites.append((a, b, c, d))
+    if not boites:
+        return None
+    b = np.array(boites)
+    a, t, c, d = b[:, 0].min(), b[:, 1].min(), b[:, 2].max(), b[:, 3].max()
+    m = MARGE_RECADRAGE * max(c - a, d - t) + MARGE_RECADRAGE_PT
+    return max(0.0, a - m), max(0.0, t - m), min(l, c + m), min(h, d + m)
 
 
 def lire_page(chemin: str | Path, numero: int, tri: TriPage | None = None, dpi: int = DPI_RENDU,
-              cote_max_px: int = COTE_MAX_PX) -> PagePdfLue:
+              cote_max_px: int = COTE_MAX_PX, recadrer: bool = True) -> PagePdfLue:
     """Image + textes d'une page. Les textes exacts ne sont pris que sur une page « vectorielle » : sur une
-    page piégée ou scannée, ils sont absents ou faux, et c'est l'OCR qui lira l'image."""
+    page piégée ou scannée, ils sont absents ou faux, et c'est l'OCR qui lira l'image.
+    `recadrer` : l'image est coupée sur la zone dessinée (zone_dessinee) ; les textes sont placés sur l'image coupée."""
     if tri is None:
         tri = trier_pdf(chemin)[numero - 1]
     image, px_par_pt = rendre_page(chemin, numero, dpi, cote_max_px)
-    textes = lire_textes_pdf(chemin, numero, px_par_pt) if tri.nature == "vectorielle" else None
-    return PagePdfLue(numero, tri.nature, tri.raison, image, px_par_pt, textes)
+    origine = (0, 0)
+    with _ouvrir(chemin) as pdf:
+        page = pdf.pages[numero - 1]
+        zone = zone_dessinee(page) if recadrer else None
+        textes = textes_de_la_page(page, px_par_pt) if tri.nature == "vectorielle" else None
+        page.close()
+    if zone is not None:
+        h, w = image.shape[:2]
+        x0, y0 = max(0, int(zone[0] * px_par_pt)), max(0, int(zone[1] * px_par_pt))
+        x1, y1 = min(w, int(math.ceil(zone[2] * px_par_pt))), min(h, int(math.ceil(zone[3] * px_par_pt)))
+        if x1 - x0 >= 16 and y1 - y0 >= 16:
+            image, origine = np.ascontiguousarray(image[y0:y1, x0:x1]), (x0, y0)
+            for t in textes or []:
+                t.boite = t.boite - np.array(origine, float)
+    return PagePdfLue(numero, tri.nature, tri.raison, image, px_par_pt, textes, origine,
+                      a_plat=tri.nature in ("vectorielle", "piegee"))
 
 
 # ---------- Partie 3 (étape A2-4) : l'ÉCHELLE ÉCRITE (« Éch. 1/50 ») ----------
