@@ -188,10 +188,10 @@ pièces ; 6-8 échelle sur les cotes ; 6-9 essai 3 + duo ; 6-10 barre d'échelle
 réalistes + essai 5 ; 6-17 moins de photos en vérification ; 6-18 écran de vérification ; 6-19 styles du
 monde (essai 6e NON mis en service) ; **A1** doutes (877967c) ; **A3** DINOv2 + murs en biais (20ce703) ;
 **P1** sauvegarde GitHub ; **P3** plan 2D propre (`moteur/plan_propre.py`, PDF A4/A3 ; sur GitHub, **pas
-encore posé sur le Mac**, attend le « vas-y » de NT) ; **A2** lecture des PDF (PC, branche GitHub `etape-a2`,
-pas encore fusionnée dans `main` ni posée sur le Mac : accord de NT).
+encore posé sur le Mac**, attend le « vas-y » de NT) ; **A2** lecture des PDF (PC ; fusionnée dans `main` sur GitHub le
+04/11/2026, fc43891 ; pas encore posée sur le Mac : accord de NT).
 
-**Prochaine étape** : à choisir par NT (fin A2 le 03/11/2026). Restes d'A2 : fusion `etape-a2` → `main`,
+**Prochaine étape** : à choisir par NT (fin A2 le 03/11/2026). Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
 option A2-7 (marques des cotes lues dans les traits du PDF : défaut ancien de ~0,5 % quand deux cotes se
 touchent de part et d'autre d'une cloison fine), essai sur de VRAIS PDF dès qu'on en aura.
