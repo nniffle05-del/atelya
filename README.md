@@ -67,6 +67,9 @@ uv run python -m moteur.lecture_pdf plan.pdf
                      # sont des plans (--json : détail des mesures). Demande pdfplumber et pypdfium2.
                      # Sur une page vectorielle, moteur.lecture_pdf.lire_page donne l'image et les textes
                      # exacts, que lire_echelle_plan(..., textes=...) prend à la place de l'OCR (étape A2-3).
+uv run python -m moteur.generateur.plan_pdf --jeu sorties/jeu-100 --sortie sorties/pdf-100
+                     # écrit en PDF les plans d'un jeu du générateur (étape A2-5) : vectoriel, piégé,
+                     # scanné, réduit, tourné, dossier de 3 pages ; la vérité dans plan-<sorte>.json
 ```
 
 ## Saisir un plan

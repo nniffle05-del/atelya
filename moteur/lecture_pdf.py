@@ -224,17 +224,22 @@ def rendre_page(chemin: str | Path, numero: int, dpi: int = DPI_RENDU,
 def _mots(page) -> list[dict]:
     """Les mots de la page (lettres regroupées), dans le bon sens de lecture.
 
-    Un texte vertical peut se lire de bas en haut (le plus courant pour une cote de mur vertical) ou de
-    haut en bas : chaque lettre porte dans le PDF sa propre orientation (sa « matrice »), on lit donc les
-    deux familles à part. Les espaces sont gardés dans un mot (« Séjour 25,92 m² » reste un seul texte,
-    comme le donne l'OCR) ; deux textes séparés par un vide sans espace (« 4,80 » … « 3,10 ») restent deux."""
-    def de_bas_en_haut(o) -> bool:
-        return o.get("upright", True) or (o.get("matrix") or (1, 0))[1] > 0
+    Chaque lettre porte dans le PDF sa propre orientation (sa « matrice », donnée dans le sens où la page
+    s'affiche) : à l'endroit, à l'envers (page tournée de 180°), de bas en haut (le plus courant pour une
+    cote de mur vertical) ou de haut en bas. On lit chacune de ces quatre familles dans son sens.
+    Les espaces sont gardés dans un mot (« Séjour 25,92 m² » reste un seul texte, comme le donne l'OCR) ;
+    deux textes séparés par un vide sans espace (« 4,80 » … « 3,10 ») restent deux."""
+    def famille(o) -> int:
+        a, b = (o.get("matrix") or (1, 0))[:2]
+        if o.get("upright", True):
+            return 0 if a >= 0 else 1
+        return 2 if b > 0 else 3
 
+    sens = ({}, {"char_dir": "rtl", "line_dir": "btt"}, {"char_dir_rotated": "btt"}, {"char_dir_rotated": "ttb"})
     mots = []
-    for garde, sens in ((de_bas_en_haut, "btt"), (lambda o: not de_bas_en_haut(o), "ttb")):
-        filtre = page.filter(lambda o, g=garde: o.get("object_type") != "char" or g(o))
-        mots += filtre.extract_words(keep_blank_chars=True, char_dir_rotated=sens)
+    for f, reglages in enumerate(sens):
+        filtre = page.filter(lambda o, f=f: o.get("object_type") != "char" or famille(o) == f)
+        mots += filtre.extract_words(keep_blank_chars=True, **reglages)
     return mots
 
 
