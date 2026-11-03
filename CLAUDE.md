@@ -305,6 +305,7 @@ permet au projet claude.ai et au futur Claude du Mac de rester au courant à leu
 @docs/projet/memoire/atelya-styles-monde.md
 @docs/projet/memoire/atelya-surfaces.md
 @docs/projet/memoire/atelya-verification.md
+@docs/projet/memoire/atelya-verification-reelle.md
 @docs/projet/memoire/audit-technologique-2026-10-31.md
 @docs/projet/memoire/calculs-sur-pc.md
 @docs/projet/memoire/carte-atelya-associe.md
