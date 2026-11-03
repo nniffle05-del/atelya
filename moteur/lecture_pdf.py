@@ -17,6 +17,9 @@ Partie 2 (version 0.2, étape A2-3) : sur une page vectorielle, les TEXTES EXACT
 (textes_de_la_page, lire_page) : mêmes fiches TexteLu que l'OCR, placées sur l'image rendue ; le reste de la chaîne
 (cotes, barre d'échelle, surfaces, noms de pièces) ne change pas.
 
+Partie 3 (version 0.3, étape A2-4) : l'échelle écrite (« Éch. 1/50 »), convertie en pixels par mètre grâce à la
+taille réelle de la feuille (echelle_ecrite) ; contrôlée par moteur.echelle_plan.decider, jamais prise seule.
+
 Les seuils ci-dessous sont des PREMIERS RÉGLAGES (plans fabriqués) : à revoir sur de vrais PDF.
 Unités : points PDF (1/72 de pouce = 0,3528 mm), origine en haut à gauche (comme pdfplumber).
 """
@@ -25,6 +28,7 @@ from __future__ import annotations
 import argparse
 import logging
 import math
+import re
 import unicodedata
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -33,7 +37,7 @@ import numpy as np
 
 from moteur.lecture_cotes import TexteLu
 
-VERSION_LECTURE_PDF = "0.2.0"
+VERSION_LECTURE_PDF = "0.3.0"
 
 SEGMENTS_DESSIN = 20  # au moins ce nombre de segments de traits pour parler de « dessin »
 LONGUEUR_DESSIN = 1.5  # et une longueur totale ≥ 1,5 fois le tour de la page (un cadre seul = 1)
@@ -281,6 +285,48 @@ def lire_page(chemin: str | Path, numero: int, tri: TriPage | None = None, dpi: 
     image, px_par_pt = rendre_page(chemin, numero, dpi, cote_max_px)
     textes = lire_textes_pdf(chemin, numero, px_par_pt) if tri.nature == "vectorielle" else None
     return PagePdfLue(numero, tri.nature, tri.raison, image, px_par_pt, textes)
+
+
+# ---------- Partie 3 (étape A2-4) : l'ÉCHELLE ÉCRITE (« Éch. 1/50 ») ----------
+
+# Échelles d'architecte courantes : un « 1/7 » ou un « 1/2 » écrit sur un plan est une fraction, pas une échelle.
+ECHELLES_ARCHITECTE = (20, 25, 50, 75, 100, 125, 150, 200, 250, 500)
+# « 1/50 », « 1:100 », « 1/50e », « 1/50ème » ; pas « 01/05/2026 » (date) ni « 11/50 » ni « 1/50,5 ».
+FORME_ECHELLE = re.compile(r"(?<![\d/.,:])1\s*[/:]\s*(\d{2,3})(?:\s*(?:e|è|ème|eme)\b)?(?![\d/.,:])", re.IGNORECASE)
+MOT_ECHELLE = re.compile(r"[ée]ch|scale", re.IGNORECASE)  # « Éch. », « ECHELLE », « échelle », « scale »
+
+
+def echelles_ecrites(textes: list[TexteLu]) -> list[tuple[int, bool]]:
+    """Les échelles écrites trouvées dans les textes : (dénominateur, précédée du mot « échelle »)."""
+    trouvees = []
+    for t in textes:
+        for m in FORME_ECHELLE.finditer(t.texte):
+            n = int(m.group(1))
+            if n in ECHELLES_ARCHITECTE:
+                trouvees.append((n, bool(MOT_ECHELLE.search(t.texte[:m.start()]))))
+    return trouvees
+
+
+def echelle_ecrite(textes: list[TexteLu], px_par_pt: float) -> tuple[float | None, str]:
+    """L'échelle de l'image (pixels par mètre) donnée par l'échelle écrite sur le plan, et le détail en clair.
+
+    Pourquoi c'est possible dans un PDF (et pas sur une photo) : le PDF connaît la taille réelle de sa feuille, en
+    points (1/72 de pouce). Au 1/50, 1 m réel fait 20 mm sur la feuille, soit 56,69 points, soit 236 pixels à 300 dpi.
+    Si le plan porte plusieurs échelles différentes (plan au 1/50 et plan de situation au 1/500), on garde celle qui
+    suit le mot « échelle » si elle est seule dans ce cas ; sinon on ne choisit pas (None).
+    ATTENTION : un PDF imprimé « ajusté à la page » garde son « 1/50 » écrit mais n'est plus au 1/50. Cette échelle
+    n'est donc jamais prise seule : moteur.echelle_plan.decider la contrôle (cotes, surfaces, portes)."""
+    trouvees = echelles_ecrites(textes)
+    valeurs = sorted({n for n, _ in trouvees})
+    if len(valeurs) > 1:
+        valeurs = sorted({n for n, mot in trouvees if mot})
+        if len(valeurs) != 1:
+            return None, f"plusieurs échelles écrites ({', '.join(f'1/{n}' for n, _ in trouvees)}) : pas de choix"
+    if not valeurs:
+        return None, ""
+    n = valeurs[0]
+    px_par_m = 1000 / n * (72 / 25.4) * px_par_pt  # mm de feuille par mètre réel → points → pixels
+    return px_par_m, f"échelle écrite 1/{n}"
 
 
 def pour_les_noms(textes: list[TexteLu]) -> list[tuple[str, float, float, float]]:

@@ -49,7 +49,7 @@
 - Styles du monde (6-19) : TERMINÉE 2026-11-02, commit Mac 11c5423 (286 tests) ; essai 6e NON mis en service, essai 5 reste. PR #19. Voir atelya-styles-monde.md.
 - Étape A1 doutes : FAITE, commit Mac 877967c (292 tests) ; PR #20. Note ~60/100. Voir atelya-doutes-a1.md.
 - Étape A3 DINOv2 + murs biais : 2026-11-03 traducteur 0.4.1 + AIGUILLAGE (e7b si ≥1,5 m de murs biais lus, sinon e5) = règle respectée → mis en service ; biais 68,7→73,8 %, droits −0,2 pt max. Note ~62/100. Commit Mac 20ce703 (314 tests). Modèles 7b sauvegardés sur la branche GitHub sauvegarde-modeles (release interdite). Voir atelya-dinov2-biais-a3.md.
-- Étape A2 lecture des PDF : plan validé par NT 2026-11-03, licences lues, bibliothèques installées sur le PC (pdfplumber, pypdfium2…), étape 1 FAITE ; étape 2 tri à l'entrée FAITE ; étape 3 textes exacts à la place de l'OCR FAITE (lecture_pdf 0.2.0, echelle_plan 0.8.0, 338 tests). Voir atelya-pdf-a2.md.
+- Étape A2 lecture des PDF : plan validé par NT 2026-11-03, licences lues, bibliothèques installées sur le PC (pdfplumber, pypdfium2…), étape 1 FAITE ; étape 2 tri à l'entrée FAITE ; étape 3 textes exacts à la place de l'OCR FAITE ; étape 4 échelle écrite « 1/50 » FAITE (lecture_pdf 0.3.0, echelle_plan 0.9.0, 353 tests). Voir atelya-pdf-a2.md.
 - Plan 2D propre (P3) : FAIT dans le cloud, moteur/plan_propre.py, GitHub atelya 7b92f34 ; suivi PR #21 ; commit Mac en attente du « vas-y » / accès dossier Mac. Voir plan-2d-propre-p7.md.
 - AUDIT TECHNO GLOBAL (2026-10-31) : https://claude.ai/artifact/WGSFGjdDD2qfD8SFHTfVzS. Voir audit-technologique-2026-10-31.md. Étapes A1-A6 dans la Feuille de route.
 ## Suivi pour l'associé

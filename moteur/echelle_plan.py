@@ -42,6 +42,15 @@ morceaux (_lire_par_morceaux), relecture gardée seulement si elle est sûre.
 Version 0.8 (étape A2-3, plans en PDF vectoriel) : lire_echelle_plan accepte les textes déjà connus (`textes`, lus dans
 le fichier PDF par moteur.lecture_pdf, en pixels du dessin). L'OCR est alors sauté : les textes sont seulement remis droit
 comme le dessin, puis les cotes, la barre et les surfaces sont lues exactement comme avant, avec les mêmes garde-fous.
+
+Version 0.9 (étape A2-4) : l'ÉCHELLE ÉCRITE d'un PDF (« Éch. 1/50 », moteur.lecture_pdf.echelle_ecrite). Dans un PDF, la
+taille de la feuille est connue : « 1/50 » donne directement les pixels par mètre, même sans cotes, barre ni surfaces.
+Mais un PDF imprimé « ajusté à la page » garde son « 1/50 » écrit sans plus être au 1/50 (A3 réduit en A4 : tout
+est 0,71 fois trop petit). Les cotes, la barre et les surfaces, elles, rapetissent AVEC le dessin et restent justes.
+D'où la règle (decider, `ecrite`) : les mesures prises sur le dessin passent toujours avant elle, et en cas de désaccord
+(plus de 3 %) elle est simplement ignorée (aucun recul par rapport à la version 0.8) ; d'accord avec la barre ou les
+surfaces, c'est elle qui sert (plus précise) ; seule, il faut que la largeur des portes la confirme à 15 % près (une page
+réduite ou agrandie s'en écarte de 29 % au moins), sinon le plan part à la vérification.
 """
 
 from __future__ import annotations
@@ -57,7 +66,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.8.0"
+VERSION_ECHELLE = "0.9.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -68,6 +77,7 @@ PORTES_MIN = 2  # il faut au moins deux portes pour une échelle approchée
 BORD_IMAGE = 0.03  # coloriage douteux : la bande du bord de l'image (fraction du grand côté)…
 PART_MURS_AU_BORD = 0.02  # … où se trouvent plus de 2 % des murs, portes et fenêtres coloriés
 ACCORD_OPTIQUE = 0.08  # photo aux proportions de l'optique : échelles des cotes en largeur et en hauteur à 8 % près
+ACCORD_ECRITE_PORTES = 0.15  # échelle écrite seule : la largeur des portes doit la confirmer à 15 % près
 ACCORD_SENS_UNIQUE = 0.01  # photo cotée dans un seul sens : la 2e mesure doit la confirmer à 1 % près
 MORCEAU, RECOUVREMENT = 1000, 200  # photo : lecture par morceaux de 1 000 pixels qui se recouvrent de 200
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
@@ -100,6 +110,9 @@ class EchelleLue:
     approchee: float | None = None
     # Le coloriage d'Atelya colle au bord de l'image (table ou plis coloriés en murs) : voir coloriage_douteux.
     douteux: bool = False
+    # L'échelle écrite d'un PDF (« 1/50 ») : px par m du coloriage, et le détail en clair (version 0.9).
+    ecrite: float | None = None
+    ecrite_detail: str = ""
 
     @property
     def px_par_m(self) -> float | None:
@@ -110,7 +123,8 @@ class EchelleLue:
         """L'échelle retenue (largeur, hauteur) et sa source, après contrôle (voir decider)."""
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
                        self.interieur_px, de_biais, self.barre if self.barre_sure else None,
-                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee, self.douteux)
+                       self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee, self.douteux,
+                       ecrite=self.ecrite)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -136,7 +150,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             de_biais: bool, barre: float | None = None,
             surfaces: float | None = None, proportions_optiques: bool = False,
             approchee: float | None = None, douteux: bool = False,
-            surfaces_lues: float | None = None) -> tuple[float | None, float | None, str]:
+            surfaces_lues: float | None = None, ecrite: float | None = None) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -169,7 +183,13 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     près (_sens_unique_confirme) : la cote d'ensemble rapportée au logement colorié (avec au moins deux cotes d'accord),
     ou les surfaces écrites, même peu sûres (`surfaces_lues`).
 
-    Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « cote d'ensemble » ou « à vérifier »
+    Version 0.9 : `ecrite`, l'échelle écrite d'un PDF (« 1/50 »), plan à plat seulement. Les cotes passent avant elle.
+    Sans cotes utilisables : d'accord à 3 % près avec la barre ou les surfaces, c'est elle qui sert (la plus précise dans
+    un PDF) ; en désaccord, elle est ignorée (page réduite à l'impression : la barre et les surfaces, dessinées, restent
+    justes) ; seule, il faut que la largeur des portes la confirme à 15 % près, sinon vérification.
+
+    Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « échelle écrite », « cote d'ensemble »
+    ou « à vérifier »
     (échelles à None)."""
     if douteux:  # le logement colorié est faux : il ne peut plus contrôler aucun chiffre lu
         return None, None, "à vérifier"
@@ -208,7 +228,15 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     if barre and _barre_plausible(barre, il, ih, *controle):
         if surfaces and plat and abs(surfaces / barre - 1) > ACCORD_SURFACES:
             return None, None, "à vérifier"  # barre et surfaces en désaccord : un humain tranche
+        if ecrite and not de_biais and abs(ecrite / barre - 1) <= ACCORD_SURFACES:
+            return ecrite, ecrite, "échelle écrite"  # confirmée par la barre, et plus précise qu'elle
         return (barre, barre, "barre") if plat else (barre, None, "barre")
+    if ecrite and not de_biais and _barre_plausible(ecrite, il, ih, *controle):
+        if surfaces and plat and abs(surfaces / ecrite - 1) <= ACCORD_SURFACES:
+            return ecrite, ecrite, "échelle écrite"  # confirmée par les surfaces, et plus précise qu'elles
+        if not surfaces and approchee and abs(approchee / ecrite - 1) <= ACCORD_ECRITE_PORTES:
+            return ecrite, ecrite, "échelle écrite"
+        # sinon : contredite par les surfaces (page réduite ?) → les surfaces décident plus bas ; ou rien ne la confirme
     if surfaces and plat and _barre_plausible(surfaces, il, ih, *controle):
         return surfaces, surfaces, "surfaces"
     if largeur or hauteur:
@@ -446,13 +474,16 @@ def interieur_du_logement(col: np.ndarray, px_par_m: float) -> tuple[float, floa
 
 
 def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: Redressement | None = None,
-                      angle: float | None = None, textes: list[TexteLu] | None = None) -> EchelleLue:
+                      angle: float | None = None, textes: list[TexteLu] | None = None,
+                      px_par_pt: float | None = None) -> EchelleLue:
     """L'échelle du coloriage, lue sur les cotes du dessin d'origine (gris ou couleurs, pleine taille).
 
     `redressement` : celui appliqué au coloriage (plan photographié de biais) ; l'échelle rendue
     est alors celle du coloriage redressé. Sinon le dessin est tourné de `angle` (estimé sur le
     coloriage s'il n'est pas donné), ce qui ne change pas l'échelle.
-    `textes` : textes déjà connus (PDF vectoriel), en pixels du dessin ; l'OCR n'est alors pas lancé."""
+    `textes` : textes déjà connus (PDF vectoriel), en pixels du dessin ; l'OCR n'est alors pas lancé.
+    `px_par_pt` : pixels du dessin par point PDF (moteur.lecture_pdf.rendre_page) ; avec `textes`, il permet de
+    lire l'échelle écrite (« 1/50 ») du plan."""
     gris = dessin if dessin.ndim == 2 else cv2.cvtColor(dessin, cv2.COLOR_RGB2GRAY)
     r = coloriage.shape[1] / gris.shape[1]  # dessin → coloriage
     if redressement is not None:
@@ -477,6 +508,12 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
         facteur = r
         col = redresser(coloriage, angle)
         vers_col = np.diag([r, r, 1.0])  # les deux sont tournés autour de leur centre
+    ecrite, ecrite_detail = None, ""
+    if textes is not None and px_par_pt and redressement is None:
+        from moteur.lecture_pdf import echelle_ecrite
+
+        e_dessin, ecrite_detail = echelle_ecrite(textes, px_par_pt)
+        ecrite = e_dessin * facteur if e_dessin else None  # tourner le dessin ne change pas l'échelle
     if textes is not None:  # textes exacts du PDF : pas d'OCR
         textes = _textes_remis_droit(textes, vers_vu)
         echelle, nombres = lire_echelle(vu, textes), _nombres(textes)
@@ -500,7 +537,8 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       max(horiz) if horiz else None, max(verti) if verti else None, interieur,
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
-                      surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage))
+                      surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage),
+                      ecrite, ecrite_detail)
 
 
 def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
