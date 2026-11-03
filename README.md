@@ -65,6 +65,8 @@ uv run python -m moteur.lecture_pdf plan.pdf
                      # trie les pages d'un PDF (étape A2) : vectorielle (textes exacts lisibles),
                      # scannee (photo dans le PDF), piegee (textes illisibles), vide ; dit lesquelles
                      # sont des plans (--json : détail des mesures). Demande pdfplumber et pypdfium2.
+                     # Sur une page vectorielle, moteur.lecture_pdf.lire_page donne l'image et les textes
+                     # exacts, que lire_echelle_plan(..., textes=...) prend à la place de l'OCR (étape A2-3).
 ```
 
 ## Saisir un plan

@@ -85,17 +85,19 @@ class PageVectorielle:
             a = b
         self.ordres.append(" ".join(morceaux) + " S")
 
-    def texte(self, x: float, y: float, texte: str, taille: float = 9, lisible: bool = True) -> None:
+    def texte(self, x: float, y: float, texte: str, taille: float = 9, lisible: bool = True,
+              vertical: bool = False) -> None:
         """Texte dont la ligne de base gauche est en (x, y). lisible=False : police sans table de
-        correspondance → un lecteur de PDF ne retrouve pas les lettres (cas des PDF « piégés »)."""
+        correspondance → un lecteur de PDF ne retrouve pas les lettres (cas des PDF « piégés »).
+        vertical=True : texte tourné d'un quart de tour, qui se lit de bas en haut (cote d'un mur vertical)."""
+        sens = "0 1 -1 0" if vertical else "1 0 0 1"
+        position = f"{sens} {_nombre(x)} {_nombre(self._y(y))} Tm"
         if lisible:
-            self.ordres.append(f"BT /F1 {_nombre(taille)} Tf {_nombre(x)} {_nombre(self._y(y))} Td "
-                               f"{_texte_pdf(texte)} Tj ET")
+            self.ordres.append(f"BT /F1 {_nombre(taille)} Tf {position} {_texte_pdf(texte)} Tj ET")
         else:
             self.illisible = True
             code = "".join(f"{(ord(c) % 200) + 3:04X}" for c in texte)
-            self.ordres.append(f"BT /F2 {_nombre(taille)} Tf {_nombre(x)} {_nombre(self._y(y))} Td "
-                               f"<{code}> Tj ET")
+            self.ordres.append(f"BT /F2 {_nombre(taille)} Tf {position} <{code}> Tj ET")
 
     def image(self, x: float, y: float, l: float, h: float, gris: np.ndarray) -> None:
         """Image en niveaux de gris (uint8) posée dans le rectangle (x, y, l, h) : un « scan »."""

@@ -38,6 +38,10 @@ du logement (bord de la feuille, table) sont effacées avant le garde-fou « col
 appliqué par le banc) ; des cotes lues dans un seul sens sont gardées si une 2e mesure les confirme à 1 % près
 (_sens_unique_confirme) ; et sur une photo, les cotes trop petites pour une lecture d'un seul coup sont relues par
 morceaux (_lire_par_morceaux), relecture gardée seulement si elle est sûre.
+
+Version 0.8 (étape A2-3, plans en PDF vectoriel) : lire_echelle_plan accepte les textes déjà connus (`textes`, lus dans
+le fichier PDF par moteur.lecture_pdf, en pixels du dessin). L'OCR est alors sauté : les textes sont seulement remis droit
+comme le dessin, puis les cotes, la barre et les surfaces sont lues exactement comme avant, avec les mêmes garde-fous.
 """
 
 from __future__ import annotations
@@ -53,7 +57,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.7.0"
+VERSION_ECHELLE = "0.8.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -354,6 +358,22 @@ def _lire_par_morceaux(gris: np.ndarray) -> list:
     return textes
 
 
+def _nombres(textes: list) -> list[tuple[float, bool]]:
+    return [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+
+
+def _textes_remis_droit(textes: list[TexteLu], matrice: np.ndarray) -> list[TexteLu]:
+    """Les textes (pixels du dessin) placés sur le dessin remis droit (matrice 3×3 dessin → dessin remis droit)."""
+    sortie = []
+    for t in textes:
+        p = np.c_[t.boite, np.ones(len(t.boite))] @ matrice.T
+        coins = p[:, :2] / p[:, 2:]
+        # On garde une boîte droite (comme l'OCR) : le sens du texte (vertical ou pas) se lit sur sa forme.
+        (x0, y0), (x1, y1) = coins.min(axis=0), coins.max(axis=0)
+        sortie.append(TexteLu(t.texte, np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], float), t.confiance))
+    return sortie
+
+
 def _lire(gris: np.ndarray, photo: bool = False) -> tuple[Echelle, list[tuple[float, bool]], list]:
     """Comme lecture_cotes.lire_textes_et_echelle, mais sans insister quand la première lecture ne trouve
     aucun nombre en forme de cote : le plan n'a pas de cotes, les lectures suivantes (plus lentes) n'en
@@ -365,7 +385,7 @@ def _lire(gris: np.ndarray, photo: bool = False) -> tuple[Echelle, list[tuple[fl
         textes = lire_textes(image, agrandir)
         echelle = lire_echelle(gris, textes)
         score = (echelle.sure, echelle.px_par_m is not None, len(echelle.retenues))
-        nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+        nombres = _nombres(textes)
         if meilleure is None or score > meilleure[0]:
             meilleure = (score, echelle, nombres, textes)
         if echelle.sure or not nombres:
@@ -382,7 +402,7 @@ def _lire(gris: np.ndarray, photo: bool = False) -> tuple[Echelle, list[tuple[fl
             textes = lire_textes(etiree, agrandir)
             echelle = lire_echelle(etiree, textes)
             if echelle.sure:
-                nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+                nombres = _nombres(textes)
                 meilleure = ((True, True, len(echelle.retenues)), echelle, nombres, textes)
                 break
     if photo and not meilleure[1].sure and max(gris.shape) > MORCEAU:
@@ -393,7 +413,7 @@ def _lire(gris: np.ndarray, photo: bool = False) -> tuple[Echelle, list[tuple[fl
             textes = _lire_par_morceaux(image)
             echelle = lire_echelle(image, textes)
             if echelle.sure:
-                nombres = [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+                nombres = _nombres(textes)
                 meilleure = ((True, True, len(echelle.retenues)), echelle, nombres, textes)
                 break
     return meilleure[1], meilleure[2], meilleure[3]
@@ -426,12 +446,13 @@ def interieur_du_logement(col: np.ndarray, px_par_m: float) -> tuple[float, floa
 
 
 def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: Redressement | None = None,
-                      angle: float | None = None) -> EchelleLue:
+                      angle: float | None = None, textes: list[TexteLu] | None = None) -> EchelleLue:
     """L'échelle du coloriage, lue sur les cotes du dessin d'origine (gris ou couleurs, pleine taille).
 
     `redressement` : celui appliqué au coloriage (plan photographié de biais) ; l'échelle rendue
     est alors celle du coloriage redressé. Sinon le dessin est tourné de `angle` (estimé sur le
-    coloriage s'il n'est pas donné), ce qui ne change pas l'échelle."""
+    coloriage s'il n'est pas donné), ce qui ne change pas l'échelle.
+    `textes` : textes déjà connus (PDF vectoriel), en pixels du dessin ; l'OCR n'est alors pas lancé."""
     gris = dessin if dessin.ndim == 2 else cv2.cvtColor(dessin, cv2.COLOR_RGB2GRAY)
     r = coloriage.shape[1] / gris.shape[1]  # dessin → coloriage
     if redressement is not None:
@@ -443,17 +464,24 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
         facteur = 1 / k
         col = redressement.appliquer(coloriage)
         vers_col = redressement.H @ np.diag([r, r, 1.0]) @ np.linalg.inv(G[0])  # dessin lu → coloriage redressé
+        vers_vu = G[0]
     else:
         if angle is None:
             angle = estimer_rotation((coloriage >= MUR) & (coloriage <= PORTE_FENETRE))
         vu = gris
+        vers_vu = np.eye(3)
         if abs(angle) >= 0.01:
             m, W, H = _rotation(gris.shape, angle)
             vu = cv2.warpAffine(gris, m, (W, H), flags=cv2.INTER_LINEAR, borderValue=255)
+            vers_vu = np.vstack([m, [0.0, 0.0, 1.0]])
         facteur = r
         col = redresser(coloriage, angle)
         vers_col = np.diag([r, r, 1.0])  # les deux sont tournés autour de leur centre
-    echelle, nombres, textes = _lire(vu, photo=redressement is not None)
+    if textes is not None:  # textes exacts du PDF : pas d'OCR
+        textes = _textes_remis_droit(textes, vers_vu)
+        echelle, nombres = lire_echelle(vu, textes), _nombres(textes)
+    else:
+        echelle, nombres, textes = _lire(vu, photo=redressement is not None)
     barre = lire_barre(vu, textes)
     cotes = echelle.retenues + echelle.ecartees
     if redressement is not None:

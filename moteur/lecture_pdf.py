@@ -13,6 +13,10 @@ Pourquoi : un PDF peut être de trois sortes, et chacune se lit autrement.
 Chaque page dit aussi si elle ressemble à un PLAN (beaucoup de traits, peu de texte), pour écarter
 la page de garde, le tableau des surfaces ou les pages de texte d'un rapport de diagnostic.
 
+Partie 2 (version 0.2, étape A2-3) : sur une page vectorielle, les TEXTES EXACTS du fichier remplacent l'OCR
+(textes_de_la_page, lire_page) : mêmes fiches TexteLu que l'OCR, placées sur l'image rendue ; le reste de la chaîne
+(cotes, barre d'échelle, surfaces, noms de pièces) ne change pas.
+
 Les seuils ci-dessous sont des PREMIERS RÉGLAGES (plans fabriqués) : à revoir sur de vrais PDF.
 Unités : points PDF (1/72 de pouce = 0,3528 mm), origine en haut à gauche (comme pdfplumber).
 """
@@ -27,7 +31,9 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION_LECTURE_PDF = "0.1.0"
+from moteur.lecture_cotes import TexteLu
+
+VERSION_LECTURE_PDF = "0.2.0"
 
 SEGMENTS_DESSIN = 20  # au moins ce nombre de segments de traits pour parler de « dessin »
 LONGUEUR_DESSIN = 1.5  # et une longueur totale ≥ 1,5 fois le tour de la page (un cadre seul = 1)
@@ -206,6 +212,80 @@ def rendre_page(chemin: str | Path, numero: int, dpi: int = DPI_RENDU,
     finally:
         document.close()
     return np.asarray(image)[:, :, ::-1].copy(), echelle
+
+
+# ---------- Partie 2 (étape A2-3) : les TEXTES EXACTS d'une page vectorielle ----------
+
+
+def _mots(page) -> list[dict]:
+    """Les mots de la page (lettres regroupées), dans le bon sens de lecture.
+
+    Un texte vertical peut se lire de bas en haut (le plus courant pour une cote de mur vertical) ou de
+    haut en bas : chaque lettre porte dans le PDF sa propre orientation (sa « matrice »), on lit donc les
+    deux familles à part. Les espaces sont gardés dans un mot (« Séjour 25,92 m² » reste un seul texte,
+    comme le donne l'OCR) ; deux textes séparés par un vide sans espace (« 4,80 » … « 3,10 ») restent deux."""
+    def de_bas_en_haut(o) -> bool:
+        return o.get("upright", True) or (o.get("matrix") or (1, 0))[1] > 0
+
+    mots = []
+    for garde, sens in ((de_bas_en_haut, "btt"), (lambda o: not de_bas_en_haut(o), "ttb")):
+        filtre = page.filter(lambda o, g=garde: o.get("object_type") != "char" or g(o))
+        mots += filtre.extract_words(keep_blank_chars=True, char_dir_rotated=sens)
+    return mots
+
+
+def textes_de_la_page(page, px_par_pt: float) -> list[TexteLu]:
+    """Les textes d'une page pdfplumber, au même format que l'OCR (moteur.lecture_cotes.TexteLu), en
+    pixels de l'image rendue par rendre_page (`px_par_pt`). Confiance 1 : le texte est celui du fichier.
+    Un mot qui contient une lettre illisible (« (cid:22) ») est laissé de côté."""
+    x0p, y0p = page.bbox[0], page.bbox[1]  # la zone visible (CropBox) peut ne pas commencer à 0
+    textes = []
+    for m in _mots(page):
+        texte = " ".join(m["text"].split())
+        if not texte or "(cid:" in texte or any(_caractere_illisible(c) for c in texte):
+            continue
+        x0, x1 = (m["x0"] - x0p) * px_par_pt, (m["x1"] - x0p) * px_par_pt
+        y0, y1 = (m["top"] - y0p) * px_par_pt, (m["bottom"] - y0p) * px_par_pt
+        boite = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=float)
+        textes.append(TexteLu(texte, boite, 1.0))
+    return textes
+
+
+def lire_textes_pdf(chemin: str | Path, numero: int, px_par_pt: float) -> list[TexteLu]:
+    """Les textes exacts de la page `numero` (à partir de 1), placés sur l'image de rendre_page."""
+    with _ouvrir(chemin) as pdf:
+        page = pdf.pages[numero - 1]
+        textes = textes_de_la_page(page, px_par_pt)
+        page.close()
+    return textes
+
+
+@dataclass
+class PagePdfLue:
+    """Une page de plan prête pour Atelya : l'image nette à colorier et, si la page est vectorielle,
+    ses textes exacts (sinon None : les textes seront lus par l'OCR sur l'image, comme aujourd'hui)."""
+    numero: int
+    nature: str
+    raison: str
+    image: np.ndarray  # BGR, format OpenCV
+    px_par_pt: float
+    textes: list[TexteLu] | None
+
+
+def lire_page(chemin: str | Path, numero: int, tri: TriPage | None = None, dpi: int = DPI_RENDU,
+              cote_max_px: int = COTE_MAX_PX) -> PagePdfLue:
+    """Image + textes d'une page. Les textes exacts ne sont pris que sur une page « vectorielle » : sur une
+    page piégée ou scannée, ils sont absents ou faux, et c'est l'OCR qui lira l'image."""
+    if tri is None:
+        tri = trier_pdf(chemin)[numero - 1]
+    image, px_par_pt = rendre_page(chemin, numero, dpi, cote_max_px)
+    textes = lire_textes_pdf(chemin, numero, px_par_pt) if tri.nature == "vectorielle" else None
+    return PagePdfLue(numero, tri.nature, tri.raison, image, px_par_pt, textes)
+
+
+def pour_les_noms(textes: list[TexteLu]) -> list[tuple[str, float, float, float]]:
+    """Les textes au format de moteur.noms_pieces (texte, x du milieu, y du milieu, confiance)."""
+    return [(t.texte, float(t.boite[:, 0].mean()), float(t.boite[:, 1].mean()), t.confiance) for t in textes]
 
 
 def main(arguments: list[str] | None = None) -> None:
