@@ -1,0 +1,48 @@
+# moteur-3d
+
+Moteur de reconstruction 3D immobilière : plan + photos, puis modèle JSON, puis scène Blender.
+
+## Organisation
+
+- `moteur/logement.py` : le format JSON d'un logement (version 0.1) et ses règles de vérification.
+- `exemples/cas-test-00/logement.json` : le cas test n°0, un T2 de synthèse de 42 m² (dimensions de référence exactes).
+- `moteur/geometrie.py` : transforme le logement en « briques » (morceaux de murs, allèges, linteaux, sols, plafonds, seuils). Aucun besoin de Blender.
+- `moteur/blender/poser_briques.py` : script lu par Blender, qui pose les briques et enregistre la maquette.
+- `moteur/blender/mesurer.py` : script lu par Blender, qui mesure la maquette (pour les tests).
+- `moteur/construire.py` : la commande unique, du logement.json à la maquette .blend.
+- `tests/` : les tests automatiques (`test_blender.py` lance vraiment Blender, sans écran).
+- `outils/saisie-plan/` : la page de saisie d'un plan (étape 3), qui produit un `logement.json` en cliquant sur l'image du plan.
+  `calculs.js` contient les calculs (échelle, aimants, export), `saisie.js` les clics et le dessin.
+  `tests/calculs.test.js` se lance avec Node.js (`node --test outils/saisie-plan/tests/calculs.test.js`), qui n'est pas nécessaire pour utiliser la page.
+- `moteur/lecture_plan.py` : la lecture automatique d'un plan (étape 3b) : trouve les murs sur l'image, redresse un plan scanné de travers, et propose un `logement.json`. Utilise OpenCV.
+- `moteur/lecture_cotes.py` : la lecture automatique de l'échelle (étape 3c) : lit les cotes écrites sur le plan avec RapidOCR (modèle de lecture de texte qui tourne sur l'ordinateur, sans Internet), mesure leurs traits et en déduit les pixels par mètre ; lit aussi la hauteur sous plafond si elle est écrite.
+- `exemples/cas-test-00/plan.png` : le plan coté du cas test n°0, dessiné à l'échelle depuis `logement.json`, pour s'exercer.
+
+## Commandes utiles
+
+```
+uv run pytest        # lance tous les tests
+uv run python -m moteur.construire exemples/cas-test-00/logement.json sorties/cas-test-00
+                     # construit sorties/cas-test-00/maquette.blend
+uv run python -m moteur.lecture_plan exemples/cas-test-00/plan.png sorties/lu.json
+                     # lit l'échelle et les murs du plan et écrit un logement.json proposé
+                     # (--echelle 100 pour imposer l'échelle, --hsp 2.50 pour la hauteur sous plafond)
+```
+
+## Saisir un plan
+
+Ouvrir `outils/saisie-plan/index.html` dans Google Chrome (double-clic, ou `open -a "Google Chrome" outils/saisie-plan/index.html`).
+La page fonctionne sans Internet : le plan ne quitte pas l'ordinateur. Suivre les étapes numérotées en haut :
+plan, échelle, contrôle de l'échelle, murs, origine, puis « Enregistrer logement.json » (le fichier arrive dans Téléchargements).
+Les longueurs affichées sont celles de l'axe des murs, d'un angle à l'autre (8,20 m pour un mur extérieur qui borde 8,00 m intérieurs).
+Une longueur obtenue en cliquant est enregistrée avec le statut `estime` ; une cote tapée dans « Modifier » avec le statut `mesure`.
+
+Les maquettes produites vont dans `sorties/`, qui n'est pas suivi par Git (on peut toujours les reconstruire).
+Blender est cherché dans `/Applications/Blender.app` ; sinon, indiquer son chemin dans la variable `BLENDER`.
+
+## Conventions
+
+- Longueurs en mètres ; repère vu de dessus : x vers l'est, y vers le nord, origine au coin intérieur sud-ouest.
+- Un mur est décrit par son axe (la ligne en son milieu) et son épaisseur.
+- Aux angles, le premier mur de la liste est rallongé et le second raccourci, pour que l'angle soit fermé sans chevauchement. Version 0.1 : angles droits seulement, deux murs au plus par angle.
+- Chaque élément porte un `statut` : `mesure`, `estime` ou `ajoute`, et une `source`.

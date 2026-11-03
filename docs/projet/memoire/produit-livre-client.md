@@ -1,0 +1,19 @@
+---
+name: produit-livre-client
+description: Produit fini livré au client = 2 parties (cinématique caméra + visite libre) ; quel outil pour chacune (conseil du 2026-11-01)
+metadata:
+  type: project
+---
+NT (2026-11-01 23h30Z) : le produit envoyé au client se scinde en deux : 1) une CINÉMATIQUE (caméra qui parcourt les pièces, très beau rendu) ; 2) une partie où le client SE DÉPLACE lui-même.
+Conseil RÉVISÉ (même soir : Cycles ~1-3 min/image sur 2070 → 30-90 h par minute de vidéo) : visite libre ET cinématique → Unreal (une seule scène, caméra sur trajet calculé depuis le plan, vidéo en minutes-1 h, Movie Render Queue) ; photos fixes d'annonce → Blender Cycles ; fabrication maquette → Atelya + Blender puis export auto vers Unreal. En attendant Unreal : démos vidéo avec EEVEE (Blender).
+Unreal : pas plus beau en image fixe ; plus-value = direct (heure, matières), interactions, VR, vidéos rapides.
+**Why:** cadre la sortie finale d'Atelya.
+**How to apply:** ne pas reproposer la visite web séparément (NT l'a reportée) ; voir [[objectif-global-nt]].
+2026-11-01 23h33Z NT : « on fera un COMPARATIF de tout pour vraiment savoir » → test Cycles / EEVEE / Unreal sur un même logement avant de choisir. Estimation donnée : RTX 5090 ~6-7× la 2070 → 1 min de vidéo Cycles ~5-15 h (3-8 h avec débruiteur) ; 5090 ~2 500-3 000 € ; location GPU ~1 €/h pour tester avant d'acheter.
+Protocole de comparatif prévu (à intégrer au plan global, quand la lecture des plans sera stabilisée ou plus tôt si NT veut ; faisable sur le PC) : même logement sorti d'Atelya, même trajet caméra 10 s (300 images, séjour, fenêtre au soleil + zone sombre) ; 4 rendus Cycles max / Cycles optimisé+débruiteur / EEVEE / Unreal ; mesurer temps par image, mémoire, qualité côte à côte ; extrapoler à 1 min et à une carte haut de gamme.
+Mouvements caméra (proposé 2026-11-01 23h35Z, pas encore validé ni codé ; aujourd'hui seulement 2 images fixes auto) : ordre de visite d'agent depuis le graphe pièces/portes ; plans courts par pièce avec coupures/fondus (caméra 1,60 m, coin opposé à la fenêtre, avancée/panoramique 6-10 s, carte des espaces libres) ; durée selon taille (T2 ~1 min, T4 ~2 min) ; même trajet pour Blender/Unreal/comparatif ; plus tard trajet continu « drone » + options client (heure, meublé/vide).
+Compléments : points de vue notés auto (surface vue, lumière, verticales droites), ouverture « maison de poupée », fichier trajet commun = aussi points de téléportation de la visite libre, options titres/logo/musique ; brique « réalisateur automatique » (règles, pas d'entraînement) placée juste après le comparatif dans le plan global.
+Soleil réel (proposé 2026-11-01 23h37Z) : adresse/ville au dépôt (latitude) + orientation (flèche nord lue par Atelya ; sinon boussole dans le formulaire de dépôt ; plus tard cadastre public) → position du soleil par formule astronomique (hors ligne), soleil Blender/Unreal. V1 sans ombres des immeubles voisins ni étage ; plus tard hauteurs IGN (BD TOPO). À décider avec NT : lumière réelle à heure choisie vs heure la plus flatteuse par pièce.
+État code : habillage.py pose un soleil FIXE (ouest-sud-ouest, 50° de haut), provisoire. Vrais plans : fr-003 et fr-017 ont une rose des vents, fr-012 « SUD-OUEST », fr-014 « 3ème étage ». Conseil donné : lumière fidèle à la réalité (moment flatteur oui, soleil inventé non).
+2026-11-01 23h45Z : à la demande de NT, section « Rendu et produit livré au client » ajoutée à la Feuille de route (étapes R1 comparatif, R2 réalisateur caméra, R3 soleil réel, R4 visite Unreal ; colonne État).
+R5 vue par les fenêtres : PAR DÉFAUT tout auto IGN (adresse+étage+orientation → volumes BD TOPO + ciel + monuments modélisés, rendu « maquette » + flou) ; option : vue remarquable détectée → proposer au client une photo de la vue. Pas de Google 3D/Street View. V2 : vraies façades par photos de rue libres (Panoramax, Mapillary CC BY-SA) projetées sur volumes IGN.

@@ -1,0 +1,57 @@
+# Modélisation immobilière
+## Personnes et règles
+- RÈGLE NT (2026-11-02) : pendant TOUT entraînement long sur le PC, SURVEILLER toutes les 30 min (lire les journaux, arrêter/corriger si ça dérive) au lieu d'attendre la fin. Cause : essai 7 a « cassé » à la 50e min et tourné 2 h pour rien.
+- RÈGLE NT (2026-11-02 21h20) : en cas de PLANTAGE (calcul, mesure, script), reprendre la main IMMÉDIATEMENT et corriger, SANS attendre que NT le demande (dans le respect des autres règles : pas d'installation sans accord, Mac = « vas-y » écrit).
+- BUT COMMUN (NT, 2026-11-01) : tout le projet doit être optimisé globalement ; finalité partagée = rendre Atelya très performant et vendable, une vraie solution sur le marché. Chaque fil doit choisir ce qui sert le plus ce but.
+- PRODUIT LIVRÉ (2026-11-01) : cinématique + visite libre → Unreal (une scène) ; photos fixes → Blender ; démos EEVEE en attendant. Voir produit-livre-client.md.
+- SUJETS PRODUIT À TRAITER (2026-11-01) : sauvegarde (urgent), hauteur, coût/logement, serveur, juridique, extérieurs. Voir sujets-produit-non-traites.md.
+- NT = associé 2, moteur 3D. Associé 1 (GitHub gabysmon2005) = plateforme interne + dashboard, dans son propre projet Claude séparé (prompt de démarrage donné le 2026-10-24). Ne jamais toucher à sa partie.
+- NOM : le modèle/moteur s'appelle désormais « Atelya » (décidé par NT 2026-10-24 21h).
+- Français, une étape à la fois, attendre validation ; AUCUNE installation sans accord. NT n'est pas informaticien : expliquer chaque terme simplement + le POURQUOI de chaque étape. Proposer un nouveau fil à chaque fin d'étape.
+- RÈGLE NT (2026-10-31) : chaque fois qu'un élément de la Feuille de route (https://claude.ai/artifact/SHUQoK6FVydYuJN2xk8UP7, 12 cas + étapes A1-A6) est fini, le fil qui l'a fini doit le marquer « fait » sur la Feuille de route (nouvelle version de l'artifact), visible par NT.
+- Gros calculs (Atelya) = sur le PC ; banc de notation dans le cloud (voir calculs-sur-pc.md).
+- NT aime une NOTE HONNÊTE /100 de l'avancement (2026-10-29 soir : ~47/100 « prêt client », ~90/100 sur plans fabriqués ; manque test sur vrais plans). Redonner cette note à chaque fin d'étape. Test sur 10-20 vrais plans français : NT dit « on le fera le moment venu » (ne pas pousser).
+- Objectif : logiciel autonome (« le moteur ») qui lit les plans et modélise dans Blender, sans LLM dedans. VALIDÉ 2026-10-22 : plan coté fait foi (photos = contrôle), Blender d'abord / Unreal plus tard. Le client dépose juste → lecture AUTOMATIQUE + vérification humaine ~2 min. NT veut une lecture PERFORMANTE AVANT les premiers clients. Visite web REPORTÉE « bien plus tard » (ne pas reproposer). NT travaillera en FRANCE : ne pas biaiser le moteur vers les plans suisses.
+- SAUVEGARDE FAITE (2026-11-02, P1) : dépôt GitHub privé nniffle05-del/atelya = code Mac (main) + pc/ + release modeles-2026-11-02. À refaire après chaque étape (bundle). Voir sauvegarde-atelya.md.
+## Machines
+- PASSAGE VS CODE (2026-11-03) : NT a dit oui → Claude Code dans VS Code sur le PC d'abord (pilote A2), Mac plus tard (Blender) ; guide + CLAUDE.md demandés dans un nouveau fil. Voir passage-vscode.md.
+- Mac M4 16 Go (PAS d'identifiants GitHub en ligne de commande, ni gh, ni Node.js ; transport cloud→Mac qui marche : fichier joint au fil, NT le télécharge, RC l'applique), Blender 5.2.2, uv, Git (nniffle05-del). Dépôt ~/Documents/reconstruction-3d/moteur-3d (main, Python 3.13 via uv ; pydantic, OpenCV 5, RapidOCR+onnxruntime). Accès dossier Mac approuvé ; pose sur le Mac = device_commit_files puis Remote Control pour pytest+commit (le 1er lancement RC échoue souvent, le 2e passe ; le Mac exige un accord écrit de NT, ex. « vas-y », avant de copier+tester du code venu de l'extérieur). Copier le dépôt dans le cloud : `git bundle` dans le dossier Mac (copie-pour-le-cloud.bundle) + device_stage_files.
+- PC Windows 11 portable (2026-10-28 : souvent sur le partage iPhone 172.20.10.x → ne voit pas le Mac ; les outils dossier ne visent QUE le Mac ; transfert PC↔Mac à la main par NT, e-mail ; NT peut aussi joindre un fichier du PC directement dans le fil) (D:\Modélisation immobilière) : RTX 2070 8 Go. 2026-10-25 : NT a validé et on a installé uv + Python 3.13 + PyTorch 2.14 dans D:\Modélisation immobilière\atelya (8 Go), GPU OK (27× le CPU). Jeu 10 199 plans copié Mac→PC par le réseau (partage fichiers macOS, \\192.168.1.18, compte nathan). Remote Control bloque les suppressions. GPU à 86 °C en charge (surélever le PC). Le PC peut se mettre en veille et couper RC en plein calcul : demander de désactiver la veille ; RC ne donne pas d'avancement avant la fin (faire des rapports par étape). Visionneuse en direct : en_direct.py (bandeau rouge si plantage).
+## Docs
+- Catalogue styles de plans FR/US/UK (2026-10-31) : https://claude.ai/artifact/XgfA55ptzti5UdRXkiEuS8
+- Audit : https://claude.ai/artifact/3LffV1yEj28nrqSm2toYqa · Récap simple : https://claude.ai/artifact/Aq3wDm7VWikvXyTB6PoW5F · Analyse lecture plans : https://claude.ai/artifact/8h5aQyKBZqMW4pKtYVj1RC · Sources de vrais plans : https://claude.ai/artifact/HBjgQUKk6JBeHdp7KJLmoL · Guide plans français : https://claude.ai/artifact/9fWqMwWYaXX9YQc67BGkNy · Feuille de route des 12 cas particuliers (objectif NT : à terme performant sur CHAQUE ligne) : https://claude.ai/artifact/SHUQoK6FVydYuJN2xk8UP7 · Ce qu'on peut ajouter à Atelya : https://claude.ai/artifact/MToWqm1wXF2JptDt9s41PX
+## Licences
+- Interdits : CubiCasa5k, CVC-FP, RPLAN (recherche seulement ; NT pense que l'entraînement n'est pas commercial → conseillé de demander l'accord des auteurs), Ultralytics YOLO (AGPL). Swiss Dwellings CC BY 4.0 OK. ResPlan → avis juridique. Aspiration d'annonces REFUSÉE.
+## Historique moteur (commits Mac)
+- Étapes 1–4 (22-23/10) : format logement.json (pydantic), géométrie → Blender, saisie/correction de plan (outils/saisie-plan), lecture auto murs/cotes/ouvertures/pièces, habillage + rendus Cycles (7508469, 99 tests).
+- 5a correcteur + banc_essai (1efdf3d) ; 5b fabrique T1–T4 + dessin_plan (fe7d64c) ; lecture fiable 96 % (59092d8) ; 5c salissure + nettoyage, salis 91 % (a677f24).
+- 5d vrais plans (60 apparts Swiss Dwellings redessinés, banc-swiss3/4 ; outils /mnt/project-files/moteur-3d-etape5d/) : murs épais 03c9ede, baies + origine 1c1d89a, passages par porte 81928c4, murs courts 1ee6f08, bords du logement / mesure hors tout 1676e46, passages ouverts 061ef52 (162 tests). Bilan suisses : dims 97 %, murs 42,6 %, ouv 69 %, pièces 64 % ; fabriqués 196/200, salis 337/360. Écarts restants surtout dus au découpage des données suisses → piste : comparaison plus juste (pas commencée).
+- Bancs cloud : fabrique 200 + 60 salis (graine 1) + convertir_swiss 60 → dessiner_banc --salir → recaler_banc → swiss3 ; OMP_NUM_THREADS=1 (~15 min les 620).
+## Vrais plans français
+- Voir vrais-plans-francais.md. 2 plans reçus avec accord (fr-001 murs en biais, fr-002 agence sans cotes, /mnt/project-files/vrais-plans-recus/). Aucune collection publique française utilisable ; il faut l'accord du propriétaire (diagnostiqueurs, agences, propre logement). 2026-11-01 : 13 vrais plans au total (servent d'EXAMEN, ne pas entraîner dessus). Piste : avec ~50+ vrais plans de plus, brouillons de corrigés par Claude + validation NT à l'écran de vérification → entraînement sur du vrai.
+- Fil « Lire les plans sans cotes » ARRÊTÉ par NT 2026-10-24 19h (travail gardé : /mnt/project-files/moteur-sans-cotes/travail-interrompu.diff).
+## Générateur de dataset synthétique (2026-10-24 soir)
+- Voir generateur-dataset.md. Commité sur le Mac : d10a7e9 + 70df4b0 (182 tests). Paquet moteur/generateur/, 3D en option --3d. Lot cloud : 1 014 plans. Jeu Mac sorties/jeu-10000 : 10 199 plans (2026-10-24, voir atelya-modele.md). Commande : `uv run python -m moteur.generateur tout --nombre 1100 --dossier sorties/jeu-1000 --processus 8`.
+## Atelya — entraînement
+- Essai 1 (2026-10-25, PC, 1 000 plans, 25 min) : 90,9 % pixels justes sur 150 plans inédits ; murs 90 %, fenêtres 85 %, portes 77 %. Défauts : invente des pièces dans les marges (cotes/titre), confond cuisine/bureau. Résultats : D:\Modélisation immobilière\atelya\resultats-essai-1\. Essai 2 FAIT (2026-10-25, 8 219 plans, 2 h) : IoU 81,8 % (essai 1 : 69,5 % mêmes plans), taches marges 10 % des plans ; bureau/buanderie faibles. Voir atelya-modele.md.
+- Redressement photos de biais (2026-10-27) : Atelya biais murs 8 → 83 % ; commit Mac a399418 ; PR #6. Voir atelya-redressement.md.
+- Essai 3 + DUO (6-9) : bon type 93,8 → 95,5 % ; commit Mac e4217ee ; PR #9. Voir atelya-essai-3.md.
+- Barre d'échelle (6-10) : commit Mac e6c2871 ; PR #10. Voir atelya-barre-echelle.md.
+- Surfaces écrites (6-11) : échelle lue 78,6 → 94,3 % ; commit Mac b4f3f0f ; PR #11. Voir atelya-surfaces.md.
+- Barre coupée (6-12) : commit Mac d1cf6f6 ; PR #12. Voir atelya-barre-coupee.md.
+- Échelle fine (6-13) : échelle lue 94,4 % ; PR #13.
+- Photos de biais sans cotes (6-14) : commit Mac 0973968 ; PR #14. Voir atelya-biais-sans-cotes.md.
+- Essai 4 (6-15) : commit Mac 56ba590 ; PR #15. Voir atelya-essai-4.md.
+- Photos réalistes + essai 5 (6-16) : essai 5 retenu (PC resultats-essai-5) ; commit Mac 986b6a0 ; PR #16. Voir atelya-photos-realistes.md.
+- Étape 6-17 : FAITE, commit Mac 065f657 (280 tests). Note ~57/100 client. Voir atelya-verification.md.
+- Échelle lue sur les cotes (6-8) : commit Mac dfd50c7 ; PR #8. Petites pièces (6-7) : commit 967b37f ; PR #7.
+- Maillon coloriage → logement.json → 3D (2026-10-26) : commit Mac 3728169.
+- Styles du monde (6-19) : TERMINÉE 2026-11-02, commit Mac 11c5423 (286 tests) ; essai 6e NON mis en service, essai 5 reste. PR #19. Voir atelya-styles-monde.md.
+- Étape A1 doutes : FAITE, commit Mac 877967c (292 tests) ; PR #20. Note ~60/100. Voir atelya-doutes-a1.md.
+- Étape A3 DINOv2 + murs biais : 2026-11-03 traducteur 0.4.1 + AIGUILLAGE (e7b si ≥1,5 m de murs biais lus, sinon e5) = règle respectée → mis en service ; biais 68,7→73,8 %, droits −0,2 pt max. Note ~62/100. Commit Mac 20ce703 (314 tests). Modèles 7b sauvegardés sur la branche GitHub sauvegarde-modeles (release interdite). Voir atelya-dinov2-biais-a3.md.
+- Plan 2D propre (P3) : FAIT dans le cloud, moteur/plan_propre.py, GitHub atelya 7b92f34 ; suivi PR #21 ; commit Mac en attente du « vas-y » / accès dossier Mac. Voir plan-2d-propre-p7.md.
+- AUDIT TECHNO GLOBAL (2026-10-31) : https://claude.ai/artifact/WGSFGjdDD2qfD8SFHTfVzS. Voir audit-technologique-2026-10-31.md. Étapes A1-A6 dans la Feuille de route.
+## Suivi pour l'associé
+- 2026-11-02 18h32 NT : ARRÊTER les ajouts au dashboard de suivi (suivi.json) à chaque étape. À la place : une CARTE du moteur Atelya (briques, rôle, performance, à travailler, suite) pour expliquer à l'associé — fil « Cartographier le moteur Atelya pour l'associé ». La tenir à jour (nouvelle version du même artifact) à chaque fin d'étape. Lien : https://claude.ai/artifact/SHUy3ye6UPhqojRfCPzS6n ; source /mnt/project-files/carte-atelya/carte-atelya.html. Voir carte-atelya-associe.md.
+- Ancien : dépôt GitHub privé nniffle05-del/suivi-moteur (suivi.json + README). PR #1, #2 fusionnées. PR #3 à #21 ouvertes, chacune posée sur la précédente : NT doit fusionner dans l'ordre. Plus aucun fil ne les surveille, les rappeler à NT si besoin.
+- Écran de vérification (6-18) : COMMITÉ Mac df59d10 ; PR #18. Suite : brancher sur vraies lectures Atelya. Voir ecran-verification.md.
