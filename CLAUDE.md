@@ -146,9 +146,10 @@ détaillé correspondant avant d'agir.
 - Remote Control (ancienne méthode) : ne peut ni tuer de processus ni supprimer de fichiers ni changer la
   veille ; le 1er lancement échoue souvent.
 
-## 5. État d'Atelya au 3 novembre 2026
+## 5. État d'Atelya au 3 novembre 2026 (soir, fin de l'étape A2)
 
-**Notes honnêtes** : **~62/100 « prêt client »** ; ~92/100 sur plans fabriqués ; ~45-48/100 sur vrais plans.
+**Notes honnêtes** : **~64/100 « prêt client »** ; ~93/100 sur plans fabriqués ; ~45-48/100 sur vrais plans
+(aucun vrai PDF testé : les 13 vrais plans sont des JPG).
 Ce qui tire vers le bas : les vrais plans (styles jamais vus, murs gris clair, traits fins, sols hachurés,
 murs en biais), les erreurs silencieuses, les plans sans cotes ni surfaces.
 
@@ -163,11 +164,20 @@ murs en biais), les erreurs silencieuses, les plans sans cotes ni surfaces.
   « coloriage douteux », accord optique 8 %, cotes fiables, sens unique confirmé, lecture par morceaux).
 - **Doutes** : `moteur/doutes.py` (A1 : relecture sous 4 angles, contrôles de bon sens, refus ;
   DOUTE_ELEMENT 0,25, ORPHELINE_MIN 0,35 m²).
+- **PDF** (A2) : `moteur/lecture_pdf.py` 0.3.0 (tri vectorielle / scannée / piégée / vide, choix de la page,
+  image 300 dpi recadrée sur le dessin, textes exacts à la place de l'OCR, échelle écrite « 1/50 ») ;
+  `echelle_plan.py` 0.9.1 (`textes=`, `px_par_pt=` ; « 1/50 » seul → vérification). PDF de test :
+  `moteur/generateur/plan_pdf.py`. Banc PC : `pc/a2/banc-a2.ps1` + `pc/a2/analyser_a2.py`.
 
 **Chiffres clés** (murs justes %, bancs PC, aiguillage A3) : plans fabriqués (1 066 niveaux) ~90,7 ;
 photos sans cotes ~75,9 ; photos réalistes avec cotes ~78,3 ; réalistes sans cotes ~71,6 ; plans en biais
 68,7 → 73,8 ; photos de biais 52,1 → 59,4 ; **0 erreur d'échelle > 3 %** ; erreurs silencieuses graves
 306 sur les six bancs. Échelle lue sur ~94 % des plans fabriqués.
+**PDF** (banc A2, 2 132 PDF fabriqués depuis les 1 066 niveaux de test) : **0 erreur d'échelle > 3 %** ; vectoriels :
+échelle lue 97,1 % (mêmes plans en image 94,7), murs justes 94,1 (90,7), plans parfaits 62,3 (53,3) ; piégés
+96,6 % lus, réduits 98,2, tournés 96,4, dossiers 3 pages 98,6, scannés 92,7. Mêmes images, textes PDF contre
+OCR : 97,1 contre 96,4 % lus (le gain vient surtout de l'image nette recadrée ; les textes = vitesse, ~0,25 s
+contre ~16 s par plan). Images : aucun recul (1 066 niveaux relus, 0 échelle changée).
 
 **Étapes faites** (commits du Mac ; détails dans `docs/projet/memoire/`) :
 1-4 format `logement.json`, géométrie → Blender, saisie de plan, lecture auto, habillage + rendus Cycles ;
@@ -178,13 +188,17 @@ pièces ; 6-8 échelle sur les cotes ; 6-9 essai 3 + duo ; 6-10 barre d'échelle
 réalistes + essai 5 ; 6-17 moins de photos en vérification ; 6-18 écran de vérification ; 6-19 styles du
 monde (essai 6e NON mis en service) ; **A1** doutes (877967c) ; **A3** DINOv2 + murs en biais (20ce703) ;
 **P1** sauvegarde GitHub ; **P3** plan 2D propre (`moteur/plan_propre.py`, PDF A4/A3 ; sur GitHub, **pas
-encore posé sur le Mac**, attend le « vas-y » de NT).
+encore posé sur le Mac**, attend le « vas-y » de NT) ; **A2** lecture des PDF (PC, branche GitHub `etape-a2`,
+pas encore fusionnée dans `main` ni posée sur le Mac : accord de NT).
 
-**Prochaine étape : A2, lecture des PDF** (pilote du travail avec Claude Code sur le PC). Les plans en PDF
-vectoriel contiennent déjà les traits et les textes exacts : les lire directement (pypdfium2 ou
-pdfplumber, **pas PyMuPDF** qui est AGPL) au lieu de les photographier. Installation = accord de NT.
+**Prochaine étape** : à choisir par NT (fin A2 le 03/11/2026). Restes d'A2 : fusion `etape-a2` → `main`,
+pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
+option A2-7 (marques des cotes lues dans les traits du PDF : défaut ancien de ~0,5 % quand deux cotes se
+touchent de part et d'autre d'une cloison fine), essai sur de VRAIS PDF dès qu'on en aura.
 
-**Pistes ouvertes** : recalibrer `ORPHELINE_MIN` vers 0,15-0,2 m² (hausse des erreurs silencieuses depuis
+**Pistes ouvertes** : défaut du générateur repéré en A2
+(`rendu._Dessin.contour_des_murs` : contour décalé sur les plans « agence » penchés, à corriger avant un futur
+entraînement) ; recalibrer `ORPHELINE_MIN` vers 0,15-0,2 m² (hausse des erreurs silencieuses depuis
 A1) ; réduire les murs « en trop » du traducteur sur les plans droits ; brancher l'écran de vérification
 sur les vraies lectures (préparateur `verification.json`) ; escaliers ; styles US/UK ; photos clients ;
 bibliothèques matières/meubles ; comparatif de rendu ; soleil réel.
@@ -225,7 +239,7 @@ bibliothèques matières/meubles ; comparatif de rendu ; soleil réel.
 - Ouvrir le dossier du dépôt cloné dans VS Code. Le Python du PC (avec PyTorch et la carte graphique) est
   celui de l'ancien dossier : `"D:\Modélisation immobilière\atelya\.venv\Scripts\python.exe"`.
   Ne pas créer un autre environnement sans l'accord de NT (ce serait une installation de ~8 Go).
-- Lancer les tests : `<python> -m pytest -q` (321 OK + 6 Blender sautés au 03/11/2026). `lancer_tests.py` = ancien secours sans pytest.
+- Lancer les tests : `<python> -m pytest -q` (367 OK + 6 Blender sautés au 03/11/2026, fin A2). `lancer_tests.py` = ancien secours sans pytest.
   Les tests Blender sont sautés sur le PC.
 - Données, modèles et bancs restent dans `D:\Modélisation immobilière\atelya\` ; y accéder par des
   **chemins relatifs** (`..\atelya\donnees\…`, `..\atelya\resultats-essai-5\…`) quand un outil écrit

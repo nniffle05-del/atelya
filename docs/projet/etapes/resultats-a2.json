@@ -1,0 +1,298 @@
+{
+ "preparation": {
+  "pdf": 2132,
+  "prepares": 2132,
+  "erreurs": 0,
+  "doutes": 0,
+  "natures": {
+   "vectorielle": 1711,
+   "piegee": 216,
+   "scannee": 205,
+   "vide": 0
+  },
+  "duree_min": 4.5,
+  "erreurs_detail": []
+ },
+ "par_sorte": {
+  "dossier": {
+   "niveaux": 207,
+   "echelle_lue_pct": 98.6,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.019,
+   "a_0_5_pct_pres": 99.5,
+   "sources": {
+    "barre": 5,
+    "surfaces": 10,
+    "echelle_ecrite": 15,
+    "cotes": 174
+   },
+   "murs_justes": 94.1,
+   "ouv_justes": 94.2,
+   "pieces_bon_type": 97.8,
+   "plans_parfaits": 62.3,
+   "rates": 0
+  },
+  "piegee": {
+   "niveaux": 208,
+   "echelle_lue_pct": 96.6,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.019,
+   "a_0_5_pct_pres": 98.5,
+   "sources": {
+    "barre": 7,
+    "surfaces": 28,
+    "cotes": 166
+   },
+   "murs_justes": 94.8,
+   "ouv_justes": 95.8,
+   "pieces_bon_type": 98.3,
+   "plans_parfaits": 67.3,
+   "rates": 0
+  },
+  "reduite": {
+   "niveaux": 222,
+   "echelle_lue_pct": 98.2,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.039,
+   "a_0_5_pct_pres": 100.0,
+   "sources": {
+    "barre": 8,
+    "surfaces": 35,
+    "cotes": 175
+   },
+   "murs_justes": 94.8,
+   "ouv_justes": 94.3,
+   "pieces_bon_type": 97.3,
+   "plans_parfaits": 59.9,
+   "rates": 0
+  },
+  "scannee": {
+   "niveaux": 205,
+   "echelle_lue_pct": 92.7,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.057,
+   "a_0_5_pct_pres": 94.7,
+   "sources": {
+    "barre": 6,
+    "surfaces": 24,
+    "cotes": 160
+   },
+   "murs_justes": 90.0,
+   "ouv_justes": 92.5,
+   "pieces_bon_type": 96.3,
+   "plans_parfaits": 52.2,
+   "rates": 0
+  },
+  "tournee": {
+   "niveaux": 224,
+   "echelle_lue_pct": 96.4,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.022,
+   "a_0_5_pct_pres": 99.1,
+   "sources": {
+    "surfaces": 21,
+    "echelle_ecrite": 18,
+    "cotes": 177
+   }
+  },
+  "vectorielle": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 97.1,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.018,
+   "a_0_5_pct_pres": 99.2,
+   "sources": {
+    "barre": 18,
+    "surfaces": 75,
+    "echelle_ecrite": 87,
+    "cotes": 855
+   },
+   "murs_justes": 94.1,
+   "ouv_justes": 94.6,
+   "pieces_bon_type": 97.7,
+   "plans_parfaits": 62.3,
+   "rates": 0
+  }
+ },
+ "pdf_hors_tournees": {
+  "niveaux": 1908,
+  "echelle_lue_pct": 96.9,
+  "plus_de_3_pct": 0,
+  "ecart_median_pct": 0.024,
+  "a_0_5_pct_pres": 98.8,
+  "sources": {
+   "barre": 44,
+   "surfaces": 172,
+   "echelle_ecrite": 102,
+   "cotes": 1530
+  },
+  "murs_justes": 93.8,
+  "ouv_justes": 94.4,
+  "pieces_bon_type": 97.6,
+  "plans_parfaits": 61.5,
+  "rates": 0
+ },
+ "pdf_tous_echelle": {
+  "niveaux": 2132,
+  "echelle_lue_pct": 96.8,
+  "plus_de_3_pct": 0,
+  "ecart_median_pct": 0.024,
+  "a_0_5_pct_pres": 98.8,
+  "sources": {
+   "barre": 44,
+   "surfaces": 193,
+   "echelle_ecrite": 120,
+   "cotes": 1707
+  }
+ },
+ "vectoriel_contre_images_memes_niveaux": {
+  "images (banc-v041-apres-e5)": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 94.7,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.05,
+   "a_0_5_pct_pres": 97.3,
+   "sources": {
+    "barre": 38,
+    "surfaces": 141,
+    "cotes": 831
+   },
+   "murs_justes": 90.7,
+   "ouv_justes": 92.0,
+   "pieces_bon_type": 97.3,
+   "plans_parfaits": 53.3,
+   "rates": 0
+  },
+  "pdf vectoriels": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 97.1,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.018,
+   "a_0_5_pct_pres": 99.2,
+   "sources": {
+    "barre": 18,
+    "surfaces": 75,
+    "echelle_ecrite": 87,
+    "cotes": 855
+   },
+   "murs_justes": 94.1,
+   "ouv_justes": 94.6,
+   "pieces_bon_type": 97.7,
+   "plans_parfaits": 62.3,
+   "rates": 0
+  }
+ },
+ "memes_images_textes_pdf_contre_ocr": {
+  "textes du PDF": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 97.1,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.018,
+   "a_0_5_pct_pres": 99.2,
+   "sources": {
+    "barre": 18,
+    "surfaces": 75,
+    "echelle_ecrite": 87,
+    "cotes": 855
+   },
+   "murs_justes": 94.1,
+   "ouv_justes": 94.6,
+   "pieces_bon_type": 97.7,
+   "plans_parfaits": 62.3,
+   "rates": 0
+  },
+  "OCR": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 96.4,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.022,
+   "a_0_5_pct_pres": 99.2,
+   "sources": {
+    "barre": 39,
+    "surfaces": 137,
+    "cotes": 852
+   },
+   "murs_justes": 94.1,
+   "ouv_justes": 94.6,
+   "pieces_bon_type": 97.7,
+   "plans_parfaits": 62.4,
+   "rates": 0
+  }
+ },
+ "non_recul_banc-a2-images-cache": {
+  "avant (banc-v041-apres-e5)": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 94.7,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.05,
+   "a_0_5_pct_pres": 97.3,
+   "sources": {
+    "barre": 38,
+    "surfaces": 141,
+    "cotes": 831
+   },
+   "murs_justes": 90.7,
+   "ouv_justes": 92.0,
+   "pieces_bon_type": 97.3,
+   "plans_parfaits": 53.3,
+   "rates": 0
+  },
+  "apres (code A2)": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 94.7,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.05,
+   "a_0_5_pct_pres": 97.3,
+   "sources": {
+    "barre": 38,
+    "surfaces": 141,
+    "cotes": 831
+   },
+   "murs_justes": 90.7,
+   "ouv_justes": 92.0,
+   "pieces_bon_type": 97.3,
+   "plans_parfaits": 53.3,
+   "rates": 0
+  },
+  "echelles_changees": 0,
+  "exemples_changes": []
+ },
+ "non_recul_banc-a2-images": {
+  "avant (banc-v041-apres-e5)": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 94.7,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.05,
+   "a_0_5_pct_pres": 97.3,
+   "sources": {
+    "barre": 38,
+    "surfaces": 141,
+    "cotes": 831
+   },
+   "murs_justes": 90.7,
+   "ouv_justes": 92.0,
+   "pieces_bon_type": 97.3,
+   "plans_parfaits": 53.3,
+   "rates": 0
+  },
+  "apres (code A2)": {
+   "niveaux": 1066,
+   "echelle_lue_pct": 94.7,
+   "plus_de_3_pct": 0,
+   "ecart_median_pct": 0.05,
+   "a_0_5_pct_pres": 97.3,
+   "sources": {
+    "barre": 38,
+    "surfaces": 141,
+    "cotes": 831
+   },
+   "murs_justes": 90.7,
+   "ouv_justes": 92.0,
+   "pieces_bon_type": 97.3,
+   "plans_parfaits": 53.3,
+   "rates": 0
+  },
+  "echelles_changees": 0,
+  "exemples_changes": []
+ }
+}

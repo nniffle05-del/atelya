@@ -99,6 +99,13 @@ c'est de la décoration, à remplacer plus tard par ce que montrent les photos.
 - Vue de dessus : sans plafonds, depuis le sud-ouest, sans perspective, cadrée sur tout le logement.
 - Lumière : soleil fixe venant de l'ouest-sud-ouest, ciel bleu clair, un plafonnier blanc chaud par pièce.
 
+## Bibliothèques tierces et mentions obligatoires
+
+La lecture des PDF (étape A2) utilise pdfplumber et pdfminer.six (MIT) et pypdfium2 (BSD-3 / Apache-2.0), qui
+contient le moteur PDFium (BSD / Apache-2.0) et la bibliothèque FreeType, dont la licence (FTL) demande cette mention :
+Portions of this software are copyright © The FreeType Project (www.freetype.org). All rights reserved.
+La police Liberation Sans (moteur/polices, licence SIL OFL) sert aussi à fabriquer les PDF « piégés » de test.
+
 ## Conventions
 
 - Longueurs en mètres ; repère vu de dessus : x vers l'est, y vers le nord, origine au coin intérieur sud-ouest.
