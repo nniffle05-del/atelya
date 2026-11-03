@@ -107,7 +107,7 @@ détaillé correspondant avant d'agir.
 - **Dossier de travail historique : `D:\Modélisation immobilière\atelya`** (pas un dépôt Git, à NE PAS
   écraser) : projet uv avec `.venv` (Python 3.13.17 dans `atelya\.pythons`, torch 2.14.1+cu126,
   torchvision 0.29.1, numpy, pillow, opencv-python-headless 5.0.0.93, rapidocr 3.10.0, onnxruntime 1.31.1,
-  pydantic 2.14.1, pytest 9.2.0 (installé le 03/11/2026 avec l'accord de NT)), `UV_CACHE_DIR` / `UV_PYTHON_INSTALL_DIR` → `atelya\.cache-uv` /
+  pydantic 2.14.1, pytest 9.2.0 (installé le 03/11/2026 avec l'accord de NT), pdfplumber 0.11.10 + pdfminer.six + pypdfium2 5.14.0 + cryptography (A2, accord NT 03/11/2026)), `UV_CACHE_DIR` / `UV_PYTHON_INSTALL_DIR` → `atelya\.cache-uv` /
   `.pythons`. Contient : `donnees\` (9,7 Go de plans fabriqués, régénérables, dont `jeu-10000` et son cache
   `cache-atelya-768px`), `resultats-essai-*\` (modèles et bilans), `code-6-13` … `code-6-19`, `code-a1`,
   `code-a3`, `code-a3b` (copies du moteur posées à chaque étape), `depot-*`, `vrais-plans\`
