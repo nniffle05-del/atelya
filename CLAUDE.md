@@ -285,6 +285,7 @@ permet au projet claude.ai et au futur Claude du Mac de rester au courant à leu
 @docs/projet/memoire/atelya-essai-4.md
 @docs/projet/memoire/atelya-modele.md
 @docs/projet/memoire/atelya-petites-pieces.md
+@docs/projet/memoire/atelya-pdf-a2.md
 @docs/projet/memoire/atelya-photos-realistes.md
 @docs/projet/memoire/atelya-redressement.md
 @docs/projet/memoire/atelya-styles-monde.md
