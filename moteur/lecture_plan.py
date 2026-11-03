@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
+from moteur.images import lire_image
 import numpy as np
 
 if TYPE_CHECKING:
@@ -981,7 +982,7 @@ def main() -> None:
     parser.add_argument("--hsp", type=float, help="hauteur sous plafond en mètres ; sinon lue sur le plan, ou 2,50")
     parser.add_argument("--projet", default="PLAN-LU", help="nom du projet")
     args = parser.parse_args()
-    image = cv2.imread(args.plan, cv2.IMREAD_GRAYSCALE)
+    image = lire_image(args.plan, cv2.IMREAD_GRAYSCALE)
     if image is None:
         sys.exit(f"Échec : image illisible ({args.plan})")
     try:

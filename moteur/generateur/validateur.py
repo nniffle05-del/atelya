@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
+from moteur.images import lire_image
 import numpy as np
 
 from moteur.generateur.annotations import CLASSES, pieces_le_long, rect_de_l_ouverture, rect_du_mur, rasteriser
@@ -250,11 +251,11 @@ def valider_dossier(dossier: Path, regles: Regles | None = None, v: Verdict | No
             v.erreurs.append(f"{dn.name}/plan.png (ou .jpg) manquant")
         if v.erreurs:
             continue
-        plan = cv2.imread(str(plan_chemin), cv2.IMREAD_UNCHANGED)
-        sem = cv2.imread(str(dn / "masque_semantique.png"), cv2.IMREAD_UNCHANGED)
-        pieces_m = cv2.imread(str(dn / "masque_pieces.png"), cv2.IMREAD_UNCHANGED)
-        elements = cv2.imread(str(dn / "masque_elements.png"), cv2.IMREAD_UNCHANGED)
-        hauteur = cv2.imread(str(dn / "hauteur.png"), cv2.IMREAD_UNCHANGED)
+        plan = lire_image(str(plan_chemin), cv2.IMREAD_UNCHANGED)
+        sem = lire_image(str(dn / "masque_semantique.png"), cv2.IMREAD_UNCHANGED)
+        pieces_m = lire_image(str(dn / "masque_pieces.png"), cv2.IMREAD_UNCHANGED)
+        elements = lire_image(str(dn / "masque_elements.png"), cv2.IMREAD_UNCHANGED)
+        hauteur = lire_image(str(dn / "hauteur.png"), cv2.IMREAD_UNCHANGED)
         if any(x is None for x in (plan, sem, pieces_m, elements, hauteur)):
             v.erreurs.append(f"{dn.name} : une image est corrompue")
             continue

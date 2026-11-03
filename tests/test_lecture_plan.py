@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 
 import cv2
+from moteur.images import lire_image
 import numpy as np
 import pytest
 
@@ -19,7 +20,7 @@ TOLERANCE_EPAISSEUR = 0.015  # 1,5 cm
 
 
 def _plan():
-    return cv2.imread(str(DOSSIER / "plan.png"), cv2.IMREAD_GRAYSCALE)
+    return lire_image(str(DOSSIER / "plan.png"), cv2.IMREAD_GRAYSCALE)
 
 
 def _tourner(img, angle):

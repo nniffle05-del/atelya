@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 import cv2
+from moteur.images import ecrire_image, lire_image
 import numpy as np
 
 from moteur.generateur.annotations import NOMS_CLASSES
@@ -73,10 +74,10 @@ def _vignette(img: np.ndarray, hauteur: int, titre: str) -> np.ndarray:
 def planche(dossier_exemple: Path, niveau: int = 0, hauteur: int = 420) -> np.ndarray:
     dn = Path(dossier_exemple) / f"niveau_{niveau}"
     from moteur.generateur.validateur import chemin_du_plan
-    plan = cv2.cvtColor(cv2.imread(str(chemin_du_plan(dn)), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
-    sem = cv2.imread(str(dn / "masque_semantique.png"), cv2.IMREAD_UNCHANGED)
-    pieces = cv2.imread(str(dn / "masque_pieces.png"), cv2.IMREAD_UNCHANGED)
-    haut = cv2.imread(str(dn / "hauteur.png"), cv2.IMREAD_UNCHANGED)
+    plan = cv2.cvtColor(lire_image(str(chemin_du_plan(dn)), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+    sem = lire_image(str(dn / "masque_semantique.png"), cv2.IMREAD_UNCHANGED)
+    pieces = lire_image(str(dn / "masque_pieces.png"), cv2.IMREAD_UNCHANGED)
+    haut = lire_image(str(dn / "hauteur.png"), cv2.IMREAD_UNCHANGED)
     ann = json.loads((dn / "annotations.json").read_text(encoding="utf-8"))
     vignettes = [
         _vignette(plan, hauteur, "plan"),
@@ -105,7 +106,7 @@ def planches(dossier: Path, nombre: int = 20) -> list[Path]:
                 print(f"planche {e['id']} niveau {niveau} impossible : {err}")
                 continue
             chemin = sortie / f"{e['id']}_niveau{niveau}.jpg"
-            cv2.imwrite(str(chemin), cv2.cvtColor(img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
+            ecrire_image(str(chemin), cv2.cvtColor(img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
             ecrits.append(chemin)
     return ecrits
 

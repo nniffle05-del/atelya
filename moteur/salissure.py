@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 import cv2
+from moteur.images import ecrire_image, lire_image
 import numpy as np
 
 FAMILLES = ("travers", "photocopie", "taches", "compression", "telephone")
@@ -174,7 +175,7 @@ def _jpeg(image: np.ndarray, qualite: int) -> np.ndarray:
 
 def salir_dossier(dossier: Path, familles: tuple[str, ...] = FAMILLES) -> list[Path]:
     """Écrit à côté du plan.png d'un dossier un plan sali par famille (plan-travers.png…)."""
-    image = cv2.imread(str(dossier / "plan.png"), cv2.IMREAD_GRAYSCALE)
+    image = lire_image(str(dossier / "plan.png"), cv2.IMREAD_GRAYSCALE)
     if image is None:
         raise FileNotFoundError(f"pas de plan.png dans {dossier}")
     ecrits = []
@@ -183,9 +184,9 @@ def salir_dossier(dossier: Path, familles: tuple[str, ...] = FAMILLES) -> list[P
         chemin = dossier / f"plan-{famille}{EXTENSION[famille]}"
         if EXTENSION[famille] == ".jpg":
             # Déjà passé par le JPEG dans salir() : on l'enregistre sans le dégrader une seconde fois.
-            cv2.imwrite(str(chemin), sali, [cv2.IMWRITE_JPEG_QUALITY, 100])
+            ecrire_image(str(chemin), sali, [cv2.IMWRITE_JPEG_QUALITY, 100])
         else:
-            cv2.imwrite(str(chemin), sali)
+            ecrire_image(str(chemin), sali)
         ecrits.append(chemin)
     return ecrits
 

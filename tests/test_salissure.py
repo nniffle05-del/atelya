@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 
 import cv2
+from moteur.images import ecrire_image, lire_image
 import numpy as np
 import pytest
 
@@ -17,7 +18,7 @@ PLAN = Path(__file__).parent.parent / "exemples" / "cas-test-00" / "plan.png"
 
 
 def _plan():
-    return cv2.imread(str(PLAN), cv2.IMREAD_GRAYSCALE)
+    return lire_image(str(PLAN), cv2.IMREAD_GRAYSCALE)
 
 
 @pytest.mark.parametrize("nom", FAMILLES)
@@ -42,12 +43,12 @@ def test_photo_de_telephone():
 
 
 def test_salir_dossier(tmp_path):
-    cv2.imwrite(str(tmp_path / "plan.png"), _plan())
+    ecrire_image(str(tmp_path / "plan.png"), _plan())
     ecrits = salir_dossier(tmp_path)
     assert sorted(p.name for p in ecrits) == sorted(
         ["plan-travers.png", "plan-photocopie.png", "plan-taches.png", "plan-compression.jpg", "plan-telephone.jpg"]
     )
-    assert all(cv2.imread(str(p)) is not None for p in ecrits)
+    assert all(lire_image(str(p)) is not None for p in ecrits)
 
 
 def test_famille_d_apres_le_nom():

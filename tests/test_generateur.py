@@ -5,6 +5,7 @@ import json
 import random
 
 import cv2
+from moteur.images import lire_image
 import numpy as np
 import pytest
 
@@ -289,7 +290,7 @@ def test_lot_ecrit_et_valide(lot):
                 assert (dn / nom).exists(), (e["id"], nom)
             assert (dn / "variante_1" / "annotations.json").exists()
             assert list((dn / "classes").glob("*.png"))
-            hauteur = cv2.imread(str(dn / "hauteur.png"), cv2.IMREAD_UNCHANGED)
+            hauteur = lire_image(str(dn / "hauteur.png"), cv2.IMREAD_UNCHANGED)
             assert hauteur.dtype == np.uint16
         for f in e["fichiers"]:
             assert (d / f).exists(), (e["id"], f)

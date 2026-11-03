@@ -4,6 +4,7 @@ import json
 import math
 
 import cv2
+from moteur.images import ecrire_image, lire_image
 import pytest
 
 from moteur.banc_essai import essayer
@@ -93,7 +94,7 @@ def test_dossier_pour_le_banc(tmp_path):
     dossier = tmp_path / "plan-00003"
     assert {f.name for f in dossier.iterdir()} == {"logement.json", "plan.png", "fiche.json"}
     assert json.loads((dossier / "fiche.json").read_text(encoding="utf-8")) == fiche
-    image = cv2.imread(str(dossier / "plan.png"), cv2.IMREAD_GRAYSCALE)
+    image = lire_image(str(dossier / "plan.png"), cv2.IMREAD_GRAYSCALE)
     assert image is not None and image.shape[0] > 400
 
 
@@ -104,7 +105,7 @@ def test_plan_fabrique_relu_par_la_lecture(tmp_path):
     dossier = tmp_path / "plan"
     dossier.mkdir()
     (dossier / "logement.json").write_text(json.dumps(logement), encoding="utf-8")
-    cv2.imwrite(str(dossier / "plan.png"), dessiner_plan(logement, Style(), battants=battants(fab)))
+    ecrire_image(str(dossier / "plan.png"), dessiner_plan(logement, Style(), battants=battants(fab)))
     resultat = essayer(dossier / "plan.png", dossier / "logement.json")
     assert resultat.note is not None, resultat.echec
     assert resultat.note.ecart_dimensions <= 0.01  # l'échelle lue sur les cotes dessinées est juste

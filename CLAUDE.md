@@ -107,7 +107,7 @@ détaillé correspondant avant d'agir.
 - **Dossier de travail historique : `D:\Modélisation immobilière\atelya`** (pas un dépôt Git, à NE PAS
   écraser) : projet uv avec `.venv` (Python 3.13.17 dans `atelya\.pythons`, torch 2.14.1+cu126,
   torchvision 0.29.1, numpy, pillow, opencv-python-headless 5.0.0.93, rapidocr 3.10.0, onnxruntime 1.31.1,
-  pydantic 2.14.1 ; **pas de pytest**), `UV_CACHE_DIR` / `UV_PYTHON_INSTALL_DIR` → `atelya\.cache-uv` /
+  pydantic 2.14.1, pytest 9.2.0 (installé le 03/11/2026 avec l'accord de NT)), `UV_CACHE_DIR` / `UV_PYTHON_INSTALL_DIR` → `atelya\.cache-uv` /
   `.pythons`. Contient : `donnees\` (9,7 Go de plans fabriqués, régénérables, dont `jeu-10000` et son cache
   `cache-atelya-768px`), `resultats-essai-*\` (modèles et bilans), `code-6-13` … `code-6-19`, `code-a1`,
   `code-a3`, `code-a3b` (copies du moteur posées à chaque étape), `depot-*`, `vrais-plans\`
@@ -131,9 +131,13 @@ détaillé correspondant avant d'agir.
 - Claude Code sur le Mac : **plus tard**, pour les étapes photos / habillage / Blender.
 
 ### Pièges connus (à respecter)
-- **Chemins avec accent** (« Modélisation immobilière ») : `cv2.imwrite` n'écrit RIEN et ne signale rien
+- **Chemins avec accent** (« Modélisation immobilière ») : `cv2.imread`/`cv2.imwrite` ne lisent/n'écrivent RIEN et ne signale rien
   dans un chemin absolu accentué ; un `.ps1` UTF-8 sans BOM sous PowerShell 5.1 lit mal le chemin en dur.
   → **toujours des chemins RELATIFS** (`..\donnees\…`), vérifier que le fichier existe, arrêter sinon.
+  Depuis le 03/11/2026 (branche `correctif-chemins-accents`), le moteur et les tests passent par
+  `moteur/images.py` (`lire_image` / `ecrire_image`, octets lus par Python puis décodés par OpenCV) : plus
+  de piège là. Tout nouveau code doit les utiliser au lieu de `cv2.imread` / `cv2.imwrite`. Les anciens
+  scripts du PC (`..\atelya\`, `pc/`) ne sont pas corrigés : chemins relatifs toujours.
 - `--processus 6` à l'entraînement → `WinError 1455` (fichier d'échange) : `--processus 1` pour charger un
   nouveau jeu (cache ensuite).
 - `OMP_NUM_THREADS=1` pour le générateur multi-processus.
@@ -221,7 +225,7 @@ bibliothèques matières/meubles ; comparatif de rendu ; soleil réel.
 - Ouvrir le dossier du dépôt cloné dans VS Code. Le Python du PC (avec PyTorch et la carte graphique) est
   celui de l'ancien dossier : `"D:\Modélisation immobilière\atelya\.venv\Scripts\python.exe"`.
   Ne pas créer un autre environnement sans l'accord de NT (ce serait une installation de ~8 Go).
-- Lancer les tests : `<python> lancer_tests.py` (le PC n'a pas pytest ; installer pytest = accord NT).
+- Lancer les tests : `<python> -m pytest -q` (321 OK + 6 Blender sautés au 03/11/2026). `lancer_tests.py` = ancien secours sans pytest.
   Les tests Blender sont sautés sur le PC.
 - Données, modèles et bancs restent dans `D:\Modélisation immobilière\atelya\` ; y accéder par des
   **chemins relatifs** (`..\atelya\donnees\…`, `..\atelya\resultats-essai-5\…`) quand un outil écrit

@@ -36,6 +36,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import cv2
+from moteur.images import ecrire_image
 import numpy as np
 
 from moteur.generateur import VERSION_GENERATEUR
@@ -94,7 +95,7 @@ class Resultat:
 def ecrire_png(chemin: Path, image: np.ndarray) -> None:
     if image.ndim == 3:
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(str(chemin), image, [cv2.IMWRITE_PNG_COMPRESSION, 6])
+    ecrire_image(str(chemin), image, [cv2.IMWRITE_PNG_COMPRESSION, 6])
 
 
 def ecrire_json(chemin: Path, contenu: dict) -> None:
@@ -109,7 +110,7 @@ def ecrire_rendu(dn: Path, rendu: Rendu, masques_par_classe: bool) -> list[str]:
     jpeg = bool(rendu.style.salissure)
     for nom, image in rendu.images.items():
         if nom.startswith("plan") and jpeg:
-            cv2.imwrite(str(dn / f"{nom}.jpg"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
+            ecrire_image(str(dn / f"{nom}.jpg"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
             fichiers.append(f"{dn.name}/{nom}.jpg")
         else:
             ecrire_png(dn / f"{nom}.png", image)

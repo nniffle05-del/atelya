@@ -670,6 +670,7 @@ def fiche(fab: Fabrication, style: dict) -> dict:
 def fabriquer_dossier(graine: int, dossier: Path) -> dict:
     """Fabrique un logement et écrit logement.json, plan.png et fiche.json dans le dossier."""
     import cv2
+    from moteur.images import ecrire_image
 
     from moteur.dessin_plan import dessiner_plan, style_au_hasard
 
@@ -681,7 +682,7 @@ def fabriquer_dossier(graine: int, dossier: Path) -> dict:
     image = dessiner_plan(logement, style, titre=titre, battants=battants(fab))
     dossier.mkdir(parents=True, exist_ok=True)
     (dossier / "logement.json").write_text(json.dumps(logement, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    cv2.imwrite(str(dossier / "plan.png"), image)
+    ecrire_image(str(dossier / "plan.png"), image)
     f = fiche(fab, style.en_dict())
     (dossier / "fiche.json").write_text(json.dumps(f, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return f

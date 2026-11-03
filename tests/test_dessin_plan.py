@@ -5,6 +5,7 @@ import random
 from pathlib import Path
 
 import cv2
+from moteur.images import ecrire_image
 
 from moteur.banc_essai import essayer
 from moteur.dessin_plan import Style, dessiner_plan, style_au_hasard
@@ -40,7 +41,7 @@ def test_cas_test_redessine_relu_sans_faute(tmp_path):
     dossier = tmp_path / "cas-test-00"
     dossier.mkdir()
     (dossier / "logement.json").write_text(json.dumps(LOGEMENT), encoding="utf-8")
-    cv2.imwrite(str(dossier / "plan.png"), dessiner_plan(LOGEMENT, titre="Cas test n°0 redessiné"))
+    ecrire_image(str(dossier / "plan.png"), dessiner_plan(LOGEMENT, titre="Cas test n°0 redessiné"))
     resultat = essayer(dossier / "plan.png", dossier / "logement.json")
     assert resultat.note is not None, resultat.echec
     assert resultat.note.corrections == 0, resultat.note.remarques

@@ -72,12 +72,13 @@ def test_chaque_brique_a_son_materiau(resultat):
 
 
 def test_deux_images_ni_noires_ni_blanches(resultat, tmp_path):
-    cv2 = pytest.importorskip("cv2")
+    pytest.importorskip("cv2")
+    from moteur.images import lire_image
     maquette, _, _ = resultat
     images = rendre(maquette, tmp_path / "images", qualite="brouillon")
     assert [i.name for i in images] == ["vue-dessus.png", "vue-sejour.png"]
     for image in images:
-        pixels = cv2.imread(str(image))
+        pixels = lire_image(str(image))
         assert pixels.shape[:2] == (250, 400)  # 25 % de 1600 × 1000
         assert 60 < pixels.mean() < 230, image.name  # ni trop sombre, ni brûlée
         assert pixels.std() > 10, image.name  # pas une image toute unie

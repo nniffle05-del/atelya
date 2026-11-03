@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
+from moteur.images import lire_image
 
 from moteur.correcteur import Note, corriger
 
@@ -57,7 +58,7 @@ def essayer(image: Path, corrige: Path) -> Resultat:
 
     debut = time.perf_counter()
     vrai = json.loads(corrige.read_text(encoding="utf-8"))
-    gris = cv2.imread(str(image), cv2.IMREAD_GRAYSCALE)
+    gris = lire_image(str(image), cv2.IMREAD_GRAYSCALE)
     if gris is None:
         return Resultat(image, None, "image illisible", 0.0)
     try:
