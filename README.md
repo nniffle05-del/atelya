@@ -61,6 +61,10 @@ uv run python -m moteur.salissure sorties/fabrique
 uv run python -m moteur.generateur tout --nombre 100 --dossier sorties/jeu-100 --processus 4
                      # génère 100 plans synthétiques annotés, les répartit, écrit les statistiques et
                      # la page sorties/jeu-100/rapports/controle.html (30 s ; voir moteur/generateur/README.md)
+uv run python -m moteur.lecture_pdf plan.pdf
+                     # trie les pages d'un PDF (étape A2) : vectorielle (textes exacts lisibles),
+                     # scannee (photo dans le PDF), piegee (textes illisibles), vide ; dit lesquelles
+                     # sont des plans (--json : détail des mesures). Demande pdfplumber et pypdfium2.
 ```
 
 ## Saisir un plan
