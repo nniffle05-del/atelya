@@ -21,4 +21,4 @@ La fabrique existante (moteur/fabrique.py) n'est pas modifiée : elle sert au ba
 de lecture, qui doit redonner exactement les mêmes plans qu'avant.
 """
 
-VERSION_GENERATEUR = "0.1.4"
+VERSION_GENERATEUR = "0.1.5"

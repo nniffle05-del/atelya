@@ -1,0 +1,14 @@
+---
+name: surveiller-entrainements
+description: Règle NT (2026-11-02) : surveiller tout long entraînement PC toutes les 30 min pour arrêter tôt une dérive
+metadata:
+  type: feedback
+---
+NT 2026-11-02 16h28Z, après l'échec de l'essai 7 (dérive à 50 min, puis 2 h perdues sans que personne ne regarde) : « surveille dans le futur toutes les 30 min pour éviter cela ».
+**Why:** une dérive (perte qui monte, « nan », lots sautés) gaspille des heures de PC si on ne l'arrête pas.
+**How to apply:** pour chaque long calcul PC, programmer un réveil toutes les 30 min (send_later). Lire le log (perte, lots sautés, IoU anciens/photos). Si ça dérive, arrêter le calcul et prévenir NT. Ne pas écrire à NT si tout va bien (case à cocher seulement). Voir [[gros-calculs-sur-pc]], [[atelya-dinov2-biais-a3]].
+2026-11-02 20h10Z : NT veut VOIR Atelya travailler en temps réel. Outil posé sur le PC : atelya\en_direct.py (source /mnt/project-files/atelya-dinov2-biais/pour-pc-7b/en_direct.py). Lancer avec `.venv\Scripts\python.exe en_direct.py`. Il ouvre la page direct\index.html, rafraîchie toutes les 2 s, en lecture seule. Ce qu'il montre : plan / vérité / coloriage / doutes pendant les coloriages, la courbe d'apprentissage depuis historique.json pendant les entraînements, et la fin du journal. Le rappeler à NT avant chaque long calcul.
+2026-11-02 20h18Z : à CHAQUE contrôle, chercher aussi « code=1 » (étape plantée) dans les .suivi, pas seulement les chiffres. NT a vu deux bancs plantés avant moi (21h02-21h12, entre deux contrôles).
+2026-11-02 20h20Z, NT a demandé un contrôle continu. Je lui ai expliqué que je ne peux pas surveiller en continu (je fonctionne par réveils). La solution retenue est que le PC se surveille lui-même : en_direct.py affiche un BANDEAU ROUGE quand une ligne contient code≠0 ou Traceback, et les futurs scripts .ps1 devront s'ARRÊTER au premier code≠0, avec une ligne claire « PLANTÉ … », au lieu de continuer.
+2026-11-02 20h20Z, RÈGLE NT : « S'il y a un plantage, je veux que tu reprennes la main immédiatement, sans que je te le demande, et que tu corriges. » C'est un accord permanent pour corriger puis relancer l'étape plantée sans redemander. Méthode : une RC « sentinelle » sur le PC lit les journaux toutes les 60 s et m'envoie un message (ce qui me réveille) dès qu'une ligne contient code≠0, et une dernière fois à FINI. Pendant qu'elle tourne, les outils dossier sont coupés : passer par une RC pour poser les correctifs.
+2026-11-03 : une veille PowerShell 5.1 a raté « FINI tout » parce que le chemin accentué « Modélisation immobilière » était écrit en dur dans un .ps1 UTF-8 sans BOM. Le chemin était donc introuvable, sans aucune erreur affichée. Règle : chemins RELATIFS dans les scripts de veille, arrêt si le fichier est introuvable, et ne jamais se fier au silence de la veille (faire un point de secours via instructions RC).

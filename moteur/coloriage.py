@@ -11,7 +11,8 @@ uniquement des règles de géométrie (OpenCV et numpy).
    photographié de biais est d'abord remis à plat par moteur.redressement) ;
 2. garder le bâti (murs + portes + fenêtres) relié au logement, jeter les
    taches isolées (flèche du Nord, barre d'échelle…) ;
-3. trouver les murs droits horizontaux et verticaux, leur axe et leur épaisseur ;
+3. trouver les murs droits horizontaux et verticaux, leur axe et leur épaisseur ; puis (A3) les murs
+   en biais et arrondis dans ce qui reste du bâti (une courbe devient une suite de petits murs droits) ;
 4. poser chaque porte ou fenêtre sur le mur qui la porte ;
 5. découper l'intérieur en pièces fermées et leur donner le type le plus colorié,
    ou celui du nom écrit dedans quand on l'a lu (moteur.noms_pieces) ;
@@ -32,7 +33,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.3.0"
+VERSION_COLORIAGE = "0.4.1"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -72,6 +73,16 @@ LONGUEUR_MIN_MUR = 0.30  # plus court : coin ou bout de mur, pas un mur à part
 TOLERANCE_BORD = 0.025  # écart toléré sur un bord de mur, d'une colonne de pixels à l'autre
 EPAISSEUR_MIN = 0.03  # m
 SURFACE_MIN_PIECE = 0.25  # m²
+# A3 : murs en biais et arrondis, cherchés dans le bâti que les murs droits n'expliquent pas.
+LONGUEUR_MIN_LIBRE = 0.45  # m : plus court, c'est un reste d'angle, pas un mur
+ANGLE_MIN_LIBRE = 8.0  # degrés : un « biais » plus proche de l'horizontale ou de la verticale est un reste de mur droit
+PAS_ARC_DEG = 7.5  # un mur arrondi est rendu par segments de 7,5°
+RAYON_MAX_ANGLE = 3.5  # m : plus grand rayon cherché pour un angle arrondi
+RAYON_MIN_ANGLE = 0.5  # m (axe) : un « arrondi » plus serré est un coin de mur mal colorié, pas un mur courbe
+# (les angles arrondis des plans ont un rayon intérieur de 0,8 m et plus)
+ECART_COURBE_MIN = 0.03  # m : un mur dont le milieu s'écarte plus de la corde (en plus de son épaisseur) est courbe
+RAPPORT_ARC = 0.85  # arrondi si la ligne du milieu colle au cercle bien mieux qu'à une droite
+COURT_MAX = 0.6  # m : un bout de mur droit plus court peut être un morceau d'« escalier » d'un pan coupé
 LARGEUR_MIN_OUVERTURE = 0.25
 ECART_FUSION_OUVERTURE = 0.10  # deux morceaux d'une même fenêtre séparés de moins : une seule
 SURFACE_MIN_SEPARATION = 0.4  # m² : plus petite tache de couleur qui compte comme une pièce à part
@@ -439,6 +450,286 @@ def _ajuster_bouts(s: Segment, segs: list[Segment], tol: float) -> tuple[float, 
     return sortie[0], sortie[1]
 
 
+@dataclass
+class MurLibre:
+    """A3 : un mur en biais (2 points) ou arrondi (une suite de points) : son axe et son épaisseur, en pixels."""
+
+    points: list[tuple[float, float]]
+    epaisseur: float
+    forme: str  # biais, arrondi
+
+
+def _cercle(xs: np.ndarray, ys: np.ndarray) -> tuple[float, float, float]:
+    """Le cercle le plus proche d'un nuage de points (méthode de Kåsa, moindres carrés)."""
+    a = np.stack([xs, ys, np.ones_like(xs)], 1)
+    b = xs ** 2 + ys ** 2
+    (c0, c1, c2), *_ = np.linalg.lstsq(a, b, rcond=None)
+    cx, cy = c0 / 2, c1 / 2
+    return float(cx), float(cy), float(math.sqrt(max(c2 + cx * cx + cy * cy, 0.0)))
+
+
+def _rattacher(e: tuple[float, float], d: tuple[float, float] | None, segs: list[Segment], ep: float) -> tuple[float, float]:
+    """Le bout e d'un mur libre rejoint l'axe du mur droit le plus proche (s'il y en a un tout près) ;
+    ce mur droit est prolongé ou raccourci jusque-là. d : direction du mur libre (None pour un arrondi)."""
+    meilleur, ecart = None, None
+    for s in segs:
+        u, v = (e[0], e[1]) if s.horizontal else (e[1], e[0])
+        dist = abs(v - s.axe)
+        if dist <= s.epaisseur + ep and s.a - 2 * ep - 2 <= u <= s.b + 2 * ep + 2:
+            bout = min(abs(u - s.a), abs(u - s.b))
+            if ecart is None or (dist + bout) < ecart:
+                meilleur, ecart = s, dist + bout
+    if meilleur is None:
+        return e
+    s = meilleur
+    if d is not None and abs(d[1] if s.horizontal else d[0]) > 1e-6:
+        # intersection de la droite du mur libre avec l'axe du mur droit
+        if s.horizontal:
+            t = (s.axe - e[1]) / d[1]
+        else:
+            t = (s.axe - e[0]) / d[0]
+        e = (e[0] + t * d[0], e[1] + t * d[1])
+    else:
+        e = (e[0], s.axe) if s.horizontal else (s.axe, e[1])
+    u = e[0] if s.horizontal else e[1]
+    if abs(u - s.a) < abs(u - s.b):
+        s.a = u
+    else:
+        s.b = u
+    return e
+
+
+def _bouts_pleins(bati: np.ndarray, g: Segment, plein: float = 0.8) -> tuple[float, float]:
+    """Les bouts du mur droit g rognés tant que sa bande (haut..bas) est remplie à moins de 80 % (bâti)."""
+    m = bati if g.horizontal else bati.T
+    h0, h1 = int(round(g.haut)), max(int(round(g.haut)) + 1, int(round(g.bas)))
+    a, b = int(math.floor(g.a)), int(math.ceil(g.b))
+    a, b = max(a, 0), min(b, m.shape[1])
+    if b <= a:
+        return g.a, g.b
+    taux = m[max(h0, 0):h1, a:b].mean(axis=0) if h1 > max(h0, 0) else np.ones(b - a)
+    ok = np.nonzero(taux >= plein)[0]
+    if not len(ok):
+        return g.a, g.b
+    return float(max(g.a, a + ok[0])), float(min(g.b, a + ok[-1] + 1))
+
+
+def _ecart_milieu(position: np.ndarray, ecart: np.ndarray, tranches: int = 8) -> float:
+    """L'écart quadratique de la ligne du milieu à son modèle : moyenne de l'écart par tranche de `position`."""
+    bords = np.quantile(position, np.linspace(0, 1, tranches + 1))
+    moyennes = []
+    for k in range(tranches):
+        dans = (position >= bords[k]) & (position <= bords[k + 1])
+        if dans.sum() >= 3:
+            moyennes.append(float(np.mean(ecart[dans])))
+    return float(np.sqrt(np.mean(np.square(np.array(moyennes) - np.mean(moyennes))))) if moyennes else 0.0
+
+
+def _angle_arrondi(xs: np.ndarray, ys: np.ndarray, segs: list[Segment], px_par_m: float):
+    """Un morceau de bâti entre le bout d'un mur horizontal et le bout d'un mur vertical : est-ce un angle
+    arrondi (quart de cercle tangent aux deux axes) ? Renvoie (mur H, mur V, coin, rayon, écart) ou None."""
+    mx, my = float(xs.mean()), float(ys.mean())
+    loin = 1.6 * RAYON_MAX_ANGLE * px_par_m
+
+    def bout_proche(horizontal: bool):
+        meilleur, d_min = None, loin
+        for g in segs:
+            if g.horizontal != horizontal or g.b - g.a < max(2 * g.epaisseur, 0.5 * px_par_m):
+                continue  # pas les miettes de raccord : un mur voisin d'un angle coupé est un vrai mur
+            for u in (g.a, g.b):
+                p = (u, g.axe) if horizontal else (g.axe, u)
+                d = math.dist(p, (mx, my))
+                if d < d_min:
+                    meilleur, d_min = (g, u), d
+        return meilleur
+
+    h, v = bout_proche(True), bout_proche(False)
+    if h is None or v is None:
+        return None
+    (gh, uh), (gv, uv) = h, v
+    kx, ky = gv.axe, gh.axe  # le coin « fictif » où les deux axes se croisent
+    s1, s2 = (1 if mx > kx else -1), (1 if my > ky else -1)
+    # les bouts des deux murs droits doivent être du côté du morceau, et le morceau dans l'angle
+    if (uh - kx) * s1 < -2 or (uv - ky) * s2 < -2:
+        return None
+    meilleur = None
+    for r in np.arange(0.25 * px_par_m, RAYON_MAX_ANGLE * px_par_m, 0.5):
+        cx, cy = kx + s1 * r, ky + s2 * r
+        e = float(np.sqrt(np.mean((np.hypot(xs - cx, ys - cy) - r) ** 2)))
+        if meilleur is None or e < meilleur[0]:
+            meilleur = (e, float(r))
+    e, r = meilleur
+    if r < RAYON_MIN_ANGLE * px_par_m:
+        return None  # coin juste un peu arrondi par le coloriage : c'est un angle droit
+    return gh, gv, (kx, ky), (s1, s2), r, e
+
+
+def _bord_exterieur_courbe(bati: np.ndarray, dehors: np.ndarray, gh: Segment, gv: Segment,
+                           signes: tuple[int, int], px_par_m: float) -> bool:
+    """Le bord EXTÉRIEUR de l'angle (côté dehors) est-il un arc de cercle ? Le suivi des murs droits mange
+    les bouts d'un arrondi épais, mais pas son bord extérieur, qui reste entier : un pan coupé y laisse une
+    droite, un arrondi un quart de cercle tangent aux deux faces extérieures."""
+    s1, s2 = signes
+    fx, fy = gv.axe - s1 * gv.epaisseur / 2, gh.axe - s2 * gh.epaisseur / 2  # faces extérieures
+    bord = bati & cv2.dilate(dehors.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    ys, xs = np.nonzero(bord)
+    xs, ys = xs + 0.5, ys + 0.5
+    u, v = (xs - fx) * s1, (ys - fy) * s2
+    loin = RAYON_MAX_ANGLE * px_par_m
+    dans = (u > 2) & (v > 2) & (u < loin) & (v < loin)
+    if dans.sum() < 12:
+        return False
+    xs, ys = xs[dans], ys[dans]
+    vx, vy, x0, y0 = (float(q) for q in cv2.fitLine(np.stack([xs, ys], 1).astype(np.float32), cv2.DIST_L2, 0, 0.01, 0.01).ravel())
+    e_ligne = float(np.sqrt(np.mean((-(xs - x0) * vy + (ys - y0) * vx) ** 2)))
+    e_cercle = min(float(np.sqrt(np.mean((np.hypot(xs - fx - s1 * R, ys - fy - s2 * R) - R) ** 2)))
+                   for R in np.arange(RAYON_MIN_ANGLE * px_par_m, loin, 0.5))
+    return e_ligne > 1.0 and e_cercle < 0.5 * e_ligne
+
+
+def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) -> list[MurLibre]:
+    """A3 : les murs en biais et arrondis, dans le bâti que les murs droits trouvés n'expliquent pas.
+
+    Chaque morceau restant assez long et penché devient un mur en biais (une droite) ou, s'il est courbe,
+    un arc de cercle découpé en segments de 7,5°. Ses bouts rejoignent l'axe des murs droits voisins.
+    Sur un plan sans mur penché, il ne reste que des miettes : rien n'est ajouté et rien ne change."""
+    couvert = np.zeros(bati.shape, np.uint8)
+    # Un pan coupé peu penché est « vu » par le suivi des murs droits comme un escalier de petits bouts
+    # de murs : ces bouts courts ne couvrent rien ici ; s'ils tombent dans un mur libre, ils sont retirés.
+    courts = [g for g in segs if g.b - g.a < max(2 * g.epaisseur, COURT_MAX * px_par_m)]
+    for g in segs:
+        if any(g is c for c in courts):
+            continue
+        # Le suivi des murs droits « glisse » dans un arrondi (il tolère un mur un peu tordu) : on ne compte
+        # comme couvert que la partie du mur où sa bande est vraiment pleine (bouts rognés sinon).
+        a, b = _bouts_pleins(bati, g)
+        x0, x1 = (a, b) if g.horizontal else (g.haut, g.bas)
+        y0, y1 = (g.haut, g.bas) if g.horizontal else (a, b)
+        cv2.rectangle(couvert, (int(math.floor(x0)) - 2, int(math.floor(y0)) - 2),
+                      (int(math.ceil(x1)) + 1, int(math.ceil(y1)) + 1), 1, -1)
+    reste = (bati & (couvert == 0)).astype(np.uint8)
+    dehors = dehors_du_logement(bati)
+    reste = cv2.morphologyEx(reste, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    n, etiq, stats, _ = cv2.connectedComponentsWithStats(reste, connectivity=8)
+    long_min = LONGUEUR_MIN_LIBRE * px_par_m
+    libres = []
+    for i in range(1, n):
+        x, y, w, h, aire = stats[i]
+        if max(w, h) < 0.7 * long_min or aire < long_min * EPAISSEUR_MIN * px_par_m:
+            continue
+        ys, xs = np.nonzero(etiq[y:y + h, x:x + w] == i)
+        xs, ys = xs.astype(float) + x + 0.5, ys.astype(float) + y + 0.5
+        vx, vy, x0, y0 = (float(v) for v in cv2.fitLine(np.stack([xs, ys], 1).astype(np.float32), cv2.DIST_L2, 0, 0.01, 0.01).ravel())
+        t = (xs - x0) * vx + (ys - y0) * vy
+        dperp = -(xs - x0) * vy + (ys - y0) * vx
+        longueur = float(np.percentile(t, 99) - np.percentile(t, 1))
+        # Angle arrondi tangent à deux murs droits : le suivi des murs droits a déjà « mangé » les deux bouts
+        # de l'arc ; on retrouve le quart de cercle entier par son rayon (le seul inconnu).
+        arr = _angle_arrondi(xs, ys, segs, px_par_m)
+        if arr is not None:
+            gh, gv, (kx, ky), (s1, s2), r, _ = arr
+            cx, cy = kx + s1 * r, ky + s2 * r
+            # On compare la LIGNE DU MILIEU du morceau aux deux modèles (l'épaisseur du mur ne compte pas) :
+            # écart moyen par tranche, le long de la droite ou du cercle.
+            e_ligne = _ecart_milieu(t, dperp)
+            e_arc = _ecart_milieu(np.arctan2(ys - cy, xs - cx), np.hypot(xs - cx, ys - cy) - r)
+            courbe_dehors = _bord_exterieur_courbe(bati, dehors, gh, gv, (s1, s2), px_par_m)
+            if (e_arc < RAPPORT_ARC * e_ligne and e_ligne > 0.6 or courbe_dehors) and longueur >= 0.25 * px_par_m:
+                rr = np.hypot(xs - cx, ys - cy)
+                ep = float(np.percentile(rr, 98) - np.percentile(rr, 2)) + 1.0
+                nb = max(2, round(90 / PAS_ARC_DEG))
+                pts = []
+                for k in range(nb + 1):  # du point de contact sur le mur H à celui sur le mur V
+                    t = math.radians(90 * k / nb)
+                    pts.append((cx - s1 * r * math.sin(t), cy - s2 * r * math.cos(t)))
+                for g, u, ref in ((gh, kx + s1 * r, kx), (gv, ky + s2 * r, ky)):
+                    if abs(g.a - ref) < abs(g.b - ref):
+                        g.a = u
+                    else:
+                        g.b = u
+                libres.append(MurLibre(pts, ep, "arrondi"))
+                continue
+        if longueur < long_min:
+            continue
+        tq1, tq3 = np.percentile(t, 20), np.percentile(t, 80)
+        mil = (t >= tq1) & (t <= tq3)  # le milieu du mur : sans les raccords avec les murs voisins
+        ep = float(np.percentile(dperp[mil], 98) - np.percentile(dperp[mil], 2)) + 1.0 if mil.sum() > 10 else aire / longueur
+        if ep < EPAISSEUR_MIN * px_par_m or longueur < 2.5 * ep:
+            continue
+        angle = abs(math.degrees(math.atan2(vy, vx))) % 90
+        courbe = float(np.percentile(np.abs(dperp - np.median(dperp[mil])), 97)) > 0.5 * ep + ECART_COURBE_MIN * px_par_m + 1
+        if not courbe:
+            if min(angle, 90 - angle) < ANGLE_MIN_LIBRE:
+                continue  # reste d'un mur droit
+            # La direction se lit sur le milieu du mur seulement : les raccords aux murs voisins la faussent.
+            if mil.sum() > 20:
+                vx, vy, x0, y0 = (float(v) for v in cv2.fitLine(np.stack([xs[mil], ys[mil]], 1).astype(np.float32),
+                                                                  cv2.DIST_L2, 0, 0.01, 0.01).ravel())
+                t = (xs - x0) * vx + (ys - y0) * vy
+                dperp = -(xs - x0) * vy + (ys - y0) * vx
+            centre = float(np.median(dperp[mil]))
+            px0, py0 = x0 - centre * vy, y0 + centre * vx
+            ta, tb = float(np.percentile(t, 0.5)), float(np.percentile(t, 99.5))
+            a = (px0 + ta * vx, py0 + ta * vy)
+            b = (px0 + tb * vx, py0 + tb * vy)
+            if arr is not None and abs(vx) > 0.2 and abs(vy) > 0.2:
+                # Pan coupé entre deux murs droits : ses bouts sont sur leurs axes (là où la droite les coupe).
+                gh, gv, (kx, ky) = arr[0], arr[1], arr[2]
+                ph = (px0 + (gh.axe - py0) / vy * vx, gh.axe)
+                pv = (gv.axe, py0 + (gv.axe - px0) / vx * vy)
+                pres = 2 * ep + 0.3 * px_par_m  # chaque bout trouvé doit être tout près d'un des deux axes
+                if min(math.dist(ph, a), math.dist(ph, b)) < pres and min(math.dist(pv, a), math.dist(pv, b)) < pres:
+                    for g, u, ref in ((gh, ph[0], kx), (gv, pv[1], ky)):
+                        if abs(g.a - ref) < abs(g.b - ref):
+                            g.a = u
+                        else:
+                            g.b = u
+                    a, b = ph, pv
+                else:
+                    a = _rattacher(a, (vx, vy), segs, ep)
+                    b = _rattacher(b, (vx, vy), segs, ep)
+            else:
+                a = _rattacher(a, (vx, vy), segs, ep)
+                b = _rattacher(b, (vx, vy), segs, ep)
+            if math.dist(a, b) >= long_min:
+                libres.append(MurLibre([a, b], ep, "biais"))
+            continue
+        cx, cy, _ = _cercle(xs, ys)
+        rr = np.hypot(xs - cx, ys - cy)
+        ep = float(np.percentile(rr, 98) - np.percentile(rr, 2)) + 1.0
+        r = float((np.percentile(rr, 98) + np.percentile(rr, 2)) / 2)
+        if ep < EPAISSEUR_MIN * px_par_m or r > 20 * px_par_m or r < RAYON_MIN_ANGLE * px_par_m or float(np.std(rr - r)) > 0.5 * ep:
+            continue
+        ang = np.arctan2(ys - cy, xs - cx)
+        milieu = math.atan2(float(np.mean(np.sin(ang))), float(np.mean(np.cos(ang))))
+        rel = (ang - milieu + math.pi) % (2 * math.pi) - math.pi
+        t0, t1 = float(np.percentile(rel, 0.5)), float(np.percentile(rel, 99.5))
+        nb = max(2, round(math.degrees(t1 - t0) / PAS_ARC_DEG))
+        pts = [(cx + r * math.cos(milieu + t0 + (t1 - t0) * k / nb), cy + r * math.sin(milieu + t0 + (t1 - t0) * k / nb))
+               for k in range(nb + 1)]
+        pts[0] = _rattacher(pts[0], None, segs, ep)
+        pts[-1] = _rattacher(pts[-1], None, segs, ep)
+        libres.append(MurLibre(pts, ep, "arrondi"))
+    if libres and courts:
+        def dans_un_libre(g: Segment) -> bool:
+            c = ((g.a + g.b) / 2, g.axe) if g.horizontal else (g.axe, (g.a + g.b) / 2)
+            for l in libres:
+                for p, q in zip(l.points, l.points[1:]):
+                    if _distance_point_segment(c, p, q) <= l.epaisseur / 2 + g.epaisseur:
+                        return True
+            return False
+        absorbes = [g for g in courts if dans_un_libre(g)]
+        segs[:] = [g for g in segs if not any(g is x for x in absorbes)]
+    return libres
+
+
+def _distance_point_segment(c: tuple[float, float], p: tuple[float, float], q: tuple[float, float]) -> float:
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    n = dx * dx + dy * dy
+    t = 0.0 if n == 0 else max(0.0, min(1.0, ((c[0] - p[0]) * dx + (c[1] - p[1]) * dy) / n))
+    return math.dist(c, (p[0] + t * dx, p[1] + t * dy))
+
+
 # ---------------------------------------------------------------- 4. les ouvertures
 
 def trouver_ouvertures(col: np.ndarray, bati: np.ndarray, segs: list[Segment], px_par_m: float) -> list[dict]:
@@ -526,6 +817,7 @@ def trouver_pieces(col: np.ndarray, bati: np.ndarray, dehors: np.ndarray, px_par
         contour = _contour_orthogonal(zone)
         if contour is None:
             continue
+        contour = _contour_libre_si_mieux(zone, contour, px_par_m)
         pieces.append({"classe": classe, "contour_px": contour, "confiance": round(confiance, 2), "nom_lu": nom_lu})
     return pieces
 
@@ -646,6 +938,53 @@ def _contour_orthogonal(zone: np.ndarray) -> list[tuple[float, float]] | None:
     return decales
 
 
+def _aire_poly(p: list[tuple[float, float]]) -> float:
+    return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(p, p[1:] + p[:1]))) / 2
+
+
+def _contour_libre_si_mieux(zone: np.ndarray, orthogonal: list[tuple[float, float]], px_par_m: float) -> list[tuple[float, float]]:
+    """A3 : une pièce à angle coupé ou arrondi n'a pas un contour à angles droits. Si le contour à angles
+    droits se trompe de plus de 2 % sur la surface, on garde le contour libre (bords des pixels), s'il fait mieux."""
+    vraie = float(zone.sum())
+    if vraie <= 0 or abs(_aire_poly(orthogonal) - vraie) / vraie <= 0.02:
+        return orthogonal
+    contours, _ = cv2.findContours(zone.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    c = max(contours, key=cv2.contourArea)
+    # Seulement s'il y a un vrai bord penché (≥ LONGUEUR_MIN_LIBRE, à plus de ANGLE_MIN_LIBRE des axes) :
+    # un plan droit un peu déformé (photo) garde son contour à angles droits.
+    gros = cv2.approxPolyDP(c, max(1.5, 0.01 * cv2.arcLength(c, True)), True)[:, 0, :].astype(float)
+    penche = False
+    for k in range(len(gros)):
+        (ax, ay), (bx, by) = gros[k - 1], gros[k]
+        a = abs(math.degrees(math.atan2(by - ay, bx - ax))) % 90
+        if min(a, 90 - a) > ANGLE_MIN_LIBRE and math.hypot(bx - ax, by - ay) >= 0.6 * LONGUEUR_MIN_LIBRE * px_par_m:
+            penche = True
+    if not penche:
+        return orthogonal
+    pts = cv2.approxPolyDP(c, max(1.0, 0.004 * px_par_m), True)[:, 0, :].astype(float) + 0.5
+    if len(pts) < 3:
+        return orthogonal
+    pts = [(float(x), float(y)) for x, y in pts]
+    # décaler chaque sommet d'un demi-pixel vers l'extérieur (les points d'OpenCV sont des centres de pixels)
+    sens = 1 if sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1])) > 0 else -1
+    libre = []
+    m = len(pts)
+    for k in range(m):
+        (ax, ay), (bx, by), (cx, cy) = pts[k - 1], pts[k], pts[(k + 1) % m]
+        normales = []
+        for (px, py), (qx, qy) in (((ax, ay), (bx, by)), ((bx, by), (cx, cy))):
+            dx, dy = qx - px, qy - py
+            nx, ny = (dy, -dx) if sens > 0 else (-dy, dx)
+            norme = math.hypot(nx, ny) or 1
+            normales.append((nx / norme, ny / norme))
+        sx, sy = normales[0][0] + normales[1][0], normales[0][1] + normales[1][1]
+        cos = max(0.3, 1 + normales[0][0] * normales[1][0] + normales[0][1] * normales[1][1])
+        libre.append((bx + 0.5 * sx / cos, by + 0.5 * sy / cos))
+    if abs(_aire_poly(libre) - vraie) < abs(_aire_poly(orthogonal) - vraie):
+        return libre
+    return orthogonal
+
+
 # ---------------------------------------------------------------- 6. vers les mètres
 
 def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "atelya",
@@ -681,6 +1020,7 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
     segs = trouver_murs(bati, dehors, px_par_m)
     if not segs:
         raise ValueError("aucun mur droit trouvé dans le coloriage")
+    libres = trouver_murs_libres(bati, segs, px_par_m)
     ouvertures = trouver_ouvertures(col, bati, segs, px_par_m)
     pieces = trouver_pieces(col, bati, dehors, px_par_m, points)
 
@@ -709,6 +1049,14 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
         ids[k] = f"M{len(murs) + 1}"
         murs.append({"id": ids[k], "debut": debut, "fin": fin, "epaisseur": ep,
                      "statut": "estime", "source": "atelya"})
+    for g in libres:  # A3 : murs en biais / arrondis (un arrondi = plusieurs petits murs droits)
+        ep = round(g.epaisseur / s, 3)
+        for p, q in zip(g.points, g.points[1:]):
+            debut, fin = pt(*p), pt(*q)
+            if math.dist(debut, fin) <= 0 or ep <= 0:
+                continue
+            murs.append({"id": f"M{len(murs) + 1}", "debut": debut, "fin": fin, "epaisseur": ep,
+                         "statut": "estime", "source": "atelya"})
     longueurs = {m["id"]: math.dist(m["debut"], m["fin"]) for m in murs}
 
     sortie_ouv = []
@@ -759,6 +1107,7 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
                 "hauteur_sous_plafond": hsp, "murs": murs, "ouvertures": sortie_ouv, "pieces": sortie_pieces}
     Logement.model_validate(logement)
     details = {"version": VERSION_COLORIAGE, "angle_deg": round(angle, 3), "px_par_m": px_par_m,
-               "redresse": redressement is not None,
-               "types_pieces": types_pieces, "pieces_nom_lu": noms_lus}
+               "redresse": redressement is not None, "origine_px": [ox, oy],
+               "types_pieces": types_pieces, "pieces_nom_lu": noms_lus,
+               "murs_libres": [{"forme": g.forme, "segments": len(g.points) - 1} for g in libres]}
     return logement, details

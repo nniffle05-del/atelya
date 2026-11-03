@@ -27,7 +27,7 @@ import cv2
 import numpy as np
 
 from moteur.generateur import VERSION_GENERATEUR
-from moteur.generateur.logements import LogementGenere, Mur, Niveau, Ouverture, Piece, Rect
+from moteur.generateur.logements import LogementGenere, Mur, Niveau, Ouverture, Piece, Rect, contour_piece, surface_piece
 
 SCHEMA = "plan-synthetique/1.0"
 
@@ -61,9 +61,11 @@ def rect_du_mur(m: Mur) -> Rect:
     """
     e = m.epaisseur / 2
     rallonge = e if m.dehors else 0
+    r0 = 0 if m.coupe_debut else rallonge  # A3 : un bout qui s'arrête sur un mur en biais n'est pas rallongé
+    r1 = 0 if m.coupe_fin else rallonge
     if m.vertical:
-        return Rect(int(m.axe - e), int(m.debut - rallonge), int(m.axe + e), int(m.fin + rallonge))
-    return Rect(int(m.debut - rallonge), int(m.axe - e), int(m.fin + rallonge), int(m.axe + e))
+        return Rect(int(m.axe - e), int(m.debut - r0), int(m.axe + e), int(m.fin + r1))
+    return Rect(int(m.debut - r0), int(m.axe - e), int(m.fin + r1), int(m.axe + e))
 
 
 def rect_de_l_ouverture(o: Ouverture) -> Rect:
@@ -186,9 +188,10 @@ def decrire_niveau(log: LogementGenere, niveau: Niveau) -> dict:
         r = p.rect
         pieces.append({
             "id": p.id, "nom": p.nom, "type": p.sorte, "classe": CLASSES[p.sorte], "niveau": niveau.index,
-            "contour": _polygone(r), "cadre": [_m(r.x0), _m(r.y0), _m(r.x1), _m(r.y1)],
+            "contour": [_pt(x, y) for x, y in contour_piece(p)] if p.contour else _polygone(r),
+            "cadre": [_m(r.x0), _m(r.y0), _m(r.x1), _m(r.y1)],
             "centre": _pt((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2),
-            "surface": round(r.surface / 1e6, 2), "largeur": _m(r.largeur), "profondeur": _m(r.hauteur),
+            "surface": round(surface_piece(p) / 1e6, 2), "largeur": _m(r.largeur), "profondeur": _m(r.hauteur),
         })
     murs = []
     for m in niveau.murs:
@@ -202,6 +205,17 @@ def decrire_niveau(log: LogementGenere, niveau: Niveau) -> dict:
             "polygone": _polygone(r), "cote_exterieur": m.dehors,
             "pieces": pieces_bordees(m, niveau.pieces),
             "ouvertures": [o.id for o in niveau.ouvertures if o.mur is m],
+        })
+    for m in niveau.murs_libres:  # A3 : murs en biais / arrondis
+        murs.append({
+            "id": m.id, "niveau": niveau.index, "exterieur": True, "porteur": m.porteur,
+            "orientation": "oblique" if m.forme == "biais" else "arrondi",
+            "axe": {"debut": _pt(*m.axe[0]), "fin": _pt(*m.axe[-1])},
+            "axe_points": [_pt(x, y) for x, y in m.axe],
+            "epaisseur": _m(m.epaisseur),
+            "longueur": _m(sum(math.dist(a, b) for a, b in zip(m.axe, m.axe[1:]))), "hauteur": _m(niveau.hsp),
+            "polygone": [_pt(x, y) for x, y in m.polygone], "cote_exterieur": m.dehors,
+            "pieces": [], "ouvertures": [],
         })
     ouvertures = []
     for o in niveau.ouvertures:
@@ -218,7 +232,7 @@ def decrire_niveau(log: LogementGenere, niveau: Niveau) -> dict:
         })
     cadre = niveau.cadre
     emprise = _surface_contour(niveau.coins)
-    habitable = sum(p.rect.surface for p in niveau.pieces)
+    habitable = sum(surface_piece(p) for p in niveau.pieces)
     return {
         "index": niveau.index, "id": f"niveau_{niveau.index}", "z_sol": _m(niveau.z_sol),
         "hauteur_sous_plafond": _m(niveau.hsp),

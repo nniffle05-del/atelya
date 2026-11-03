@@ -136,7 +136,6 @@ CAS_NON_GERES = {
     "deux ouvertures qui se chevauchent": lambda d: d["ouvertures"][3].update(
         mur="M_nord", position=2.00
     ),
-    "angle qui n'est pas droit": lambda d: d["murs"][1].update(fin=[8.50, 5.50]),
     "trois murs au même point": lambda d: d["murs"].append(
         {"id": "M_trop", "debut": [-0.10, -0.10], "fin": [-1.10, -0.10], "epaisseur": 0.20,
          "statut": "ajoute", "source": "test"}
@@ -151,3 +150,20 @@ def test_cas_non_geres_refuses(nom):
     logement = Logement.model_validate(donnees)  # le fichier est valide...
     with pytest.raises(ValueError):
         calculer_briques(logement)  # ...mais la géométrie n'est pas encore gérée
+
+
+@pytest.mark.parametrize("fin_b", [(4.0, 3.0), (2.5, 3.0), (5.0, 0.5), (-1.0, 3.0), (3.0, -2.0)])
+@pytest.mark.parametrize("ep_b", [0.20, 0.35])
+def test_angle_en_biais_coupe_d_onglet(fin_b, ep_b):
+    """A3 : deux murs qui se rejoignent en biais se touchent le long d'une même arête (onglet), sans trou."""
+    from moteur.logement import Mur
+    a = Mur(id="A", debut=(0.0, 0.0), fin=(2.0, 0.0), epaisseur=0.20, statut="ajoute", source="test")
+    b = Mur(id="B", debut=(2.0, 0.0), fin=fin_b, epaisseur=ep_b, statut="ajoute", source="test")
+    from moteur.geometrie import _ajustements_aux_angles, _briques_du_mur
+    aj = _ajustements_aux_angles([a, b])
+    ba = _briques_du_mur(a, 2.5, (-aj["A"][0][0], -aj["A"][0][1]),
+                         (a.longueur + aj["A"][1][0], a.longueur + aj["A"][1][1]), [])
+    bb = _briques_du_mur(b, 2.5, (-aj["B"][0][0], -aj["B"][0][1]),
+                         (b.longueur + aj["B"][1][0], b.longueur + aj["B"][1][1]), [])
+    communs = {tuple(round(v, 5) for v in p) for p in ba[0].contour} & {tuple(round(v, 5) for v in p) for p in bb[0].contour}
+    assert len(communs) == 2  # l'arête d'onglet est partagée

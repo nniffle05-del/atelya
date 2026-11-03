@@ -38,6 +38,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
+from moteur.doutes import examiner
 from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan, sans_taches_au_bord
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique,
@@ -87,8 +88,77 @@ def _chaines(murs: list[dict]) -> list[dict]:
     return groupes
 
 
+ANGLE_DROIT_MAX = 3.0  # degrés : au-delà, un mur est « libre » (en biais ou morceau d'arrondi), noté à part (A3)
+
+
+def _est_libre(m: dict) -> bool:
+    (x1, y1), (x2, y2) = m["debut"], m["fin"]
+    a = abs(math.degrees(math.atan2(y2 - y1, x2 - x1))) % 90
+    return min(a, 90 - a) > ANGLE_DROIT_MAX
+
+
+def _groupe_libre(ident: str) -> str:
+    """Les petits segments d'un même mur arrondi (« M_arrondi1-0 », « -1 »…) forment un seul mur."""
+    return ident.rsplit("-", 1)[0] if "-" in ident else ident
+
+
+def _distance_segments(p: tuple[float, float], segs: list[dict]) -> tuple[float, float | None]:
+    """Distance du point p au plus proche des segments, et l'épaisseur de ce segment."""
+    meilleur, ep = float("inf"), None
+    for m in segs:
+        (ax, ay), (bx, by) = m["debut"], m["fin"]
+        dx, dy = bx - ax, by - ay
+        l2 = dx * dx + dy * dy or 1e-12
+        t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / l2))
+        d = math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy)
+        if d < meilleur:
+            meilleur, ep = d, m["epaisseur"]
+    return meilleur, ep
+
+
+def comparer_murs_libres(vrais: list[dict], lus: list[dict]) -> tuple[list[dict], int]:
+    """A3 : chaque mur vrai en biais ou arrondi est suivi tous les 5 cm le long de son axe ; on cherche
+    à quelle distance passe l'axe des murs libres lus. Trouvé : la moitié des points à moins de 15 cm ;
+    juste : 90 % des points à moins de AXE_JUSTE + 5 cm, épaisseur à EPAISSEUR_JUSTE près, et toute la
+    longueur couverte (bouts compris, à BOUT_JUSTE près). Les murs lus qu'aucun vrai n'explique sont en trop."""
+    groupes: dict[str, list[dict]] = {}
+    for m in vrais:
+        groupes.setdefault(_groupe_libre(m["id"]), []).append(m)
+    sortie, utiles = [], set()
+    for ident, segs in groupes.items():
+        pts = []
+        for m in segs:
+            (ax, ay), (bx, by) = m["debut"], m["fin"]
+            n = max(2, int(math.dist((ax, ay), (bx, by)) / 0.05))
+            pts += [(ax + (bx - ax) * k / n, ay + (by - ay) * k / n) for k in range(n + 1)]
+        if not lus:
+            sortie.append({"vrai": ident, "trouve": False, "libre": True})
+            continue
+        res = [_distance_segments(p, lus) for p in pts]
+        d = np.array([r[0] for r in res])
+        if np.median(d) > 0.15:
+            sortie.append({"vrai": ident, "trouve": False, "libre": True})
+            continue
+        for k, m in enumerate(lus):
+            if any(_distance_segments(q, segs)[0] <= 0.15 for q in (m["debut"], m["fin"])):
+                utiles.add(k)
+        ep_lu = float(np.median([r[1] for r, dd in zip(res, d) if dd <= 0.15]))
+        e = {"vrai": ident, "trouve": True, "libre": True, "axe": float(np.percentile(d, 90)),
+             "epaisseur": abs(ep_lu - segs[0]["epaisseur"]),
+             "bouts": float(max(d[0], d[-1]))}
+        e["juste"] = e["axe"] <= AXE_JUSTE + 0.05 and e["epaisseur"] <= EPAISSEUR_JUSTE and e["bouts"] <= BOUT_JUSTE
+        sortie.append(e)
+    return sortie, len(lus) - len(utiles)
+
+
 def comparer_murs(vrais: list[dict], lus: list[dict]) -> list[dict]:
-    """Chaque mur vrai est noté sur sa ligne de murs : trouvée ou non, écart d'axe, d'épaisseur, de bouts."""
+    """Chaque mur vrai est noté sur sa ligne de murs : trouvée ou non, écart d'axe, d'épaisseur, de bouts.
+    A3 : les murs en biais ou arrondis sont notés à part (comparer_murs_libres) ; sans eux, rien ne change."""
+    lv, ll = [m for m in vrais if _est_libre(m)], [m for m in lus if _est_libre(m)]
+    if lv or ll:
+        droits, trop = comparer_murs([m for m in vrais if not _est_libre(m)], [m for m in lus if not _est_libre(m)])
+        libres, trop_l = comparer_murs_libres(lv, ll)
+        return droits + libres, trop + trop_l
     cv, cl = _chaines(vrais), _chaines(lus)
     candidats = []
     for i, v in enumerate(cv):
@@ -286,7 +356,7 @@ def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement
 
 def noter_niveau(args) -> dict:
     exemple, niveau_nom, fichier_coloriage, *options = args
-    redresser, proportions, noms_opt, echelle_opt = (list(options) + [None, None])[:4] if options else (True, "cotes", None, None)
+    redresser, proportions, noms_opt, echelle_opt, doutes_opt = (list(options) + [None, None, None])[:5] if options else (True, "cotes", None, None, None)
     exemple, niveau = Path(exemple), Path(exemple) / niveau_nom
     idx = int(niveau_nom.split("_")[1])
     ann = json.loads((niveau / "annotations.json").read_text(encoding="utf-8"))
@@ -376,12 +446,128 @@ def noter_niveau(args) -> dict:
                                      hauteur_sous_plafond=vrai["hauteur_sous_plafond"], redressement=R, noms=noms)
     except Exception as e:  # noqa: BLE001 — un plan raté est noté comme tel
         resultat["erreur"] = f"{type(e).__name__}: {str(e)[:200]}"
+        if doutes_opt:
+            resultat["doutes"] = examiner(None, erreur=resultat["erreur"])
         return resultat
     resultat["angle_lu"] = details["angle_deg"]
     resultat.update(comparer(vrai, lu, types_vrais, details["types_pieces"]))
+    if doutes_opt:
+        carte = None
+        if fichier_coloriage:
+            f = Path(fichier_coloriage).with_name(Path(fichier_coloriage).stem + "-doute.png")
+            if f.exists():
+                carte = np.array(Image.open(f), np.uint8)
+        autres = []
+        if resultat.get("echelle_a_verifier"):
+            autres.append({"code": "echelle", "element": None, "raison": "échelle illisible", "gravite": "fort"})
+        if resultat.get("coloriage_douteux"):
+            autres.append({"code": "coloriage_douteux", "element": None, "raison": "coloriage collé au bord de l'image",
+                           "gravite": "faible"})
+        resultat["doutes"] = examiner(lu, details, carte=carte, redressement=R, autres=autres)
+        resultat["erreurs_zones"] = zones_des_erreurs(vrai, resultat)
     resultat["pieces_nom_lu"] = len(details["pieces_nom_lu"])
     resultat["logement"] = lu
     return resultat
+
+
+# ---------------------------------------------------------------- doutes (étape A1)
+
+MUR_GRAVE_BOUTS, MUR_GRAVE_AXE = 0.30, 0.10  # m : au-delà, l'erreur se voit sur la maquette
+OUVERTURE_GRAVE_LARGEUR = 0.20
+
+
+def _boite_mur(m: dict) -> list[float]:
+    e = m["epaisseur"] / 2
+    (x1, y1), (x2, y2) = m["debut"], m["fin"]
+    return [min(x1, x2) - e, min(y1, y2) - e, max(x1, x2) + e, max(y1, y2) + e]
+
+
+def _boite_mur_vrai(mv: dict, ident: str) -> list[float]:
+    """Boîte d'un mur vrai ; un mur arrondi (« M_arrondi1 ») est fait de morceaux « M_arrondi1-k »."""
+    if ident in mv:
+        return _boite_mur(mv[ident])
+    boites = [_boite_mur(m) for k, m in mv.items() if k.startswith(ident + "-")]
+    if not boites:
+        return [0.0, 0.0, 0.0, 0.0]
+    return [min(b[0] for b in boites), min(b[1] for b in boites), max(b[2] for b in boites), max(b[3] for b in boites)]
+
+
+def zones_des_erreurs(vrai: dict, r: dict) -> list[dict]:
+    """Où sont les vraies erreurs de lecture (repère du logement vrai, en m), et si elles sont graves."""
+    mv = {m["id"]: m for m in vrai["murs"]}
+    zones = []
+    for m in r["murs"]:
+        if m.get("juste"):
+            continue
+        grave = not m["trouve"] or m["bouts"] > MUR_GRAVE_BOUTS or m["axe"] > MUR_GRAVE_AXE
+        zones.append({"quoi": "mur", "id": m["vrai"], "grave": grave, "zone": _boite_mur_vrai(mv, m["vrai"])})
+    for o in r["ouvertures"]:
+        if o.get("juste"):
+            continue
+        ov = next(x for x in vrai["ouvertures"] if x["id"] == o["vrai"])
+        cx, cy = _centre_ouverture(ov, mv)
+        d = ov["largeur"] / 2 + 0.1
+        grave = not o["trouve"] or not o["bon_type"] or o["largeur"] > OUVERTURE_GRAVE_LARGEUR
+        zones.append({"quoi": "ouverture", "id": o["vrai"], "grave": grave, "zone": [cx - d, cy - d, cx + d, cy + d]})
+    for p in r["pieces"]:
+        if p.get("trouve") and p.get("bon_type"):
+            continue
+        pv = next(x for x in vrai["pieces"] if x["id"] == p["vrai"])
+        xs, ys = [q[0] for q in pv["contour"]], [q[1] for q in pv["contour"]]
+        zones.append({"quoi": "piece", "id": p["vrai"], "grave": True, "zone": [min(xs), min(ys), max(xs), max(ys)]})
+    return zones
+
+
+def _touche(a: list[float], b: list[float], marge: float = 0.2) -> bool:
+    return a[0] - marge <= b[2] and b[0] - marge <= a[2] and a[1] - marge <= b[3] and b[1] - marge <= a[3]
+
+
+def bilan_doutes(resultats: list[dict]) -> dict:
+    """Les doutes attrapent-ils les erreurs ? Plan par plan et erreur par erreur."""
+    rs = [r for r in resultats if "doutes" in r]
+
+    def echelle_fausse(r):
+        e = r.get("echelle_lue")
+        if not e or r.get("echelle_a_verifier"):
+            return False
+        return any(e[k] is not None and abs(e[k]) > 3 for k in ("ecart_largeur_pct", "ecart_hauteur_pct"))
+
+    def erreur(r, grave):
+        if "erreur" in r or echelle_fausse(r):
+            return True
+        if r["murs_en_trop"] or r["ouvertures_en_trop"]:
+            return True
+        return any(z["grave"] or not grave for z in r.get("erreurs_zones", []))
+
+    sortie = {"niveaux": len(rs)}
+    dec = [r["doutes"]["decision"] for r in rs]
+    sortie["decisions"] = {k: dec.count(k) for k in ("lu", "a_verifier", "refuse")}
+    for nom, grave in (("graves", True), ("toutes", False)):
+        avec = [r for r in rs if erreur(r, grave)]
+        sans = [r for r in rs if not erreur(r, grave)]
+        silencieuses = [r for r in avec if r["doutes"]["decision"] == "lu"]
+        fausses = [r for r in sans if r["doutes"]["decision"] != "lu"]
+        sortie[nom] = {"plans_avec_erreur": len(avec), "erreurs_silencieuses": len(silencieuses),
+                       "attrapees_pct": round(100 * (1 - len(silencieuses) / len(avec)), 1) if avec else None,
+                       "plans_justes": len(sans), "justes_envoyes_en_verification": len(fausses),
+                       "fausses_alertes_pct": round(100 * len(fausses) / len(sans), 1) if sans else None,
+                       "silencieuses_exemples": [f"{r['plan']}-N{r['niveau']}" for r in silencieuses[:30]]}
+    # Erreur par erreur : un doute fort posé dessus (zone qui la touche) ?
+    tot = vues = 0
+    for r in rs:
+        fortes = [d for d in r["doutes"]["doutes"] if d["gravite"] == "fort"]
+        for z in r.get("erreurs_zones", []):
+            if not z["grave"]:
+                continue
+            tot += 1
+            vues += any("zone_m" not in d or _touche(d["zone_m"], z["zone"]) for d in fortes)
+    sortie["erreurs_graves_localisees"] = {"nombre": tot, "avec_doute_dessus_pct": round(100 * vues / tot, 1) if tot else None}
+    codes: dict[str, int] = {}
+    for r in rs:
+        for c in {d["code"] for d in r["doutes"]["doutes"] if d["gravite"] == "fort"}:
+            codes[c] = codes.get(c, 0) + 1
+    sortie["plans_par_code"] = dict(sorted(codes.items(), key=lambda kv: -kv[1]))
+    return sortie
 
 
 # ---------------------------------------------------------------- bilan
@@ -422,7 +608,11 @@ def bilan(resultats: list[dict]) -> dict:
                  "ecart_axe_cm_moyen": moy_cm([m["axe"] for m in mt]), "ecart_axe_cm_median": med_cm([m["axe"] for m in mt]),
                  "ecart_epaisseur_cm_moyen": moy_cm([m["epaisseur"] for m in mt]),
                  "ecart_bouts_cm_moyen": moy_cm([m["bouts"] for m in mt]), "ecart_bouts_cm_median": med_cm([m["bouts"] for m in mt]),
-                 "en_trop": sum(r["murs_en_trop"] for r in ok)},
+                 "en_trop": sum(r["murs_en_trop"] for r in ok),
+                 # A3 : les murs en biais / arrondis seuls (absent s'il n'y en a aucun)
+                 **({"libres": {"nombre": len(ml), "trouves_pct": pct(sum(m["trouve"] for m in ml), len(ml)),
+                                "justes_pct": pct(sum(m.get("juste", False) for m in ml), len(ml))}}
+                    if (ml := [m for m in murs if m.get("libre")]) else {})},
         "ouvertures": {"nombre": len(ouv), "trouvees_pct": pct(len(ot), len(ouv)), "justes_pct": pct(sum(o["juste"] for o in ot), len(ouv)),
                        "bon_type_pct": pct(sum(o["bon_type"] for o in ot), len(ot)),
                        "ecart_largeur_cm_moyen": moy_cm([o["largeur"] for o in ot]),
@@ -507,6 +697,9 @@ def main() -> None:
     ap.add_argument("--images", type=Path, help="dossier « exemples » des dessins, s'ils ne sont pas dans le jeu")
     ap.add_argument("--echelle", choices=("exacte", "lue"), default="exacte",
                     help="échelle donnée au traducteur : l'exacte (vérité du jeu) ou celle lue sur les cotes du dessin")
+    ap.add_argument("--doutes", action="store_true",
+                    help="étape A1 : examiner chaque lecture (moteur.doutes) et mesurer si les doutes attrapent les erreurs ; "
+                         "carte des doutes lue à côté du coloriage (<niveau>-doute.png) si elle existe")
     a = ap.parse_args()
     noms_opt = None
     if a.noms:
@@ -518,7 +711,7 @@ def main() -> None:
         cache = a.sortie / "echelles-lues"
         cache.mkdir(parents=True, exist_ok=True)
         echelle_opt = (str(a.images) if a.images else None, str(cache))
-    taches = [(*t, not a.sans_redressement, a.proportions, noms_opt, echelle_opt) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
+    taches = [(*t, not a.sans_redressement, a.proportions, noms_opt, echelle_opt, a.doutes) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
     t0 = time.time()
     with ProcessPoolExecutor(a.processus) as ex:
         resultats = list(ex.map(noter_niveau, taches, chunksize=8))
@@ -533,6 +726,8 @@ def main() -> None:
         b["plans_echelle_lue"] = bilan(lus)
         b["plans_echelle_lue_a_plat"] = bilan([r for r in lus if r["perspective"] == 0])
         b["plans_echelle_lue_de_biais"] = bilan([r for r in lus if r["perspective"] > 0])
+    if a.doutes:
+        b["doutes"] = bilan_doutes(resultats)
     b["source"] = "atelya" if a.coloriages else "parfait"
     b["duree_s"] = round(time.time() - t0, 1)
     (a.sortie / "bilan.json").write_text(json.dumps(b, ensure_ascii=False, indent=1, default=_en_json), encoding="utf-8")

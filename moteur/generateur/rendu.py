@@ -34,7 +34,7 @@ from PIL import Image, ImageDraw
 
 from moteur.dessin_plan import _police
 from moteur.generateur.annotations import CLASSES, rect_de_l_ouverture, rect_du_mur, rasteriser
-from moteur.generateur.logements import LogementGenere, Niveau, Ouverture, Piece, Rect
+from moteur.generateur.logements import LogementGenere, MurLibre, Niveau, Ouverture, Piece, Rect, contour_piece, surface_piece
 from moteur.generateur.mobilier import Meuble, meubler_niveau
 from moteur.generateur.photo import plis_a_plat
 from moteur.generateur import variete as V
@@ -193,6 +193,8 @@ class _Dessin:
         self.ids_elements = {m.id: i + 1 for i, m in enumerate(niveau.murs)}
         n = len(niveau.murs)
         self.ids_elements.update({o.id: n + i + 1 for i, o in enumerate(niveau.ouvertures)})
+        n += len(niveau.ouvertures)  # A3 : les murs en biais / arrondis viennent après (les anciens numéros ne bougent pas)
+        self.ids_elements.update({m.id: n + i + 1 for i, m in enumerate(niveau.murs_libres)})
 
     # ---- outils ----
 
@@ -228,8 +230,7 @@ class _Dessin:
     def pieces(self) -> None:
         palette = PALETTES[self.style.palette]
         for p in self.niv.pieces:
-            r = p.rect
-            contour = [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
+            contour = contour_piece(p)
             if self.style.pieces_colorees:
                 self.d.polygon(self.poly_px(contour), fill=palette.get(p.sorte, (240, 240, 240)))
             v = self.style.variete
@@ -299,6 +300,8 @@ class _Dessin:
             self.remplir_masque(self.semantique, contour, CLASSES["mur"])
             self.remplir_masque(self.elements, contour, self.ids_elements[m.id])
             self.remplir_masque(self.hauteur, contour, min(self.niv.hsp, 65535))
+        for m in self.niv.murs_libres:
+            self.mur_libre(m)
         for o in self.niv.ouvertures:
             r = rect_de_l_ouverture(o)
             contour = [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
@@ -310,6 +313,25 @@ class _Dessin:
             self.contour_des_murs()
         for o in self.niv.ouvertures:
             self.ouverture(o)
+
+    def mur_libre(self, m: MurLibre) -> None:
+        """A3 : un mur en biais ou arrondi, dessiné comme les autres murs du style (plein, trait, double, hachure)."""
+        st, v = self.style, self.style.variete
+        pts = self.poly_px(m.polygone)
+        genre = v.murs if v is not None else "plein"
+        if genre == "trait":
+            ep_px = max(1, m.epaisseur * self.rep.s)
+            self.d.line(self.poly_px(m.axe), fill=st.murs, width=max(1, round(ep_px * v.epaisseur_trait_mur)))
+        elif genre == "double":
+            ep_px = max(1, m.epaisseur * self.rep.s)
+            self.d.polygon(pts, outline=st.murs, width=max(1, round(min(3, ep_px * v.epaisseur_trait_mur))))
+        elif genre == "hachure":
+            V.mur(self, m, m.polygone, v)
+        else:
+            self.d.polygon(pts, fill=st.murs)
+        self.remplir_masque(self.semantique, m.polygone, CLASSES["mur"])
+        self.remplir_masque(self.elements, m.polygone, self.ids_elements[m.id])
+        self.remplir_masque(self.hauteur, m.polygone, min(self.niv.hsp, 65535))
 
     def contour_des_murs(self) -> None:
         """Le trait qui cerne les murs (style agence) : le bord de l'union des murs, trous des ouvertures compris."""
@@ -391,7 +413,7 @@ class _Dessin:
             cx, cy = self.px((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2)
             place = r.largeur * self.rep.s * 0.9
             nom = p.nom.upper() if v is not None and v.majuscules else p.nom
-            surface = f"{_fr(r.surface / 1e6)} m²"
+            surface = f"{_fr(surface_piece(p) / 1e6)} m²"
             if v is not None and v.parentheses:
                 surface = f"({surface})"
             t = taille
@@ -581,13 +603,20 @@ def _annotations_pixels(log: LogementGenere, niveau: Niveau, rep: Repere, d: _De
     H_m[:, 0] *= 1000
     H_m[:, 1] *= 1000
     pieces = []
+    def poly_pts(contour) -> list[list[float]]:
+        return [[round(u, 2), round(v, 2)] for u, v in (rep.final(x, y) for x, y in contour)]
+
     for p in niveau.pieces:
-        pts = poly(p.rect)
+        pts = poly_pts(p.contour) if p.contour else poly(p.rect)
         pieces.append({"id": p.id, "valeur_masque": d.ids_pieces[p.id], "classe": CLASSES[p.sorte],
                        "polygone_px": pts, "boite_px": boite(pts)})
     murs = []
     for m in niveau.murs:
         pts = poly(rect_du_mur(m))
+        murs.append({"id": m.id, "valeur_masque": d.ids_elements[m.id], "classe": CLASSES["mur"],
+                     "polygone_px": pts, "boite_px": boite(pts)})
+    for m in niveau.murs_libres:
+        pts = poly_pts(m.polygone)
         murs.append({"id": m.id, "valeur_masque": d.ids_elements[m.id], "classe": CLASSES["mur"],
                      "polygone_px": pts, "boite_px": boite(pts)})
     ouvertures = []

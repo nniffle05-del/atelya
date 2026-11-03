@@ -29,6 +29,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 
+from moteur.generateur.logements import contour_piece
+
 SOLS = ("carrelage", "parquet", "hachures", "points", "damier")
 MURS = ("plein", "trait", "double", "gris_clair", "hachure", "couleur")
 FILIGRANES = ("monsite-annonces", "IMMO-PLUS", "agence du centre", "leplan.fr", "VISITE 3D", "PLAN NON CONTRACTUEL")
@@ -118,8 +120,7 @@ def appliquer_couleurs(style, v: Variete, rng: random.Random) -> None:
 
 def sol(d, piece, motif: str, v: Variete) -> None:
     """Le motif du sol, à l'intérieur de la pièce seulement (le mur le recouvre ensuite)."""
-    r = piece.rect
-    pts = d.poly_px([(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)])
+    pts = d.poly_px(contour_piece(piece))
     xs, ys = [p[0] for p in pts], [p[1] for p in pts]
     x0, y0, x1, y1 = int(min(xs)), int(min(ys)), int(max(xs)) + 1, int(max(ys)) + 1
     w, h = x1 - x0, y1 - y0
