@@ -116,6 +116,26 @@ Produit par le moteur (côté Atelya) pour chaque plan à vérifier.
   À garder : ces logements corrigés pourront plus tard servir à réentraîner Atelya
   (avec l'accord des clients, à prévoir dans les conditions d'utilisation).
 
+## 6. Le plan 2D propre à livrer au client (PDF)
+
+Une fois le plan validé, le moteur dessine la page à livrer : marque Atelya, titre, adresse, date,
+plan à l'échelle (1/50, 1/75, 1/100…), nom, surface et dimensions de chaque pièce, surface habitable
+indicative, barre d'échelle, et la mention « surfaces indicatives, pas un mesurage Carrez ».
+
+```bash
+python -m moteur.plan_propre resultat.json --sortie plan.pdf \
+       --titre "Appartement T3" --adresse "12 rue des Lilas|75011 Paris"
+```
+
+- `resultat.json` = le `resultat-verification/0.1` renvoyé par l'écran (§ 5), tel quel.
+- Le site peut aussi y glisser un objet `infos` facultatif, repris sur la page :
+  `{"titre": "...", "adresse": "ligne 1\nligne 2", "reference": "...", "nord_deg": 20}`.
+  L'adresse vient de la commande du client (Atelya ne peut pas la deviner). `nord_deg` (angle du nord
+  depuis le haut de la page, sens horaire) n'est à donner que si on le connaît : sans lui, pas de flèche.
+- Garde-fou : un logement qui n'est pas passé par « Valider » sort avec « BROUILLON, NON VÉRIFIÉ »
+  en travers de la page.
+- Sorties : `plan.pdf` (A4 ou A3, 300 points par pouce) et `plan.png` (aperçu).
+
 ## Ce qui reste à faire côté moteur
 
 Le moteur ne produit pas encore `verification.json` à partir d'une vraie lecture d'Atelya
