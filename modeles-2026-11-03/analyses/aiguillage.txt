@@ -1,0 +1,39 @@
+Aiguillage : e7 si le logement lu sur le coloriage e7 a au moins un mur libre (id avec « - » ou mur en biais), sinon e5.
+Notation : code-a3b (0.4.1), fonctions bilan / bilan_echelle / bilan_doutes du banc.
+
+== apres : 1066 plans communs (e5 seul 0, e7 seul 0) ; aiguillés vers e7 : 11 (1.0 %)
+lecture                    plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   decisions
+e5 (v041)                  1066   90.7  1078   92.0   99.0   97.3    0 119/380 fa8.3  lu748/av318/r0
+e7 (v041)                  1066   87.1   901   91.9   99.0   97.3    0 154/378 fa10.9  lu767/av298/r1
+aiguillage                 1066   90.5  1211   91.8   99.0   97.3    0 121/381 fa8.3  lu749/av317/r0
+
+== psc : 342 plans communs (e5 seul 0, e7 seul 0) ; aiguillés vers e7 : 4 (1.2 %)
+lecture                    plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   decisions
+e5 (v041)                   342   75.9   163   85.9   94.5   90.4    0 40/177 fa46.7  lu128/av213/r1
+e7 (v041)                   342   69.4   224   87.0   94.5   90.2    1 41/195 fa49.0  lu116/av226/r0
+aiguillage                  342   75.5   204   85.7   94.6   90.3    0 40/180 fa46.9  lu126/av215/r1
+
+== reel-cotes : 343 plans communs (e5 seul 0, e7 seul 0) ; aiguillés vers e7 : 6 (1.7 %)
+lecture                    plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   decisions
+e5 (v041)                   343   78.2   236   85.1   95.3   91.3    0 43/201 fa23.9  lu151/av191/r1
+e7 (v041)                   343   71.7   285   84.4   94.8   91.2    4 52/203 fa23.6  lu159/av184/r0
+aiguillage                  343   77.7   287   85.0   95.3   91.2    0 43/203 fa24.3  lu149/av193/r1
+
+== reel-sc : 342 plans communs (e5 seul 0, e7 seul 0) ; aiguillés vers e7 : 5 (1.5 %)
+lecture                    plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   decisions
+e5 (v041)                   342   71.6   272   81.2   93.9   88.9    0 27/223 fa59.7  lu75/av267/r0
+e7 (v041)                   342   69.2   254   84.3   94.8   89.8    2 36/228 fa59.6  lu82/av260/r0
+aiguillage                  342   71.3   315   81.2   93.9   89.0    0 26/225 fa59.0  lu74/av268/r0
+
+== biais : 384 plans communs (e5 seul 0, e7 seul 0) ; aiguillés vers e7 : 223 (58.1 %)
+lecture                    plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   decisions
+e5 (v041)                   384   68.7  1588   84.0   88.3   87.0    3 70/290 fa16.0  lu149/av218/r17
+e7 (v041)                   384   75.4   935   89.8   97.5   96.1    3 66/201 fa30.6  lu193/av190/r1
+aiguillage                  384   75.4  1093   88.6   96.3   94.8    3 57/203 fa30.9  lu182/av200/r2
+
+== biais-photos : 199 plans communs (e5 seul 0, e7 seul 0) ; aiguillés vers e7 : 113 (56.8 %)
+lecture                    plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   decisions
+e5 (v041)                   199   52.1   788   71.5   77.3   72.1    0 22/178 fa42.9  lu34/av156/r9
+e7 (v041)                   199   57.9   664   78.6   85.2   81.2    2 19/145 fa55.6  lu43/av149/r7
+aiguillage                  199   60.2   724   78.6   85.4   81.1    0 21/150 fa55.1  lu43/av149/r7
+

@@ -1,0 +1,201 @@
+Plans devenus silencieux (A = banc-a1-X-e5 code-a1 ; V5 = banc-v041-X-e5 code-a3b ; mêmes coloriages e5)
+
+== apres : 16 devenus silencieux ; 10 silencieux en A rattrapés en V5 ; 0 plans dont le fait « erreur grave » change entre A et V5
+
+  000167-N0  A=a_verifier  erreur V5 : zones_graves=2
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.11 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+  000626-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.18 m²) »
+  000783-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.29 m²) »
+  001305-N0  A=a_verifier  erreur V5 : murs_en_trop=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  002519-N1  A=a_verifier  erreur V5 : murs_en_trop=1, zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  003003-N0  A=a_verifier  erreur V5 : zones_graves=4
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.22 m²) »
+  003271-N0  A=a_verifier  erreur V5 : zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  003385-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  003738-N0  A=a_verifier  erreur V5 : murs_en_trop=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.13 m²) »
+  003993-N0  A=a_verifier  erreur V5 : murs_en_trop=3, zones_graves=3
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.10 m²) »
+  004452-N0  A=a_verifier  erreur V5 : murs_en_trop=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.16 m²) »
+  006385-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.09 m²) »
+  007005-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.10 m²) »
+  008888-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.17 m²) »
+  009655-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.12 m²) »
+  009688-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.31 m²) »
+
+  décompte apres : {'zone_douteuse': 16}
+
+== psc : 9 devenus silencieux ; 1 silencieux en A rattrapés en V5 ; 0 plans dont le fait « erreur grave » change entre A et V5
+
+  020020-N0  A=a_verifier  erreur V5 : zones_graves=4
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+  020088-N0  A=a_verifier  erreur V5 : murs_en_trop=11, zones_graves=24
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.14 m²) »
+  020129-N0  A=a_verifier  erreur V5 : zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.16 m²) »
+  020155-N0  A=a_verifier  erreur V5 : murs_en_trop=1, zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.18 m²) »
+  020187-N0  A=a_verifier  erreur V5 : zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.09 m²) »
+  020217-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  020237-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+  020259-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  020312-N1  A=a_verifier  erreur V5 : zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.06 m²) »
+
+  décompte psc : {'zone_douteuse': 9}
+
+== reel-cotes : 11 devenus silencieux ; 2 silencieux en A rattrapés en V5 ; 0 plans dont le fait « erreur grave » change entre A et V5
+
+  050040-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+  050060-N0  A=a_verifier  erreur V5 : zones_graves=5
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+  050062-N0  A=a_verifier  erreur V5 : murs_en_trop=1, zones_graves=4
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.09 m²) »
+  050077-N0  A=a_verifier  erreur V5 : zones_graves=3
+      forts A : {'zone_douteuse': 3}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.12 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.13 m²) »
+  050106-N1  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.19 m²) »
+  050109-N0  A=a_verifier  erreur V5 : zones_graves=2
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.21 m²) »
+  050167-N0  A=a_verifier  erreur V5 : murs_en_trop=3, zones_graves=3
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+  050238-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.06 m²) »
+  050282-N0  A=a_verifier  erreur V5 : ouv_en_trop=1, zones_graves=1
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.17 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.25 m²) »
+  050306-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.09 m²) »
+  050309-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.17 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+
+  décompte reel-cotes : {'zone_douteuse': 11}
+
+== reel-sc : 6 devenus silencieux ; 2 silencieux en A rattrapés en V5 ; 1 plans dont le fait « erreur grave » change entre A et V5
+
+  020110-N0  A=a_verifier  erreur V5 : murs_en_trop=2, zones_graves=3
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.13 m²) »
+  020178-N0  A=a_verifier  erreur V5 : zones_graves=5
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.14 m²) »
+  020217-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 1}  forts V5 : {}
+      disparus : zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.07 m²) »
+  020235-N0  A=a_verifier  erreur V5 : murs_en_trop=2, zones_graves=7
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.09 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.34 m²) »
+  020259-N0  A=a_verifier  erreur V5 : zones_graves=1
+      forts A : {'zone_douteuse': 4}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None, zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.10 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.12 m²) »
+  020301-N0  A=a_verifier  erreur V5 : murs_en_trop=1, zones_graves=1
+      forts A : {'zone_douteuse': 2}  forts V5 : {}
+      disparus : zone_douteuse:None, zone_douteuse:None
+        « Atelya hésite ici sans rien avoir lu (0.08 m²) »
+        « Atelya hésite ici sans rien avoir lu (0.11 m²) »
+
+  décompte reel-sc : {'zone_douteuse': 6}
+
+== décompte total des motifs disparus : {'zone_douteuse': 42}

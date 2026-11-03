@@ -1,0 +1,62 @@
+Variantes d'aiguillage (bancs banc-v041-X-e5 / -e7, notation code-a3b 0.4.1)
+
+== apres (1066 plans)
+lecture                        ->e7    %   murs%  trop   ouv%  pie_ty ech>3 graves sil/err fa%
+e5 seul                           0   0.0   90.7  1078   92.0   97.3    0 119/380 fa8.3
+e7 seul                        1066 100.0   87.1   901   91.9   97.3    0 154/378 fa10.9
+V0 e7 a un mur libre             11   1.0   90.5  1211   91.8   97.3    0 121/381 fa8.3
+V1 e7 et e5 ont un mur libre      4   0.4   90.6  1152   92.0   97.3    0 119/380 fa8.3
+V2 libre e7 >= 1,5 m              5   0.5   90.6  1186   91.9   97.4    0 120/380 fa8.3
+V3 V2 et e5 a un mur libre        3   0.3   90.6  1150   91.9   97.4    0 119/380 fa8.3
+V4 part libre e7 >= 10 %          1   0.1   90.7  1110   92.0   97.3    0 119/380 fa8.3
+
+== psc (342 plans)
+lecture                        ->e7    %   murs%  trop   ouv%  pie_ty ech>3 graves sil/err fa%
+e5 seul                           0   0.0   75.9   163   85.9   90.4    0 40/177 fa46.7
+e7 seul                         342 100.0   69.4   224   87.0   90.2    1 41/195 fa49.0
+V0 e7 a un mur libre              4   1.2   75.5   204   85.7   90.3    0 40/180 fa46.9
+V1 e7 et e5 ont un mur libre      0   0.0   75.9   163   85.9   90.4    0 40/177 fa46.7
+V2 libre e7 >= 1,5 m              3   0.9   75.7   200   85.9   90.3    0 40/179 fa46.6
+V3 V2 et e5 a un mur libre        0   0.0   75.9   163   85.9   90.4    0 40/177 fa46.7
+V4 part libre e7 >= 10 %          0   0.0   75.9   163   85.9   90.4    0 40/177 fa46.7
+
+== reel-cotes (343 plans)
+lecture                        ->e7    %   murs%  trop   ouv%  pie_ty ech>3 graves sil/err fa%
+e5 seul                           0   0.0   78.2   236   85.1   91.3    0 43/201 fa23.9
+e7 seul                         343 100.0   71.7   285   84.4   91.2    4 52/203 fa23.6
+V0 e7 a un mur libre              6   1.7   77.7   287   85.0   91.2    0 43/203 fa24.3
+V1 e7 et e5 ont un mur libre      1   0.3   78.2   236   85.1   91.3    0 43/201 fa23.9
+V2 libre e7 >= 1,5 m              2   0.6   78.1   248   85.1   91.3    0 43/202 fa24.1
+V3 V2 et e5 a un mur libre        1   0.3   78.2   236   85.1   91.3    0 43/201 fa23.9
+V4 part libre e7 >= 10 %          0   0.0   78.2   236   85.1   91.3    0 43/201 fa23.9
+
+== reel-sc (342 plans)
+lecture                        ->e7    %   murs%  trop   ouv%  pie_ty ech>3 graves sil/err fa%
+e5 seul                           0   0.0   71.6   272   81.2   88.9    0 27/223 fa59.7
+e7 seul                         342 100.0   69.2   254   84.3   89.8    2 36/228 fa59.6
+V0 e7 a un mur libre              5   1.5   71.3   315   81.2   89.0    0 26/225 fa59.0
+V1 e7 et e5 ont un mur libre      0   0.0   71.6   272   81.2   88.9    0 27/223 fa59.7
+V2 libre e7 >= 1,5 m              1   0.3   71.4   284   81.1   88.9    0 27/224 fa59.3
+V3 V2 et e5 a un mur libre        0   0.0   71.6   272   81.2   88.9    0 27/223 fa59.7
+V4 part libre e7 >= 10 %          0   0.0   71.6   272   81.2   88.9    0 27/223 fa59.7
+
+== biais (384 plans)
+lecture                        ->e7    %   murs%  trop   ouv%  pie_ty ech>3 graves sil/err fa%
+e5 seul                           0   0.0   68.7  1588   84.0   87.0    3 70/290 fa16.0
+e7 seul                         384 100.0   75.4   935   89.8   96.1    3 66/201 fa30.6
+V0 e7 a un mur libre            223  58.1   75.4  1093   88.6   94.8    3 57/203 fa30.9
+V1 e7 et e5 ont un mur libre    114  29.7   70.1  1191   84.7   90.0    3 78/255 fa20.9
+V2 libre e7 >= 1,5 m            169  44.0   73.8  1190   87.4   93.5    3 55/221 fa31.9
+V3 V2 et e5 a un mur libre       87  22.7   69.5  1261   84.3   89.5    3 76/264 fa21.7
+V4 part libre e7 >= 10 %         19   4.9   68.8  1530   84.2   87.6    4 69/287 fa17.5
+
+== biais-photos (199 plans)
+lecture                        ->e7    %   murs%  trop   ouv%  pie_ty ech>3 graves sil/err fa%
+e5 seul                           0   0.0   52.1   788   71.5   72.1    0 22/178 fa42.9
+e7 seul                         199 100.0   57.9   664   78.6   81.2    2 19/145 fa55.6
+V0 e7 a un mur libre            113  56.8   60.2   724   78.6   81.1    0 21/150 fa55.1
+V1 e7 et e5 ont un mur libre     54  27.1   54.6   642   73.1   74.4    0 28/169 fa50.0
+V2 libre e7 >= 1,5 m             85  42.7   59.4   734   77.5   79.7    0 21/155 fa56.8
+V3 V2 et e5 a un mur libre       45  22.6   54.3   661   72.8   74.5    0 26/169 fa50.0
+V4 part libre e7 >= 10 %         18   9.0   53.2   849   72.4   73.2    0 23/174 fa52.0
+

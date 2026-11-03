@@ -1,0 +1,43 @@
+== apres
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A  banc-a1-apres-e5               1066   90.7   794   92.0   99.0   97.4    0 113/380 fa12.1  221/510 fa11.0  lu716/av350/r0
+B  banc-ctl-apres-e5-codea3       1066   90.7  1350   92.0   99.0   97.3    0 120/381 fa8.3  232/510 fa7.2  lu748/av318/r0
+V5 banc-v041-apres-e5             1066   90.7  1078   92.0   99.0   97.3    0 119/380 fa8.3  232/510 fa7.2  lu748/av318/r0
+D  banc-a3-apres-e7               1066   87.1  1256   91.9   99.0   97.3    0 156/380 fa10.9  294/546 fa9.0  lu767/av298/r1
+V7 banc-v041-apres-e7             1066   87.1   901   91.9   99.0   97.3    0 154/378 fa10.9  294/546 fa9.0  lu767/av298/r1
+
+== psc
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A  banc-a1-psc-e5                  342   75.9   163   85.9   94.4   90.3    0 32/177 fa56.4  61/251 fa52.7  lu104/av237/r1
+B  banc-ctl-psc-e5-codea3          342   75.9   175   85.9   94.5   90.4    0 40/177 fa46.7  79/251 fa46.2  lu128/av213/r1
+V5 banc-v041-psc-e5                342   75.9   163   85.9   94.5   90.4    0 40/177 fa46.7  79/251 fa46.2  lu128/av213/r1
+D  banc-a3-psc-e7                  342   69.3   294   87.0   94.5   90.2    1 41/195 fa49.0  91/285 fa56.1  lu116/av226/r0
+V7 banc-v041-psc-e7                342   69.4   224   87.0   94.5   90.2    1 41/195 fa49.0  91/285 fa56.1  lu116/av226/r0
+
+== reel-cotes
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A  banc-a1-reel-cotes-e5           343   78.3   200   85.1   95.2   91.2    0 34/201 fa34.5  69/257 fa32.6  lu127/av215/r1
+B  banc-ctl-reel-cotes-e5-codea3   343   78.2   292   85.1   95.3   91.3    0 43/201 fa23.9  83/257 fa20.9  lu151/av191/r1
+V5 banc-v041-reel-cotes-e5         343   78.2   236   85.1   95.3   91.3    0 43/201 fa23.9  83/257 fa20.9  lu151/av191/r1
+D  banc-a3-reel-cotes-e7           343   71.7   391   84.4   94.8   91.2    4 52/203 fa23.6  107/277 fa21.2  lu159/av184/r0
+V7 banc-v041-reel-cotes-e7         343   71.7   285   84.4   94.8   91.2    4 52/203 fa23.6  107/277 fa21.2  lu159/av184/r0
+
+== reel-sc
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A  banc-a1-reel-sc-e5              342   71.6   240   81.2   93.8   88.8    0 23/224 fa60.2  42/272 fa60.0  lu70/av272/r0
+B  banc-ctl-reel-sc-e5-codea3      342   71.5   341   81.2   93.9   88.9    0 27/223 fa59.7  47/271 fa60.6  lu75/av267/r0
+V5 banc-v041-reel-sc-e5            342   71.6   272   81.2   93.9   88.9    0 27/223 fa59.7  47/271 fa60.6  lu75/av267/r0
+D  banc-a3-reel-sc-e7              342   69.2   300   84.3   94.8   89.8    2 36/227 fa60.0  66/289 fa69.8  lu82/av260/r0
+V7 banc-v041-reel-sc-e7            342   69.2   254   84.3   94.8   89.8    2 36/228 fa59.6  66/289 fa69.8  lu82/av260/r0
+
+== biais
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+   banc-a3-biais-e5                384   68.2  2098   84.0   88.3   87.0    3 67/290 fa16.0  83/313 fa11.3  lu146/av221/r17
+   banc-v041-biais-e5              384   68.7  1588   84.0   88.3   87.0    3 70/290 fa16.0  86/313 fa11.3  lu149/av218/r17
+   banc-a3-biais-e7                384   75.2  1169   89.8   97.5   96.1    3 65/204 fa30.0  124/305 fa15.2  lu191/av192/r1
+   banc-v041-biais-e7              384   75.4   935   89.8   97.5   96.1    3 66/201 fa30.6  126/305 fa15.2  lu193/av190/r1
+   banc-a3-biais-photos-e5         199   52.0   907   71.5   77.3   72.1    0 22/178 fa42.9  28/190 fa33.3  lu34/av156/r9
+   banc-v041-biais-photos-e5       199   52.1   788   71.5   77.3   72.1    0 22/178 fa42.9  28/190 fa33.3  lu34/av156/r9
+   banc-a3-biais-photos-e7         199   57.9   720   78.6   85.2   81.2    2 19/145 fa55.6  38/187 fa58.3  lu43/av149/r7
+   banc-v041-biais-photos-e7       199   57.9   664   78.6   85.2   81.2    2 19/145 fa55.6  38/187 fa58.3  lu43/av149/r7
+

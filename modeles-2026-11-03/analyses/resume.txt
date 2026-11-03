@@ -1,0 +1,58 @@
+CHAMPS bilan.json : niveaux_notes ; murs.justes_pct ; murs.en_trop ; ouvertures.justes_pct ; pieces.trouvees_pct ; pieces.bon_type_pct (pas de pieces.justes_pct) ; echelle_lue.tous.plus_de_3_pct (nombre) ; doutes.graves|toutes.{erreurs_silencieuses, plans_avec_erreur, fausses_alertes_pct} ; doutes.decisions.{lu,a_verifier,refuse}
+
+== apres
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A banc-a1-apres-e5               1066   90.7   794   92.0   99.0   97.4    0 113/380 fa12.1  221/510 fa11.0  lu716/av350/r0
+B banc-ctl-apres-e5-codea3       1066   90.7  1350   92.0   99.0   97.3    0 120/381 fa8.3  232/510 fa7.2  lu748/av318/r0
+C banc-ctl-apres-e7-codea1       1066   87.1   740   91.9   99.0   97.3    0 156/377 fa15.7  288/546 fa13.7  lu737/av328/r1
+D banc-a3-apres-e7               1066   87.1  1256   91.9   99.0   97.3    0 156/380 fa10.9  294/546 fa9.0  lu767/av298/r1
+E banc-a3-apres-e7d              1066   86.6  1335   91.5   98.9   97.3    0 158/390 fa11.4  292/556 fa8.8  lu757/av308/r1
+
+== psc
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A banc-a1-psc-e5                  342   75.9   163   85.9   94.4   90.3    0 32/177 fa56.4  61/251 fa52.7  lu104/av237/r1
+B banc-ctl-psc-e5-codea3          342   75.9   175   85.9   94.5   90.4    0 40/177 fa46.7  79/251 fa46.2  lu128/av213/r1
+C banc-ctl-psc-e7-codea1          342   69.4   187   87.1   94.5   90.1    1 35/194 fa52.7  82/285 fa59.6  lu105/av237/r0
+D banc-a3-psc-e7                  342   69.3   294   87.0   94.5   90.2    1 41/195 fa49.0  91/285 fa56.1  lu116/av226/r0
+E banc-a3-psc-e7d                 342   68.5   327   85.1   95.2   90.7    0 41/200 fa47.2  93/288 fa57.4  lu116/av226/r0
+
+== reel-cotes
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A banc-a1-reel-cotes-e5           343   78.3   200   85.1   95.2   91.2    0 34/201 fa34.5  69/257 fa32.6  lu127/av215/r1
+B banc-ctl-reel-cotes-e5-codea3   343   78.2   292   85.1   95.3   91.3    0 43/201 fa23.9  83/257 fa20.9  lu151/av191/r1
+C banc-ctl-reel-cotes-e7-codea1   343   71.8   224   84.4   94.7   91.2    4 48/202 fa31.2  96/277 fa25.8  lu145/av198/r0
+D banc-a3-reel-cotes-e7           343   71.7   391   84.4   94.8   91.2    4 52/203 fa23.6  107/277 fa21.2  lu159/av184/r0
+E banc-a3-reel-cotes-e7d          343   71.6   378   85.4   95.0   91.4    2 60/217 fa22.2  111/285 fa19.0  lu158/av184/r1
+
+== reel-sc
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+A banc-a1-reel-sc-e5              342   71.6   240   81.2   93.8   88.8    0 23/224 fa60.2  42/272 fa60.0  lu70/av272/r0
+B banc-ctl-reel-sc-e5-codea3      342   71.5   341   81.2   93.9   88.9    0 27/223 fa59.7  47/271 fa60.6  lu75/av267/r0
+C banc-ctl-reel-sc-e7-codea1      342   69.3   216   84.4   94.6   89.6    2 30/228 fa61.4  59/290 fa71.2  lu74/av268/r0
+D banc-a3-reel-sc-e7              342   69.2   300   84.3   94.8   89.8    2 36/227 fa60.0  66/289 fa69.8  lu82/av260/r0
+E banc-a3-reel-sc-e7d             342   67.4   294   83.1   94.6   89.5    1 40/232 fa58.2  68/293 fa63.3  lu86/av256/r0
+
+== biais
+banc                           plans murs% trop  ouv%   pie_tr pie_ty ech>3 graves sil/err fa%   toutes sil/err fa%   decisions
+  banc-a3-biais-e5                384   68.2  2098   84.0   88.3   87.0    3 67/290 fa16.0  83/313 fa11.3  lu146/av221/r17
+  banc-a3-biais-e7                384   75.2  1169   89.8   97.5   96.1    3 65/204 fa30.0  124/305 fa15.2  lu191/av192/r1
+  banc-a3-biais-e7d               384   74.6  1269   89.4   97.1   95.7    2 60/212 fa29.7  115/310 fa10.8  lu181/av200/r3
+  banc-a3-biais-photos-e5         199   52.0   907   71.5   77.3   72.1    0 22/178 fa42.9  28/190 fa33.3  lu34/av156/r9
+  banc-a3-biais-photos-e7         199   57.9   720   78.6   85.2   81.2    2 19/145 fa55.6  38/187 fa58.3  lu43/av149/r7
+  banc-a3-biais-photos-e7d        199   58.1   698   77.8   86.0   81.9    0 26/152 fa57.4  41/186 fa61.5  lu46/av146/r7
+
+== vrais plans (13) : part de pixels douteux % ; statut lu/a_verifier/refuse NON produit par cette sortie
+plan      e5 (a1)        e7       e7d
+fr-003        7.0       6.1       5.7
+fr-004        1.5       1.3       1.1
+fr-005        7.7      11.8      10.2
+fr-006        4.5       4.7       4.7
+fr-007        9.1       4.1       3.8
+fr-008       10.8      25.6      27.5
+fr-009        8.9       3.9       3.8
+fr-010       16.1      17.3      16.4
+fr-012       13.6      10.8      10.7
+fr-014        4.7       8.3       8.5
+fr-015        6.6       3.9       3.9
+fr-016        8.5       7.4       6.5
+fr-017        4.1       3.1       3.0
