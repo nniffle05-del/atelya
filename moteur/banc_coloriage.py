@@ -336,19 +336,33 @@ def textes_du_plan(dessin: Path, cache: Path | None) -> list:
     return textes
 
 
+def textes_pdf(niveau: Path) -> tuple[list, float] | None:
+    """Étape A2-6 : les textes exacts d'un plan venu d'un PDF vectoriel (moteur.generateur.plan_pdf.preparer_niveau),
+    au format de l'OCR, et les pixels par point PDF ; None si le niveau n'en a pas (image, PDF piégé ou scanné)."""
+    f = niveau / "textes-pdf.json"
+    if not f.exists():
+        return None
+    from moteur.lecture_cotes import TexteLu
+
+    d = json.loads(f.read_text(encoding="utf-8"))
+    return [TexteLu(t["texte"], np.array(t["boite"], float), 1.0) for t in d["textes"]], d["px_par_pt"]
+
+
 def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement | None, cache: Path | None,
-                    suffixe: str = "") -> dict:
+                    suffixe: str = "", pdf: bool = False) -> dict:
     """L'échelle lue sur les cotes du dessin (px par m du coloriage, en largeur et en hauteur), gardée en cache.
     `suffixe` : un coloriage nettoyé (voir sans_taches_au_bord) a son propre fichier cache."""
     f = cache / f"{niveau.parent.name}-{niveau.name}{suffixe}.json" if cache else None
     if f and f.exists():
         return json.loads(f.read_text(encoding="utf-8"))
-    e = lire_echelle_plan(np.array(Image.open(dessin).convert("L")), col, R)
+    tp = textes_pdf(niveau) if pdf else None
+    e = lire_echelle_plan(np.array(Image.open(dessin).convert("L")), col, R,
+                          textes=tp[0] if tp else None, px_par_pt=tp[1] if tp else None)
     lu = {"largeur": e.largeur, "hauteur": e.hauteur, "sure": e.sure, "cotes": len(e.cotes), "redresse": R is not None,
           "cote_max_largeur": e.cote_max_largeur, "cote_max_hauteur": e.cote_max_hauteur, "interieur_px": e.interieur_px,
           "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail,
           "surfaces": e.surfaces, "surfaces_sure": e.surfaces_sure, "surfaces_detail": e.surfaces_detail,
-          "approchee": e.approchee}
+          "approchee": e.approchee, "ecrite": e.ecrite, "ecrite_detail": e.ecrite_detail, "textes_pdf": tp is not None}
     if f:
         f.write_text(json.dumps(lu), encoding="utf-8")
     return lu
@@ -400,18 +414,22 @@ def noter_niveau(args) -> dict:
         resultat["perspective_lue"] = round(R.perspective, 4)
     lu = lx = ly = None
     if echelle_opt is not None:
-        images, cache = echelle_opt
+        images, cache, *reste = echelle_opt
+        pdf = bool(reste and reste[0])
         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
-        lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None, "-nettoye" if nettoye else "") if dessin else {"largeur": None, "hauteur": None}
+        lu = echelle_du_plan(niveau, dessin, col, R, Path(cache) if cache else None, "-nettoye" if nettoye else "",
+                             pdf) if dessin else {"largeur": None, "hauteur": None}
         douteux = coloriage_douteux(col)  # calculé ici et non gardé en cache : il ne dépend que du coloriage brut
         if douteux:
             resultat["coloriage_douteux"] = True
         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
                                  lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
                                  lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"),
-                                 douteux, lu.get("surfaces"))
+                                 douteux, lu.get("surfaces"), ecrite=lu.get("ecrite"))
         if R is None:
             lx = ly = lx or ly
+        if lu.get("textes_pdf"):
+            resultat["textes_pdf"] = True
         resultat["echelle_lue"] = {"largeur": lx, "hauteur": ly, "cotes": lu.get("cotes", 0), "source": source,
                                    "ecart_largeur_pct": round(100 * (lx / vx - 1), 3) if lx else None,
                                    "ecart_hauteur_pct": round(100 * (ly / vy - 1), 3) if ly else None}
@@ -433,11 +451,17 @@ def noter_niveau(args) -> dict:
     resultat["redresse"] = R is not None
     noms = None
     if noms_opt is not None:
-        images, cache = noms_opt
+        images, cache, *reste = noms_opt
         dessin = dessin_du_niveau(niveau, Path(images) if images else None)
+        tp = textes_pdf(niveau) if reste and reste[0] else None
         if dessin is not None:
             r = col.shape[1] / Image.open(dessin).width  # dessin d'origine → coloriage (grand côté 768 px)
-            noms = noms_depuis_textes(textes_du_plan(dessin, Path(cache) if cache else None))
+            if tp:  # textes exacts du PDF, pas d'OCR
+                from moteur.lecture_pdf import pour_les_noms
+
+                noms = noms_depuis_textes(pour_les_noms(tp[0]))
+            else:
+                noms = noms_depuis_textes(textes_du_plan(dessin, Path(cache) if cache else None))
             for n in noms:
                 n.x, n.y = (n.x + 0.5) * r - 0.5, (n.y + 0.5) * r - 0.5
         resultat["noms_lus"] = len(noms or [])
@@ -647,6 +671,7 @@ def bilan_echelle(resultats: list[dict]) -> dict:
                 "par_cote_d_ensemble": sum(r["echelle_lue"].get("source") == "cote d'ensemble" for r in rs if "echelle_lue" in r),
                 "par_barre": sum(r["echelle_lue"].get("source") == "barre" for r in rs if "echelle_lue" in r),
                 "par_surfaces": sum(r["echelle_lue"].get("source") == "surfaces" for r in rs if "echelle_lue" in r),
+                "par_echelle_ecrite": sum(r["echelle_lue"].get("source") == "échelle écrite" for r in rs if "echelle_lue" in r),
                 # Les plans « à vérifier » : combien reçoivent une échelle approchée par les portes, et à quel point.
                 "a_verifier_avec_approchee": len(approchees),
                 "approchee_a_10_pct_pres": sum(a <= 10 for a in approchees)}
@@ -697,6 +722,9 @@ def main() -> None:
     ap.add_argument("--images", type=Path, help="dossier « exemples » des dessins, s'ils ne sont pas dans le jeu")
     ap.add_argument("--echelle", choices=("exacte", "lue"), default="exacte",
                     help="échelle donnée au traducteur : l'exacte (vérité du jeu) ou celle lue sur les cotes du dessin")
+    ap.add_argument("--textes-pdf", action="store_true",
+                    help="étape A2 : sur les niveaux venus d'un PDF vectoriel (textes-pdf.json), prendre les textes exacts "
+                         "du PDF et son échelle écrite au lieu de l'OCR")
     ap.add_argument("--doutes", action="store_true",
                     help="étape A1 : examiner chaque lecture (moteur.doutes) et mesurer si les doutes attrapent les erreurs ; "
                          "carte des doutes lue à côté du coloriage (<niveau>-doute.png) si elle existe")
@@ -705,12 +733,12 @@ def main() -> None:
     if a.noms:
         cache = a.sortie / "textes-lus"
         cache.mkdir(parents=True, exist_ok=True)
-        noms_opt = (str(a.images) if a.images else None, str(cache))
+        noms_opt = (str(a.images) if a.images else None, str(cache), a.textes_pdf)
     echelle_opt = None
     if a.echelle == "lue":
         cache = a.sortie / "echelles-lues"
         cache.mkdir(parents=True, exist_ok=True)
-        echelle_opt = (str(a.images) if a.images else None, str(cache))
+        echelle_opt = (str(a.images) if a.images else None, str(cache), a.textes_pdf)
     taches = [(*t, not a.sans_redressement, a.proportions, noms_opt, echelle_opt, a.doutes) for t in lister(a.jeu, a.partie, a.coloriages, a.nombre)]
     t0 = time.time()
     with ProcessPoolExecutor(a.processus) as ex:

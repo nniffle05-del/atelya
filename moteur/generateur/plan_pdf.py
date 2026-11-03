@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 
 from moteur.ecrire_pdf import A3, A4, MM, DocumentPdf, PageVectorielle
+from moteur.images import ecrire_image
 from moteur.generateur.logements import LogementGenere, Niveau, generer, surface_piece
 from moteur.generateur.mobilier import meubler_niveau
 from moteur.generateur.rendu import Repere, _cadre_des_murs, _Dessin, _fr
@@ -148,6 +149,7 @@ def mise_en_page(largeur_px: float, hauteur_px: float, px_par_m: float) -> tuple
 class PdfFabrique:
     octets: bytes
     infos: dict
+    masque: np.ndarray | None = None  # la vérité pixel par pixel (classes), dans les pixels de l'image du générateur
 
 
 def pdf_du_niveau(log: LogementGenere, niveau: Niveau, style: Style, sorte: str = "vectorielle",
@@ -202,7 +204,7 @@ def pdf_du_niveau(log: LogementGenere, niveau: Niveau, style: Style, sorte: str 
         "cotes": st.cotes, "surfaces": st.surfaces, "barre": st.echelle_graphique,
         "ordres_non_recopies": sorted(oublis),
     }
-    return PdfFabrique(doc.octets(), infos)
+    return PdfFabrique(doc.octets(), infos, d.semantique)
 
 
 def _page_de_garde(page: PageVectorielle, log: LogementGenere, niveau: Niveau) -> None:
@@ -278,6 +280,8 @@ def fabriquer_jeu(jeu: Path, sortie: Path, ids: list[str] | None = None, partie:
                 f = pdf_du_niveau(log, niveau, style, sorte, echelle_ecrite_pour(graine, niveau.index))
                 (dn / f"plan-{sorte}.pdf").write_bytes(f.octets)
                 (dn / f"plan-{sorte}.json").write_text(json.dumps(f.infos, ensure_ascii=False, indent=1), encoding="utf-8")
+                if not (dn / "masque_semantique.png").exists():  # le même pour toutes les sortes du niveau
+                    ecrire_image(dn / "masque_semantique.png", f.masque)
                 bilan["pdf"] += 1
                 bilan["par_sorte"][sorte] = bilan["par_sorte"].get(sorte, 0) + 1
                 bilan["oublis"] |= set(f.infos["ordres_non_recopies"])
@@ -306,13 +310,135 @@ def _meme_plan(source: Path, log, niveau: Niveau, style: Style, en_logement) -> 
     return refait == vrai and memes
 
 
+# ---------------------------------------------------------------- préparer le banc (étape A2-6)
+
+
+def _matrice_affichage(rotation: int, page_pt: tuple[float, float]) -> np.ndarray:
+    """Points de la page à plat → points de la page AFFICHÉE (pdfium tourne la page de /Rotate, sens horaire)."""
+    l, h = page_pt
+    return {0: np.eye(3), 90: np.array([[0, -1, h], [1, 0, 0], [0, 0, 1]], float),
+            180: np.array([[-1, 0, l], [0, -1, h], [0, 0, 1]], float),
+            270: np.array([[0, 1, 0], [-1, 0, l], [0, 0, 1]], float)}[rotation % 360]
+
+
+def preparer_niveau(pdf: Path, jeu: Path, sortie: Path) -> dict:
+    """Lit un PDF comme le fera le produit (tri, choix de la page, image nette, textes exacts) et range le
+    résultat comme un niveau de jeu du générateur, pour que le coloriage d'Atelya et le banc le notent :
+    `sortie/exemples/<plan>-<sorte>/niveau_<n>/` avec plan.png, annotations.json (la vérité, ramenée aux
+    pixels de l'image rendue), masque_semantique.png, et textes-pdf.json si la page est vectorielle."""
+    import cv2
+
+    from moteur import lecture_pdf as L
+
+    info = json.loads(pdf.with_suffix(".json").read_text(encoding="utf-8"))
+    ident, niv = pdf.parent.parent.name, pdf.parent.name
+    sorte = info["sorte"]
+    resultat = {"plan": ident, "niveau": niv, "sorte": sorte}
+    tri = L.trier_pdf(pdf)
+    pages, doute = L.choisir_pages(tri)
+    resultat.update(page_choisie=pages, doute=doute, nature=tri[pages[0] - 1].nature if pages else None)
+    if pages != [info["page_du_plan"]]:
+        resultat["erreur"] = "mauvaise page choisie"
+        return resultat
+    page = L.lire_page(pdf, pages[0], tri[pages[0] - 1])
+    dest = sortie / "exemples" / f"{ident}-{sorte}"
+    (dest / niv).mkdir(parents=True, exist_ok=True)
+    source = jeu / "exemples" / ident
+    for f in ["geometrie.json", *[q.name for q in source.glob("logement_niveau*.json")]]:
+        (dest / f).write_bytes((source / f).read_bytes())
+    ecrire_image(dest / niv / "plan.png", page.image)
+    h, w = page.image.shape[:2]
+    # mètres → pixels de l'image rendue : (mm → points à plat) puis rotation de l'affichage puis points → pixels
+    A = _matrice_affichage(info["rotation"], info["page_pt"])
+    M = np.diag([page.px_par_pt, page.px_par_pt, 1.0]) @ A @ np.array(info["matrice_mm_vers_pt"]) @ np.diag([1000, 1000, 1.0])
+    # la vérité pixel par pixel : masque du générateur (pixels de son image) → pixels de l'image rendue
+    k, (ox, oy) = info["pt_par_px_image"], info["decalage_pt"]
+    P = np.diag([page.px_par_pt, page.px_par_pt, 1.0]) @ A @ np.array([[k, 0, ox], [0, k, oy], [0, 0, 1]])
+    from moteur.images import lire_image
+
+    masque = lire_image(pdf.parent / "masque_semantique.png", cv2.IMREAD_UNCHANGED)
+    ecrire_image(dest / niv / "masque_semantique.png",
+                 cv2.warpAffine(masque, P[:2], (w, h), flags=cv2.INTER_NEAREST, borderValue=0))
+    mur = np.argwhere(masque == 1)
+    if len(mur):
+        (y0, x0), (y1, x1) = mur.min(0), mur.max(0)
+        coins = np.c_[[[x0, y0], [x1, y0], [x1, y1], [x0, y1]], np.ones(4)] @ P.T
+        polygone = (coins[:, :2] / coins[:, 2:]).tolist()
+    else:
+        polygone = [[0, 0], [w, 0], [w, h], [0, h]]
+    px_par_m = info["pt_par_m"] * page.px_par_pt
+    annotations = {
+        "niveau": int(niv.split("_")[1]),
+        "image": {"largeur": w, "hauteur": h, "px_par_m": px_par_m, "rotation_deg": float(info["rotation"]),
+                  "perspective": 0.0, "matrice_m_vers_px": M.round(9).tolist(), "a_plat": True},
+        "murs": [{"polygone_px": polygone}],  # seulement le cadre du logement (sert au centre, si redressement)
+        "pdf": {**{c: info[c] for c in ("sorte", "echelle_vraie", "echelle_ecrite", "reduction", "rotation", "format")},
+                "page": pages[0], "nature": page.nature, "px_par_pt": page.px_par_pt},
+    }
+    (dest / niv / "annotations.json").write_text(json.dumps(annotations, ensure_ascii=False, indent=1), encoding="utf-8")
+    if page.textes is not None:
+        (dest / niv / "textes-pdf.json").write_text(json.dumps(
+            {"px_par_pt": page.px_par_pt, "textes": [{"texte": t.texte, "boite": t.boite.round(2).tolist()}
+                                                     for t in page.textes]}, ensure_ascii=False), encoding="utf-8")
+    resultat["dossier"] = f"{ident}-{sorte}"
+    return resultat
+
+
+def _preparer(args) -> dict:
+    pdf, jeu, sortie = args
+    try:
+        return preparer_niveau(Path(pdf), Path(jeu), Path(sortie))
+    except Exception as e:  # noqa: BLE001 — un PDF raté est compté comme tel
+        return {"plan": Path(pdf).parent.parent.name, "niveau": Path(pdf).parent.name, "sorte": Path(pdf).stem,
+                "erreur": f"{type(e).__name__}: {str(e)[:200]}"}
+
+
+def preparer_banc(pdfs: Path, jeu: Path, sortie: Path, processus: int = 4, nombre: int = 0) -> dict:
+    """Prépare tous les PDF de `pdfs` (fabriquer_jeu) pour le banc ; écrit repartition.json (tout en « test », et
+    les pages vectorielles seules en « vecto »)
+    et preparation.json (tri, page choisie, erreurs)."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    fichiers = sorted(pdfs.glob("exemples/*/niveau_*/plan-*.pdf"))
+    if nombre:
+        plans = sorted({f.parent.parent.name for f in fichiers})[:nombre]
+        fichiers = [f for f in fichiers if f.parent.parent.name in plans]
+    debut = time.perf_counter()
+    resultats = []
+    with ProcessPoolExecutor(processus) as ex:
+        for i, r in enumerate(ex.map(_preparer, [(str(f), str(jeu), str(sortie)) for f in fichiers], chunksize=4), 1):
+            resultats.append(r)
+            if i % 100 == 0 or i == len(fichiers):
+                ecoule = time.perf_counter() - debut
+                print(f"{i}/{len(fichiers)} PDF préparés, {ecoule / 60:.1f} min "
+                      f"(reste ~{ecoule / i * (len(fichiers) - i) / 60:.0f} min)", flush=True)
+    ids = sorted({r["dossier"] for r in resultats if "dossier" in r})
+    sortie.mkdir(parents=True, exist_ok=True)
+    # « vecto » : les seules pages vectorielles, pour noter les mêmes images avec l'OCR (banc --partie vecto)
+    vecto = sorted(i for i in ids if i.endswith("-vectorielle"))
+    (sortie / "repartition.json").write_text(json.dumps({"test": ids, "vecto": vecto}, ensure_ascii=False), encoding="utf-8")
+    bilan = {"pdf": len(fichiers), "prepares": sum("dossier" in r for r in resultats),
+             "erreurs": [r for r in resultats if "erreur" in r], "doutes": sum(bool(r.get("doute")) for r in resultats),
+             "natures": {n: sum(r.get("nature") == n for r in resultats) for n in ("vectorielle", "piegee", "scannee", "vide")},
+             "duree_min": round((time.perf_counter() - debut) / 60, 1)}
+    (sortie / "preparation.json").write_text(json.dumps({"bilan": bilan, "pdf": resultats}, ensure_ascii=False, indent=1),
+                                             encoding="utf-8")
+    return bilan
+
+
 def main(arguments: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(description="Écrire en PDF les plans d'un jeu du générateur (étape A2-5).")
+    p = argparse.ArgumentParser(description="Écrire en PDF les plans d'un jeu du générateur (étape A2-5), "
+                                            "puis les préparer pour le banc de notation (--preparer, étape A2-6).")
     p.add_argument("--jeu", type=Path, required=True, help="dossier du jeu (ex. ..\\atelya\\jeu-test-6-13)")
-    p.add_argument("--sortie", type=Path, required=True, help="dossier des PDF (chemin RELATIF sous Windows)")
+    p.add_argument("--sortie", type=Path, required=True, help="dossier de sortie (chemin RELATIF sous Windows)")
     p.add_argument("--partie", default="test")
     p.add_argument("--nombre", type=int, default=0, help="seulement les N premiers plans (0 : tous)")
+    p.add_argument("--preparer", type=Path, help="dossier des PDF déjà fabriqués : les préparer pour le banc dans --sortie")
+    p.add_argument("--processus", type=int, default=4)
     a = p.parse_args(arguments)
+    if a.preparer:
+        print(json.dumps(preparer_banc(a.preparer, a.jeu, a.sortie, a.processus, a.nombre), ensure_ascii=False, indent=1))
+        return
     ids = None
     if a.nombre:
         ids = sorted(x.name for x in (a.jeu / "exemples").iterdir() if x.is_dir())[:a.nombre]

@@ -106,3 +106,23 @@ def test_mise_en_page():
     assert P.mise_en_page(1900, 1200, 100)[:2] == (50, "A3")  # 19 × 12 m : 38 × 24 cm
     assert P.mise_en_page(2500, 1700, 100)[:2] == (100, "A4")  # 25 × 17 m : 25 × 17 cm au 1/100
     assert P.sorte_en_plus(4, 0) == P.sorte_en_plus(4, 0) and P.sorte_en_plus(4, 0) in P.SORTES_EN_PLUS
+
+
+def test_piege_realiste_lettres_affichees_mais_illisibles(dossier):
+    """Un vrai PDF piégé : les lettres s'affichent normalement (police dans le fichier), mais un lecteur de PDF ne
+    peut pas dire lesquelles (il voit « (cid:54) ») ; c'est l'OCR qui les lira sur l'image."""
+    import pdfplumber
+
+    from moteur.ecrire_pdf import DocumentPdf, police_piege
+
+    if police_piege() is None:
+        pytest.skip("police Liberation Sans absente")
+    doc = DocumentPdf()
+    p = doc.page()
+    p.texte_ancre(100, 100, "Chambre 12,50 m²", 20, 0.0, lisible=False)
+    chemin = doc.enregistrer(dossier / "piege.pdf")
+    with pdfplumber.open(chemin) as pdf:
+        assert all(c["text"].startswith("(cid:") for c in pdf.pages[0].chars if c["text"].strip())
+    image, k = L.rendre_page(chemin, 1, dpi=150)
+    zone = image[round(85 * k):round(105 * k), round(95 * k):round(260 * k)]
+    assert (zone.min(axis=2) < 100).mean() > 0.05  # de l'encre à l'endroit du texte : les lettres sont dessinées

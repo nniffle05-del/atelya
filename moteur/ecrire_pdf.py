@@ -49,6 +49,70 @@ def _couleur(c) -> str:
     return " ".join(_nombre(v / 255) for v in c[:3])
 
 
+POLICE_PIEGE = Path(__file__).parent / "polices" / "LiberationSans-Regular.ttf"  # même largeur de lettres qu'Helvetica
+
+
+@dataclass
+class PoliceTtf:
+    """Une police TrueType lue à la main (sans bibliothèque) : ses octets, lettre → numéro de dessin (« glyphe »),
+    et la largeur de chaque glyphe (millièmes de la taille du texte)."""
+    octets: bytes
+    glyphe: dict[int, int]
+    largeur: dict[int, int]
+
+    def code(self, texte: str) -> str:
+        return "".join(f"{self.glyphe.get(ord(c), 0):04X}" for c in texte)
+
+
+def lire_ttf(chemin: Path) -> PoliceTtf:
+    import struct
+
+    o = Path(chemin).read_bytes()
+    n = struct.unpack(">H", o[4:6])[0]
+    tables = {o[12 + 16 * i:16 + 16 * i].decode("latin-1"): struct.unpack(">II", o[20 + 16 * i:28 + 16 * i])
+              for i in range(n)}
+    unites = struct.unpack(">H", o[tables["head"][0] + 18:tables["head"][0] + 20])[0]
+    n_metriques = struct.unpack(">H", o[tables["hhea"][0] + 34:tables["hhea"][0] + 36])[0]
+    h = tables["hmtx"][0]
+    largeur = {g: round(struct.unpack(">H", o[h + 4 * g:h + 4 * g + 2])[0] * 1000 / unites) for g in range(n_metriques)}
+    c = tables["cmap"][0]
+    glyphe: dict[int, int] = {}
+    for i in range(struct.unpack(">H", o[c + 2:c + 4])[0]):
+        plateforme, codage, decalage = struct.unpack(">HHI", o[c + 4 + 8 * i:c + 12 + 8 * i])
+        t = c + decalage
+        if (plateforme, codage) != (3, 1) or struct.unpack(">H", o[t:t + 2])[0] != 4:
+            continue
+        seg = struct.unpack(">H", o[t + 6:t + 8])[0] // 2
+        fins = struct.unpack(f">{seg}H", o[t + 14:t + 14 + 2 * seg])
+        debuts = struct.unpack(f">{seg}H", o[t + 16 + 2 * seg:t + 16 + 4 * seg])
+        deltas = struct.unpack(f">{seg}h", o[t + 16 + 4 * seg:t + 16 + 6 * seg])
+        p_decal = t + 16 + 6 * seg
+        decals = struct.unpack(f">{seg}H", o[p_decal:p_decal + 2 * seg])
+        for k in range(seg):
+            for u in range(debuts[k], fins[k] + 1):
+                if u == 0xFFFF:
+                    continue
+                if decals[k] == 0:
+                    g = (u + deltas[k]) & 0xFFFF
+                else:
+                    a = p_decal + 2 * k + decals[k] + 2 * (u - debuts[k])
+                    g = struct.unpack(">H", o[a:a + 2])[0]
+                    g = (g + deltas[k]) & 0xFFFF if g else 0
+                glyphe[u] = g
+        break
+    return PoliceTtf(o, glyphe, largeur)
+
+
+_POLICE: list = []
+
+
+def police_piege() -> PoliceTtf | None:
+    """La police des PDF « piégés », lue une seule fois (None si le fichier manque : ancien piège, sans dessin)."""
+    if not _POLICE:
+        _POLICE.append(lire_ttf(POLICE_PIEGE) if POLICE_PIEGE.exists() else None)
+    return _POLICE[0]
+
+
 def largeur_texte(texte: str, taille: float) -> float:
     """Largeur d'un texte en Helvetica (points), avec les largeurs que lira pdfplumber (pdfminer)."""
     try:
@@ -115,7 +179,8 @@ class PageVectorielle:
             self.ordres.append(f"BT /F1 {_nombre(taille)} Tf {position} {_texte_pdf(texte)} Tj ET")
         else:
             self.illisible = True
-            code = "".join(f"{(ord(c) % 200) + 3:04X}" for c in texte)
+            ttf = police_piege()
+            code = ttf.code(texte) if ttf else "".join(f"{(ord(c) % 200) + 3:04X}" for c in texte)
             self.ordres.append(f"BT /F2 {_nombre(taille)} Tf {position} <{code}> Tj ET")
 
     def image(self, x: float, y: float, l: float, h: float, gris: np.ndarray) -> None:
@@ -197,10 +262,28 @@ class DocumentPdf:
         catalogue = ajouter(b"")  # rempli à la fin
         racine_pages = ajouter(b"")
         police = ajouter(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
-        descendante = ajouter(b"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Arial "
-                              b"/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> >>")
-        illisible = ajouter(b"<< /Type /Font /Subtype /Type0 /BaseFont /Arial /Encoding /Identity-H "
-                            b"/DescendantFonts [%d 0 R] >>" % descendante)
+        ttf = police_piege() if any(p.illisible for p in self.pages) else None
+        if ttf:
+            # Le cas des vrais PDF « piégés » : la police est DANS le fichier (les lettres s'affichent normalement), mais
+            # sans table de correspondance (pas de ToUnicode) et sous une déclaration maison (pas « Adobe-Identity ») :
+            # un lecteur de PDF ne peut pas retrouver quelles lettres sont écrites (il voit « (cid:42) »).
+            fichier = ajouter(b"<< /Length %d /Length1 %d >>stream\n" % (len(ttf.octets), len(ttf.octets))
+                              + ttf.octets + b"\nendstream")
+            descripteur = ajouter(b"<< /Type /FontDescriptor /FontName /AAAAAA+Police /Flags 32 "
+                                  b"/FontBBox [-544 -303 1302 980] /ItalicAngle 0 /Ascent 905 /Descent -212 "
+                                  b"/CapHeight 716 /StemV 80 /FontFile2 %d 0 R >>" % fichier)
+            largeurs = " ".join(str(ttf.largeur[g]) for g in sorted(ttf.largeur)).encode()
+            descendante = ajouter(b"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /AAAAAA+Police "
+                                  b"/CIDSystemInfo << /Registry (Atelya) /Ordering (Piege) /Supplement 0 >> "
+                                  b"/FontDescriptor %d 0 R /CIDToGIDMap /Identity /DW 1000 /W [0 [" % descripteur
+                                  + largeurs + b"]] >>")
+            illisible = ajouter(b"<< /Type /Font /Subtype /Type0 /BaseFont /AAAAAA+Police /Encoding /Identity-H "
+                                b"/DescendantFonts [%d 0 R] >>" % descendante)
+        else:
+            descendante = ajouter(b"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Arial "
+                                  b"/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> >>")
+            illisible = ajouter(b"<< /Type /Font /Subtype /Type0 /BaseFont /Arial /Encoding /Identity-H "
+                                b"/DescendantFonts [%d 0 R] >>" % descendante)
         enfants = []
         for p in self.pages:
             refs_images = []
