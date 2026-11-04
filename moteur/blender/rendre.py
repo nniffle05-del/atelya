@@ -47,7 +47,8 @@ def main() -> None:
 def choisir_processeur(scene) -> str:
     """Utilise la carte graphique si Blender en trouve une (Metal sur Mac), sinon le processeur."""
     reglages = bpy.context.preferences.addons["cycles"].preferences
-    for type_ in ("METAL", "OPTIX", "CUDA", "HIP", "ONEAPI"):
+    # CUDA avant OptiX : sur le PC (pilote NVIDIA 555.97), le module OptiX de Blender 5.2 ne se charge pas et ferait tout échouer.
+    for type_ in ("METAL", "CUDA", "OPTIX", "HIP", "ONEAPI"):
         try:
             reglages.compute_device_type = type_
         except TypeError:

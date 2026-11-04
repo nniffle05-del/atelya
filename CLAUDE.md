@@ -113,6 +113,7 @@ détaillé correspondant avant d'agir.
   `code-a3`, `code-a3b` (copies du moteur posées à chaque étape), `depot-*`, `vrais-plans\`
   (`lot-2026-10-31` = les 13 plans d'examen + coloriages), `modeles-externes\` (poids DINOv2 vits14 et
   vitb14), `banc-*` (bancs et caches), `analyse-a3b\`, `en_direct.py`, scripts `.ps1`.
+- Blender 5.2.2 (04/11/2026, archive, sans droits administrateur) : `atelya\blender-5.2.2\blender.exe`, variable utilisateur BLENDER. Rendu : CUDA (OptiX échoue avec le pilote 555.97).
 - Dossiers de travail que NT peut supprimer (déjà sauvegardés) : `sauvegarde-pc-2026-11-02`,
   `modeles-a-envoyer`, `modeles-pour-github-2026-11-02`.
 - Souvent sur le **partage iPhone** (172.20.10.x) → ne voit pas le Mac. Le PC peut se mettre en **veille**
