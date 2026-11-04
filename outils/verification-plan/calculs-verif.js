@@ -667,6 +667,27 @@
 
   const pointSurMur = (m, t) => { const { d } = axes(m); return ar([m.debut[0] + d[0] * t, m.debut[1] + d[1] * t]); };
 
+  /**
+   * Une position le long d'un mur, au centimètre, retenue près d'un repère utile : le bord d'une porte ou d'une fenêtre,
+   * ou l'endroit où un autre mur arrive. Rend {t, repere}.
+   */
+  function aimanterSurMur(lg, id, t, rayon) {
+    const mur = lg.murs.find((m) => m.id === id);
+    const { l, d } = axes(mur);
+    const reperes = [];
+    for (const o of lg.ouvertures || []) if (o.mur === id) reperes.push(o.position, o.position + o.largeur);
+    for (const m of lg.murs) {
+      if (m.id === id) continue;
+      for (const b of [m.debut, m.fin]) {
+        const pr = projection(b, mur.debut, mur.fin);
+        if (pr.dist <= mur.epaisseur / 2 + m.epaisseur / 2 + PRES) reperes.push((b[0] - mur.debut[0]) * d[0] + (b[1] - mur.debut[1]) * d[1]);
+      }
+    }
+    let meilleur = null, dist = rayon;
+    for (const r of reperes) if (r > 0 && r < l && Math.abs(r - t) < dist) { dist = Math.abs(r - t); meilleur = r; }
+    return meilleur === null ? { t: arrondi(Math.max(0, Math.min(l, t)), 2), repere: false } : { t: arrondi(meilleur, 3), repere: true };
+  }
+
   /** Coupe un mur en deux à `t` mètres de son début : chaque morceau peut ensuite se retoucher ou se supprimer à part. */
   function couperMur(v0, id, t) {
     const v = copie(v0);
@@ -911,8 +932,9 @@
   }
 
   /** Tout ce que la personne doit regarder, dans l'ordre, chaque point étant expliqué en français. */
-  function pointsAVerifier(v) {
+  function pointsAVerifier(v, options = {}) {
     const lg = v.logement;
+    const enDetail = new Set(options.detail || []); // les doutes que la personne veut voir un par un
     const m = matriceDuCalage(v.calage);
     const px = (q) => versPixel(m, q);
     const murs = new Map(lg.murs.map((x) => [x.id, x]));
@@ -934,16 +956,23 @@
     const etatEchelle = (v.echelle || {}).etat;
     const doutesEchelle = doutes.filter((d) => d.code === "echelle");
     doutes = doutes.filter((d) => d.code !== "echelle");
+    const grande = [...(lg.pieces || [])].sort((a, b) => surfacePolygone(b.contour) - surfacePolygone(a.contour))[0];
+    const mesure = grande ? (() => {
+      const xs = grande.contour.map((q) => q[0]), ys = grande.contour.map((q) => q[1]);
+      return { piece: grande.id, nom: grande.nom, x: arrondi(Math.max(...xs) - Math.min(...xs)), y: arrondi(Math.max(...ys) - Math.min(...ys)) };
+    })() : null;
     if (etatEchelle === "a_verifier" && !resolus.has("echelle")) {
       points.push({ cle: "echelle", genre: "echelle", titre: "Les mesures sont à contrôler",
-        texte: "Atelya n'a pas pu lire l'échelle : les mesures sont approximatives. Cliquez sur un mur dont le plan donne la longueur, puis tapez cette longueur : tout le plan se met à la bonne taille.",
-        elements: [], doutes: doutesEchelle, zone_px: null, actions: [{ libelle: "Les mesures sont bonnes", action: { type: "regler" } }] });
-    } else if (etatEchelle !== "corrigee" && !resolus.has("controle-echelle") && (lg.pieces || []).length) {
-      const grande = [...lg.pieces].sort((a, b) => surfacePolygone(b.contour) - surfacePolygone(a.contour))[0];
-      const xs = grande.contour.map((q) => q[0]), ys = grande.contour.map((q) => q[1]);
+        texte: mesure
+          ? `Atelya n'a pas pu lire l'échelle : ses mesures sont approximatives. Il voit « ${mesure.nom} » à ${fr(mesure.x)} × ${fr(mesure.y)} m. Quelle est sa vraie taille d'après le plan ?`
+          : "Atelya n'a pas pu lire l'échelle : ses mesures sont approximatives. Cliquez sur un mur dont le plan donne la longueur, puis tapez cette longueur.",
+        elements: mesure ? [mesure.piece] : [], doutes: doutesEchelle, zone_px: null, mesure,
+        actions: [...(mesure ? [{ libelle: "Je donne la vraie mesure", action: { type: "mesurer" }, principal: true }] : []), { libelle: "Les mesures sont bonnes", action: { type: "regler" } }] });
+    } else if (etatEchelle !== "corrigee" && !resolus.has("controle-echelle") && mesure) {
       points.push({ cle: "controle-echelle", genre: "echelle", titre: "Vérifiez une mesure",
-        texte: `Atelya lit « ${grande.nom} » à ${fr(Math.max(...xs) - Math.min(...xs))} × ${fr(Math.max(...ys) - Math.min(...ys))} m. Est-ce bien ce que dit le plan ? Sinon, cliquez sur un mur dont le plan donne la longueur et tapez-la.`,
-        elements: [grande.id], doutes: doutesEchelle, zone_px: null, actions: [{ libelle: "Oui, c'est bon", action: { type: "regler" }, principal: true }] });
+        texte: `Atelya lit « ${mesure.nom} » à ${fr(mesure.x)} × ${fr(mesure.y)} m. Est-ce bien ce que dit le plan ?`,
+        elements: [mesure.piece], doutes: doutesEchelle, zone_px: null, mesure,
+        actions: [{ libelle: "Oui, c'est bon", action: { type: "regler" }, principal: true }, { libelle: "Non, je corrige", action: { type: "mesurer" } }] });
     }
 
     // 2. Les pièces coupées en morceaux.
@@ -960,17 +989,19 @@
     }
     doutes = doutes.filter((d) => !dansUnGroupe.has(d.element));
 
-    // 3. Les petites hésitations : un seul point, à la fin.
-    const legers = doutes.filter((d) => d.gravite === "faible");
-    doutes = doutes.filter((d) => d.gravite !== "faible");
+    // 3. Les petites hésitations : un seul point, à la fin (sauf si la personne a demandé à les voir une par une).
+    const legers = doutes.filter((d) => d.gravite === "faible" && !enDetail.has(d.cle));
+    doutes = doutes.filter((d) => d.gravite !== "faible" || enDetail.has(d.cle));
 
     // 4. Les doutes sur les murs et les zones : ceux qui sont au même endroit ne font qu'un point.
-    const estZone = (d) => CODES_ZONE.has(d.code) || (d.element && murs.has(d.element));
+    const estZone = (d) => !enDetail.has(d.cle) && (CODES_ZONE.has(d.code) || (d.element && murs.has(d.element)));
     const zones = doutes.filter(estZone);
     const seuls = doutes.filter((d) => !estZone(d));
     for (const d of seuls) {
       const point = pointSeul(lg, d);
       if (!point.zone_px && d.element) point.zone_px = zoneDe(d.element);
+      if (d.code === "carte" && d.element) point.texte = `Atelya n'est pas sûr de ${nomSimple(lg, d.element)}. Existe-t-il vraiment sur le plan ?`;
+      if (d.code === "epaisseur" && d.element) point.texte = `L'épaisseur de ${nomSimple(lg, d.element)} paraît inhabituelle.`;
       points.push(point);
     }
     const a = px([0, 0]), b = px([1, 0]), c = px([0, 1]);
@@ -1002,7 +1033,7 @@
         actions = [{ libelle: "C'est juste", action: { type: "regler" } }, { libelle: "Le supprimer", action: { type: "supprimer_tout" }, danger: true }];
       } else {
         texte = `Atelya n'est pas sûr de ces ${nb} morceaux, tous à cet endroit. Existent-ils vraiment sur le plan ?`;
-        actions = [{ libelle: "Tout est juste", action: { type: "regler" } }, { libelle: "Tout supprimer", action: { type: "supprimer_tout" }, danger: true }];
+        actions = [{ libelle: "Tout est juste", action: { type: "regler" } }, { libelle: "Non : les voir un par un", action: { type: "detail" } }, { libelle: "Tout supprimer", action: { type: "supprimer_tout" }, danger: true }];
       }
       return { cle: `zone|${ds.map((d) => d.cle).sort().join("+")}`, genre: "zone", titre: nb === 1 ? "Mur douteux" : nb ? "Zone douteuse" : "Zone douteuse", texte,
         elements, doutes: ds, zone_px: unirBoites(indices.map((i) => boites[i]).filter(Boolean)), actions };
@@ -1015,7 +1046,8 @@
       const boitesL = legers.map((d) => zoneDe(d.element, d)).filter(Boolean);
       points.push({ cle: "legers", genre: "legers", titre: "Petites hésitations",
         texte: `Atelya hésite un peu sur ${legers.length > 1 ? `ces ${legers.length} éléments, entourés en orange` : "cet élément, entouré en orange"}. Si cela vous paraît juste, vous pouvez passer.`,
-        elements, doutes: legers, zone_px: boitesL.length ? unirBoites(boitesL) : null, actions: [{ libelle: "Tout est juste", action: { type: "regler" }, principal: true }] });
+        elements, doutes: legers, zone_px: boitesL.length ? unirBoites(boitesL) : null,
+        actions: [{ libelle: "Tout est juste", action: { type: "regler" }, principal: true }, ...(legers.length > 1 ? [{ libelle: "Non : les voir un par un", action: { type: "detail" } }] : [])] });
     }
     return points;
   }
@@ -1219,6 +1251,7 @@
     fusionnerPieces,
     deplacerBout,
     accrocherBout,
+    aimanterSurMur,
     couperMur,
     enleverMorceau,
     relierMurs,

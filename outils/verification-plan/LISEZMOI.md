@@ -46,7 +46,10 @@ porte < 55 cm, ouverture > 3 m, surface écrite différente du contour.
 - Cliquer un élément sur le plan ouvre sa fiche (nom d'une pièce, réunion avec une autre, type et largeur d'une porte,
   vraie longueur d'un mur : ce mur seulement ou tout le plan à la bonne taille). Glisser un mur le déplace ; les murs
   et les coins de pièces qui le touchent suivent.
-- « + Ajouter » : un mur, une porte, une fenêtre, une porte-fenêtre.
+- Chaque point se règle par « oui » ou par « non » : « non » ouvre la correction précise (vraie mesure, fiche de l'élément, doutes groupés vus un par un).
+- « ✎ Outils » : couper un mur, enlever un morceau (au centimètre, à taper ou à cliquer), relier deux murs ; ajouter un mur, une porte, une fenêtre, une porte-fenêtre.
+- Fiche d'un mur : tirer les ronds à ses bouts (il s'accroche au voisin), le déplacer d'une distance exacte, épaisseur − / +.
+- « Recalculer les pièces » : chaque espace fermé par des murs devient une pièce ; une pièce non fermée reste inchangée et est signalée.
 - Annuler / Rétablir (Ctrl+Z, Ctrl+Y), Suppr pour supprimer, Échap pour arrêter un outil.
 - Un élément touché par la personne passe à confiance 1, source `…+verification`, et son id
   est rangé dans `verifies` (les doutes réglés sans élément dans `resolus`).

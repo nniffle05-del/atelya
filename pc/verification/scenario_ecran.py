@@ -104,6 +104,12 @@ window.addEventListener("load", () => setTimeout(() => {
       window.Verification.choisir(null);
       outil("couper");
       clic(sur(lg0().murs.find((m) => m.id === id), tL));
+      note("couper : position retenue, rien de coupé encore", V.trace && lg0().murs.length === nb && !c("precision").hidden);
+      const champT = c("f-t1");
+      champT.value = String(Math.round((tL + 0.03) * 100) / 100).replace(".", ",");
+      champT.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+      note("couper : position tapée au cm", Math.abs(V.trace.t[0] - (Math.round((tL + 0.03) * 100) / 100)) < 1e-6, V.trace.t[0]);
+      c("couper-ici").click();
       note("couper un mur", lg0().murs.length === nb + 1 && V.outil === "choisir", V.v && lg0().murs.length);
       note("logement cohérent après coupe", K.verifierCoherence(lg0()).length === 0, K.verifierCoherence(lg0()).slice(0, 2).join(" | "));
       c("annuler").click();
@@ -112,8 +118,10 @@ window.addEventListener("load", () => setTimeout(() => {
       if (!(lg0().ouvertures || []).some((o) => o.mur === id && tF > o.position - 0.05 && tF < o.position + o.largeur + 0.05)) {
         outil("morceau");
         clic(sur(m, tL));
-        note("début du morceau retenu", V.morceau && V.morceau.id !== undefined);
+        note("début du morceau retenu", V.trace && V.trace.t.length === 1);
         clic(sur(m, tF));
+        note("fin du morceau retenue", V.trace && V.trace.t.length === 2 && !!c("enlever-ici"));
+        c("enlever-ici").click();
         note("enlever un morceau", lg0().murs.reduce((s, x) => s + K.longueur(x.debut, x.fin), 0) < longs.reduce((s, x) => s + K.longueur(x.debut, x.fin), 0) - 0.1 && V.outil === "choisir");
         c("annuler").click();
       }
@@ -134,6 +142,44 @@ window.addEventListener("load", () => setTimeout(() => {
       note("alerte retirée après recalcul", c("alerte-pieces").hidden);
       c("annuler").click();
     } else note("aucun mur libre pour les gestes", true);
+
+    // Répondre « non » : la mesure, le mur à déplacer, les points groupés.
+    V.rangPoint = 0; window.Verification.choisir(null);
+    const pm = V.points[0];
+    if (pm.mesure) {
+      const nonMesure = bouton("Non, je corrige") || bouton("Je donne la vraie mesure");
+      nonMesure.click();
+      note("formulaire de mesure", !!c("m-x") && !!c("m-appliquer"));
+      c("m-y").value = String(Math.round(pm.mesure.y * 105) / 100).replace(".", ",");  // 5 % : assez pour ne pas passer pour une erreur d'échelle
+      c("m-appliquer").click();
+      note("un seul côté faux : conseil sur le mur", !!c("m-mur"), c("m-conseil").textContent);
+      c("m-mur").click();
+      note("déplacement proposé", V.deplacementPropose > 0 && !c("m-x"), V.deplacementPropose);
+      const unMur = lg0().murs[0];
+      window.Verification.choisir(unMur.id);
+      note("distance préremplie dans la fiche", c("f-deplace").value === String(V.deplacementPropose), c("f-deplace").value);
+      const debutAvant = unMur.debut.join();
+      document.querySelector('#fiche [data-sens]').click();
+      note("mur déplacé au cm", lg0().murs.find((m) => m.id === unMur.id).debut.join() !== debutAvant, lg0().murs.find((m) => m.id === unMur.id).debut.join());
+      c("annuler").click();
+      window.Verification.choisir(null);
+      V.rangPoint = 0; window.Verification.choisir(null);
+      (bouton("Non, je corrige") || bouton("Je donne la vraie mesure")).click();
+      c("m-x").value = String(pm.mesure.x * 1.1).replace(".", ",");
+      c("m-y").value = String(pm.mesure.y * 1.1).replace(".", ",");
+      c("m-appliquer").click();
+      note("les deux côtés faux : tout le plan corrigé", V.v.echelle.etat === "corrigee", V.v.echelle.facteur);
+      c("annuler").click();
+      V.mesure = null; window.Verification.choisir(null);
+    }
+    const groupeAvecDetail = V.points.findIndex((x) => x.actions.some((a) => a.action.type === "detail"));
+    if (groupeAvecDetail >= 0) {
+      const avantDetail = V.points.length;
+      V.rangPoint = groupeAvecDetail; window.Verification.choisir(null);
+      bouton("Non : les voir un par un").click();
+      note("voir un par un", V.points.length > avantDetail, `${avantDetail} → ${V.points.length} points`);
+      note("textes détaillés sans code interne", !V.points.some((p) => /[a-z]+_\d/.test(p.texte) || /\b[MO]\d+\b/.test(p.texte)), V.points.map((p) => p.texte).filter((t) => /\b[MO]\d+\b/.test(t)).slice(0, 1).join());
+    }
 
     let garde = 0;
     while (V.points.length && garde++ < 1000) {

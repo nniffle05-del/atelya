@@ -429,3 +429,27 @@ test("une nouvelle cloison dans une pièce : deux espaces, le second reçoit un 
   assert.equal(new Set(w.logement.pieces.map((p) => p.id)).size, 3);
   assert.deepEqual(C.verifierCoherence(w.logement), []);
 });
+
+test("couper au centimètre, avec arrêt sur le bord d'une porte et sur un mur qui arrive", () => {
+  const lg = logementCarre().logement;
+  assert.deepEqual(C.aimanterSurMur(lg, "S", 2.5271, 0.03), { t: 2.53, repere: false });
+  assert.deepEqual(C.aimanterSurMur(lg, "S", 1.81, 0.03), { t: 1.8, repere: true }); // le bord de la porte
+  assert.deepEqual(C.aimanterSurMur(lg, "S", 3.02, 0.03), { t: 3, repere: true }); // là où arrive la cloison
+});
+
+test("répondre non : le point de mesure propose de corriger, les points groupés se voient un par un", () => {
+  const pieces = [{ id: "a", nom: "Séjour", contour: rectangle(0, 0, 5, 5.58) }];
+  const [point] = C.pointsAVerifier(fichierPieces(pieces, [], { echelle: { etat: "lue" } }));
+  assert.deepEqual(point.actions.map((a) => a.action.type), ["regler", "mesurer"]);
+  assert.deepEqual(point.mesure, { piece: "a", nom: "Séjour", x: 5, y: 5.58 });
+
+  const ms = [0, 1, 2].map((i) => ({ id: `Z${i}`, debut: [10 + i * 0.5, 0], fin: [10.4 + i * 0.5, 0], epaisseur: 0.1, statut: "estime", source: "atelya" }));
+  const v = fichierPieces([], ms, { doutes: ms.map((m) => ({ element: m.id, code: "carte", gravite: "fort", raison: `mur ${m.id} : hésite` })) });
+  const groupe = C.pointsAVerifier(v);
+  assert.equal(groupe.length, 1);
+  assert.ok(groupe[0].actions.some((a) => a.action.type === "detail"));
+  const detail = C.pointsAVerifier(v, { detail: groupe[0].doutes.map((d) => d.cle) });
+  assert.equal(detail.length, 3);
+  assert.ok(detail.every((x) => x.elements.length === 1 && x.zone_px));
+  assert.ok(!/Z\d/.test(detail[0].texte), detail[0].texte);
+});

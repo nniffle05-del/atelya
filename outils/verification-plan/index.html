@@ -74,6 +74,16 @@
     #alerte-pieces p { margin: 0 0 8px; font-size: 14px; }
     #alerte-pieces .bouton, #liste-pieces .bouton { width: 100%; }
     #liste-pieces .bouton { margin-top: 8px; }
+    #mesure, #precision { margin-top: 10px; }
+    #mesure label, #precision label { display: block; margin: 8px 0 2px; color: var(--doux); font-size: 13px; }
+    #mesure input, #precision input { width: 100%; padding: 6px 8px; border: 1px solid var(--bord); border-radius: 7px; font: inherit; }
+    #mesure .bouton, #precision .bouton { width: 100%; margin-top: 8px; }
+    #m-conseil { margin: 8px 0 0; font-size: 14px; }
+    #precision { border: 1px solid var(--bord); border-radius: 10px; padding: 12px 14px; }
+    #precision h2 { font-size: 15px; margin: 0 0 4px; }
+    #precision p { margin: 0; color: var(--doux); font-size: 13px; }
+    .deux-colonnes { display: flex; gap: 6px; }
+    .deux-colonnes > * { flex: 1; }
     .reglage { display: flex; gap: 6px; align-items: center; }
     .reglage input { text-align: center; }
     .reglage .bouton { flex: none !important; width: 38px; padding: 5px 0; }
@@ -169,6 +179,8 @@
         </div>
       </section>
       <p id="message"></p>
+
+      <section id="precision" hidden></section>
 
       <section id="alerte-pieces" hidden>
         <p>Les murs ont changé : les pièces et leurs surfaces ne sont plus à jour.</p>

@@ -27,8 +27,8 @@
     porte: "Cliquez sur un mur, à l'endroit de la porte.",
     fenetre: "Cliquez sur un mur, à l'endroit de la fenêtre.",
     porte_fenetre: "Cliquez sur un mur, à l'endroit de la porte-fenêtre.",
-    couper: "Cliquez sur un mur, là où il faut le couper.",
-    morceau: "Cliquez sur un mur au début du morceau à enlever, puis à sa fin.",
+    couper: "Cliquez sur un mur, là où il faut le couper. Vous pourrez ajuster au centimètre.",
+    morceau: "Cliquez sur un mur au début du morceau à enlever, puis à sa fin. Vous pourrez ajuster au centimètre.",
     relier: "Cliquez sur le bout d'un mur, puis sur le bout de l'autre.",
   };
   const VISEE = 8; // pixels d'écran : à quelle distance un clic « touche » un élément
@@ -46,7 +46,10 @@
     outil: "choisir",
     affichage: "deux", // "plan" : le plan seul ; "lecture" : la lecture seule ; "deux" : l'une sur l'autre
     depart: null, // premier bout d'un mur en cours d'ajout (m)
-    morceau: null, // début du morceau de mur à enlever : {id, t}
+    trace: null, // ce qu'on va couper ou enlever : {id, t: [une ou deux positions en m depuis le début du mur]}
+    detail: new Set(), // les doutes que la personne a demandé à voir un par un
+    mesure: null, // la clé du point dont le formulaire de mesure est ouvert
+    deplacementPropose: null, // en cm : ce qu'il manque d'après la mesure donnée
     relier: null, // premier bout à relier : {id, bout, point}
     accroche: null, // le point où un bout de mur vient de s'accrocher (m)
     mursReference: null, // les murs quand les pièces ont été calculées pour la dernière fois
@@ -100,6 +103,9 @@
     etat.refaire = [];
     etat.choisi = null;
     etat.rangPoint = 0;
+    etat.detail = new Set();
+    etat.mesure = null;
+    etat.deplacementPropose = null;
     etat.mursReference = empreinteMurs(verification);
     $("accueil").style.display = "none";
     message("");
@@ -114,7 +120,7 @@
     etat.matrice = C.matriceDuCalage(etat.v.calage);
     etat.inverse = C.inverse(etat.matrice);
     etat.doutes = C.trouverDoutes(etat.v);
-    etat.points = C.pointsAVerifier(etat.v);
+    etat.points = C.pointsAVerifier(etat.v, { detail: etat.detail });
     etat.rangPoint = Math.min(etat.rangPoint, Math.max(0, etat.points.length - 1));
     if (etat.choisi && !trouverElement(etat.choisi)) etat.choisi = null;
   }
@@ -415,24 +421,74 @@
       if (etat.relier) rond(etat.relier.point, COULEURS.choisi, 7);
     }
     if (etat.accroche) rond(etat.accroche, "#16a34a", 8);
-    if (etat.outil === "morceau" && etat.morceau && etat.souris) {
-      const m = v.logement.murs.find((x) => x.id === etat.morceau.id);
+    dessinerTrace(v, trait);
+
+    dessinerEtiquettes(f, enCours, dpr);
+  }
+
+  const sensMur = (m) => { const l = C.longueur(m.debut, m.fin); return { l, d: [(m.fin[0] - m.debut[0]) / l, (m.fin[1] - m.debut[1]) / l] }; };
+
+  /** La position sous la souris sur le mur visé : {id, t}, ou null. */
+  function viseeSurMur(lg) {
+    if (!etat.souris) return null;
+    const m = C.murLePlusProche(lg, etat.souris, metresPour(VISEE * 2, etat.souris));
+    return m ? { id: m.id, t: C.aimanterSurMur(lg, m.id, m.le_long, metresPour(VISEE, etat.souris)).t } : null;
+  }
+
+  /** Les repères de coupe : le trait à l'endroit visé, les distances aux deux bouts, et le morceau qui va partir. */
+  function dessinerTrace(v, trait) {
+    if (etat.outil !== "couper" && etat.outil !== "morceau") return;
+    const lg = v.logement;
+    const marque = (id, t, couleur) => {
+      const m = lg.murs.find((x) => x.id === id);
+      if (!m) return;
+      const { d } = sensMur(m);
+      const n = [-d[1], d[0]], c = [m.debut[0] + d[0] * t, m.debut[1] + d[1] * t], h = Math.max(m.epaisseur, 0.15);
+      const a = px([c[0] + n[0] * h, c[1] + n[1] * h]), b = px([c[0] - n[0] * h, c[1] - n[1] * h]);
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.lineWidth = 2.5 * trait;
+      ctx.strokeStyle = couleur;
+      ctx.stroke();
+    };
+    const tr = etat.trace;
+    if (tr && tr.t.length === 2) {
+      const m = lg.murs.find((x) => x.id === tr.id);
       if (m) {
-        const l = C.longueur(m.debut, m.fin);
-        const d = [(m.fin[0] - m.debut[0]) / l, (m.fin[1] - m.debut[1]) / l];
-        const t = Math.max(0, Math.min(l, (etat.souris[0] - m.debut[0]) * d[0] + (etat.souris[1] - m.debut[1]) * d[1]));
-        const a = [m.debut[0] + d[0] * etat.morceau.t, m.debut[1] + d[1] * etat.morceau.t], b = [m.debut[0] + d[0] * t, m.debut[1] + d[1] * t];
-        const pa = px(a), pb = px(b);
+        const { d } = sensMur(m);
+        const a = px([m.debut[0] + d[0] * tr.t[0], m.debut[1] + d[1] * tr.t[0]]), b = px([m.debut[0] + d[0] * tr.t[1], m.debut[1] + d[1] * tr.t[1]]);
         ctx.beginPath();
-        ctx.moveTo(pa[0], pa[1]);
-        ctx.lineTo(pb[0], pb[1]);
-        ctx.lineWidth = 6 * trait;
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.lineWidth = 5 * trait;
         ctx.strokeStyle = "#dc2626";
         ctx.stroke();
       }
     }
-
-    dessinerEtiquettes(f, enCours, dpr);
+    if (tr) for (const t of tr.t) marque(tr.id, t, "#dc2626");
+    const vise = viseeSurMur(lg);
+    if (!vise) return;
+    marque(vise.id, vise.t, "#7c3aed");
+    const m = lg.murs.find((x) => x.id === vise.id);
+    const { l, d } = sensMur(m);
+    const c = px([m.debut[0] + d[0] * vise.t, m.debut[1] + d[1] * vise.t]);
+    const z = etat.vue.zoom, dpr = window.devicePixelRatio || 1;
+    const x = c[0] * z + etat.vue.dx, y = c[1] * z + etat.vue.dy;
+    const texte = `${formatM(vise.t)} m  |  ${formatM(l - vise.t)} m`;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    const larg = ctx.measureText(texte).width + 14;
+    ctx.fillStyle = "#1f2937";
+    ctx.beginPath();
+    const haut = y - 40 < 64 ? y + 16 : y - 40; // sous le mur s'il passerait derrière la consigne
+    ctx.roundRect(x - larg / 2, haut, larg, 24, 5);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.fillText(texte, x, haut + 17);
+    ctx.restore();
   }
 
   /** Les noms des pièces, écrits à taille fixe et sans jamais se chevaucher : ceux qui n'ont plus la place attendent un zoom. */
@@ -507,6 +563,7 @@
     $("bandeau").textContent = etat.affichage === "plan" ? "Plan tel qu'il a été déposé. Pour corriger, revenez sur « Les deux »." : "";
 
     afficherPoint();
+    afficherPrecision();
     afficherFiche();
     $("alerte-pieces").hidden = empreinteMurs(v) === etat.mursReference;
 
@@ -559,6 +616,7 @@
       nom = el("select", { "aria-label": "Nom de la pièce réunie" }, ...[...new Set([sansNumero, ...pieces.map((p) => p.nom), ...C.NOMS_PIECES])].map((x) => el("option", { value: x, texte: `Nom : ${x}` })));
       actions.append(nom);
     }
+    if (etat.mesure === point.cle && point.mesure) return afficherMesure(point);
     for (const a of point.actions) {
       actions.append(el("button", {
         class: `bouton${a.principal ? " principal" : ""}${a.danger ? " danger" : ""}`,
@@ -566,13 +624,112 @@
         onclick: () => choisirPourLePoint(point, a, nom && nom.value),
       }));
     }
-    if (point.elements.length === 1 && point.genre !== "echelle") {
-      actions.append(el("button", { class: "bouton", texte: "Modifier…", onclick: () => choisir(point.elements[0]) }));
+    if (point.elements.length === 1 && point.genre !== "echelle" && !point.actions.some((a) => a.action.type === "outil")) {
+      actions.append(el("button", { class: "bouton", texte: "Non, je corrige", onclick: () => choisir(point.elements[0]) }));
     }
+  }
+
+  /** « Non » sur une mesure : la vraie taille, puis la bonne correction : tout le plan, ou un seul mur mal placé. */
+  function afficherMesure(point) {
+    const actions = $("point-actions");
+    const { mesure } = point;
+    const champX = el("input", { type: "text", id: "m-x", value: formatM(mesure.x), inputmode: "decimal" });
+    const champY = el("input", { type: "text", id: "m-y", value: formatM(mesure.y), inputmode: "decimal" });
+    const conseil = el("div", { id: "m-conseil" });
+    const lire = () => {
+      const x = lireNombre(champX.value), y = lireNombre(champY.value);
+      return x > 0 && y > 0 ? { x, y, kx: x / mesure.x, ky: y / mesure.y } : null;
+    };
+    const toutLePlan = (k) => {
+      if (corriger((v) => C.mettreAEchelle(v, k), "Toutes les mesures du plan sont corrigées.")) {
+        etat.mesure = null;
+        rafraichir();
+      }
+    };
+    const verifier = () => {
+      conseil.innerHTML = "";
+      const m = lire();
+      if (!m) return message("Tapez deux nombres en mètres, par exemple 5,68.", true);
+      message("");
+      if (Math.abs(m.kx - 1) < 0.002 && Math.abs(m.ky - 1) < 0.002) return message("Ces mesures sont déjà celles d'Atelya : il n'y a rien à corriger.");
+      if (Math.abs(m.kx / m.ky - 1) <= 0.01) return toutLePlan((m.kx + m.ky) / 2);
+      // Un côté juste et l'autre faux : l'échelle n'y est pour rien, c'est un mur mal placé.
+      const sensFaux = Math.abs(m.ky - 1) > Math.abs(m.kx - 1) ? "y" : "x";
+      const ecartCm = Math.round(Math.abs(m[sensFaux] - mesure[sensFaux]) * 100);
+      conseil.append(el("p", { texte: `Les deux côtés ne sont pas faux de la même façon : il y a ${ecartCm} cm d'écart ${sensFaux === "y" ? "dans le sens haut-bas" : "dans le sens gauche-droite"}. C'est sans doute un seul mur mal placé.` }),
+        el("button", { class: "bouton principal", id: "m-mur", texte: "Déplacer le mur", onclick: () => {
+          etat.deplacementPropose = ecartCm;
+          etat.mesure = null;
+          const piece = etat.v.logement.pieces.find((x) => x.id === mesure.piece);
+          cadrer(rectangleDe(piece.contour.map(px)));
+          message(`Cliquez sur le mur à déplacer de ${ecartCm} cm : la fiche à droite vous laisse choisir le sens.`);
+          rafraichir();
+        } }),
+        el("button", { class: "bouton", id: "m-tout", texte: "Corriger tout le plan quand même", onclick: () => toutLePlan((m.kx + m.ky) / 2) }));
+    };
+    actions.append(el("div", { id: "mesure" },
+      el("label", { texte: `« ${mesure.nom} », d'après le plan, en mètres` }),
+      el("div", { class: "deux-colonnes" },
+        el("div", {}, el("label", { texte: "Gauche-droite" }), champX),
+        el("div", {}, el("label", { texte: "Haut-bas" }), champY)),
+      el("button", { class: "bouton principal", id: "m-appliquer", texte: "Corriger", onclick: verifier }),
+      el("button", { class: "bouton", texte: "Revenir", onclick: () => { etat.mesure = null; rafraichir(); } }),
+      conseil));
+  }
+
+  /** Couper ou enlever un morceau : la position au centimètre, à taper ou à reprendre en cliquant de nouveau sur le mur. */
+  function afficherPrecision() {
+    const sec = $("precision");
+    sec.innerHTML = "";
+    const tr = etat.trace;
+    const m = tr && etat.v.logement.murs.find((x) => x.id === tr.id);
+    sec.hidden = !m || (etat.outil !== "couper" && etat.outil !== "morceau");
+    if (sec.hidden) return;
+    const { l } = sensMur(m);
+    const a = px(m.debut), b = px(m.fin);
+    const couche = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]);
+    const nomBout = couche ? (a[0] <= b[0] ? "gauche" : "droit") : (a[1] <= b[1] ? "haut" : "bas");
+    const champ = (id, rang, texte) => {
+      const c = el("input", { type: "text", id, value: formatM(tr.t[rang]), inputmode: "decimal" });
+      const lireChamp = () => {
+        const n = lireNombre(c.value);
+        if (!(n >= 0) || n > l) return message(`Tapez une distance entre 0 et ${formatM(l)} m.`, true);
+        tr.t[rang] = n;
+        message("");
+        rafraichir();
+      };
+      c.addEventListener("keydown", (ev) => ev.key === "Enter" && lireChamp());
+      c.addEventListener("change", lireChamp);
+      return [el("label", { texte }), c];
+    };
+    if (etat.outil === "couper") {
+      sec.append(el("h2", { texte: "Couper ce mur" }), el("p", { texte: `Il mesure ${formatM(l)} m. Tapez la position, ou cliquez ailleurs sur le mur.` }),
+        ...champ("f-t1", 0, `Distance depuis le bout ${nomBout} (m)`),
+        el("button", { class: "bouton principal", id: "couper-ici", texte: "Couper ici", onclick: () => {
+          if (corriger((x) => C.couperMur(x, tr.id, tr.t[0]), "Mur coupé en deux : chaque morceau se retouche à part.")) changerOutil("choisir");
+        } }));
+      return;
+    }
+    sec.append(el("h2", { texte: "Enlever ce morceau de mur" }));
+    if (tr.t.length < 2) {
+      sec.append(el("p", { texte: "Cliquez maintenant à la fin du morceau, sur le même mur." }), ...champ("f-t1", 0, `Début, depuis le bout ${nomBout} (m)`));
+      return;
+    }
+    sec.append(el("p", { texte: `Morceau de ${formatM(Math.abs(tr.t[1] - tr.t[0]))} m, sur un mur de ${formatM(l)} m.` }),
+      ...champ("f-t1", 0, `Début, depuis le bout ${nomBout} (m)`), ...champ("f-t2", 1, `Fin, depuis le bout ${nomBout} (m)`),
+      el("button", { class: "bouton principal", id: "enlever-ici", texte: "Enlever ce morceau", onclick: () => {
+        if (corriger((x) => C.enleverMorceau(x, tr.id, tr.t[0], tr.t[1]), "Morceau de mur enlevé.")) changerOutil("choisir");
+      } }));
   }
 
   function choisirPourLePoint(point, choix, nom) {
     if (choix.action.type === "outil") return changerOutil(choix.action.outil);
+    if (choix.action.type === "mesurer") { etat.mesure = point.cle; return rafraichir(); }
+    if (choix.action.type === "detail") {
+      for (const d of point.doutes) etat.detail.add(d.cle);
+      recalculer();
+      return montrerPoint();
+    }
     const fait = { regler: "Noté.", supprimer_tout: "Supprimé.", fusionner: "Pièces réunies." }[choix.action.type];
     if (corriger((x) => C.reglerPoint(x, point, choix.action, nom), fait)) {
       etat.choisi = null;
@@ -591,6 +748,7 @@
   function allerAuPoint(sens) {
     etat.rangPoint = Math.max(0, Math.min(etat.points.length - 1, etat.rangPoint + sens));
     etat.choisi = null;
+    etat.mesure = null;
     montrerPoint();
   }
 
@@ -662,6 +820,7 @@
           el("button", { class: "bouton principal", texte: "Tout mettre à la bonne taille", title: "Toutes les mesures du plan sont corrigées dans la même proportion",
             onclick: () => { const n = lue(); if (n) corriger((x) => C.mettreAEchelle(x, n / l), "Toutes les mesures du plan sont corrigées."); } }),
           el("button", { class: "bouton", texte: "Ce mur seulement", onclick: () => { const n = lue(); if (n) corriger((x) => C.longueurMur(x, e.id, n), "Longueur du mur corrigée."); } })),
+        ...deplacementPrecis(e),
         el("label", { texte: "Épaisseur en mètres" }),
         el("div", { class: "reglage" },
           el("button", { class: "bouton", id: "f-ep-moins", texte: "−", title: "1 cm de moins", onclick: () => pasEpaisseur(-0.01) }), ep,
@@ -672,6 +831,28 @@
           el("button", { class: "bouton", texte: "Enlever un morceau", onclick: () => changerOutil("morceau") })),
         el("div", { class: "ligne" }, supprimerBouton("Supprimer ce mur")));
     }
+  }
+
+  /** Déplacer un mur d'une distance exacte, dans un sens clair à l'écran. */
+  function deplacementPrecis(e) {
+    const { d } = sensMur(e);
+    const n = [-d[1], d[0]];
+    const milieu = [(e.debut[0] + e.fin[0]) / 2, (e.debut[1] + e.fin[1]) / 2];
+    const a = px(milieu), b = px([milieu[0] + n[0], milieu[1] + n[1]]);
+    const couche = Math.abs(b[1] - a[1]) >= Math.abs(b[0] - a[0]); // la normale va vers le haut ou le bas de l'écran
+    const positif = couche ? (b[1] < a[1] ? "↑ Haut" : "↓ Bas") : (b[0] > a[0] ? "→ Droite" : "← Gauche");
+    const negatif = couche ? (b[1] < a[1] ? "↓ Bas" : "↑ Haut") : (b[0] > a[0] ? "← Gauche" : "→ Droite");
+    const champ = el("input", { type: "text", id: "f-deplace", inputmode: "decimal", placeholder: "en centimètres", value: etat.deplacementPropose == null ? "" : String(etat.deplacementPropose) });
+    const pousser = (signe) => {
+      const cm = lireNombre(champ.value);
+      if (!(cm > 0)) return message("Tapez le déplacement en centimètres, par exemple 10.", true);
+      const k = (signe * cm) / 100;
+      if (corriger((x) => C.deplacerMur(x, e.id, [n[0] * k, n[1] * k]), `Mur déplacé de ${cm} cm.`)) etat.deplacementPropose = null;
+      rafraichir();
+    };
+    const boutons = [[positif, 1], [negatif, -1]].sort((u, w) => (u[0] < w[0] ? -1 : 1));
+    return [el("label", { texte: "Le déplacer exactement de (cm)" }), champ,
+      el("div", { class: "ligne" }, ...boutons.map(([t, signe]) => el("button", { class: "bouton", texte: t, "data-sens": String(signe), onclick: () => pousser(signe) })))];
   }
 
   function choisir(id) {
@@ -693,7 +874,7 @@
   function changerOutil(outil) {
     etat.outil = outil;
     etat.depart = null;
-    etat.morceau = null;
+    etat.trace = null;
     etat.relier = null;
     if (outil !== "choisir" && etat.affichage === "plan") etat.affichage = "deux";
     $("menu-ajouter").hidden = true;
@@ -742,14 +923,14 @@
     if (etat.outil === "couper" || etat.outil === "morceau") {
       const m = C.murLePlusProche(lg, p, tol * 2);
       if (!m) return message("Cliquez sur un mur (ou tout près).", true);
-      if (etat.outil === "couper") {
-        if (corriger((x) => C.couperMur(x, m.id, m.le_long), "Mur coupé en deux : chaque morceau se retouche à part.")) changerOutil("choisir");
-        return;
-      }
-      if (!etat.morceau) { etat.morceau = { id: m.id, t: m.le_long }; message("Cliquez maintenant à la fin du morceau."); dessiner(); return; }
-      const debut = etat.morceau;
-      if (m.id !== debut.id) return message("Cliquez sur le même mur, à la fin du morceau.", true);
-      if (corriger((x) => C.enleverMorceau(x, debut.id, debut.t, m.le_long), "Morceau de mur enlevé.")) changerOutil("choisir");
+      const t = C.aimanterSurMur(lg, m.id, m.le_long, metresPour(VISEE, p)).t;
+      const tr = etat.trace;
+      if (!tr || tr.id !== m.id) etat.trace = { id: m.id, t: [t] };
+      else if (etat.outil === "couper") tr.t = [t];
+      else if (tr.t.length < 2) tr.t.push(t);
+      else tr.t[Math.abs(t - tr.t[0]) <= Math.abs(t - tr.t[1]) ? 0 : 1] = t; // reprend la marque la plus proche
+      message("");
+      rafraichir();
       return;
     }
     if (etat.outil === "relier") {
