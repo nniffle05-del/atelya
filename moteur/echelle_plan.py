@@ -67,7 +67,7 @@ from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
 
-VERSION_ECHELLE = "0.9.1"
+VERSION_ECHELLE = "0.9.2"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -526,6 +526,10 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
         hauteur = _mediane_accordee([c for c in cotes if c.verticale])
     else:
         largeur = hauteur = echelle.px_par_m
+    if redressement is None and echelle.contredite:
+        # Sur un plan à plat, les cotes justes s'accordent presque toutes. Si la plupart sont écartées, l'accord des
+        # autres peut être un hasard (fr-006 : deux cotes mesurées sur le même mur, 12 % d'erreur sans alerte).
+        largeur = hauteur = None
     largeur = largeur * facteur if largeur else None
     hauteur = hauteur * facteur if hauteur else None
     horiz = [v for v, vert in nombres if not vert and v >= COTE_MIN]

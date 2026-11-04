@@ -42,6 +42,9 @@ TRAINEE_MIN = 0.4  # une marque foncée à plus de 40 %, loin des deux côtés d
 TRAINEE_PORTEE = 150  # en pixels : jusqu'où on regarde de chaque côté
 COTE_MIN = 0.30  # une « cote » plus petite (« 0,00 » lu dans une tache) n'en est pas une
 TROU_MAX = 4  # trou toléré (en pixels) dans un trait de cote abîmé (photocopie, compression)
+EPAISSEUR_TRAIT = 0.6  # un trait de cote est plus fin que 60 % de la hauteur du chiffre : au-delà, c'est un mur
+EPAISSEUR_TRAIT_MIN = 4  # en pixels : les chiffres minuscules ne doivent pas faire refuser un vrai trait
+TRAIT_EN_LIGNE_PLEIN = 0.8  # chiffre au milieu du trait : le trait doit être plein à 80 % de part et d'autre
 
 FORME_COTE = re.compile(r"^\d{1,2}[,.]\d{2}$")
 # « Murs extérieurs : 20 cm », « Cloisons : 7 cm » (le modèle de lecture abîme souvent les mots, pas les nombres).
@@ -76,6 +79,11 @@ class Echelle:
     retenues: list[CoteLue] = field(default_factory=list)
     ecartees: list[CoteLue] = field(default_factory=list)
     hauteur_sous_plafond: float | None = None
+
+    @property
+    def contredite(self) -> bool:
+        """Plus de cotes écartées que de cotes gardées : l'accord des cotes gardées peut être un hasard."""
+        return len(self.ecartees) > len(self.retenues)
 
 
 def lire_textes(gris: np.ndarray, agrandir: int = 1) -> list[TexteLu]:
@@ -234,27 +242,32 @@ def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tu
     if not 0 <= cx < w:
         return None
 
-    # 1. Le trait de cote : la ligne la plus proche du texte (au-dessus ou en dessous)
-    #    qui porte un long trait passant sous le milieu du texte.
-    lignes = []
-    for d in range(1, int(2 * hauteur) + 1):
-        lignes += [int(y0) - d, int(np.ceil(y1)) + d]
-    for y in lignes:
-        if not 0 <= y < h:
-            continue
-        debut, fin = _trait_autour(noir[y], cx)
-        if fin - debut >= 1.2 * (x1 - x0):
-            break
+    # 1. Le trait de cote. D'abord un trait qui traverse le chiffre (« —— 5.00 —— ») ; sinon la ligne la plus
+    #    proche du texte (au-dessus ou en dessous) qui porte un long trait passant sous le milieu du texte.
+    #    Un trait épais est un mur : le prendre pour une cote fausserait l'échelle sans alerte.
+    en_ligne = _trait_en_ligne(noir, x0, y0, x1, y1)
+    if en_ligne:
+        y, debut, fin = en_ligne
     else:
-        return None
-    # Un trait de cote resté un peu penché (scan, photo) passe d'une rangée à l'autre :
-    # on prend, autour de la rangée trouvée, les trois rangées réunies qui donnent le plus long trait.
-    # À longueur égale, la rangée la plus proche de celle trouvée.
-    trouvee = y
-    y, debut, fin = max(
-        ((r, *_trait_autour(noir[max(0, r - 1):r + 2].max(axis=0), cx)) for r in range(max(0, y - 2), min(h, y + 3))),
-        key=lambda t: (t[2] - t[1], -abs(t[0] - trouvee)),
-    )
+        lignes = []
+        for d in range(1, int(2 * hauteur) + 1):
+            lignes += [int(y0) - d, int(np.ceil(y1)) + d]
+        for y in lignes:
+            if not 0 <= y < h:
+                continue
+            debut, fin = _trait_autour(noir[y], cx)
+            if fin - debut >= 1.2 * (x1 - x0) and _trait_fin(noir, y, debut, fin, hauteur):
+                break
+        else:
+            return None
+        # Un trait de cote resté un peu penché (scan, photo) passe d'une rangée à l'autre :
+        # on prend, autour de la rangée trouvée, les trois rangées réunies qui donnent le plus long trait.
+        # À longueur égale, la rangée la plus proche de celle trouvée.
+        trouvee = y
+        y, debut, fin = max(
+            ((r, *_trait_autour(noir[max(0, r - 1):r + 2].max(axis=0), cx)) for r in range(max(0, y - 2), min(h, y + 3))),
+            key=lambda t: (t[2] - t[1], -abs(t[0] - trouvee)),
+        )
 
     # 2. Les marques : colonnes où un petit trait perpendiculaire traverse la ligne,
     #    en dehors des colonnes occupées par le texte.
@@ -265,7 +278,7 @@ def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tu
     colonnes = np.arange(len(plus_long)) + decalage
     hors_texte = (colonnes < x0 - 2) | (colonnes > x1 + 2)
     if not hors_texte.any():
-        return None
+        return (float(debut), float(fin), y) if en_ligne else None
     # Une marque floue déborde sur ses voisines : on ne garde que les colonnes
     # presque aussi hautes que la plus haute marque.
     seuil = max(MARQUE_MIN, 0.6 * plus_long[hors_texte].max())
@@ -275,9 +288,55 @@ def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tu
     marques = _centres_des_groupes(np.array(colonnes, dtype=int), plus_long, decalage)
     gauche = [m for m in marques if m < cx]
     droite = [m for m in marques if m > cx]
+    if en_ligne:  # les marques de ce style sont parfois minuscules : le trait s'arrête alors de lui-même à la bonne place
+        return max(gauche) if gauche else float(debut), min(droite) if droite else float(fin), y
     if not gauche or not droite:
         return None
     return max(gauche), min(droite), y
+
+
+def _trait_en_ligne(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tuple[int, int, int] | None:
+    """Le trait qui traverse le chiffre (rangée, début, fin), s'il y en a un : plein et fin de part et d'autre du texte."""
+    h, w = noir.shape
+    hauteur = y1 - y0
+    cx = int(round((x0 + x1) / 2))
+    g, d = max(0, int(x0 - hauteur)), min(w, int(np.ceil(x1 + hauteur)) + 1)  # le chiffre et le blanc qui l'entoure
+    milieu = (y0 + y1) / 2
+    for y in sorted(range(max(0, int(y0)), min(h, int(np.ceil(y1)) + 1)), key=lambda r: abs(r - milieu)):
+        rangee = noir[y].copy()
+        rangee[g:d] = 1
+        debut, fin = _trait_autour(rangee, cx)
+        if debut >= g - 2 or fin <= d + 1 or fin - debut < 1.2 * (x1 - x0):
+            continue  # le trait doit continuer des deux côtés du chiffre
+        if noir[y, debut:g].mean() < TRAIT_EN_LIGNE_PLEIN or noir[y, d:fin + 1].mean() < TRAIT_EN_LIGNE_PLEIN:
+            continue
+        if _trait_fin(noir, y, debut, fin, hauteur, sans=(g, d)):
+            return y, debut, fin
+    return None
+
+
+def _trait_fin(noir: np.ndarray, y: int, debut: int, fin: int, hauteur: float, sans: tuple[int, int] | None = None) -> bool:
+    """Le trait trouvé à la rangée y est-il assez fin pour être un trait de cote (et pas le bord d'un mur) ?"""
+    colonnes = np.ones(fin + 1 - debut, bool)
+    if sans:
+        colonnes[max(0, sans[0] - debut):max(0, sans[1] - debut)] = False  # le chiffre lui-même ne compte pas
+    if not colonnes.any():
+        return True
+    limite = max(EPAISSEUR_TRAIT_MIN, EPAISSEUR_TRAIT * hauteur)
+    epaisseur = 1
+
+    def plein(r: int) -> bool:
+        return 0 <= r < noir.shape[0] and noir[r, debut:fin + 1][colonnes].mean() >= 0.5
+
+    r = y - 1
+    while plein(r) and epaisseur <= limite:
+        epaisseur += 1
+        r -= 1
+    r = y + 1
+    while plein(r) and epaisseur <= limite:
+        epaisseur += 1
+        r += 1
+    return epaisseur <= limite
 
 
 def _trainee(colonne: np.ndarray, y: int) -> bool:
