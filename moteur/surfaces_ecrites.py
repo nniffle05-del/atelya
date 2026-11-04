@@ -17,6 +17,7 @@ somme de ses surfaces.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 import cv2
@@ -24,9 +25,14 @@ import numpy as np
 
 from moteur.lecture_cotes import TexteLu
 
-# « 12,50 m² », « 2,10m2 », « 3,61Lm² » (une lettre parasite lue entre le nombre et l'unité).
-# Le nombre doit avoir ses deux décimales : « T2 de 45 m² » (titre) et « 2 m » (barre) ne sont pas des surfaces de pièce.
-FORME_SURFACE = re.compile(r"^(\d{1,3}[,.]\d{2})\s*[^\d\s]?\s*m\s*[²2]$", re.IGNORECASE)
+# « 12,50 m² », « 2,10m2 », « 3,61Lm² » (une lettre parasite lue entre le nombre et l'unité), « (14,13 m2) » (fr-009),
+# « 1,9m2 » (fr-004 : une seule décimale). Le nombre doit avoir une décimale au moins : « T2 de 45 m² » (titre) et « 2 m »
+# (barre d'échelle) ne sont pas des surfaces de pièce.
+FORME_SURFACE = re.compile(r"^\(?(\d{1,3}[,.]\d{1,2})\s*[^\d\s]?\s*m\s*[²2]\)?$", re.IGNORECASE)
+# « 4,32m × 5,17m » (fr-012) : les deux dimensions d'une pièce ; leur produit vaut une surface écrite.
+FORME_DIMENSIONS = re.compile(r"^\(?(\d{1,2}[,.]\d{1,2})\s*m?\s*[x×X*]\s*(\d{1,2}[,.]\d{1,2})\s*m\)?$", re.IGNORECASE)
+# Une ligne de légende : un nom de pièce éventuel, puis une surface (« Chambre 12,05 m² », « Séjour : 22,45 m2 »).
+FORME_LEGENDE = re.compile(r"^(?P<nom>.*?)\s*[:\-]?\s*\(?(?P<v>\d{1,3}[,.]\d{1,2})\s*[^\d\s]?\s*m\s*[²2]\)?\s*$", re.IGNORECASE)
 SURFACE_MIN, SURFACE_MAX = 0.5, 200.0  # m² : une pièce vraisemblable
 ACCORD_PIECES = 0.03  # deux pièces sont d'accord quand leurs échelles diffèrent de moins de 3 %
 PART_MIN = 0.5  # les pièces d'accord réunissent au moins la moitié des surfaces lues
@@ -51,14 +57,94 @@ def surfaces_dans_textes(textes: list[TexteLu]) -> list[tuple[float, float, floa
     """Les surfaces de pièce écrites sur le plan : (m², x, y) au centre du texte, en pixels de l'image lue."""
     lues = []
     for t in textes:
-        m = FORME_SURFACE.match(t.texte.strip())
-        if not m:
+        texte = t.texte.strip()
+        m = FORME_SURFACE.match(texte)
+        if m:
+            v = float(m.group(1).replace(",", "."))
+        elif (d := FORME_DIMENSIONS.match(texte)):
+            v = float(d.group(1).replace(",", ".")) * float(d.group(2).replace(",", "."))
+        else:
             continue
-        v = float(m.group(1).replace(",", "."))
         if SURFACE_MIN <= v <= SURFACE_MAX:
             cx, cy = np.asarray(t.boite, np.float64).mean(axis=0)
             lues.append((v, float(cx), float(cy)))
     return lues
+
+
+def _cle(texte: str) -> str:
+    """« Chambre 2 » → « chambre 2 » : minuscules, sans accents ni ponctuation, mais avec le numéro."""
+    t = unicodedata.normalize("NFKD", texte.lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return " ".join(re.sub(r"[^a-z0-9 ]", " ", t).split())
+
+
+def surfaces_de_legende(textes: list[TexteLu], vers_col, dedans: np.ndarray) -> list[SurfaceLue]:
+    """Les surfaces écrites dans une légende (« Chambre 12,05 m² » sous le plan : diagnostiqueurs, Carrez), ramenées
+    chacune dans la pièce qui porte le même nom sur le plan.
+
+    Une surface qui n'est dans aucune pièce coloriée est une ligne de légende. Son nom est dans le même texte
+    (« Chambre 12,05 m² ») ou dans le texte juste à sa gauche sur la même ligne. On la rattache à la zone du plan où un
+    nom identique est écrit (« Chambre 2 » ↔ « Chambre 2 »), sinon à la seule zone de ce type de pièce. Une zone qui a
+    déjà sa surface écrite dedans n'en reçoit pas une seconde. Rend des SurfaceLue au centre des zones rattachées."""
+    from moteur.noms_pieces import type_depuis_nom
+
+    n, etiq, stats, centres = cv2.connectedComponentsWithStats(dedans.astype(np.uint8), connectivity=4)
+    h, w = dedans.shape
+
+    def zone_de(t: TexteLu) -> int:
+        cx, cy = np.asarray(t.boite, np.float64).mean(axis=0)
+        x, y = vers_col(float(cx), float(cy))
+        x, y = int(round(x)), int(round(y))
+        return int(etiq[y, x]) if 0 <= y < h and 0 <= x < w else 0
+
+    zones_avec_surface = set()
+    legende = []  # (nom, type, surface)
+    for t in textes:
+        texte = t.texte.strip()
+        m = FORME_LEGENDE.match(texte)
+        if m:
+            v = float(m.group("v").replace(",", "."))
+            if not (SURFACE_MIN <= v <= SURFACE_MAX):
+                continue
+            if zone_de(t) > 0:
+                zones_avec_surface.add(zone_de(t))
+                continue
+            nom = m.group("nom").strip(" :-")
+            if not nom:  # « 12,05 m² » seul : le nom est le texte juste à gauche, sur la même ligne
+                (x0, y0), (x1, y1) = t.boite.min(axis=0), t.boite.max(axis=0)
+                voisins = [u for u in textes if u is not t and abs(u.boite.mean(axis=0)[1] - (y0 + y1) / 2) <= 0.6 * (y1 - y0)
+                           and 0 <= x0 - u.boite.max(axis=0)[0] <= 6 * (y1 - y0) and type_depuis_nom(u.texte)
+                           and not FORME_LEGENDE.match(u.texte.strip())]
+                if not voisins:
+                    continue
+                nom = min(voisins, key=lambda u: x0 - u.boite.max(axis=0)[0]).texte
+            type_ = type_depuis_nom(nom)
+            if type_:
+                legende.append((_cle(nom), type_, v))
+    if not legende:
+        return []
+
+    noms_du_plan = {}  # zone → liste de (clé, type) des noms écrits dedans
+    for t in textes:
+        if FORME_LEGENDE.match(t.texte.strip()):
+            continue
+        type_ = type_depuis_nom(t.texte)
+        z = zone_de(t) if type_ else 0
+        if z > 0:
+            noms_du_plan.setdefault(z, []).append((_cle(t.texte), type_))
+
+    sortie, prises = [], set(zones_avec_surface)
+    for cle, type_, v in legende:
+        exactes = [z for z, noms in noms_du_plan.items() if z not in prises and any(c == cle for c, _ in noms)]
+        if len(exactes) != 1:
+            meme_type = [z for z, noms in noms_du_plan.items() if z not in prises and any(ty == type_ for _, ty in noms)]
+            if len(meme_type) != 1 or sum(1 for _, ty, _ in legende if ty == type_) != 1:
+                continue  # plusieurs pièces de ce type et pas de nom exact : on ne devine pas
+            exactes = meme_type
+        z = exactes[0]
+        prises.add(z)
+        sortie.append(SurfaceLue(v, float(centres[z][0]), float(centres[z][1])))
+    return sortie
 
 
 def echelle_par_surfaces(dedans: np.ndarray, surfaces: list[SurfaceLue]) -> EchelleSurfaces | None:

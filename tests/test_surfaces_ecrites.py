@@ -73,3 +73,41 @@ def test_surfaces_controlent_les_cotes_peu_sures_et_pas_sur_une_photo():
     assert decider(S, S, False, None, None, interieur, False, None, 1.01 * S)[2] == "cotes"
     # Sur une photo de biais, les surfaces ne donnent pas l'échelle.
     assert decider(None, None, False, None, None, interieur, True, None, S)[2] == "à vérifier"
+
+
+def test_formes_de_surfaces_des_vrais_plans():
+    """« (14,13 m2) » (fr-009), « 1,9m2 » (fr-004), « 4,32m × 5,17m » (fr-012 : le produit vaut une surface)."""
+    import numpy as np
+
+    from moteur.lecture_cotes import TexteLu
+    from moteur.surfaces_ecrites import surfaces_dans_textes
+
+    boite = np.array([[0.0, 0], [10, 0], [10, 5], [0, 5]])
+    textes = [TexteLu(t, boite, 1.0) for t in ["(14,13 m2)", "1,9m2", "4,32m × 5,17m", "T2 de 45 m²", "4,80", "2 m"]]
+    valeurs = [round(v, 2) for v, _, _ in surfaces_dans_textes(textes)]
+    assert valeurs == [14.13, 1.9, 22.33]
+
+
+def test_surfaces_d_une_legende_ramenees_dans_les_pieces_du_meme_nom():
+    """Plan de diagnostiqueur : les surfaces sont listées sous le plan, pas écrites dans les pièces (fr-003, fr-004, fr-017)."""
+    import numpy as np
+
+    from moteur.lecture_cotes import TexteLu
+    from moteur.surfaces_ecrites import echelle_par_surfaces, surfaces_de_legende
+
+    dedans = np.zeros((600, 800), bool)
+    dedans[100:400, 100:500] = True  # 300 × 400 px = 12 m² à 100 px/m
+    dedans[100:400, 520:720] = True  # 300 × 200 px = 6 m²
+    dedans[420:520, 100:700] = True  # 100 × 600 px = 6 m²
+
+    def texte(t, x, y):
+        return TexteLu(t, np.array([[x - 30.0, y - 8], [x + 30, y - 8], [x + 30, y + 8], [x - 30, y + 8]]), 1.0)
+
+    textes = [texte("Séjour", 300, 250), texte("Chambre 1", 620, 250), texte("Chambre 2", 400, 470),
+              texte("Superficie loi Carrez totale : 24,00 m²", 300, 560),
+              texte("Séjour 12,00 m²", 200, 580), texte("Chambre 2", 180, 595), texte("6,00 m²", 320, 595),
+              texte("Chambre 1 : 6,00 m²", 500, 580), texte("Cuisine 9,00 m²", 650, 580)]  # pas de cuisine sur le plan
+    lues = surfaces_de_legende(textes, lambda x, y: (x, y), dedans)
+    assert sorted(round(s.valeur, 2) for s in lues) == [6.0, 6.0, 12.0]
+    e = echelle_par_surfaces(dedans, lues)
+    assert e.sure and abs(e.px_par_m - 100) / 100 < 0.01

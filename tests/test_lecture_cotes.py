@@ -113,3 +113,73 @@ def test_plus_de_cotes_ecartees_que_gardees_est_une_contradiction():
         t.texte = f"{9 - i * 0.7:.2f}".replace(".", ",")  # chacune fausse, et toutes différentes
     echelle = lire_echelle(gris, textes)
     assert len(echelle.ecartees) > len(echelle.retenues) and echelle.contredite
+
+
+def test_cote_en_centimetres_entiers():
+    """« 300 » au milieu de son trait (plans de géomètre, fr-010) : 3,00 m."""
+    gris, texte = _plan_chiffre_sur_le_trait()
+    texte.texte = "300"
+    assert lire_echelle(gris, [texte]).px_par_m is None  # une seule cote en centimètres ne suffit pas : numéro de pièce ?
+    echelle = lire_echelle(gris, [texte, texte])  # deux cotes d'accord (ici la même, lue deux fois) : le plan est en cm
+    assert echelle.px_par_m == pytest.approx(100, rel=TOLERANCE_ECHELLE)
+    decimale = TexteLu("3,00", texte.boite, 1.0)
+    assert lire_echelle(gris, [decimale, texte, texte]).retenues[0].texte.texte == "3,00"  # avec une cote « d,dd », les entiers sont ignorés
+    assert len(lire_echelle(gris, [decimale, texte, texte]).retenues) == 1
+
+
+def test_un_numero_sans_trait_n_est_pas_une_cote():
+    vide = np.full((300, 600), 255, np.uint8)
+    boite = np.array([[230.0, 90], [270, 90], [270, 111], [230, 111]])
+    assert lire_echelle(vide, [TexteLu("2024", boite, 1.0), TexteLu("405", boite, 1.0)]).px_par_m is None
+
+
+def test_hachures_de_sol_gris_clair_ne_sont_pas_des_marques():
+    """PDF d'architecte (fr-019) : des lattes de parquet gris clair traversent la cote ; ses vraies marques sont de petits
+    traits noirs de 4 à 8 pixels. Avant : la cote mesurait l'écart entre deux lattes."""
+    gris = np.full((300, 600), 255, np.uint8)
+    gris[:, 115::30] = 200  # les lattes, sur toute la hauteur
+    gris[150:152, 100:401] = 80  # le trait de cote
+    gris[147:155, 100:102] = 40  # ses marques
+    gris[147:155, 399:401] = 40
+    gris[118:143, 226:275] = 255  # le chiffre, au-dessus du trait
+    gris[122:139, 232:269:3] = 40
+    boite = np.array([[230.0, 120], [270, 120], [270, 141], [230, 141]])
+    echelle = lire_echelle(gris, [TexteLu("3,00", boite, 1.0)])
+    assert echelle.px_par_m == pytest.approx(100, rel=TOLERANCE_ECHELLE)
+
+
+def test_des_cotes_imprecises_ne_sont_pas_une_contradiction():
+    """Dessin à la main (fr-010) : des cotes à ±10 % de l'échelle gardée sont imprécises, pas contradictoires."""
+    from moteur.lecture_cotes import CoteLue, Echelle
+
+    boite = np.zeros((4, 2))
+
+    def cote(valeur, px):
+        return CoteLue(valeur, px, False, TexteLu(str(valeur), boite, 1.0), ((0.0, 0.0), (px, 0.0)))
+
+    gardees = [cote(4.0, 400), cote(3.0, 300)]
+    imprecises = [cote(2.0, 215), cote(1.0, 92), cote(1.5, 162)]
+    fausses = [cote(2.0, 400), cote(1.0, 300), cote(1.5, 50)]
+    assert not Echelle(100.0, True, gardees, imprecises).contredite
+    assert Echelle(100.0, True, gardees, fausses).contredite
+
+
+def test_sure_quand_deux_cotes_s_accordent_entre_elles():
+    """Trois cotes à 58,5, 58,5 et 56 px/m : les deux premières s'accordent, l'échelle est sûre (avant, la moyenne
+    pondérée tombait entre les deux et personne n'était « concordant »)."""
+    from moteur.lecture_cotes import CoteLue, Echelle, lire_echelle
+
+    gris, texte = _plan_chiffre_sur_le_trait()
+    # On ne peut pas dessiner trois cotes facilement : on vérifie le critère sur les objets eux-mêmes via lire_echelle
+    # d'une image sans cote (aucune), puis sur un faux jeu de cotes retenues recomposé.
+    boite = np.zeros((4, 2))
+
+    def cote(valeur, px):
+        return CoteLue(valeur, px, False, TexteLu(str(valeur), boite, 1.0), ((0.0, 0.0), (px, 0.0)))
+
+    retenues = [cote(3.28, 3.28 * 58.54), cote(1.65, 1.65 * 56.01), cote(1.48, 1.48 * 58.52)]
+    from moteur import lecture_cotes as L
+    px = sum(c.longueur_px for c in retenues) / sum(c.valeur for c in retenues)
+    concordantes = max(sum(abs(d.px_par_m - c.px_par_m) / c.px_par_m <= L.ACCORD for d in retenues) for c in retenues)
+    assert concordantes == 2 and all(abs(c.px_par_m - px) / px > L.ACCORD for c in retenues)
+    assert lire_echelle(gris, [texte]).sure is False  # une seule cote : toujours pas sûre

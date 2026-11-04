@@ -63,11 +63,12 @@ import numpy as np
 
 from moteur.barre_echelle import lire_barre
 from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
-from moteur.lecture_cotes import COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle, lire_textes
+from moteur.lecture_cotes import (COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle,
+                                  lire_textes, plan_en_cm, valeur_de_cote)
 from moteur.redressement import Redressement
-from moteur.surfaces_ecrites import SurfaceLue, echelle_par_surfaces, surfaces_dans_textes
+from moteur.surfaces_ecrites import FORME_LEGENDE, SurfaceLue, echelle_par_surfaces, surfaces_dans_textes, surfaces_de_legende
 
-VERSION_ECHELLE = "0.9.2"
+VERSION_ECHELLE = "0.10.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -113,6 +114,9 @@ class EchelleLue:
     # L'échelle écrite d'un PDF (« 1/50 ») : px par m du coloriage, et le détail en clair (version 0.9).
     ecrite: float | None = None
     ecrite_detail: str = ""
+    # Pour le diagnostic : les cotes qui ont fait l'échelle, et si les autres la contredisent (version 0.10).
+    retenues: list[CoteLue] = field(default_factory=list)
+    contredite: bool = False
 
     @property
     def px_par_m(self) -> float | None:
@@ -386,7 +390,9 @@ def _lire_par_morceaux(gris: np.ndarray) -> list:
 
 
 def _nombres(textes: list) -> list[tuple[float, bool]]:
-    return [(float(t.texte.replace(",", ".")), _vertical(t.boite)) for t in textes if FORME_COTE.match(t.texte)]
+    cm = plan_en_cm(textes)  # les entiers ne sont des cotes que sur un plan coté en centimètres (lecture_cotes)
+    return [(v, _vertical(t.boite)) for t in textes
+            if (v := valeur_de_cote(t.texte)) is not None and (cm or FORME_COTE.match(t.texte.strip()))]
 
 
 def _textes_remis_droit(textes: list[TexteLu], matrice: np.ndarray) -> list[TexteLu]:
@@ -541,17 +547,27 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
                       surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage),
-                      ecrite, ecrite_detail)
+                      ecrite, ecrite_detail, retenues=echelle.retenues, contredite=echelle.contredite)
 
 
 def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
     """L'échelle des surfaces écrites (voir moteur.surfaces_ecrites), placées sur le coloriage remis droit."""
     lues = surfaces_dans_textes(textes)
-    if not lues:
+    if not lues and not any(FORME_LEGENDE.match(t.texte.strip()) for t in textes):
         return None
-    pts = np.array([[x, y, 1.0] for _, x, y in lues]) @ vers_col.T
+    pts = np.array([[x, y, 1.0] for _, x, y in lues]).reshape(-1, 3) @ vers_col.T
     surfaces = [SurfaceLue(v, float(p[0] / p[2]), float(p[1] / p[2])) for (v, _, _), p in zip(lues, pts)]
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
-    return echelle_par_surfaces(~bati & ~dehors_du_logement(bati), surfaces)
+    dedans = ~bati & ~dehors_du_logement(bati)
+
+    def projeter_col(x: float, y: float) -> tuple[float, float]:
+        p = vers_col @ (x, y, 1.0)
+        return float(p[0] / p[2]), float(p[1] / p[2])
+
+    de_legende = surfaces_de_legende(textes, projeter_col, dedans)  # « Chambre 12,05 m² » écrit sous le plan (Carrez)
+    r = echelle_par_surfaces(dedans, surfaces + de_legende)
+    if r and de_legende:
+        r.detail += f" ; {len(de_legende)} ramenée(s) depuis la légende"
+    return r

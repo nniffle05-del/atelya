@@ -47,6 +47,12 @@ EPAISSEUR_TRAIT_MIN = 4  # en pixels : les chiffres minuscules ne doivent pas fa
 TRAIT_EN_LIGNE_PLEIN = 0.8  # chiffre au milieu du trait : le trait doit être plein à 80 % de part et d'autre
 
 FORME_COTE = re.compile(r"^\d{1,2}[,.]\d{2}$")
+FORME_COTE_CM = re.compile(r"^\d{2,3}$")  # « 405 » : cote en centimètres (plans de géomètre, fr-010) ; 3 chiffres = 9,99 m au plus
+SOMBRE = 128  # niveau de gris : en dessous, un trait est franc (noir) ; les hachures de sol d'un PDF sont gris clair
+MARQUE_MIN_FORT = 4  # sur les traits francs, une marque de bout de cote peut n'avoir que 4 pixels (PDF à 300 dpi)
+CONTRADICTION = 0.15  # une cote écartée à plus de 15 % de l'échelle gardée la contredit vraiment (voir Echelle.contredite)
+HACHURE_MIN = 40  # pixels : une marque gris clair qui continue si loin d'un côté est une hachure de sol, pas une marque
+LIGNE_FRANCHE = 0.5  # part du trait de cote qui doit être noire pour qu'on lui applique les règles des traits francs (un trait fin de PDF, adouci par le rendu, l'est à moitié)
 # « Murs extérieurs : 20 cm », « Cloisons : 7 cm » (le modèle de lecture abîme souvent les mots, pas les nombres).
 FORME_EPAISSEUR = re.compile(r"^\s*(murs?|cl\w*)\b\D*?(\d{1,2})\s*cm\b", re.IGNORECASE)
 FORME_HSP = re.compile(r"(?:hauteur\s+sous\s+plafond|h\.?\s*s\.?\s*p\.?)\D*(\d+[,.]\d+)", re.IGNORECASE)
@@ -82,8 +88,13 @@ class Echelle:
 
     @property
     def contredite(self) -> bool:
-        """Plus de cotes écartées que de cotes gardées : l'accord des cotes gardées peut être un hasard."""
-        return len(self.ecartees) > len(self.retenues)
+        """Plus de cotes franchement en désaccord que de cotes gardées : l'accord des cotes gardées peut être un hasard
+        (fr-006 : deux cotes mesurées sur le même mur). Une cote à moins de CONTRADICTION de l'échelle gardée n'est pas
+        une contradiction, c'est une cote imprécise (dessin à la main, fr-010 : 11 cotes entre −23 % et +22 %)."""
+        if not self.px_par_m:
+            return False
+        loin = [c for c in self.ecartees if abs(c.px_par_m / self.px_par_m - 1) > CONTRADICTION]
+        return len(loin) > len(self.retenues)
 
 
 def lire_textes(gris: np.ndarray, agrandir: int = 1) -> list[TexteLu]:
@@ -147,15 +158,50 @@ def egaliser_les_echelles(
     return etire, textes, lire_echelle(etire, textes), etirement
 
 
+def valeur_de_cote(texte: str) -> float | None:
+    """La longueur en mètres qu'annonce un texte de cote : « 4,80 » → 4,8 ; « 405 » (centimètres) → 4,05 ; sinon None.
+
+    Un nombre entier n'est une cote que si son trait et ses marques sont retrouvés sur le plan, puis s'il s'accorde
+    avec les autres cotes : un numéro de lot ou une année n'ont ni l'un ni l'autre."""
+    t = texte.strip()
+    if FORME_COTE.match(t):
+        return float(t.replace(",", "."))
+    if FORME_COTE_CM.match(t):
+        return int(t) / 100
+    return None
+
+
+def plan_en_cm(textes: list[TexteLu]) -> bool:
+    """Un plan coté en centimètres entiers n'a aucune cote « d,dd » : sinon, un entier est un numéro, pas une cote."""
+    return not any(FORME_COTE.match(t.texte.strip()) for t in textes)
+
+
+def _cotes_en_cm_admises(cotes: list[CoteLue], en_cm: list[CoteLue]) -> list[CoteLue]:
+    """Les cotes en centimètres entiers ne comptent que sur un plan sans cote « d,dd », et si deux au moins s'accordent :
+    un numéro de pièce (« 60 ») près d'un trait quelconque donnait une échelle absurde (plan fabriqué 004826)."""
+    if cotes or len(en_cm) < 2:
+        return []
+    for c in en_cm:
+        if sum(abs(d.px_par_m - c.px_par_m) / c.px_par_m <= ECART_MAX for d in en_cm) >= 2:
+            return en_cm
+    return []
+
+
 def lire_echelle(gris: np.ndarray, textes: list[TexteLu] | None = None) -> Echelle:
     """L'échelle (pixels par mètre) d'un plan déjà redressé, lue sur ses cotes."""
     if textes is None:
         textes = lire_textes(gris)
     noir = _traits(gris)
-    cotes = [
-        c for t in textes
-        if FORME_COTE.match(t.texte) and (c := _mesurer_cote(noir, t)) and c.valeur >= COTE_MIN
-    ]
+    fort = _traits_forts(gris, noir)
+    cotes, en_cm = [], []
+    for t in textes:
+        v = valeur_de_cote(t.texte)
+        if v is None or v < COTE_MIN:
+            continue
+        c = _mesurer_cote(noir, t, fort, v)
+        if c:
+            (en_cm if FORME_COTE_CM.match(t.texte.strip()) else cotes).append(c)
+    cotes += _cotes_en_cm_admises(cotes, en_cm)
     hsp = lire_hauteur_sous_plafond(textes)
     if not cotes:
         return Echelle(None, False, hauteur_sous_plafond=hsp)
@@ -175,8 +221,10 @@ def lire_echelle(gris: np.ndarray, textes: list[TexteLu] | None = None) -> Echel
     ecartees = [c for c in cotes if abs(c.px_par_m - mediane) / mediane > ECART_MAX]
     # Moyenne pondérée par la longueur : une grande cote est plus précise qu'une petite.
     px_par_m = sum(c.longueur_px for c in retenues) / sum(c.valeur for c in retenues)
-    concordantes = [c for c in retenues if abs(c.px_par_m - px_par_m) / px_par_m <= ACCORD]
-    return Echelle(round(px_par_m, 3), len(concordantes) >= 2, retenues, ecartees, hsp)
+    # Sûre : deux cotes au moins d'accord entre elles à 1 % près. (Avant : d'accord avec la moyenne ; avec trois cotes à
+    # 58,5, 58,5 et 56, la moyenne tombait entre les deux et aucune n'était « concordante ».)
+    concordantes = max((sum(abs(d.px_par_m - c.px_par_m) / c.px_par_m <= ACCORD for d in retenues) for c in retenues), default=0)
+    return Echelle(round(px_par_m, 3), concordantes >= 2, retenues, ecartees, hsp)
 
 
 def lire_hauteur_sous_plafond(textes: list[TexteLu]) -> float | None:
@@ -216,26 +264,40 @@ def _traits(gris: np.ndarray) -> np.ndarray:
     return cv2.adaptiveThreshold(gris, 1, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 25, 20)
 
 
-def _mesurer_cote(noir: np.ndarray, texte: TexteLu) -> CoteLue | None:
-    """Retrouve le trait d'une cote à côté de son texte et mesure la distance entre ses marques."""
+def _traits_forts(gris: np.ndarray, noir: np.ndarray) -> np.ndarray:
+    """Les traits francs seulement : noirs, pas gris clair. Les hachures de parquet d'un PDF (gris clair) traversent les
+    cotes et passaient pour des marques de bout : la cote « 2,75 » de fr-019 mesurait l'écart entre deux lattes."""
+    return noir & (gris < SOMBRE).astype(np.uint8)
+
+
+def _mesurer_cote(noir: np.ndarray, texte: TexteLu, fort: np.ndarray | None = None,
+                  valeur: float | None = None) -> CoteLue | None:
+    """Retrouve le trait d'une cote à côté de son texte et mesure la distance entre ses marques.
+
+    `fort` : les traits francs (voir _traits_forts). Il sert à deux choses dans _marques : admettre les petites marques
+    noires d'un PDF (4 pixels), et écarter les hachures de sol gris clair qui traversent la cote."""
+    if valeur is None:
+        valeur = float(texte.texte.replace(",", "."))
     x0, y0 = texte.boite.min(axis=0)
     x1, y1 = texte.boite.max(axis=0)
     verticale = (y1 - y0) > (x1 - x0)
     if verticale:  # on retourne l'image : la cote verticale devient horizontale
-        noir = noir.T
         x0, y0, x1, y1 = y0, x0, y1, x1
-    marques = _marques(noir, x0, y0, x1, y1)
-    if marques is None:
+        noir = noir.T
+        fort = fort.T if fort is not None else None
+    choix = _marques(noir, x0, y0, x1, y1, fort)
+    if choix is None:
         return None
-    gauche, droite, ligne = marques
+    gauche, droite, ligne, _, _ = choix
     bouts = ((gauche, ligne), (droite, ligne))
     if verticale:  # on remet les coordonnées à l'endroit
         bouts = ((ligne, gauche), (ligne, droite))
-    return CoteLue(float(texte.texte.replace(",", ".")), droite - gauche, verticale, texte, bouts)
+    return CoteLue(valeur, droite - gauche, verticale, texte, bouts)
 
 
-def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tuple[float, float, int] | None:
-    """Les deux marques qui bornent la cote (colonnes) et la ligne du trait de cote."""
+def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float,
+             fort: np.ndarray | None = None) -> tuple[float, float, int, int, int] | None:
+    """Les deux marques qui bornent la cote (colonnes), la ligne du trait de cote, et le début et la fin de ce trait."""
     h, w = noir.shape
     hauteur = y1 - y0
     cx = int(round((x0 + x1) / 2))
@@ -272,27 +334,39 @@ def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tu
     # 2. Les marques : colonnes où un petit trait perpendiculaire traverse la ligne,
     #    en dehors des colonnes occupées par le texte.
     haut, bas = max(0, y - 12), min(h, y + 13)
-    bande = noir[haut:bas, max(0, debut - 3):min(w, fin + 4)]
-    decalage = max(0, debut - 3)
+    g, d = max(0, debut - 3), min(w, fin + 4)
+    bande = noir[haut:bas, g:d]
+    decalage = g
     plus_long = _plus_longue_suite(bande)
+    # Sur un trait de cote franc (noir sur presque toute sa longueur : dessin net, PDF), une petite marque noire qui
+    # TRAVERSE le trait compte dès 4 pixels, et une marque gris clair mais longue est une hachure de sol, pas une marque.
+    # Sur un trait gris (scan, photo), rien de tout ça : un grain noir sur la ligne passerait pour une marque (009592).
+    ligne_franche = fort is not None and fort[max(0, y - 1):y + 2, debut:fin + 1].max(axis=0).mean() >= LIGNE_FRANCHE
+    franche = _hauteur_a_travers(fort[haut:bas, g:d], y - haut) if ligne_franche else np.zeros_like(plus_long)
     colonnes = np.arange(len(plus_long)) + decalage
     hors_texte = (colonnes < x0 - 2) | (colonnes > x1 + 2)
     if not hors_texte.any():
-        return (float(debut), float(fin), y) if en_ligne else None
+        return (float(debut), float(fin), y, debut, fin) if en_ligne else None
     # Une marque floue déborde sur ses voisines : on ne garde que les colonnes
     # presque aussi hautes que la plus haute marque.
     seuil = max(MARQUE_MIN, 0.6 * plus_long[hors_texte].max())
-    colonnes = colonnes[hors_texte & (plus_long >= seuil)]
-    # Une traînée de photocopieuse traverse toute la feuille : ce n'est pas une marque.
-    colonnes = [c for c in colonnes if not _trainee(noir[:, c], y)]
-    marques = _centres_des_groupes(np.array(colonnes, dtype=int), plus_long, decalage)
+    # Seules les colonnes presque aussi hautes que la plus haute : la base d'une flèche (courte) ne vaut pas la ligne
+    # d'attache, et une marque oblique (photo 050136) ne doit donner qu'une marque, là où elle croise le trait.
+    seuil_franc = max(MARQUE_MIN_FORT, 0.8 * franche[hors_texte].max())
+    retenue = hors_texte & ((plus_long >= seuil) | (franche >= seuil_franc))
+    poids = np.maximum(plus_long, franche)
+    colonnes = colonnes[retenue]
+    # Une traînée de photocopieuse traverse toute la feuille : ce n'est pas une marque. Une hachure gris clair non plus.
+    colonnes = [c for c in colonnes if not _trainee(noir[:, c], y)
+                and not (ligne_franche and franche[c - decalage] == 0 and _longue_d_un_cote(noir[:, c], y))]
+    marques = _centres_des_groupes(np.array(colonnes, dtype=int), poids, decalage)
     gauche = [m for m in marques if m < cx]
     droite = [m for m in marques if m > cx]
     if en_ligne:  # les marques de ce style sont parfois minuscules : le trait s'arrête alors de lui-même à la bonne place
-        return max(gauche) if gauche else float(debut), min(droite) if droite else float(fin), y
+        return max(gauche) if gauche else float(debut), min(droite) if droite else float(fin), y, debut, fin
     if not gauche or not droite:
         return None
-    return max(gauche), min(droite), y
+    return max(gauche), min(droite), y, debut, fin
 
 
 def _trait_en_ligne(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> tuple[int, int, int] | None:
@@ -339,6 +413,20 @@ def _trait_fin(noir: np.ndarray, y: int, debut: int, fin: int, hauteur: float, s
     return epaisseur <= limite
 
 
+def _longue_d_un_cote(colonne: np.ndarray, y: int) -> bool:
+    """La colonne reste foncée sur HACHURE_MIN pixels d'un côté du trait de cote au moins : une latte de parquet, une
+    ligne de carrelage (gris clair), là où une marque de cote s'arrête à quelques pixels."""
+    h = len(colonne)
+    for sens in (-1, 1):
+        r, n = y + 3 * sens, 0
+        while 0 <= r < h and colonne[r] and n < HACHURE_MIN:
+            n += 1
+            r += sens
+        if n >= HACHURE_MIN:
+            return True
+    return False
+
+
 def _trainee(colonne: np.ndarray, y: int) -> bool:
     """La colonne reste foncée loin au-dessus ET loin en dessous du trait de cote (une marque, elle, est courte)."""
     dessus = colonne[max(0, y - TRAINEE_PORTEE):max(0, y - 15)]
@@ -362,6 +450,21 @@ def _trait_autour(ligne: np.ndarray, cx: int) -> tuple[int, int]:
         trou = 0 if ligne[fin] else trou + 1
     fin -= trou
     return debut, fin
+
+
+def _hauteur_a_travers(bande: np.ndarray, rangee: int) -> np.ndarray:
+    """Pour chaque colonne, la hauteur du trait foncé qui passe par la rangée donnée (0 si elle n'y est pas foncée)."""
+    h = bande.shape[0]
+    rangee = min(max(rangee, 0), h - 1)
+    hauteur = bande[rangee].astype(int)
+    for sens, limite in ((-1, -1), (1, h)):
+        vivant = bande[rangee] > 0
+        r = rangee + sens
+        while r != limite and vivant.any():
+            vivant = vivant & (bande[r] > 0)
+            hauteur += vivant
+            r += sens
+    return hauteur
 
 
 def _plus_longue_suite(bande: np.ndarray) -> np.ndarray:

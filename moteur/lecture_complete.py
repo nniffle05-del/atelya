@@ -183,16 +183,25 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
     if R is None:
         lx = ly = lx or ly
     autres = list(source.doutes_tri)
+    # Le détail de ce qui a été lu, pour comprendre une décision après coup (diagnostic), jamais pour construire.
+    detail = {"cotes_retenues": [[c.valeur, round(c.px_par_m, 2)] for c in e.retenues],
+              "cotes": [[c.valeur, round(c.px_par_m, 2), "V" if c.verticale else "H"] for c in e.cotes],
+              "sure": e.sure, "contredite": e.contredite, "barre": e.barre_detail or None, "surfaces": e.surfaces_detail or None,
+              "surfaces_px_par_m": e.surfaces, "ecrite": e.ecrite_detail or None, "portes_px_par_m": e.approchee,
+              "interieur_px": list(e.interieur_px) if e.interieur_px else None, "coloriage_douteux": douteux,
+              "largeur_px_par_m": e.largeur, "hauteur_px_par_m": e.hauteur, "cote_max": [e.cote_max_largeur, e.cote_max_hauteur],
+              "de_biais": R is not None, "optique": optique}
     if lx or ly:
         vx, vy = lx or ly, ly or lx
-        echelle = {"etat": "lue", "source": origine, "px_par_m_largeur": vx, "px_par_m_hauteur": vy, "cotes": len(e.cotes)}
+        echelle = {"etat": "lue", "source": origine, "px_par_m_largeur": vx, "px_par_m_hauteur": vy, "cotes": len(e.cotes),
+                   "detail": detail}
         if R is not None and lx and ly:  # lue dans les deux sens : elle a le dernier mot sur les proportions
             R = corriger_proportions(R, vx / vy)
         s = vx
     else:
         s, comment = _echelle_de_secours(e.approchee, col.shape)
         echelle = {"etat": "a_verifier", "source": origine, "provisoire": s, "raison": f"échelle non lue : {comment}",
-                   "cotes": len(e.cotes)}
+                   "cotes": len(e.cotes), "detail": detail}
         autres.append({"code": "echelle", "element": None, "gravite": "fort",
                        "raison": f"Échelle non lue : les mesures sont provisoires ({comment}). Corrige une cote pour tout recaler."})
     if douteux:
