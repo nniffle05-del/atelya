@@ -28,8 +28,16 @@ from typing import Literal
 from moteur.logement import Logement, Mur, Ouverture
 
 VERSION_PLAN = "construction/0.1"
-PRESQUE_ALIGNES = 0.9995  # deux murs à moins de ~1,8° l'un de l'autre sont considérés comme alignés
+# Deux murs qui se rejoignent à moins de 1° sont dans le prolongement l'un de l'autre : pas de coupe d'onglet.
+# Et quand l'onglet s'étirerait trop loin (angle de quelques degrés : à 2°, deux murs de 30 cm donnent 10 m d'onglet,
+# qui avalait toutes les portes du mur sur fr-003), on les traite aussi comme alignés (voir _ajustements_aux_angles).
+ANGLE_ONGLET_MIN_DEG = 1.0
+PRESQUE_ALIGNES = math.cos(math.radians(ANGLE_ONGLET_MIN_DEG))
 RECOUVREMENT_TOLERE = 0.01  # m : au-delà, deux ouvertures se chevauchent vraiment et le plan doit être corrigé
+# Une ouverture lue un peu dans l'angle du mur (le coin est pris par le mur voisin) est raccourcie à ce qui reste du mur :
+# c'est une imprécision de lecture, pas une erreur de plan. Au-delà de cette marge, le plan est faux et on refuse.
+ANGLE_OUVERTURE_MAX = 0.30  # m
+OUVERTURE_MIN = 0.25  # m : ce qui doit rester d'une ouverture raccourcie
 
 # En dessous de cette distance (en mètres), deux points sont considérés égaux.
 PRECISION = 1e-6
@@ -132,8 +140,14 @@ def _ajustements_aux_angles(murs: list[Mur]) -> dict[str, Ajustement]:
         if produit > PRESQUE_ALIGNES:
             continue  # murs dans le prolongement l'un de l'autre : rien à corriger (un onglet sur un angle minuscule exploserait)
         if produit > PRECISION:
-            for (m, b), (n_, _) in (((mur_a, bout_a), (mur_b, bout_b)), ((mur_b, bout_b), (mur_a, bout_a))):
-                ajustements[m.id][b] = list(_onglet(m, b, n_, _))
+            onglets = {m.id: (b, list(_onglet(m, b, n_, _)))
+                       for (m, b), (n_, _) in (((mur_a, bout_a), (mur_b, bout_b)), ((mur_b, bout_b), (mur_a, bout_a)))}
+            # Un onglet plus long que ça n'existe pas dans un logement : l'angle est trop aigu (moins de ~12° pour des murs
+            # de 30 cm), c'est une lecture imprécise de deux murs alignés.
+            limite = max(1.0, 2 * (mur_a.epaisseur + mur_b.epaisseur))
+            if all(abs(v) <= limite for _, vals in onglets.values() for v in vals):  # sinon : comme des murs alignés
+                for id_, (b, vals) in onglets.items():
+                    ajustements[id_][b] = vals
             continue
         for k in (0, 1):
             ajustements[mur_a.id][bout_a][k] += mur_b.epaisseur / 2
@@ -184,8 +198,15 @@ def _briques_du_mur(
         return [Brique(f"{mur.id}__plein_1", "mur", mur.id, _rectangle(mur, t_debut, t_fin), 0.0, hauteur)]
     curseur = t_debut
     numero = 0
+    debut_libre, fin_libre = max(t_debut), min(t_fin)  # entre les deux, le mur est à lui ; au-delà, c'est l'angle
     for o in sorted(ouvertures, key=lambda o: o.position):
         gauche, droite = o.position, o.position + o.largeur
+        if debut_libre - ANGLE_OUVERTURE_MAX <= gauche < debut_libre:
+            gauche = debut_libre
+        if fin_libre < droite <= fin_libre + ANGLE_OUVERTURE_MAX:
+            droite = fin_libre
+        if (gauche, droite) != (o.position, o.position + o.largeur) and droite - gauche < OUVERTURE_MIN:
+            raise ValueError(f"l'ouverture {o.id} est presque entièrement dans l'angle du mur {mur.id}")
         if gauche < max(curseur) - RECOUVREMENT_TOLERE:
             raise ValueError(
                 f"l'ouverture {o.id} chevauche une autre ouverture ou l'angle du mur {mur.id}"
@@ -212,7 +233,8 @@ def _briques_du_mur(
 
     reste = min(t_fin) - max(curseur)
     if reste < -PRECISION:
-        raise ValueError(f"une ouverture du mur {mur.id} empiète sur son angle")
+        derniere = max(ouvertures, key=lambda o: o.position)
+        raise ValueError(f"l'ouverture {derniere.id} du mur {mur.id} empiète sur son angle")
     if max(t_fin) - min(curseur) > PRECISION:
         numero += 1
         briques.append(

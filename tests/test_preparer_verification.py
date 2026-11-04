@@ -120,3 +120,16 @@ def test_fichier_au_format_de_l_ecran():
 
 def test_plan_refuse_pas_d_ecran():
     assert verification_du_plan(_plan_lu(np.zeros((600, 800), np.uint8))) is None
+
+
+def test_un_logement_que_la_3d_refuse_donne_un_doute_sur_l_ouverture_en_cause():
+    from moteur.preparer_verification import doutes_de_construction
+
+    mur = {"id": "A", "debut": [0, 0], "fin": [6, 0], "epaisseur": 0.2, "statut": "estime", "source": "atelya"}
+    porte = {"id": "P", "type": "porte", "mur": "A", "position": 1, "largeur": 0.9, "hauteur": 2.04, "allege": 0, "statut": "estime", "source": "atelya"}
+    fenetre = {**porte, "id": "F", "type": "fenetre", "position": 1.5, "hauteur": 1.2, "allege": 0.9}
+    base = {"schema": "logement/0.1", "projet_id": "T", "unites": "m", "hauteur_sous_plafond": 2.5, "murs": [mur], "pieces": []}
+    assert doutes_de_construction({**base, "ouvertures": [porte]}) == []
+    [d] = doutes_de_construction({**base, "ouvertures": [porte, fenetre]})
+    assert d["code"] == "construction" and d["element"] == "F" and d["gravite"] == "fort"
+    assert "3D" in d["raison"]

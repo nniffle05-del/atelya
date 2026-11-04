@@ -24,6 +24,7 @@
   const MUR_COURT = 0.3; // m
   const PORTE_ETROITE = 0.55; // m
   const OUVERTURE_LARGE = 3.0; // m
+  const RECOUVREMENT_TOLERE = 0.01; // m : même tolérance que moteur/geometrie.py entre deux ouvertures voisines
 
   function arrondi(valeur, decimales = 2) {
     const f = 10 ** decimales;
@@ -1061,6 +1062,23 @@
         actions: [{ libelle: "Oui, c'est bon", action: { type: "regler" }, principal: true }, { libelle: "Non, je corrige", action: { type: "mesurer" } }] });
     }
 
+    // 1 bis. Deux ouvertures l'une sur l'autre : le moteur ne saura pas construire, il faut en supprimer une.
+    const parMur = new Map();
+    for (const o of lg.ouvertures || []) { if (!parMur.has(o.mur)) parMur.set(o.mur, []); parMur.get(o.mur).push(o); }
+    for (const liste of parMur.values()) {
+      liste.sort((a, b) => a.position - b.position);
+      for (let i = 1; i < liste.length; i++) {
+        const a = liste[i - 1], b = liste[i];
+        if (a.position + a.largeur - b.position <= 0.01 || resolus.has(`recouvrement|${a.id}+${b.id}`)) continue;
+        const nomA = nomSimple(lg, a.id).replace(/^cette /, ""), nomB = nomSimple(lg, b.id).replace(/^cette /, "");
+        points.push({ cle: `recouvrement|${a.id}+${b.id}`, genre: "recouvrement", titre: "Deux ouvertures l'une sur l'autre",
+          texte: `Une ${nomA} de ${fr(a.largeur)} m et une ${nomB} de ${fr(b.largeur)} m se chevauchent sur le même mur. Le plan n'en a sûrement qu'une : laquelle garder ?`,
+          elements: [a.id, b.id], doutes: doutes.filter((d) => d.element === a.id || d.element === b.id), zone_px: unirBoites([zoneDe(a.id), zoneDe(b.id)].filter(Boolean)),
+          actions: [{ libelle: `Garder la ${nomA} (${fr(a.largeur)} m)`, action: { type: "garder_une", garder: a.id, supprimer: b.id }, principal: a.largeur >= b.largeur },
+            { libelle: `Garder la ${nomB} (${fr(b.largeur)} m)`, action: { type: "garder_une", garder: b.id, supprimer: a.id }, principal: b.largeur > a.largeur }] });
+      }
+    }
+
     // 2. Les pièces coupées en morceaux.
     const dansUnGroupe = new Set();
     for (const groupe of morceauxDePieces(lg)) {
@@ -1143,6 +1161,12 @@
     let v = v0;
     if (action.type === "fusionner") return fusionnerPieces(v, point.elements, nom);
     if (action.type === "fermer") return recalculerPieces(ajouterMur(v, action.debut, action.fin, action.epaisseur));
+    if (action.type === "garder_une") {
+      v = confirmer(supprimer(v, action.supprimer), action.garder);
+      v = copie(v);
+      v.resolus = [...new Set([...(v.resolus || []), point.cle])];
+      return v;
+    }
     if (action.type === "supprimer_tout") {
       for (const id of point.elements) if (trouver(v.logement, id)) v = supprimer(v, id);
     } else if (action.type === "regler") {
@@ -1296,6 +1320,17 @@
       }
       const h = m.hauteur || lg.hauteur_sous_plafond;
       if (o.allege + o.hauteur > h + 1e-9) erreurs.push(`l'ouverture ${o.id} dépasse le haut du mur ${m.id}`);
+    }
+    // Deux ouvertures qui se chevauchent sur le même mur : le moteur refuse de construire (moteur/geometrie.py).
+    const parMur = new Map();
+    for (const o of lg.ouvertures || []) { if (!parMur.has(o.mur)) parMur.set(o.mur, []); parMur.get(o.mur).push(o); }
+    for (const liste of parMur.values()) {
+      liste.sort((a, b) => a.position - b.position);
+      for (let i = 1; i < liste.length; i++) {
+        const a = liste[i - 1], b = liste[i];
+        const recouvrement = a.position + a.largeur - b.position;
+        if (recouvrement > RECOUVREMENT_TOLERE) erreurs.push(`les ouvertures ${a.id} et ${b.id} se chevauchent de ${Math.round(recouvrement * 100)} cm sur le mur ${a.mur}`);
+      }
     }
     for (const p of lg.pieces || []) {
       if (!p.nom || !p.nom.trim()) erreurs.push(`la pièce ${p.id} n'a pas de nom`);

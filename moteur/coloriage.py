@@ -33,7 +33,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.4.1"
+VERSION_COLORIAGE = "0.4.2"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -1070,8 +1070,11 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
         else:
             pos = (g.b - o["fin"]) / s  # le mur vertical va du sud (bas de l'image) au nord
         largeur = (o["fin"] - o["debut"]) / s
+        # Une ouverture lue au-delà d'un bout du mur s'arrête à ce bout, sans glisser le long du mur : avant 0.4.2,
+        # son début était ramené à 0 mais sa largeur gardée, et elle venait chevaucher sa voisine (fr-016 : 73 cm).
+        bout = min(pos + largeur, longueurs[mid])
         pos = max(0.0, pos)
-        largeur = min(largeur, longueurs[mid] - pos)
+        largeur = bout - pos
         if largeur < LARGEUR_MIN_OUVERTURE:
             continue
         type_ = OUVERTURES[o["classe"]]

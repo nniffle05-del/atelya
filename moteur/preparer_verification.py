@@ -64,6 +64,36 @@ def _echelle(echelle: dict) -> dict:
     return sortie
 
 
+def doutes_de_construction(logement: dict) -> list[dict]:
+    """Ce que le moteur 3D refuserait de construire, dit comme un doute fort sur l'élément en cause.
+
+    La 3D (moteur/geometrie.py) s'arrête à la première impossibilité : une ouverture sur une autre, ou trop
+    engagée dans l'angle du mur. Sans ce doute, l'écran laisserait « Terminer » un logement qu'on ne peut pas bâtir."""
+    import re
+
+    from moteur.geometrie import calculer_briques
+    from moteur.logement import Logement
+
+    try:
+        calculer_briques(Logement.model_validate(logement))
+    except ValueError as e:
+        message = str(e)
+        trouve = re.search(r"l'ouverture (\S+)", message) or re.search(r"du mur (\S+)", message)
+        element = trouve.group(1) if trouve else None
+        if "chevauche" in message:
+            raison = "la 3D ne peut pas se construire : cette ouverture est sur une autre ouverture, ou trop engagée dans l'angle du mur"
+        elif "angle" in message:
+            raison = "la 3D ne peut pas se construire : cette ouverture déborde dans l'angle du mur, là où le mur voisin arrive"
+        elif "se rejoignent" in message:
+            raison = "la 3D ne peut pas se construire : plus de deux murs se rejoignent au même point"
+        else:
+            raison = f"la 3D ne peut pas se construire telle quelle ({re.sub(r'\\b[MOP]_?\\w*\\d+\\b', 'cet élément', message)})"
+        return [{"code": "construction", "element": element, "gravite": "fort", "raison": raison}]
+    except Exception:  # noqa: BLE001 — un logement que le format refuse est déjà signalé ailleurs
+        return []
+    return []
+
+
 def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | None:
     """Le contenu de verification.json ; None pour un plan refusé (rien à montrer : pas d'écran)."""
     g = plan.gardee
@@ -71,7 +101,7 @@ def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | No
         return None
     M = matrice_calage(g.details, g.coloriage.shape, plan.source.image.shape, g.redressement)
     doutes = []
-    for d in g.examen["doutes"]:
+    for d in [*g.examen["doutes"], *doutes_de_construction(g.logement)]:
         sortie = {"element": d.get("element"), "raison": d["raison"], "code": d["code"], "gravite": d["gravite"]}
         if d.get("zone_m"):
             sortie["zone_px"] = zone_en_pixels(M, d["zone_m"])

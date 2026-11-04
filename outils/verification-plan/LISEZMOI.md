@@ -36,10 +36,15 @@ porte < 55 cm, ouverture > 3 m, surface écrite différente du contour.
 
 `pointsAVerifier` (dans `calculs-verif.js`) présente les doutes autrement, sans en changer aucun ni aucun seuil :
 1. l'échelle : à contrôler quand elle est lue (une erreur d'échelle ne se voit pas sur le dessin), à corriger sinon ;
+1 bis. deux ouvertures l'une sur l'autre sur le même mur (le moteur 3D refuse) : « laquelle garder ? » ; `verifierCoherence` le refuse aussi ;
 2. les pièces qu'aucun mur ne sépare (`morceauxDePieces`) : « Les réunir » (`fusionnerPieces`) ou « Ce sont des pièces séparées » ;
 3. les doutes sur une porte, une fenêtre ou une pièce, un par un ;
 4. les doutes sur des murs ou des zones à moins de 60 cm les uns des autres : un seul point ;
 5. les petites hésitations (gravité « faible ») : un seul point, à la fin.
+
+Le préparateur Python (`moteur/preparer_verification.py`) ajoute un doute `construction` quand la 3D (`moteur/geometrie.py`)
+refuse le logement tel quel (ouverture dans l'angle d'un mur, ou sur une autre) : il devient un point sur l'ouverture en cause.
+L'écran ne refait pas ce contrôle après les corrections.
 
 ## Corriger
 

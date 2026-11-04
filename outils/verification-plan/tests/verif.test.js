@@ -171,12 +171,12 @@ test("corriger une cote : ce mur seulement, ou l'échelle de tout le plan", () =
 });
 
 test("ajouter un mur et des ouvertures ; supprimer un mur emporte ses portes", () => {
-  let v = C.ajouterMur(exemple(), [1, 1], [3, 1], 0.1);
+  let v = C.ajouterMur(exemple(), [1, 1], [4, 1], 0.1);
   const id = v.logement.murs.at(-1).id;
   assert.equal(id, "M_v1");
-  v = C.ajouterOuverture(v, id, "porte", 1.0);
+  v = C.ajouterOuverture(v, id, "porte", 2.5);
   const o = v.logement.ouvertures.at(-1);
-  proche(o.position, 1.0 - 0.83 / 2, 1e-3);
+  proche(o.position, 2.5 - 0.83 / 2, 1e-3);
   assert.equal(o.hauteur, 2.04);
   v = C.ajouterOuverture(v, id, "fenetre", 0.1); // trop près du bout : elle est ramenée dans le mur
   assert.equal(v.logement.ouvertures.at(-1).position, 0);
@@ -519,4 +519,17 @@ test("reprendre : un fichier d'un autre plan ou sans rapport est refusé", () =>
   assert.throws(() => C.reprendreTravail(base, autre), /concerne le plan « Autre »/);
   assert.throws(() => C.reprendreTravail(base, { a: 1 }), /pas un travail/);
   assert.throws(() => C.reprendreTravail(base, C.travail({ ...base, logement: autre })), /concerne le plan/);
+});
+
+test("deux ouvertures l'une sur l'autre : incohérence pour le moteur, et un point qui propose d'en garder une", () => {
+  const v = logementCarre();
+  v.logement.ouvertures.push({ id: "F", type: "fenetre", mur: "S", position: 1.5, largeur: 1.0, hauteur: 1.2, allege: 0.9, statut: "estime", source: "atelya" });
+  assert.ok(C.verifierCoherence(v.logement).some((e) => /chevauchent de 30 cm/.test(e)));
+  const point = C.pointsAVerifier(v).find((p) => p.genre === "recouvrement");
+  assert.deepEqual(point.elements, ["P", "F"]);
+  assert.match(point.texte, /porte de 0,80 m et une fenêtre de 1,00 m/);
+  const w = C.reglerPoint(v, point, point.actions[1].action); // garder la fenêtre
+  assert.deepEqual(w.logement.ouvertures.map((o) => o.id), ["F"]);
+  assert.deepEqual(C.verifierCoherence(w.logement), []);
+  assert.ok(!C.pointsAVerifier(w).some((p) => p.genre === "recouvrement"));
 });

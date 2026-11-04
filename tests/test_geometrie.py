@@ -152,7 +152,7 @@ def test_cas_non_geres_refuses(nom):
         calculer_briques(logement)  # ...mais la géométrie n'est pas encore gérée
 
 
-@pytest.mark.parametrize("fin_b", [(4.0, 3.0), (2.5, 3.0), (5.0, 0.5), (-1.0, 3.0), (3.0, -2.0)])
+@pytest.mark.parametrize("fin_b", [(4.0, 3.0), (2.5, 3.0), (5.0, 1.2), (-1.0, 3.0), (3.0, -2.0)])  # 22° au plus aigu : en dessous de ~12°, plus d'onglet
 @pytest.mark.parametrize("ep_b", [0.20, 0.35])
 def test_angle_en_biais_coupe_d_onglet(fin_b, ep_b):
     """A3 : deux murs qui se rejoignent en biais se touchent le long d'une même arête (onglet), sans trou."""
@@ -207,3 +207,43 @@ def test_deux_ouvertures_qui_se_touchent_a_un_millimetre_pres():
     assert calculer_briques(avec(1.999))
     with pytest.raises(ValueError, match="chevauche"):
         calculer_briques(avec(1.9))
+
+
+def _logement(murs, ouvertures):
+    from moteur.logement import Logement
+
+    return Logement.model_validate({
+        "schema": "logement/0.1", "projet_id": "T", "unites": "m", "hauteur_sous_plafond": 2.5,
+        "murs": [{"id": i, "debut": d, "fin": f, "epaisseur": e, "statut": "estime", "source": "atelya"} for i, d, f, e in murs],
+        "ouvertures": [{"id": i, "type": t, "mur": m, "position": p, "largeur": l, "hauteur": 2.04 if t == "porte" else 1.2,
+                        "allege": 0 if t == "porte" else 0.9, "statut": "estime", "source": "atelya"} for i, t, m, p, l in ouvertures],
+        "pieces": [],
+    })
+
+
+def test_deux_murs_a_petit_angle_ne_font_pas_d_onglet_de_dix_metres():
+    """Un mur de 6 m qui continue à 2° (lecture imprécise) : ses portes doivent toutes rester constructibles (fr-003)."""
+    from moteur.geometrie import calculer_briques
+    import math
+
+    a = 2.0
+    fin = [6 + 5 * math.cos(math.radians(a)), 5 * math.sin(math.radians(a))]
+    lg = _logement([("A", [0, 0], [6, 0], 0.32), ("B", [6, 0], fin, 0.5)],
+                   [("P1", "porte", "A", 1.5, 0.8), ("P2", "porte", "A", 2.8, 1.0), ("P3", "porte", "A", 4.0, 0.3)])
+    briques = calculer_briques(lg)
+    assert sum(b.id.startswith("A__plein") for b in briques) == 4  # les trois portes découpent le mur en quatre pleins
+
+
+def test_une_fenetre_qui_mord_sur_l_angle_est_raccourcie_pas_refusee():
+    """fr-004 : fenêtre lue sur toute la longueur d'un mur de 1 m dont le coin est pris par le mur voisin (15 cm)."""
+    from moteur.geometrie import calculer_briques
+
+    # B est cité en premier : c'est lui qui est rallongé dans l'angle, et A qui est raccourci de la demi-épaisseur de B.
+    lg = _logement([("B", [1, 0], [1, 3], 0.31), ("A", [0, 0], [1, 0], 0.25)], [("F", "fenetre", "A", 0.0, 0.995)])
+    briques = calculer_briques(lg)
+    allege = next(b for b in briques if b.id == "A__allege_F")
+    assert max(p[0] for p in allege.contour) <= 1 - 0.155 + 1e-6
+    # Au-delà de 30 cm dans l'angle, ce n'est plus une imprécision : refus clair.
+    loin = _logement([("B", [1, 0], [1, 3], 0.9), ("A", [0, 0], [1, 0], 0.25)], [("F", "fenetre", "A", 0.0, 0.995)])
+    with pytest.raises(ValueError):
+        calculer_briques(loin)
