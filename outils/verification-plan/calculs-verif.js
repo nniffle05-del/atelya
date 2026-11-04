@@ -1153,6 +1153,50 @@
     return v;
   }
 
+  // ---------- Reprendre un travail ----------
+
+  const VERSION_TRAVAIL = "travail-verification/0.1";
+
+  /** Tout ce qu'il faut pour reprendre une vérification plus tard (l'image du plan n'y est pas : elle reste à part). */
+  function travail(v, { detail = [], fermeture = false, murs_calcules = null, quand = new Date().toISOString() } = {}) {
+    return { schema: VERSION_TRAVAIL, date: quand, projet_id: v.logement.projet_id, verification: v, detail: [...detail], fermeture, murs_calcules };
+  }
+
+  /**
+   * Repart d'un fichier enregistré : un travail, un résultat de vérification, ou un simple logement.json corrigé.
+   * Ce dernier n'a ni calage ni liste de ce qui a été vérifié : on les retrouve à partir de la lecture de départ (`base`) ;
+   * si l'échelle a été corrigée, les murs qui existent des deux côtés donnent la correction.
+   */
+  function reprendreTravail(base, contenu) {
+    if (!contenu || typeof contenu !== "object") throw new Error("ce fichier n'est pas un travail de vérification");
+    const projet = base.logement.projet_id;
+    const mauvaisPlan = (id) => new Error(`ce fichier concerne le plan « ${id} », pas « ${projet} »`);
+    if (contenu.schema === VERSION_TRAVAIL) {
+      if (contenu.projet_id !== projet) throw mauvaisPlan(contenu.projet_id);
+      const erreurs = verifierFichier(contenu.verification);
+      if (erreurs.length) throw new Error(erreurs.join(" ; "));
+      return { v: copie(contenu.verification), detail: contenu.detail || [], fermeture: !!contenu.fermeture, murs_calcules: contenu.murs_calcules || null };
+    }
+    const lg = contenu.schema === VERSION_RESULTAT ? contenu.logement : contenu;
+    if (!lg || lg.schema !== "logement/0.1" || !Array.isArray(lg.murs) || !lg.murs.length) throw new Error("ce fichier n'est pas un travail de vérification");
+    if (lg.projet_id !== projet) throw mauvaisPlan(lg.projet_id);
+    const v = copie(base);
+    v.logement = copie(lg);
+    const anciens = new Map(base.logement.murs.map((m) => [m.id, m]));
+    const rapports = lg.murs.filter((m) => anciens.has(m.id) && longueur(anciens.get(m.id).debut, anciens.get(m.id).fin) > 0.5)
+      .map((m) => longueur(m.debut, m.fin) / longueur(anciens.get(m.id).debut, anciens.get(m.id).fin)).sort((a, b) => a - b);
+    const k = rapports.length ? rapports[Math.floor(rapports.length / 2)] : 1;
+    if (Math.abs(k - 1) > 1e-4) {
+      const m = matriceDuCalage(v.calage);
+      v.calage = { matrice: m.map((ligne) => [ligne[0] / k, ligne[1] / k, ligne[2]]) };
+      v.echelle = { ...(v.echelle || {}), etat: "corrigee", facteur: arrondi(k, 5) };
+    }
+    const touches = [...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].filter((e) => e.source && e.source.includes("verification"));
+    v.verifies = touches.map((e) => e.id);
+    delete v.resolus;
+    return { v, detail: [], fermeture: true, murs_calcules: null }; // montre tout de suite ce qui n'est pas fermé
+  }
+
   // ---------- Viser avec la souris ----------
 
   function inverse(m) {
@@ -1335,6 +1379,8 @@
     confirmer,
     resoudre,
     appliquerAction,
+    travail,
+    reprendreTravail,
     fusionnerPieces,
     deplacerBout,
     accrocherBout,

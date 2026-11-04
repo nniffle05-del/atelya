@@ -53,6 +53,9 @@
     deplacementPropose: null, // en cm : ce qu'il manque d'après la mesure donnée
     relier: null, // premier bout à relier : {id, bout, point}
     accroche: null, // le point où un bout de mur vient de s'accrocher (m)
+    fait: null, // le point qu'on vient de régler, à regarder avant de passer au suivant : {titre, texte, zone_px}
+    depart_lecture: null, // la lecture d'Atelya, telle qu'à l'ouverture
+    pastilles: [], // où sont dessinées les pastilles : {rang, x, y} en pixels d'écran
     references: new WeakMap(), // pour chaque version du plan : ses murs quand les pièces ont été calculées (suit « Annuler »)
     souris: null, // position de la souris (m)
     glisse: null, // {genre: "vue"|"mur", ...}
@@ -61,7 +64,7 @@
     refaire: [],
     vue: { zoom: 1, dx: 0, dy: 0 },
   };
-  window.Verification = { etat, choisir }; // pour les tests automatiques
+  window.Verification = { etat, choisir, reprendre }; // pour les tests automatiques
 
   // ---------- Branchement au site interne ----------
   //
@@ -104,15 +107,96 @@
     etat.refaire = [];
     etat.choisi = null;
     etat.rangPoint = 0;
+    etat.fait = null;
     etat.detail = new Set();
     etat.fermeture = false;
     etat.mesure = null;
     etat.deplacementPropose = null;
     etat.references.set(verification, empreinteMurs(verification));
+    etat.depart_lecture = verification;
     $("accueil").style.display = "none";
     message("");
     recalculer();
     ajuster();
+    rafraichir();
+    proposerReprise();
+  }
+
+  // ---------- Garder le travail ----------
+  //
+  // Chaque correction s'enregistre dans le navigateur. Dans le site interne, c'est le site qui garde les fichiers.
+
+  const cleSauvegarde = () => `atelya-verification|${etat.depart_lecture.logement.projet_id}`;
+  const heure = (date) => new Date(date).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+
+  function photoDuTravail() {
+    return C.travail(etat.v, { detail: [...etat.detail], fermeture: etat.fermeture, murs_calcules: etat.references.get(etat.v) || null });
+  }
+
+  function sauvegarder() {
+    if (integre || !etat.v) return;
+    try {
+      localStorage.setItem(cleSauvegarde(), JSON.stringify(photoDuTravail()));
+      $("sauvegarde").textContent = "✓ Enregistré";
+    } catch (e) {
+      $("sauvegarde").textContent = "Non enregistré : téléchargez votre travail";
+    }
+  }
+
+  function proposerReprise() {
+    $("reprise").hidden = true;
+    if (integre) return;
+    let t = null;
+    try { t = JSON.parse(localStorage.getItem(cleSauvegarde())); } catch (e) { return; }
+    if (!t || !t.verification || JSON.stringify(t.verification.logement) === JSON.stringify(etat.v.logement)) return;
+    $("reprise-texte").textContent = `Vous avez déjà travaillé sur ce plan (le ${heure(t.date)}).`;
+    $("reprise").hidden = false;
+    $("reprise-oui").onclick = () => reprendre(t);
+    $("reprise-non").onclick = repartir;
+  }
+
+  /** Repart d'un travail enregistré (dans le navigateur ou dans un fichier). */
+  function reprendre(contenu) {
+    try {
+      const r = C.reprendreTravail(etat.depart_lecture, contenu);
+      etat.v = r.v;
+      etat.historique = [];
+      etat.refaire = [];
+      etat.detail = new Set(r.detail);
+      etat.fermeture = r.fermeture;
+      etat.references.set(r.v, r.murs_calcules || empreinteMurs(r.v));
+      etat.choisi = null;
+      etat.rangPoint = 0;
+      etat.mesure = null;
+      etat.fait = null;
+      $("reprise").hidden = true;
+      recalculer();
+      ajuster();
+      message("Travail repris.");
+      rafraichir();
+      sauvegarder();
+    } catch (e) {
+      message("Reprise impossible : " + e.message, true);
+    }
+  }
+
+  function repartir() {
+    try { localStorage.removeItem(cleSauvegarde()); } catch (e) { /* rien à effacer */ }
+    etat.v = JSON.parse(JSON.stringify(etat.depart_lecture));
+    etat.references.set(etat.v, empreinteMurs(etat.v));
+    etat.historique = [];
+    etat.refaire = [];
+    etat.detail = new Set();
+    etat.fermeture = false;
+    etat.choisi = null;
+    etat.rangPoint = 0;
+    etat.mesure = null;
+    etat.fait = null;
+    $("reprise").hidden = true;
+    $("sauvegarde").textContent = "";
+    recalculer();
+    ajuster();
+    message("Vous repartez de la lecture d'Atelya.");
     rafraichir();
   }
 
@@ -176,13 +260,18 @@
     try {
       const nouveau = correction(etat.v);
       if (nouveau === etat.v) return false;
+      const pointAvant = etat.fait ? null : etat.points[etat.rangPoint];
       etat.historique.push(etat.v);
       etat.refaire = [];
       etat.references.set(nouveau, etat.references.get(etat.v));
       etat.v = nouveau;
       recalculer();
-      message(texte || "");
+      if (pointAvant && !etat.points.some((x) => x.cle === pointAvant.cle)) {
+        etat.fait = { titre: pointAvant.titre, texte: texte || "C'est fait.", zone_px: pointAvant.zone_px };
+        message("");
+      } else message(texte || "");
       rafraichir();
+      sauvegarder();
       return true;
     } catch (e) {
       message(e.message, true);
@@ -194,18 +283,22 @@
     if (!etat.historique.length) return;
     etat.refaire.push(etat.v);
     etat.v = etat.historique.pop();
+    etat.fait = null;
     recalculer();
     message("Dernière correction annulée.");
     rafraichir();
+    sauvegarder();
   }
 
   function refaire() {
     if (!etat.refaire.length) return;
     etat.historique.push(etat.v);
     etat.v = etat.refaire.pop();
+    etat.fait = null;
     recalculer();
     message("Correction rétablie.");
     rafraichir();
+    sauvegarder();
   }
 
   // ---------- Vue ----------
@@ -336,7 +429,7 @@
     const v = etat.apercu || etat.v;
     const f = formes(v);
     const trait = 1 / z; // un pixel d'écran
-    const point = etat.points[etat.rangPoint];
+    const point = etat.fait ? null : etat.points[etat.rangPoint];
     const enCours = new Set(point ? point.elements : []);
 
     for (const p of f.pieces) {
@@ -382,6 +475,17 @@
       ctx.fillRect(x, y, l, h);
       ctx.lineWidth = 3 * trait;
       ctx.strokeStyle = COULEURS.doute;
+      ctx.setLineDash([8 * trait, 5 * trait]);
+      ctx.strokeRect(x - m, y - m, l + 2 * m, h + 2 * m);
+      ctx.setLineDash([]);
+    }
+
+    // Le point qu'on vient de régler : l'endroit reste entouré en vert, le temps de regarder le résultat.
+    if (etat.fait && etat.fait.zone_px) {
+      const [x, y, l, h] = etat.fait.zone_px;
+      const m = 8 * trait;
+      ctx.lineWidth = 3 * trait;
+      ctx.strokeStyle = "#16a34a";
       ctx.setLineDash([8 * trait, 5 * trait]);
       ctx.strokeRect(x - m, y - m, l + 2 * m, h + 2 * m);
       ctx.setLineDash([]);
@@ -449,6 +553,46 @@
     dessinerTrace(v, trait);
 
     dessinerEtiquettes(f, enCours, dpr);
+    dessinerPastilles(f, dpr);
+  }
+
+  /** Une pastille numérotée pour chaque point à vérifier. Le point en cours est plus grand et plus foncé. */
+  function dessinerPastilles(f, dpr) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const formesParId = new Map([...f.murs, ...f.ouvertures, ...f.pieces].map((e) => [e.id, e]));
+    const places = [];
+    etat.points.forEach((point, rang) => {
+      let rect = point.zone_px;
+      if (!rect) {
+        const pts = point.elements.flatMap((id) => (formesParId.get(id) ? formesParId.get(id).points : []));
+        if (!pts.length) return;
+        rect = rectangleDe(pts);
+      }
+      let x = (rect[0] + rect[2] / 2) * etat.vue.zoom + etat.vue.dx, y = (rect[1] + rect[3] / 2) * etat.vue.zoom + etat.vue.dy;
+      while (places.some((q) => Math.hypot(q.x - x, q.y - y) < 22)) x += 22; // à côté de la voisine, jamais dessus
+      places.push({ rang, x, y });
+    });
+    etat.pastilles = places;
+    ctx.textAlign = "center";
+    for (const { rang, x, y } of places) {
+      const actuel = rang === etat.rangPoint && !etat.fait;
+      ctx.beginPath();
+      ctx.arc(x, y, actuel ? 13 : 10, 0, 2 * Math.PI);
+      ctx.fillStyle = actuel ? "#9a3412" : COULEURS.doute;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.fillText(String(rang + 1), x, y + 4);
+    }
+  }
+
+  function pastilleSous(ev) {
+    const r = canvas.getBoundingClientRect();
+    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    return etat.affichage === "plan" || etat.outil !== "choisir" ? null : etat.pastilles.find((q) => Math.hypot(q.x - x, q.y - y) <= 12) || null;
   }
 
   const sensMur = (m) => { const l = C.longueur(m.debut, m.fin); return { l, d: [(m.fin[0] - m.debut[0]) / l, (m.fin[1] - m.debut[1]) / l] }; };
@@ -617,6 +761,17 @@
     actions.innerHTML = "";
     const n = etat.points.length;
     const point = etat.points[etat.rangPoint];
+    if (etat.fait) {
+      sec.classList.add("fini");
+      $("point-nav").hidden = true;
+      $("point-numero").textContent = "✓ C'est fait";
+      $("point-titre").textContent = etat.fait.titre;
+      $("point-texte").textContent = `${etat.fait.texte} Regardez le résultat sur le plan, puis continuez. Si ce n'est pas bon, annulez.`;
+      actions.append(
+        el("button", { class: "bouton principal", id: "fait-suivant", texte: n ? "C'est bon, point suivant ›" : "C'est bon, voir la fin ›", onclick: montrerPoint }),
+        el("button", { class: "bouton", id: "fait-annuler", texte: "↶ Annuler cette correction", onclick: annuler }));
+      return;
+    }
     sec.classList.toggle("fini", !n);
     $("point-nav").hidden = n < 2;
     $("point-precedent").disabled = etat.rangPoint === 0;
@@ -757,14 +912,15 @@
     }
     const fait = { regler: "Noté.", supprimer_tout: "Supprimé.", fusionner: "Pièces réunies.", fermer: "Mur ajouté et pièces recalculées." }[choix.action.type];
     if (corriger((x) => C.reglerPoint(x, point, choix.action, nom), fait)) {
-      if (choix.action.type === "fermer") etat.references.set(etat.v, empreinteMurs(etat.v));
+      if (choix.action.type === "fermer") { etat.references.set(etat.v, empreinteMurs(etat.v)); sauvegarder(); }
       etat.choisi = null;
-      montrerPoint();
+      rafraichir(); // on reste au même endroit : le résultat se regarde avant de passer au suivant
     }
   }
 
   /** Amène le plan sur le point en cours. */
   function montrerPoint() {
+    etat.fait = null;
     const point = etat.points[etat.rangPoint];
     if (point && point.zone_px) cadrer(point.zone_px);
     else ajuster();
@@ -923,6 +1079,17 @@
     const tol = metresPour(VISEE, p);
     const lg = etat.v.logement;
 
+    // Une poignée du mur choisi passe avant une pastille posée au même endroit.
+    const murPoignee = etat.choisi && lg.murs.find((m) => m.id === etat.choisi);
+    const surPoignee = murPoignee && ["debut", "fin"].some((b) => C.longueur(p, murPoignee[b]) <= metresPour(VISEE * 1.5, p));
+    const pastille = surPoignee ? null : pastilleSous(ev);
+    if (pastille) {
+      etat.rangPoint = pastille.rang;
+      etat.choisi = null;
+      etat.mesure = null;
+      montrerPoint();
+      return;
+    }
     if (etat.affichage === "plan") { // le plan seul : on ne fait que le regarder
       etat.glisse = { genre: "vue", dernier: [ev.clientX, ev.clientY] };
       return;
@@ -993,6 +1160,7 @@
     if (!etat.v) return;
     const p = ecranVersMetres(ev);
     etat.souris = p;
+    if (!etat.glisse && etat.outil === "choisir") canvas.style.cursor = pastilleSous(ev) ? "pointer" : "grab";
     const g = etat.glisse;
     if (g && g.genre === "vue") {
       etat.vue.dx += ev.clientX - g.dernier[0];
@@ -1127,8 +1295,19 @@
       etat.rangPoint = 0;
       etat.choisi = null;
       montrerPoint();
+      sauvegarder();
     }
   }
+  $("telecharger-travail").addEventListener("click", () => {
+    if (etat.v) telecharger(`${etat.v.logement.projet_id}-travail.json`, photoDuTravail());
+  });
+  $("fichier-travail").addEventListener("change", async (ev) => {
+    const f = ev.target.files[0];
+    ev.target.value = "";
+    if (!f || !etat.v) return;
+    try { reprendre(JSON.parse(await lireTexte(f))); } catch (e) { message("Ce fichier est illisible : " + e.message, true); }
+  });
+  $("repartir").addEventListener("click", repartir);
   $("recalculer-pieces").addEventListener("click", refairePieces);
   $("recalculer-pieces-2").addEventListener("click", refairePieces);
   $("point-precedent").addEventListener("click", () => allerAuPoint(-1));

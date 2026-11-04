@@ -20,7 +20,7 @@ const c = (id) => document.getElementById(id);
 const note = (quoi, ok, plus) => J.push({ quoi, ok: !!ok, plus: plus === undefined ? "" : String(plus) });
 const bouton = (t) => [...document.querySelectorAll("#point-actions button")].find((b) => b.textContent === t);
 window.addEventListener("error", (e) => note("erreur JavaScript", false, e.message));
-window.addEventListener("load", () => setTimeout(() => {
+if (!location.search.includes("rouvrir")) window.addEventListener("load", () => setTimeout(() => {
   try {
     note("plan ouvert", V.v && c("accueil").style.display === "none", V.v.logement.projet_id);
     note("nombre de points", V.points.length > 0, `${V.points.length} points pour ${V.doutes.length} doutes`);
@@ -88,7 +88,9 @@ window.addEventListener("load", () => setTimeout(() => {
       const bout = cible.fin;
       geste("pointerdown", bout);
       note("poignée attrapée", V.glisse && V.glisse.genre === "bout", V.glisse && V.glisse.genre);
-      const loin = [bout[0] + av.d[0] * 0.8, bout[1] + av.d[1] * 0.8];  // assez loin pour ne pas se raccrocher à son voisin
+      const a0 = K.versPixel(V.matrice, bout), a1 = K.versPixel(V.matrice, [bout[0] + av.d[0], bout[1] + av.d[1]]);
+      const parEcran = 60 / (V.vue.zoom * Math.hypot(a1[0] - a0[0], a1[1] - a0[1]));  // 60 pixels d'écran : assez loin pour ne pas se raccrocher à son voisin
+      const loin = [bout[0] + av.d[0] * parEcran, bout[1] + av.d[1] * parEcran];
       geste("pointermove", loin);
       geste("pointerup", loin);
       note("bout du mur déplacé", lg0().murs.find((m) => m.id === id).fin.join() !== bout.join(), lg0().murs.find((m) => m.id === id).fin.join());
@@ -192,12 +194,34 @@ window.addEventListener("load", () => setTimeout(() => {
       note("textes détaillés sans code interne", !V.points.some((p) => /[a-z]+_\d/.test(p.texte) || /\b[MO]\d+\b/.test(p.texte)), V.points.map((p) => p.texte).filter((t) => /\b[MO]\d+\b/.test(t)).slice(0, 1).join());
     }
 
+    // Les pastilles, et le travail gardé.
+    if (V.pastilles.length > 1) {
+      const toileP = c("plan"), rp = toileP.getBoundingClientRect(), cible2 = V.pastilles[V.pastilles.length - 1];
+      toileP.dispatchEvent(new PointerEvent("pointerdown", { clientX: cible2.x + rp.left, clientY: cible2.y + rp.top, pointerId: 1, bubbles: true }));
+      toileP.dispatchEvent(new PointerEvent("pointerup", { clientX: cible2.x + rp.left, clientY: cible2.y + rp.top, pointerId: 1, bubbles: true }));
+      note("clic sur une pastille", V.rangPoint === cible2.rang, `point ${V.rangPoint + 1} sur ${V.points.length}, ${V.pastilles.length} pastilles`);
+      V.rangPoint = 0; window.Verification.choisir(null);
+    }
+    note("travail enregistré", !!localStorage.getItem(`atelya-verification|${lg0().projet_id}`) && c("sauvegarde").textContent.includes("Enregistré"), c("sauvegarde").textContent);
+    const photoP = JSON.parse(JSON.stringify(window.CalculsVerif.resultat ? window.CalculsVerif.travail(V.v, { detail: [...V.detail] }) : {}));
+    const nbPieces = lg0().pieces.length;
+    window.Verification.reprendre(lg0());
+    note("reprendre un logement.json", lg0().pieces.length === nbPieces && V.historique.length === 0, c("message").textContent);
+    window.Verification.reprendre(photoP);
+    note("reprendre un travail", lg0().pieces.length === nbPieces, c("message").textContent);
+    window.Verification.reprendre({ a: 1 });
+    note("fichier sans rapport refusé", c("message").className === "erreur", c("message").textContent);
+
     let garde = 0;
     while (V.points.length && garde++ < 1000) {
       const p = V.points[V.rangPoint];
       const a = p.actions.find((x) => x.action.type === "regler");
       if (!a) { c("point-suivant").click(); if (V.rangPoint === V.points.length - 1 && !V.points[V.rangPoint].actions.some((x) => x.action.type === "regler")) break; continue; }
+      const zoneAvant = JSON.stringify(V.vue);
       bouton(a.libelle).click();
+      if (garde === 1) note("le résultat se regarde avant de continuer", V.fait && !!c("fait-suivant") && JSON.stringify(V.vue) === zoneAvant, V.fait && V.fait.titre);
+      if (c("fait-suivant")) c("fait-suivant").click();
+      if (garde === 1) note("point suivant après validation", !V.fait);
     }
     note("tous les points réglés", V.points.length === 0, `reste ${V.points.length} ; ${V.doutes.length} doutes`);
     const vraiClic = HTMLAnchorElement.prototype.click;
@@ -239,6 +263,13 @@ def main() -> int:
                 if not x["ok"]:
                     ko += 1
                 print(f"{nom} {'OK ' if x['ok'] else 'ÉCHEC'} {x['quoi']} {x['plus']}")
+        # Même navigateur, page rouverte : le travail enregistré doit être proposé.
+        rouvert = subprocess.run(commun + ["--dump-dom", scen.as_uri() + "?rouvrir"], capture_output=True, timeout=180).stdout.decode("utf-8", "replace")
+        if re.search(r'id="reprise"(?![^>]*hidden)', rouvert):
+            print(f"{nom} OK  travail proposé à la réouverture")
+        else:
+            print(f"{nom} ÉCHEC travail non proposé à la réouverture")
+            ko += 1
         vues = {"deux": "", "plan": 'document.querySelector(\'[data-vue="plan"]\').click();', "lecture": 'document.querySelector(\'[data-vue="lecture"]\').click();',
                 "point2": 'document.getElementById("point-suivant").click();',
                 "recalcul": 'document.getElementById("recalculer-pieces-2").click(); document.querySelector(\'[data-vue="lecture"]\').click(); window.Verification.choisir(window.Verification.etat.v.logement.murs[0].id);'}

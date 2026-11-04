@@ -484,3 +484,39 @@ test("une pièce vraiment ouverte peut rester ouverte, et un nouvel espace est s
   assert.equal(noms.length, 3);
   assert.deepEqual(C.pointsAVerifier(cloison, { fermeture: true }).filter((x) => x.genre === "fuite"), []);
 });
+
+// ---------- Reprendre un travail ----------
+
+test("reprendre un travail : tout revient, y compris ce qui a été vérifié et les doutes vus un par un", () => {
+  const base = logementCarre();
+  const corrige = C.confirmer(C.supprimer(base, "C"), "S");
+  const t = C.travail(corrige, { detail: ["x"], fermeture: true, murs_calcules: "abc", quand: "2026-11-04" });
+  const r = C.reprendreTravail(base, JSON.parse(JSON.stringify(t)));
+  assert.deepEqual(r.v, corrige);
+  assert.deepEqual(r.detail, ["x"]);
+  assert.equal(r.fermeture, true);
+  assert.equal(r.murs_calcules, "abc");
+});
+
+test("reprendre un logement.json enregistré : le calage et la correction d'échelle sont retrouvés", () => {
+  const base = logementCarre();
+  const corrige = C.supprimer(C.mettreAEchelle(base, 1.1), "C");
+  const r = C.reprendreTravail(base, JSON.parse(JSON.stringify(corrige.logement)));
+  assert.deepEqual(r.v.logement, corrige.logement);
+  const a = C.matriceDuCalage(r.v.calage), b = C.matriceDuCalage(corrige.calage);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) proche(a[i][j], b[i][j], 1e-3);
+  assert.equal(r.v.echelle.etat, "corrigee");
+  const resultat = C.resultat(C.renommerPiece(base, "a", "Salon"));
+  const r2 = C.reprendreTravail(base, resultat);
+  assert.deepEqual(r2.v.verifies, ["a"].filter((id) => resultat.logement.pieces.find((x) => x.id === id).source.includes("verification")));
+  assert.equal(r2.v.echelle.etat, "corrigee"); // celle de logementCarre, inchangée
+});
+
+test("reprendre : un fichier d'un autre plan ou sans rapport est refusé", () => {
+  const base = logementCarre();
+  const autre = JSON.parse(JSON.stringify(base.logement));
+  autre.projet_id = "Autre";
+  assert.throws(() => C.reprendreTravail(base, autre), /concerne le plan « Autre »/);
+  assert.throws(() => C.reprendreTravail(base, { a: 1 }), /pas un travail/);
+  assert.throws(() => C.reprendreTravail(base, C.travail({ ...base, logement: autre })), /concerne le plan/);
+});

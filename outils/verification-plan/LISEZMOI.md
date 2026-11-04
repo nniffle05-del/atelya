@@ -56,6 +56,13 @@ porte < 55 cm, ouverture > 3 m, surface écrite différente du contour.
 
 Le code est écrit pour ce projet ; aucun morceau d'OpenPlan3D n'a été recopié (pas de mention de licence à ajouter).
 
+## Garder le travail
+
+Chaque correction s'enregistre dans le navigateur (`localStorage`, écran seul) : à la réouverture, l'écran propose de reprendre.
+Dans « Aide » : « Télécharger mon travail » (`travail-verification/0.1`), « Reprendre un fichier enregistré » (un travail, un
+résultat, ou le logement.json de « Terminer » ; dans ce cas, le calage vient de la lecture de départ et les murs communs
+redonnent la correction d'échelle) et « Repartir de la lecture d'Atelya ». L'historique d'« Annuler » n'est pas gardé.
+
 ## Fichiers
 
 - `calculs-verif.js` : les calculs (calage, formes, doutes), sans dessin.

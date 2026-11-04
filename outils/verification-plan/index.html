@@ -84,6 +84,13 @@
     #precision p { margin: 0; color: var(--doux); font-size: 13px; }
     .deux-colonnes { display: flex; gap: 6px; }
     .deux-colonnes > * { flex: 1; }
+    #reprise { background: var(--accent-doux); border: 1px solid #bfd3fb; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+    #reprise p { margin: 0 0 8px; }
+    #reprise .bouton { width: 100%; margin-top: 6px; }
+    #sauvegarde { color: var(--doux); font-size: 13px; white-space: nowrap; }
+    #fichiers-travail .bouton { display: block; width: 100%; text-align: center; margin-top: 6px; box-sizing: border-box; cursor: pointer; }
+    #fichiers-travail h3 { font-size: 14px; margin: 12px 0 2px; }
+    #fichier-travail { display: none; }
     .reglage { display: flex; gap: 6px; align-items: center; }
     .reglage input { text-align: center; }
     .reglage .bouton { flex: none !important; width: 38px; padding: 5px 0; }
@@ -140,6 +147,7 @@
       <button data-vue="lecture" title="Seulement ce qu'Atelya a compris, sans le plan">Lecture d'Atelya</button>
       <button data-vue="deux" title="La lecture d'Atelya posée sur le plan">Les deux</button>
     </div>
+    <span id="sauvegarde"></span>
     <button class="bouton" id="annuler" title="Défaire la dernière correction (Ctrl+Z)" disabled>↶ Annuler</button>
     <button class="bouton" id="refaire" title="Remettre la correction annulée (Ctrl+Y)" hidden>↷ Rétablir</button>
     <button class="bouton" id="abandonner" hidden title="Fermer sans rien enregistrer">Abandonner</button>
@@ -168,6 +176,11 @@
 
   <aside>
     <div id="defile">
+      <section id="reprise" hidden>
+        <p id="reprise-texte"></p>
+        <button class="bouton principal" id="reprise-oui">Reprendre là où j'en étais</button>
+        <button class="bouton" id="reprise-non">Repartir de la lecture d'Atelya</button>
+      </section>
       <section id="point" aria-live="polite">
         <div id="point-numero"></div>
         <h2 id="point-titre">Aucun plan ouvert</h2>
@@ -212,7 +225,16 @@
         <p><strong>Corriger un élément :</strong> cliquez dessus sur le plan. Un mur se déplace en le faisant glisser.</p>
         <p><strong>Rallonger un mur :</strong> cliquez dessus, puis tirez un des ronds à ses bouts. Il s'accroche tout seul au mur voisin.</p>
         <p><strong>Se déplacer :</strong> faites glisser le plan, et utilisez la molette pour zoomer.</p>
+        <p><strong>Les pastilles numérotées</strong> marquent tous les points à vérifier. Cliquez sur une pastille pour y aller.</p>
         <p><strong>L'orange</strong> montre un doute d'Atelya, pas une erreur certaine. Atelya peut aussi se tromper sans le savoir : regardez aussi le reste du plan.</p>
+        <div id="fichiers-travail">
+          <h3>Votre travail</h3>
+          <p>Il s'enregistre tout seul dans ce navigateur, sur ce PC. Pour le garder ailleurs, téléchargez-le.</p>
+          <button class="bouton" id="telecharger-travail">Télécharger mon travail</button>
+          <label class="bouton" for="fichier-travail">Reprendre un fichier enregistré…</label>
+          <input type="file" id="fichier-travail" accept="application/json,.json">
+          <button class="bouton" id="repartir">Repartir de la lecture d'Atelya</button>
+        </div>
       </section>
     </div>
     <div id="bas">
