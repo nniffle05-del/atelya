@@ -847,7 +847,70 @@
       return total === 0 || ferme / total < 0.5;
     });
     const reunies = anciennes.length - gardees.size - ouvertes.length;
-    return { pieces: [...pieces, ...ouvertes.map(copie)], ouvertes: ouvertes.map((p) => p.nom), reunies, nouvelles: pieces.filter((x) => !anciennes.some((a) => a.id === x.id)).length };
+    return { pieces: [...pieces, ...ouvertes.map(copie)], ouvertes: ouvertes.map((p) => p.nom), reunies,
+      nouvelles: pieces.filter((x) => !anciennes.some((a) => a.id === x.id)).length,
+      fuites: ouvertes.map((p) => fuiteDePiece(lg, p)) };
+  }
+
+  const FUITE_MIN = 0.25; // m : un passage plus court le long d'un contour n'est pas un trou dans les murs
+  const FUITE_LIBRE = 0.15; // m : plus loin que ça d'un mur, le contour n'est plus bordé par un mur
+
+  /**
+   * Où une pièce n'est pas fermée : le plus long passage de son contour qu'aucun mur ne borde, de préférence celui qui
+   * donne sur l'extérieur du logement. Rend {piece, nom, a, b, longueur, mur} ; `mur` : le mur qui fermerait ce trou,
+   * d'un bout de mur voisin à l'autre, s'il y en a ; a et b sont null si le passage n'a pas pu être situé.
+   */
+  function fuiteDePiece(lg, piece) {
+    const contour = piece.contour;
+    const prochDUnMur = (q, marge) => lg.murs.some((m) => projection(q, m.debut, m.fin).dist <= m.epaisseur / 2 + marge);
+    const passages = [];
+    let courant = null;
+    const fermer = () => { if (courant && longueur(courant.a, courant.b) >= FUITE_MIN) passages.push(courant); courant = null; };
+    for (let i = 0, n = contour.length; i < n; i++) {
+      const q = contour[i], r = contour[(i + 1) % n];
+      const l = longueur(q, r);
+      const pas = Math.max(1, Math.ceil(l / 0.05));
+      for (let k = 0; k <= pas; k++) {
+        const s0 = [q[0] + ((r[0] - q[0]) * k) / pas, q[1] + ((r[1] - q[1]) * k) / pas];
+        if (prochDUnMur(s0, FUITE_LIBRE)) { fermer(); continue; }
+        if (!courant) courant = { a: s0, b: s0, cote: [q, r] };
+        else courant.b = s0;
+      }
+      fermer();
+    }
+    const tous = lg.murs.flatMap((m) => [m.debut, m.fin]);
+    const x0 = Math.min(...tous.map((q) => q[0])) - 1, x1 = Math.max(...tous.map((q) => q[0])) + 1;
+    const y0 = Math.min(...tous.map((q) => q[1])) - 1, y1 = Math.max(...tous.map((q) => q[1])) + 1;
+    const donneDehors = (f) => {
+      const m = [(f.a[0] + f.b[0]) / 2, (f.a[1] + f.b[1]) / 2];
+      const lf = longueur(f.cote[0], f.cote[1]) || 1;
+      let n = [-(f.cote[1][1] - f.cote[0][1]) / lf, (f.cote[1][0] - f.cote[0][0]) / lf];
+      if (dansPolygone([m[0] + n[0] * 0.05, m[1] + n[1] * 0.05], contour)) n = [-n[0], -n[1]];
+      for (let t = 0.05; t < 60; t += 0.1) {
+        const q = [m[0] + n[0] * t, m[1] + n[1] * t];
+        if (q[0] < x0 || q[0] > x1 || q[1] < y0 || q[1] > y1) return true;
+        if (prochDUnMur(q, 0)) return false;
+      }
+      return true;
+    };
+    const classes = passages.map((f) => ({ f, l: longueur(f.a, f.b), dehors: donneDehors(f) }));
+    classes.sort((u, w) => (w.dehors - u.dehors) || (w.l - u.l));
+    if (!classes.length) return { piece: piece.id, nom: piece.nom, a: null, b: null, longueur: 0, mur: null };
+    const { f, l } = classes[0];
+    const a = ar(f.a), b = ar(f.b);
+    const boutProche = (q, sauf) => {
+      let best = null, d = 0.7;
+      for (const m of lg.murs) for (const c of [m.debut, m.fin]) {
+        if (sauf && longueur(c, sauf.point) < 0.2) continue;
+        const e = longueur(q, c);
+        if (e < d) { d = e; best = { point: c, epaisseur: m.epaisseur }; }
+      }
+      return best;
+    };
+    const u = boutProche(a, null);
+    const w = u && boutProche(b, u);
+    const mur = u && w ? { debut: u.point, fin: w.point, epaisseur: Math.max(u.epaisseur, w.epaisseur) } : null;
+    return { piece: piece.id, nom: piece.nom, a, b, longueur: arrondi(l), mur };
   }
 
   /** Remplace les pièces par celles que dessinent les murs. Le détail reste calculable par piecesDepuisMurs. */
@@ -942,6 +1005,29 @@
     const resolus = new Set(v.resolus || []);
     const points = [];
     let doutes = trouverDoutes(v);
+    if (options.fermeture) {
+      // Après un recalcul des pièces : ce qui n'est pas fermé, montré à son endroit exact, avant tout le reste.
+      for (const f of piecesDepuisMurs(lg).fuites) {
+        const cle = `fuite|${f.piece}`;
+        if (resolus.has(cle)) continue;
+        const situe = f.a !== null;
+        const taille = situe ? `${fr(f.longueur)} m` : "";
+        points.push({ cle, genre: "fuite", titre: `« ${f.nom} » n'est pas fermée`, doutes: [],
+          texte: situe
+            ? `Aucun mur ne ferme cette pièce à l'endroit marqué en rouge, sur ${taille}. Atelya ne peut donc pas la calculer. S'il y a une porte d'entrée à cet endroit, fermez avec un mur, puis ajoutez la porte dessus.`
+            : "Cette pièce touche l'extérieur, mais Atelya ne trouve pas où. Regardez son contour et ajoutez le mur manquant.",
+          elements: [f.piece], trait_m: situe ? [f.a, f.b] : null, mur_propose: f.mur,
+          zone_px: situe ? boitePixels([px(f.a), px(f.b)]) : boitePixels(trouver(lg, f.piece).e.contour.map(px)),
+          actions: [...(f.mur ? [{ libelle: "Ajouter le mur manquant", action: { type: "fermer", ...f.mur }, principal: true }] : []),
+            { libelle: "C'est normal (balcon, ouvert)", action: { type: "regler" } }] });
+      }
+      for (const n of (lg.pieces || []).filter((x) => x.nom === "Pièce" && !resolus.has(`nouvelle|${x.id}`))) {
+        points.push({ cle: `nouvelle|${n.id}`, genre: "nouvelle", titre: "Nouvelle pièce", doutes: [],
+          texte: `Les murs ferment un nouvel espace de ${fr(surfacePolygone(n.contour))} m², entouré en orange. Donnez-lui un nom, ou corrigez les murs si c'est une erreur.`,
+          elements: [n.id], zone_px: boitePixels(n.contour.map(px)),
+          actions: [{ libelle: "C'est une vraie pièce, garder ce nom", action: { type: "regler" } }] });
+      }
+    }
 
     const zoneDe = (id, d = null) => {
       if (d && d.zone_px) return d.zone_px;
@@ -1056,6 +1142,7 @@
   function reglerPoint(v0, point, action, nom = null) {
     let v = v0;
     if (action.type === "fusionner") return fusionnerPieces(v, point.elements, nom);
+    if (action.type === "fermer") return recalculerPieces(ajouterMur(v, action.debut, action.fin, action.epaisseur));
     if (action.type === "supprimer_tout") {
       for (const id of point.elements) if (trouver(v.logement, id)) v = supprimer(v, id);
     } else if (action.type === "regler") {

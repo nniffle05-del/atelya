@@ -453,3 +453,34 @@ test("répondre non : le point de mesure propose de corriger, les points groupé
   assert.ok(detail.every((x) => x.elements.length === 1 && x.zone_px));
   assert.ok(!/Z\d/.test(detail[0].texte), detail[0].texte);
 });
+
+test("une pièce non fermée : l'écran montre le trou et propose le mur qui le ferme", () => {
+  const troue = C.enleverMorceau(logementCarre(), "N", 1, 3); // trou de 2 m dans le mur nord, côté chambre
+  const [f] = C.piecesDepuisMurs(troue.logement).fuites;
+  assert.equal(f.piece, "b");
+  proche(f.a[1], 3.9, 0.01);
+  assert.ok(f.longueur > 1.2 && f.longueur < 2.2, `${f.longueur}`);
+  assert.ok(f.mur, "un mur proposé");
+  const points = C.pointsAVerifier(troue, { fermeture: true });
+  const point = points.find((x) => x.genre === "fuite");
+  assert.equal(point.cle, "fuite|b");
+  assert.equal(point.trait_m.length, 2);
+  assert.ok(point.zone_px[2] > 0);
+  assert.ok(!/\bb\b/.test(point.titre));
+  assert.ok(!C.pointsAVerifier(troue).some((x) => x.genre === "fuite"), "seulement après un recalcul");
+  const ferme = C.reglerPoint(troue, point, point.actions[0].action);
+  assert.deepEqual(C.piecesDepuisMurs(ferme.logement).ouvertes, []);
+  assert.deepEqual(C.verifierCoherence(ferme.logement), []);
+  assert.ok(!C.pointsAVerifier(ferme, { fermeture: true }).some((x) => x.genre === "fuite"));
+});
+
+test("une pièce vraiment ouverte peut rester ouverte, et un nouvel espace est signalé", () => {
+  const troue = C.enleverMorceau(logementCarre(), "N", 1, 3);
+  const point = C.pointsAVerifier(troue, { fermeture: true }).find((x) => x.genre === "fuite");
+  const garde = C.reglerPoint(troue, point, { type: "regler" });
+  assert.ok(!C.pointsAVerifier(garde, { fermeture: true }).some((x) => x.genre === "fuite"));
+  const cloison = C.recalculerPieces(C.ajouterMur(logementCarre(), [3, 2], [6, 2], 0.1));
+  const noms = cloison.logement.pieces.map((x) => x.nom);
+  assert.equal(noms.length, 3);
+  assert.deepEqual(C.pointsAVerifier(cloison, { fermeture: true }).filter((x) => x.genre === "fuite"), []);
+});

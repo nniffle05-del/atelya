@@ -140,6 +140,17 @@ window.addEventListener("load", () => setTimeout(() => {
       c("recalculer-pieces-2").click();
       note("recalculer les pièces", K.verifierCoherence(lg0()).length === 0 && lg0().pieces.length > 0, c("message").textContent);
       note("alerte retirée après recalcul", c("alerte-pieces").hidden);
+      const fuites = V.points.filter((x) => x.genre === "fuite");
+      note("pièces non fermées montrées", V.fermeture && fuites.every((x) => x.zone_px), `${fuites.length} (dont ${fuites.filter((x) => x.trait_m).length} situées, ${fuites.filter((x) => x.mur_propose).length} avec un mur proposé)`);
+      const aFermer = V.points.findIndex((x) => x.genre === "fuite" && x.mur_propose);
+      if (aFermer >= 0) {
+        V.rangPoint = aFermer; window.Verification.choisir(null);
+        const nbM = lg0().murs.length;
+        bouton("Ajouter le mur manquant").click();
+        note("ajouter le mur manquant", lg0().murs.length === nbM + 1, c("message").textContent);
+        note("logement cohérent après fermeture", K.verifierCoherence(lg0()).length === 0, K.verifierCoherence(lg0()).slice(0, 2).join(" | "));
+        c("annuler").click();
+      }
       c("annuler").click();
     } else note("aucun mur libre pour les gestes", true);
 

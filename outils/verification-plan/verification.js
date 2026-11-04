@@ -49,10 +49,11 @@
     trace: null, // ce qu'on va couper ou enlever : {id, t: [une ou deux positions en m depuis le début du mur]}
     detail: new Set(), // les doutes que la personne a demandé à voir un par un
     mesure: null, // la clé du point dont le formulaire de mesure est ouvert
+    fermeture: false, // true après un recalcul des pièces : on montre ce qui n'est pas fermé
     deplacementPropose: null, // en cm : ce qu'il manque d'après la mesure donnée
     relier: null, // premier bout à relier : {id, bout, point}
     accroche: null, // le point où un bout de mur vient de s'accrocher (m)
-    mursReference: null, // les murs quand les pièces ont été calculées pour la dernière fois
+    references: new WeakMap(), // pour chaque version du plan : ses murs quand les pièces ont été calculées (suit « Annuler »)
     souris: null, // position de la souris (m)
     glisse: null, // {genre: "vue"|"mur", ...}
     apercu: null, // copie corrigée affichée pendant qu'on glisse un mur
@@ -104,9 +105,10 @@
     etat.choisi = null;
     etat.rangPoint = 0;
     etat.detail = new Set();
+    etat.fermeture = false;
     etat.mesure = null;
     etat.deplacementPropose = null;
-    etat.mursReference = empreinteMurs(verification);
+    etat.references.set(verification, empreinteMurs(verification));
     $("accueil").style.display = "none";
     message("");
     recalculer();
@@ -120,7 +122,7 @@
     etat.matrice = C.matriceDuCalage(etat.v.calage);
     etat.inverse = C.inverse(etat.matrice);
     etat.doutes = C.trouverDoutes(etat.v);
-    etat.points = C.pointsAVerifier(etat.v, { detail: etat.detail });
+    etat.points = C.pointsAVerifier(etat.v, { detail: etat.detail, fermeture: etat.fermeture });
     etat.rangPoint = Math.min(etat.rangPoint, Math.max(0, etat.points.length - 1));
     if (etat.choisi && !trouverElement(etat.choisi)) etat.choisi = null;
   }
@@ -176,6 +178,7 @@
       if (nouveau === etat.v) return false;
       etat.historique.push(etat.v);
       etat.refaire = [];
+      etat.references.set(nouveau, etat.references.get(etat.v));
       etat.v = nouveau;
       recalculer();
       message(texte || "");
@@ -421,6 +424,28 @@
       if (etat.relier) rond(etat.relier.point, COULEURS.choisi, 7);
     }
     if (etat.accroche) rond(etat.accroche, "#16a34a", 8);
+    if (point && point.trait_m) { // le trou dans les murs : un trait rouge à l'endroit exact, et le mur proposé en vert
+      const [ta, tb] = point.trait_m.map(px);
+      ctx.beginPath();
+      ctx.moveTo(ta[0], ta[1]);
+      ctx.lineTo(tb[0], tb[1]);
+      ctx.lineWidth = 5 * trait;
+      ctx.strokeStyle = "#dc2626";
+      ctx.setLineDash([10 * trait, 6 * trait]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (point.mur_propose) {
+        const [ma, mb] = [point.mur_propose.debut, point.mur_propose.fin].map(px);
+        ctx.beginPath();
+        ctx.moveTo(ma[0], ma[1]);
+        ctx.lineTo(mb[0], mb[1]);
+        ctx.lineWidth = 3 * trait;
+        ctx.strokeStyle = "#16a34a";
+        ctx.stroke();
+        rond(point.mur_propose.debut, "#16a34a", 5);
+        rond(point.mur_propose.fin, "#16a34a", 5);
+      }
+    }
     dessinerTrace(v, trait);
 
     dessinerEtiquettes(f, enCours, dpr);
@@ -565,7 +590,7 @@
     afficherPoint();
     afficherPrecision();
     afficherFiche();
-    $("alerte-pieces").hidden = empreinteMurs(v) === etat.mursReference;
+    $("alerte-pieces").hidden = empreinteMurs(v) === etat.references.get(v);
 
     const tb = $("pieces");
     tb.innerHTML = "";
@@ -730,8 +755,9 @@
       recalculer();
       return montrerPoint();
     }
-    const fait = { regler: "Noté.", supprimer_tout: "Supprimé.", fusionner: "Pièces réunies." }[choix.action.type];
+    const fait = { regler: "Noté.", supprimer_tout: "Supprimé.", fusionner: "Pièces réunies.", fermer: "Mur ajouté et pièces recalculées." }[choix.action.type];
     if (corriger((x) => C.reglerPoint(x, point, choix.action, nom), fait)) {
+      if (choix.action.type === "fermer") etat.references.set(etat.v, empreinteMurs(etat.v));
       etat.choisi = null;
       montrerPoint();
     }
@@ -1026,7 +1052,7 @@
       message("Impossible de terminer : " + erreurs.join(" ; "), true);
       return;
     }
-    if (empreinteMurs(etat.v) !== etat.mursReference) {
+    if (empreinteMurs(etat.v) !== etat.references.get(etat.v)) {
       const ok = await demander("Les pièces ne sont pas à jour",
         "Vous avez changé des murs sans recalculer les pièces : leurs surfaces peuvent être fausses. Revenez cliquer sur « Recalculer les pièces », ou terminez quand même.");
       if (!ok) return;
@@ -1091,16 +1117,16 @@
   function refairePieces() {
     if (!etat.v) return;
     const r = C.piecesDepuisMurs(etat.v.logement);
-    const parties = [`${r.pieces.length} pièce(s) après recalcul`];
+    const parties = [`${r.pieces.length} pièce(s)`];
     if (r.reunies) parties.push(`${r.reunies} réunie(s) à une voisine`);
-    if (r.nouvelles) parties.push(`${r.nouvelles} nouvelle(s), à nommer`);
-    const avertir = r.ouvertes.length > 0;
-    if (avertir) parties.push(`pas fermée(s) par des murs, donc inchangée(s) : ${r.ouvertes.join(", ")}. Il manque sans doute un mur`);
-    const reference = empreinteMurs(etat.v);
+    if (r.nouvelles) parties.push(`${r.nouvelles} nouvelle(s)`);
+    if (r.ouvertes.length) parties.push(`${r.ouvertes.length} pas fermée(s) : suivez les points ci-dessus`);
+    etat.fermeture = true;
     if (corriger((x) => C.recalculerPieces(x), parties.join(" ; ") + ".")) {
-      etat.mursReference = reference;
-      if (avertir) message(parties.join(" ; ") + ".", true);
-      rafraichir();
+      etat.references.set(etat.v, empreinteMurs(etat.v));
+      etat.rangPoint = 0;
+      etat.choisi = null;
+      montrerPoint();
     }
   }
   $("recalculer-pieces").addEventListener("click", refairePieces);
