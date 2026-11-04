@@ -167,3 +167,43 @@ def test_angle_en_biais_coupe_d_onglet(fin_b, ep_b):
                          (b.longueur + aj["B"][1][0], b.longueur + aj["B"][1][1]), [])
     communs = {tuple(round(v, 5) for v in p) for p in ba[0].contour} & {tuple(round(v, 5) for v in p) for p in bb[0].contour}
     assert len(communs) == 2  # l'arête d'onglet est partagée
+
+
+def test_deux_murs_presque_alignes_ne_font_pas_exploser_l_angle():
+    """Un bout de mur retouché à la main laisse parfois deux murs à 0,15° : la porte voisine doit rester constructible."""
+    from moteur.geometrie import calculer_briques
+    from moteur.logement import Logement
+
+    donnees = {
+        "schema": "logement/0.1", "projet_id": "T", "unites": "m", "hauteur_sous_plafond": 2.5,
+        "murs": [
+            {"id": "A", "debut": [0.01, 0.0], "fin": [0.0, 3.75], "epaisseur": 0.13, "statut": "estime", "source": "atelya"},
+            {"id": "B", "debut": [0.0, 3.75], "fin": [0.0, 6.9], "epaisseur": 0.12, "statut": "estime", "source": "atelya"},
+        ],
+        "ouvertures": [{"id": "O", "type": "porte", "mur": "B", "position": 0.54, "largeur": 0.82, "hauteur": 2.04, "allege": 0,
+                        "statut": "estime", "source": "atelya"}],
+        "pieces": [],
+    }
+    briques = calculer_briques(Logement.model_validate(donnees))
+    assert any(b.element == "B" for b in briques) and any(b.element == "A" for b in briques)
+
+
+def test_deux_ouvertures_qui_se_touchent_a_un_millimetre_pres():
+    """L'arrondi d'une lecture ne doit pas bloquer la 3D ; un vrai chevauchement, si."""
+    from moteur.geometrie import calculer_briques
+    from moteur.logement import Logement
+
+    def avec(position):
+        return Logement.model_validate({
+            "schema": "logement/0.1", "projet_id": "T", "unites": "m", "hauteur_sous_plafond": 2.5,
+            "murs": [{"id": "A", "debut": [0, 0], "fin": [6, 0], "epaisseur": 0.2, "statut": "estime", "source": "atelya"}],
+            "ouvertures": [
+                {"id": "F1", "type": "fenetre", "mur": "A", "position": 1, "largeur": 1, "hauteur": 1.2, "allege": 0.9, "statut": "estime", "source": "atelya"},
+                {"id": "F2", "type": "fenetre", "mur": "A", "position": position, "largeur": 1, "hauteur": 1.2, "allege": 0.9, "statut": "estime", "source": "atelya"},
+            ],
+            "pieces": [],
+        })
+
+    assert calculer_briques(avec(1.999))
+    with pytest.raises(ValueError, match="chevauche"):
+        calculer_briques(avec(1.9))

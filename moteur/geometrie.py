@@ -28,6 +28,8 @@ from typing import Literal
 from moteur.logement import Logement, Mur, Ouverture
 
 VERSION_PLAN = "construction/0.1"
+PRESQUE_ALIGNES = 0.9995  # deux murs à moins de ~1,8° l'un de l'autre sont considérés comme alignés
+RECOUVREMENT_TOLERE = 0.01  # m : au-delà, deux ouvertures se chevauchent vraiment et le plan doit être corrigé
 
 # En dessous de cette distance (en mètres), deux points sont considérés égaux.
 PRECISION = 1e-6
@@ -127,8 +129,8 @@ def _ajustements_aux_angles(murs: list[Mur]) -> dict[str, Ajustement]:
         deja_vus |= {i, j}
         mur_b, bout_b, _ = bouts[j]
         produit = abs(_scalaire(_direction(mur_a), _direction(mur_b)))
-        if abs(produit - 1) < PRECISION:
-            continue  # murs dans le prolongement l'un de l'autre : rien à corriger
+        if produit > PRESQUE_ALIGNES:
+            continue  # murs dans le prolongement l'un de l'autre : rien à corriger (un onglet sur un angle minuscule exploserait)
         if produit > PRECISION:
             for (m, b), (n_, _) in (((mur_a, bout_a), (mur_b, bout_b)), ((mur_b, bout_b), (mur_a, bout_a))):
                 ajustements[m.id][b] = list(_onglet(m, b, n_, _))
@@ -184,10 +186,11 @@ def _briques_du_mur(
     numero = 0
     for o in sorted(ouvertures, key=lambda o: o.position):
         gauche, droite = o.position, o.position + o.largeur
-        if gauche < max(curseur) - PRECISION:
+        if gauche < max(curseur) - RECOUVREMENT_TOLERE:
             raise ValueError(
                 f"l'ouverture {o.id} chevauche une autre ouverture ou l'angle du mur {mur.id}"
             )
+        gauche = max(gauche, max(curseur))  # arrondi d'une lecture : deux ouvertures qui se touchent à quelques mm près
         if gauche - min(curseur) > PRECISION:
             numero += 1
             briques.append(
