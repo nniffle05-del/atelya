@@ -5,8 +5,8 @@ Depuis le dossier du dépôt (atelya-code) :
 
     ..\\atelya\\.venv\\Scripts\\python.exe outils\\atelya\\lire_plan.py mon-plan.pdf --sortie ..\\atelya\\lectures
 
-Pour chaque page, écrit dans <sortie>\\<nom>\\ : plan.png (l'image lue) et verification.json, les deux fichiers à ouvrir
-dans l'écran de vérification ; logement.json, lecture.json (décision, doutes, échelle, modèle gardé, durées), coloriage.png
+Pour chaque page, écrit dans <sortie>\\<nom>\\ : ecran.html (double-clic : l'écran de vérification avec ce plan) ;
+plan.png (l'image lue) et verification.json, les deux fichiers qu'il contient ; logement.json, lecture.json (décision, doutes, échelle, modèle gardé, durées), coloriage.png
 et coloriage-doute.png du modèle gardé.
 Un plan refusé n'est pas un plantage : la commande le dit et finit normalement. Un plantage finit par un code ≠ 0.
 """
@@ -26,6 +26,9 @@ sys.path.insert(0, str(RACINE))
 
 from moteur.lecture_complete import VERSION_LECTURE_COMPLETE, FichierNonLisible, PlanLu, lire_plan, plans_du_fichier  # noqa: E402
 from moteur.preparer_verification import verification_du_plan  # noqa: E402
+
+sys.path.insert(0, str(RACINE / "outils" / "verification-plan" / "scripts"))
+from page_unique import fabriquer as fabriquer_page_unique  # noqa: E402
 
 MODELES = {"e5": "resultats-essai-5/atelya-essai-4.pt", "e7": "resultats-essai-7b/atelya-essai-7.pt"}
 
@@ -61,6 +64,7 @@ def ecrire(plan: PlanLu, dossier: Path, duree_s: float) -> None:
     verification = verification_du_plan(plan)
     if verification is not None:
         (dossier / "verification.json").write_text(json.dumps(verification, ensure_ascii=False, indent=1, default=float), encoding="utf-8")
+        fabriquer_page_unique(dossier)
     resume = {"version": VERSION_LECTURE_COMPLETE, "nom": plan.source.nom, "page": plan.source.page,
               "nature": plan.source.nature, "decision": plan.decision, "modele": g.modele, "aiguillage": plan.aiguillage,
               "echelle": g.echelle, "doutes": g.examen["doutes"], "infos": g.infos, "erreur": g.erreur,
