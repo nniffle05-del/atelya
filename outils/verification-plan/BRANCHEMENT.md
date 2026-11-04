@@ -6,7 +6,7 @@
 
 Quand Atelya a lu un plan et qu'il reste des **vérifications humaines** à faire, l'onglet du site
 affiche l'écran de vérification dans un cadre (`<iframe>`), lui envoie la lecture d'Atelya et l'image
-du plan, puis récupère le **logement.json corrigé** quand la personne clique « Valider ».
+du plan, puis récupère le **logement.json corrigé** quand la personne clique « Terminer ».
 
 ```
 Site (onglet « Plans à vérifier »)                 Écran de vérification (iframe)
@@ -14,7 +14,7 @@ Site (onglet « Plans à vérifier »)                 Écran de vérification (
                                    ◄── pret ──────  (l'écran a fini de charger)
   ouvrir {verification, plan} ────────────────►     affiche le plan + doutes en orange
                                                     … la personne corrige …
-                                   ◄── valide {resultat}   (bouton « Valider »)
+                                   ◄── valide {resultat}   (bouton « Terminer »)
                               ou   ◄── abandon            (bouton « Abandonner »)
 ```
 
@@ -66,7 +66,7 @@ Une page de démonstration complète fait exactement cela : `exemples/site-demo.
 `http://localhost:8000/outils/verification-plan/exemples/site-demo.html`).
 
 Autre façon, sans messages : `index.html?verification=/chemin/lecture.json&plan=/chemin/plan.png`
-(les deux fichiers sur le même domaine que l'écran). Dans ce cas, « Valider » télécharge le fichier.
+(les deux fichiers sur le même domaine que l'écran). Dans ce cas, « Terminer » télécharge le fichier.
 
 ## 4. Ce que le site envoie : `verification/0.1`
 
@@ -132,7 +132,7 @@ python -m moteur.plan_propre resultat.json --sortie plan.pdf \
   `{"titre": "...", "adresse": "ligne 1\nligne 2", "reference": "...", "nord_deg": 20}`.
   L'adresse vient de la commande du client (Atelya ne peut pas la deviner). `nord_deg` (angle du nord
   depuis le haut de la page, sens horaire) n'est à donner que si on le connaît : sans lui, pas de flèche.
-- Garde-fou : un logement qui n'est pas passé par « Valider » sort avec « BROUILLON, NON VÉRIFIÉ »
+- Garde-fou : un logement qui n'est pas passé par « Terminer » sort avec « BROUILLON, NON VÉRIFIÉ »
   en travers de la page.
 - Sorties : `plan.pdf` (A4 ou A3, 300 points par pouce) et `plan.png` (aperçu).
 

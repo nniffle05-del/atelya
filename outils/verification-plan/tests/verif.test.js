@@ -234,3 +234,95 @@ test("valider : avec des doutes restants, c'est noté ; avec une incohérence, c
   const casse = C.modifierOuverture(exemple(), "P_entree", { largeur: 9 });
   assert.throws(() => C.resultat(casse), /pas encore cohérent/);
 });
+
+// ---------- Points à vérifier et pièces réunies ----------
+
+const rectangle = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+const fichierPieces = (pieces, mursEnPlus = [], extra = {}) => fichier({
+  echelle: { etat: "corrigee" },
+  logement: { schema: "logement/0.1", projet_id: "T", unites: "m", hauteur_sous_plafond: 2.5, murs: [...murs, ...mursEnPlus], ouvertures: [], pieces },
+  ...extra,
+});
+
+test("morceaux d'une pièce : sans mur entre eux, ils sont groupés ; avec un mur, non", () => {
+  const pieces = [
+    { id: "a", nom: "Chambre", contour: rectangle(0, 0, 2, 3) },
+    { id: "b", nom: "Chambre 2", contour: rectangle(2, 0, 4, 3) },
+  ];
+  assert.deepEqual(C.morceauxDePieces(fichierPieces(pieces).logement), [["a", "b"]]);
+  const cloison = { id: "C", debut: [2, 0], fin: [2, 3], epaisseur: 0.1, statut: "estime", source: "atelya" };
+  const separees = [{ ...pieces[0], contour: rectangle(0, 0, 1.95, 3) }, { ...pieces[1], contour: rectangle(2.05, 0, 4, 3) }];
+  assert.deepEqual(C.morceauxDePieces(fichierPieces(separees, [cloison]).logement), []);
+});
+
+test("réunir deux pièces : une seule reste, avec la bonne surface et le nom choisi", () => {
+  const v = fichierPieces([
+    { id: "a", nom: "Chambre", contour: rectangle(0, 0, 2, 3) },
+    { id: "b", nom: "Séjour 2", contour: rectangle(2, 0, 4, 3) },
+  ]);
+  const w = C.fusionnerPieces(v, ["a", "b"], "Chambre 1");
+  assert.equal(w.logement.pieces.length, 1);
+  assert.equal(w.logement.pieces[0].nom, "Chambre 1");
+  proche(C.surfacePolygone(w.logement.pieces[0].contour), 12, 0.3);
+  assert.ok(w.logement.pieces[0].contour.length <= 6, `${w.logement.pieces[0].contour.length} coins`);
+  assert.equal(v.logement.pieces.length, 2); // l'original n'est pas touché
+  assert.deepEqual(C.verifierCoherence(w.logement), []);
+});
+
+test("réunir des morceaux en L garde la forme en L", () => {
+  const v = fichierPieces([
+    { id: "a", nom: "Cuisine", contour: rectangle(0, 0, 4, 2) },
+    { id: "b", nom: "Coin", contour: rectangle(0, 2, 2, 4) },
+  ]);
+  const w = C.fusionnerPieces(v, ["a", "b"]);
+  assert.equal(w.logement.pieces[0].nom, "Cuisine"); // sans nom donné : celui de la plus grande
+  proche(C.surfacePolygone(w.logement.pieces[0].contour), 12, 0.3);
+});
+
+test("les doutes voisins sur des murs ne font qu'un point ; les légers sont réunis à la fin", () => {
+  const ms = [0, 1, 2].map((i) => ({ id: `Z${i}`, debut: [10 + i * 0.5, 0], fin: [10.4 + i * 0.5, 0], epaisseur: 0.1, statut: "estime", source: "atelya" }));
+  const v = fichierPieces([], ms, { doutes: [
+    { element: "Z0", code: "carte", gravite: "fort", raison: "mur Z0 : hésite" },
+    { element: "Z1", code: "carte", gravite: "fort", raison: "mur Z1 : hésite" },
+    { element: "Z2", code: "carte", gravite: "fort", raison: "mur Z2 : hésite" },
+    { element: "M1", code: "carte", gravite: "faible", raison: "mur M1 : hésite un peu" },
+    { element: "M2", code: "carte", gravite: "faible", raison: "mur M2 : hésite un peu" },
+  ] });
+  const points = C.pointsAVerifier(v);
+  assert.deepEqual(points.map((p) => p.genre), ["zone", "legers"]);
+  assert.equal(points[0].elements.length, 3);
+  assert.equal(points[1].elements.length, 2);
+  assert.equal(C.trouverDoutes(v).length, 5); // les doutes eux-mêmes ne changent pas
+});
+
+test("régler un point le fait disparaître, et rien n'est perdu pour le rapport", () => {
+  const v = fichierPieces([], [], { doutes: [
+    { element: "M1", code: "carte", gravite: "fort", raison: "mur M1 : hésite" },
+    { element: null, code: "zone_douteuse", gravite: "fort", raison: "zone", zone_px: [0, 0, 10, 10] },
+  ] });
+  let w = v;
+  for (const point of C.pointsAVerifier(v)) w = C.reglerPoint(w, point, point.actions[0].action);
+  assert.equal(C.pointsAVerifier(w).length, 0);
+  assert.equal(C.resultat(w).statut, "valide");
+  assert.equal(C.resultat(v).statut, "valide_avec_doutes");
+});
+
+test("échelle lue : on demande de contrôler une mesure ; une fois corrigée, plus de question", () => {
+  const pieces = [{ id: "a", nom: "Séjour", contour: rectangle(0, 0, 5, 4) }];
+  const lue = fichierPieces(pieces, [], { echelle: { etat: "lue", source: "cotes" } });
+  const [point] = C.pointsAVerifier(lue);
+  assert.equal(point.cle, "controle-echelle");
+  assert.match(point.texte, /5,00 × 4,00/);
+  assert.equal(C.pointsAVerifier(C.reglerPoint(lue, point, point.actions[0].action)).length, 0);
+  assert.equal(C.pointsAVerifier(C.mettreAEchelle(lue, 1.1)).length, 0);
+  const absente = fichierPieces(pieces, [], { echelle: { etat: "a_verifier" } });
+  assert.equal(C.pointsAVerifier(absente)[0].cle, "echelle");
+});
+
+test("les textes ne montrent jamais les codes internes", () => {
+  const pieces = [{ id: "chambre_1", nom: "Chambre", contour: rectangle(0, 0, 2, 2) }, { id: "chambre_2", nom: "Bureau", contour: rectangle(5, 5, 7, 7) }];
+  const v = fichierPieces(pieces, [], { doutes: [{ element: "chambre_1", code: "chevauchement", gravite: "fort", raison: "les pièces chambre_1 et chambre_2 se chevauchent" }] });
+  const [point] = C.pointsAVerifier(v);
+  assert.ok(!/chambre_\d/.test(point.texte), point.texte);
+  assert.match(point.texte, /« Chambre » et « Bureau »/);
+});

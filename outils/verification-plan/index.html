@@ -6,173 +6,199 @@
   <title>Vérification de plan — Atelya</title>
   <style>
     :root {
-      --fond: #f4f5f7; --panneau: #ffffff; --bord: #d9dce1; --texte: #1f2328;
+      --fond: #eef0f3; --panneau: #ffffff; --bord: #d9dce1; --texte: #1f2328;
       --doux: #636c76; --accent: #2563eb; --accent-doux: #e8effd; --ok: #15803d;
       --doute: #ea580c; --doute-doux: #fff1e6; --erreur: #b91c1c;
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     html, body { height: 100%; margin: 0; }
     body {
-      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--texte); background: var(--fond);
-      display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: 1fr 340px;
-      grid-template-areas: "barre barre" "bandeau panneau" "plan panneau" "etat panneau";
+      display: grid; grid-template-rows: auto auto 1fr; grid-template-columns: 1fr 360px;
+      grid-template-areas: "barre barre" "bandeau panneau" "plan panneau";
     }
+    button { font: inherit; cursor: pointer; }
+    button:disabled { opacity: .4; cursor: default; }
+    .bouton { border: 1px solid var(--bord); background: var(--panneau); color: var(--texte); border-radius: 7px; padding: 7px 12px; }
+    .bouton:hover:not(:disabled) { border-color: #9aa3ad; }
+    .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    .bouton.danger { color: var(--erreur); border-color: #e5b4b4; }
+    .bouton.terminer { background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 600; }
+
     header {
-      grid-area: barre; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
-      padding: 8px 12px; background: var(--panneau); border-bottom: 1px solid var(--bord);
+      grid-area: barre; display: flex; gap: 12px; align-items: center;
+      padding: 8px 14px; background: var(--panneau); border-bottom: 1px solid var(--bord);
     }
-    header h1 { font-size: 15px; margin: 0 12px 0 0; }
-    .bouton {
-      border: 1px solid var(--bord); background: var(--panneau); color: var(--texte);
-      border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit;
-    }
-    .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+    header h1 { font-size: 15px; margin: 0; font-weight: 600; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .espace { flex: 1; }
-    #bandeau { grid-area: bandeau; padding: 6px 12px; background: var(--doute-doux); color: #9a3412; border-bottom: 1px solid #fed7aa; }
+    .vues { display: flex; margin: 0 auto; border: 1px solid var(--bord); border-radius: 8px; overflow: hidden; }
+    .vues button { border: 0; background: var(--panneau); color: var(--texte); padding: 7px 14px; border-right: 1px solid var(--bord); }
+    .vues button:last-child { border-right: 0; }
+    .vues button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+
+    #bandeau { grid-area: bandeau; padding: 7px 14px; background: var(--doute-doux); color: #9a3412; border-bottom: 1px solid #fed7aa; }
     #bandeau:empty { display: none; }
+
     #zone { grid-area: plan; position: relative; overflow: hidden; }
     #plan { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
     #zone.depot { outline: 3px dashed var(--accent); outline-offset: -8px; }
     #accueil {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      color: var(--doux); text-align: center; padding: 24px; pointer-events: none;
+      position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center;
+      color: var(--doux); text-align: center; padding: 24px;
     }
-    #etat {
-      grid-area: etat; padding: 6px 12px; background: var(--panneau); border-top: 1px solid var(--bord);
-      color: var(--doux); display: flex; gap: 16px;
-    }
-    aside {
-      grid-area: panneau; background: var(--panneau); border-left: 1px solid var(--bord);
-      overflow-y: auto; padding: 12px 14px;
-    }
-    section { border-bottom: 1px solid var(--bord); padding: 10px 0 14px; }
-    section:last-child { border-bottom: 0; }
-    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--doux); margin: 0 0 8px; }
-    p { margin: 0 0 8px; }
-    .info { color: var(--doux); font-size: 13px; }
-    .erreur { color: var(--erreur); }
-    label.case { display: flex; gap: 8px; align-items: center; margin: 4px 0; cursor: pointer; }
-    .pastille { width: 14px; height: 14px; border-radius: 3px; display: inline-block; flex: none; }
-    ul.doutes { list-style: none; margin: 0; padding: 0; }
-    ul.doutes li {
-      border: 1px solid #fed7aa; background: var(--doute-doux); border-radius: 6px;
-      padding: 6px 8px; margin-bottom: 6px; cursor: pointer;
-    }
-    ul.doutes li:hover, ul.doutes li.choisi { border-color: var(--doute); }
-    ul.doutes li strong { color: #9a3412; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    td, th { padding: 4px; border-bottom: 1px solid #eef0f2; text-align: left; }
-    th { color: var(--doux); font-weight: 500; }
-    td.nb { text-align: right; font-variant-numeric: tabular-nums; }
-    tr.douteux td:first-child { color: var(--doute); font-weight: 600; }
-    input[type=range] { width: 100%; }
+    #accueil .ligne { display: flex; gap: 8px; }
     input[type=file] { display: none; }
-    .bouton.valider { background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 600; }
+    #commandes-vue { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; }
+    #commandes-vue .bouton { box-shadow: 0 1px 3px rgba(0,0,0,.15); min-width: 38px; }
+    #consigne-outil {
+      position: absolute; left: 50%; top: 12px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center;
+      background: #1f2937; color: #fff; padding: 7px 8px 7px 14px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.25); white-space: nowrap;
+    }
+    #consigne-outil button { border: 0; border-radius: 6px; padding: 3px 10px; background: #fff; color: #1f2937; }
+
+    aside { grid-area: panneau; background: var(--panneau); border-left: 1px solid var(--bord); display: flex; flex-direction: column; min-height: 0; }
+    #defile { flex: 1; overflow-y: auto; padding: 14px 16px; min-height: 0; }
+    #bas { border-top: 1px solid var(--bord); padding: 10px 12px; display: flex; gap: 6px; position: relative; }
+    #bas .bouton { flex: 1; padding: 7px 4px; white-space: nowrap; }
+    #bas .bouton[aria-expanded="true"] { background: var(--accent-doux); border-color: var(--accent); color: var(--accent); }
+    #menu-ajouter {
+      position: absolute; left: 12px; bottom: 54px; width: 210px; background: #fff; border: 1px solid var(--bord); border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.18); padding: 4px; z-index: 5;
+    }
+    #menu-ajouter button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; }
+    #menu-ajouter button:hover { background: var(--accent-doux); }
+
+    #point { background: var(--doute-doux); border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 14px; }
+    #point.fini { background: #ecfdf3; border-color: #a7e3bd; }
+    #point-numero { color: #9a3412; font-size: 13px; }
+    #point.fini #point-numero { color: var(--ok); }
+    #point h2 { font-size: 17px; margin: 2px 0 6px; }
+    #point p { margin: 0 0 10px; }
+    #point-actions { display: flex; flex-direction: column; gap: 6px; }
+    #point-actions select { width: 100%; padding: 7px; border: 1px solid var(--bord); border-radius: 7px; font: inherit; }
+    #point-nav { display: flex; justify-content: space-between; margin-top: 10px; }
+    #point-nav button { border: 0; background: none; color: var(--accent); padding: 4px 2px; }
+    #message { margin: 10px 0 0; font-size: 14px; color: var(--doux); min-height: 1.4em; }
+    #message.erreur { color: var(--erreur); font-weight: 600; }
+
+    #choix { margin-top: 14px; border: 1px solid var(--bord); border-radius: 10px; padding: 12px 14px; }
+    #choix h2 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    #fermer-choix { border: 0; background: none; color: var(--doux); padding: 0 2px; font-size: 18px; line-height: 1; }
+    #fiche label { display: block; margin: 8px 0 2px; color: var(--doux); font-size: 13px; }
+    #fiche input, #fiche select { width: 100%; padding: 6px 8px; border: 1px solid var(--bord); border-radius: 7px; font: inherit; }
+    #fiche .ligne { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    #fiche .ligne > * { flex: 1; }
+    #fiche details { margin-top: 8px; color: var(--doux); font-size: 14px; }
+    #fiche summary { cursor: pointer; }
+    #fiche .info { color: var(--doux); font-size: 13px; margin: 6px 0 0; }
+
+    #liste-pieces, #aide { margin-top: 14px; border-top: 1px solid var(--bord); padding-top: 12px; }
+    #liste-pieces h2, #aide h2 { font-size: 15px; margin: 0 0 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    td { padding: 5px 4px; border-bottom: 1px solid #eef0f2; }
+    tr { cursor: pointer; }
+    tr:hover td { background: var(--accent-doux); }
+    td.nb { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    tr.douteux td:first-child { color: var(--doute); font-weight: 600; }
+    #resume { color: var(--doux); font-size: 13px; margin: 8px 0 0; }
+    #aide ul { list-style: none; padding: 0; margin: 0 0 10px; }
+    #aide li { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+    #aide p { margin: 0 0 8px; font-size: 14px; }
+    .pastille { width: 16px; height: 12px; border-radius: 3px; flex: none; }
+
     #fond-confirmation { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 10; }
-    #fond-confirmation[hidden] { display: none; }
     #confirmation { background: #fff; border-radius: 10px; padding: 18px 20px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
     #confirmation h3 { margin: 0 0 8px; font-size: 16px; }
     #confirmation .ligne { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-    body.comparer .corriger-seulement, body.comparer .propositions { display: none !important; }
-    #mode-corriger[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .separateur { width: 1px; align-self: stretch; background: var(--bord); margin: 0 4px; }
-    .outil[aria-pressed="true"] { background: var(--accent-doux); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-    button:disabled { opacity: .4; cursor: default; }
-    .propositions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-    .propositions button { border: 1px solid var(--doute); background: #fff; color: #9a3412; border-radius: 12px; padding: 2px 10px; cursor: pointer; font: inherit; font-size: 13px; }
-    .propositions button:hover { background: var(--doute); color: #fff; }
-    #fiche label { display: block; margin: 8px 0 2px; color: var(--doux); font-size: 13px; }
-    #fiche input, #fiche select { width: 100%; padding: 5px 7px; border: 1px solid var(--bord); border-radius: 6px; font: inherit; }
-    #fiche .ligne { display: flex; gap: 6px; margin-top: 6px; }
-    #fiche .ligne > * { flex: 1; }
-    #fiche button { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--accent); background: #fff; color: var(--accent); cursor: pointer; font: inherit; font-size: 13px; }
-    #fiche button.plein { background: var(--accent); color: #fff; }
-    #fiche button.danger { border-color: var(--erreur); color: var(--erreur); }
-    #coherence ul { margin: 4px 0 0; padding-left: 18px; color: var(--erreur); }
-    #coherence .ok { color: var(--ok); font-weight: 600; }
-    kbd { border: 1px solid var(--bord); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; }
   </style>
 </head>
-<body class="comparer">
+<body>
   <header>
-    <h1>Vérification de plan</h1>
-    <label class="bouton principal" for="fichiers">Ouvrir un plan à vérifier…</label>
-    <input type="file" id="fichiers" multiple accept="application/json,.json,image/png,image/jpeg">
-    <button class="bouton" id="exemple">Voir l'exemple</button>
-    <button class="bouton" id="mode-corriger" aria-pressed="false" title="Faire apparaître les outils de correction">✎ Corriger</button>
-    <span class="corriger-seulement separateur"></span>
-    <button class="corriger-seulement bouton outil" data-outil="choisir" aria-pressed="true" title="Choisir un élément, déplacer un mur (glisser)">Choisir</button>
-    <button class="corriger-seulement bouton outil" data-outil="mur" title="Ajouter un mur : cliquer ses deux bouts">+ Mur</button>
-    <button class="corriger-seulement bouton outil" data-outil="porte" title="Ajouter une porte : cliquer sur un mur">+ Porte</button>
-    <button class="corriger-seulement bouton outil" data-outil="fenetre" title="Ajouter une fenêtre : cliquer sur un mur">+ Fenêtre</button>
-    <button class="corriger-seulement bouton outil" data-outil="porte_fenetre" title="Ajouter une porte-fenêtre : cliquer sur un mur">+ Porte-fenêtre</button>
-    <span class="corriger-seulement separateur"></span>
-    <button class="corriger-seulement bouton" id="annuler" title="Annuler (Cmd+Z)" disabled>↶ Annuler</button>
-    <button class="corriger-seulement bouton" id="refaire" title="Rétablir (Cmd+Maj+Z)" disabled>↷ Rétablir</button>
-    <span class="espace"></span>
-    <button class="bouton" id="zoom-moins" title="Dézoomer">−</button>
-    <button class="bouton" id="zoom-plus" title="Zoomer">+</button>
-    <button class="bouton" id="zoom-ajuster" title="Voir tout le plan">Ajuster</button>
-    <span class="corriger-seulement separateur"></span>
-    <button class="corriger-seulement bouton" id="abandonner" hidden title="Fermer sans rien enregistrer">Abandonner</button>
-    <button class="corriger-seulement bouton valider" id="valider" disabled title="Enregistrer le logement corrigé">✓ Valider</button>
+    <h1 id="titre">Vérification de plan</h1>
+    <div class="vues" role="group" aria-label="Ce qu'on affiche">
+      <button data-vue="plan" title="Le plan tel qu'il a été déposé, sans rien par-dessus">Plan d'origine</button>
+      <button data-vue="lecture" title="Seulement ce qu'Atelya a compris, sans le plan">Lecture d'Atelya</button>
+      <button data-vue="deux" title="La lecture d'Atelya posée sur le plan">Les deux</button>
+    </div>
+    <button class="bouton" id="annuler" title="Défaire la dernière correction (Ctrl+Z)" disabled>↶ Annuler</button>
+    <button class="bouton" id="refaire" title="Remettre la correction annulée (Ctrl+Y)" hidden>↷ Rétablir</button>
+    <button class="bouton" id="abandonner" hidden title="Fermer sans rien enregistrer">Abandonner</button>
+    <button class="bouton terminer" id="valider" disabled title="Enregistrer le logement corrigé">✓ Terminer</button>
   </header>
 
   <div id="bandeau"></div>
 
   <div id="zone">
     <canvas id="plan"></canvas>
-    <div id="accueil">Choisissez en même temps le fichier de vérification (.json) et l'image du plan,<br>
-      ou glissez-les ici. Pour essayer : « Voir l'exemple ».</div>
+    <div id="accueil">
+      <div>Choisissez en même temps le fichier de vérification (.json) et l'image du plan,<br>ou glissez-les ici.</div>
+      <div class="ligne">
+        <label class="bouton principal" for="fichiers">Ouvrir un plan à vérifier…</label>
+        <button class="bouton" id="exemple">Voir l'exemple</button>
+      </div>
+      <input type="file" id="fichiers" multiple accept="application/json,.json,image/png,image/jpeg">
+    </div>
+    <div id="consigne-outil" hidden><span id="consigne"></span><button id="arreter-outil">Arrêter</button></div>
+    <div id="commandes-vue">
+      <button class="bouton" id="zoom-moins" title="Voir plus large">−</button>
+      <button class="bouton" id="zoom-plus" title="Voir de plus près">+</button>
+      <button class="bouton" id="zoom-ajuster" title="Revoir tout le logement">Tout voir</button>
+    </div>
   </div>
 
-  <div id="etat"><span id="consigne">Glisser pour se déplacer, molette ou <kbd>+</kbd> / <kbd>−</kbd> pour zoomer.</span><span class="espace"></span><span id="position"></span></div>
-
   <aside>
-    <section>
-      <h2>Le plan</h2>
-      <p id="titre" class="info">Aucun plan ouvert.</p>
-      <p id="message" class="info"></p>
-    </section>
+    <div id="defile">
+      <section id="point" aria-live="polite">
+        <div id="point-numero"></div>
+        <h2 id="point-titre">Aucun plan ouvert</h2>
+        <p id="point-texte"></p>
+        <div id="point-actions"></div>
+        <div id="point-nav">
+          <button id="point-precedent">‹ Précédent</button>
+          <button id="point-suivant">Suivant ›</button>
+        </div>
+      </section>
+      <p id="message"></p>
 
-    <section>
-      <h2>À vérifier <span id="nb-doutes"></span></h2>
-      <p class="info">En orange : ce dont Atelya n'est pas sûr. Un clic sur la ligne montre l'endroit sur le plan.</p>
-      <ul class="doutes" id="doutes"></ul>
-    </section>
+      <section id="choix" hidden>
+        <h2><span id="choix-titre"></span><button id="fermer-choix" title="Fermer" aria-label="Fermer">×</button></h2>
+        <div id="fiche"></div>
+      </section>
 
-    <section id="choix" class="corriger-seulement" hidden>
-      <h2>Élément choisi</h2>
-      <div id="fiche"></div>
-    </section>
+      <section id="liste-pieces" hidden>
+        <h2>Pièces lues</h2>
+        <table><tbody id="pieces"></tbody></table>
+        <p id="resume"></p>
+      </section>
 
-    <section class="corriger-seulement">
-      <h2>Lisible par le moteur ?</h2>
-      <div id="coherence" class="info"></div>
-    </section>
-
-    <section>
-      <h2>Ce qu'Atelya a lu</h2>
-      <label class="case"><input type="checkbox" data-calque="pieces" checked><span class="pastille" style="background:#93c5fd"></span>Pièces (nom et surface)</label>
-      <label class="case"><input type="checkbox" data-calque="murs" checked><span class="pastille" style="background:#1d4ed8"></span>Murs</label>
-      <label class="case"><input type="checkbox" data-calque="ouvertures" checked>
-        <span class="pastille" style="background:#16a34a"></span>Portes
-        <span class="pastille" style="background:#0891b2"></span>Fenêtres
-        <span class="pastille" style="background:#9333ea"></span>P.-fenêtres</label>
-      <label class="case"><span class="pastille" style="background:var(--doute)"></span>À vérifier</label>
-      <p class="info" style="margin-top:8px">Transparence de la lecture (pour voir le plan dessous)</p>
-      <input type="range" id="opacite" min="0" max="100" value="70">
-    </section>
-
-    <section>
-      <h2>Pièces</h2>
-      <table>
-        <thead><tr><th>Nom</th><th class="nb">Surface</th></tr></thead>
-        <tbody id="pieces"></tbody>
-      </table>
-      <p class="info" id="resume"></p>
-    </section>
+      <section id="aide" hidden>
+        <h2>Comment ça marche</h2>
+        <p>Atelya a lu votre plan. Comparez sa lecture au plan et corrigez ce qui est faux, point par point.</p>
+        <ul>
+          <li><span class="pastille" style="background:#1d4ed8"></span>Murs lus par Atelya</li>
+          <li><span class="pastille" style="background:#16a34a"></span>Portes</li>
+          <li><span class="pastille" style="background:#0891b2"></span>Fenêtres</li>
+          <li><span class="pastille" style="background:#9333ea"></span>Portes-fenêtres</li>
+          <li><span class="pastille" style="background:#ea580c"></span>Le point en cours de vérification</li>
+        </ul>
+        <p><strong>Corriger un élément :</strong> cliquez dessus sur le plan. Un mur se déplace en le faisant glisser.</p>
+        <p><strong>Se déplacer :</strong> faites glisser le plan, et utilisez la molette pour zoomer.</p>
+        <p><strong>L'orange</strong> montre un doute d'Atelya, pas une erreur certaine. Atelya peut aussi se tromper sans le savoir : regardez aussi le reste du plan.</p>
+      </section>
+    </div>
+    <div id="bas">
+      <button class="bouton" id="ouvrir-ajouter" aria-expanded="false">+ Ajouter ▾</button>
+      <button class="bouton" id="ouvrir-pieces" aria-expanded="false">Pièces</button>
+      <button class="bouton" id="ouvrir-aide" aria-expanded="false">? Aide</button>
+      <div id="menu-ajouter" hidden>
+        <button data-outil="mur">Un mur</button>
+        <button data-outil="porte">Une porte</button>
+        <button data-outil="fenetre">Une fenêtre</button>
+        <button data-outil="porte_fenetre">Une porte-fenêtre</button>
+      </div>
+    </div>
   </aside>
 
   <div id="fond-confirmation" hidden>
@@ -180,8 +206,8 @@
       <h3 id="confirmation-titre"></h3>
       <p id="confirmation-texte"></p>
       <div class="ligne">
-        <button class="bouton" id="confirmation-non">Revenir corriger</button>
-        <button class="bouton valider" id="confirmation-oui">Valider quand même</button>
+        <button class="bouton" id="confirmation-non">Revenir vérifier</button>
+        <button class="bouton terminer" id="confirmation-oui">Terminer quand même</button>
       </div>
     </div>
   </div>

@@ -136,17 +136,20 @@
     const deja = new Set();
     const verifies = new Set(verification.verifies || []);
     const resolus = new Set(verification.resolus || []);
-    const ajouter = (element, raison, zone_px = null, propositions = null) => {
+    const ajouter = (element, raison, zone_px = null, propositions = null, origine = null) => {
       const cle = `${element}|${raison}`;
       if (deja.has(cle) || resolus.has(cle) || (element != null && verifies.has(element))) return;
       deja.add(cle);
-      doutes.push({ cle, element, zone_px, raison, propositions: propositions || propositionsAuto(lg, element) });
+      const doute = { cle, element, zone_px, raison, propositions: propositions || propositionsAuto(lg, element) };
+      if (origine && origine.code) doute.code = origine.code;
+      if (origine && origine.gravite) doute.gravite = origine.gravite;
+      doutes.push(doute);
     };
 
     const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id));
     for (const d of verification.doutes || []) {
       if (d.element != null && !ids.has(d.element)) continue; // élément supprimé entre-temps
-      ajouter(d.element ?? null, d.raison || "à vérifier", d.zone_px ?? null, d.propositions || null);
+      ajouter(d.element ?? null, d.raison || "à vérifier", d.zone_px ?? null, d.propositions || null, d);
     }
 
     const murs = new Map(lg.murs.map((m) => [m.id, m]));
@@ -422,6 +425,362 @@
     }
   }
 
+  // ---------- Réunir des morceaux de pièce ----------
+
+  const CELLULE_FUSION = 0.04; // m : finesse du calcul de la forme réunie
+  const FERMETURE_FUSION = 2; // cellules : petits trous bouchés entre deux morceaux
+  const TOLERANCE_CONTOUR = 0.06; // m : un contour réuni garde ses vrais angles, pas ses dents de scie
+
+  function simplifier(points, tolerance) {
+    if (points.length < 3) return points;
+    let iMax = 0, dMax = 0;
+    const a = points[0], b = points[points.length - 1];
+    for (let i = 1; i < points.length - 1; i++) {
+      const d = projection(points[i], a, b).dist;
+      if (d > dMax) { dMax = d; iMax = i; }
+    }
+    if (dMax <= tolerance) return [a, b];
+    return [...simplifier(points.slice(0, iMax + 1), tolerance).slice(0, -1), ...simplifier(points.slice(iMax), tolerance)];
+  }
+
+  /** Le contour extérieur de plusieurs polygones qui se touchent, calculé sur une grille fine. */
+  function contourReuni(contours) {
+    const tous = contours.flat();
+    const x0 = Math.min(...tous.map((q) => q[0])), y0 = Math.min(...tous.map((q) => q[1]));
+    const x1 = Math.max(...tous.map((q) => q[0])), y1 = Math.max(...tous.map((q) => q[1]));
+    const c = Math.max(CELLULE_FUSION, Math.max(x1 - x0, y1 - y0) / 500);
+    const marge = FERMETURE_FUSION + 2;
+    const l = Math.ceil((x1 - x0) / c) + 2 * marge, h = Math.ceil((y1 - y0) / c) + 2 * marge;
+    const X = (i) => x0 + (i - marge) * c, Y = (j) => y0 + (j - marge) * c;
+    let grille = new Uint8Array(l * h);
+    for (const contour of contours) {
+      const ys = contour.map((q) => q[1]);
+      const jMin = Math.max(0, Math.floor((Math.min(...ys) - y0) / c) + marge - 1), jMax = Math.min(h - 1, Math.ceil((Math.max(...ys) - y0) / c) + marge + 1);
+      for (let j = jMin; j <= jMax; j++) {
+        const yc = Y(j + 0.5), coupes = [];
+        for (let k = 0, n = contour.length; k < n; k++) {
+          const [xa, ya] = contour[k], [xb, yb] = contour[(k + 1) % n];
+          if ((ya > yc) !== (yb > yc)) coupes.push(xa + ((yc - ya) * (xb - xa)) / (yb - ya));
+        }
+        coupes.sort((u, v) => u - v);
+        for (let k = 0; k + 1 < coupes.length; k += 2) {
+          const iA = Math.max(0, Math.round((coupes[k] - x0) / c) + marge), iB = Math.min(l, Math.round((coupes[k + 1] - x0) / c) + marge);
+          grille.fill(1, j * l + iA, j * l + iB);
+        }
+      }
+    }
+    const voisinage = (entree, valeur) => { // valeur 1 : on étend ; 0 : on rétrécit
+      const sortie = new Uint8Array(l * h);
+      for (let j = 0; j < h; j++) for (let i = 0; i < l; i++) {
+        let v = valeur === 0 ? 1 : 0;
+        for (let dj = -1; dj <= 1 && v !== valeur; dj++) for (let di = -1; di <= 1; di++) {
+          const u = i + di, w = j + dj;
+          const e = u >= 0 && w >= 0 && u < l && w < h ? entree[w * l + u] : 0;
+          if (e === valeur) { v = valeur; break; }
+        }
+        sortie[j * l + i] = v;
+      }
+      return sortie;
+    };
+    for (let k = 0; k < FERMETURE_FUSION; k++) grille = voisinage(grille, 1);
+    for (let k = 0; k < FERMETURE_FUSION; k++) grille = voisinage(grille, 0);
+
+    // Le bord : chaque côté de cellule pleine qui touche une cellule vide, relié au suivant.
+    const suivants = new Map();
+    const lien = (a, b) => { if (!suivants.has(a)) suivants.set(a, []); suivants.get(a).push(b); };
+    const P = (i, j) => j * (l + 1) + i;
+    const plein = (i, j) => i >= 0 && j >= 0 && i < l && j < h && grille[j * l + i] === 1;
+    for (let j = 0; j < h; j++) for (let i = 0; i < l; i++) {
+      if (!plein(i, j)) continue;
+      if (!plein(i, j - 1)) lien(P(i, j), P(i + 1, j));
+      if (!plein(i + 1, j)) lien(P(i + 1, j), P(i + 1, j + 1));
+      if (!plein(i, j + 1)) lien(P(i + 1, j + 1), P(i, j + 1));
+      if (!plein(i - 1, j)) lien(P(i, j + 1), P(i, j));
+    }
+    let meilleure = [];
+    while (suivants.size) {
+      const depart = suivants.keys().next().value;
+      const boucle = [];
+      let q = depart;
+      while (suivants.has(q)) {
+        boucle.push(q);
+        const liste = suivants.get(q);
+        const r = liste.shift();
+        if (!liste.length) suivants.delete(q);
+        q = r;
+        if (q === depart) break;
+      }
+      if (boucle.length > meilleure.length) meilleure = boucle;
+    }
+    const brut = meilleure.map((q) => [X(q % (l + 1)), Y(Math.floor(q / (l + 1)))]);
+    if (brut.length < 3) throw new Error("ces pièces ne peuvent pas être réunies");
+    // Pour simplifier une boucle fermée : on la coupe en deux au point le plus loin de son départ.
+    let loin = 0;
+    brut.forEach((q, i) => { if (longueur(q, brut[0]) > longueur(brut[loin], brut[0])) loin = i; });
+    const moitie1 = simplifier(brut.slice(0, loin + 1), TOLERANCE_CONTOUR);
+    const moitie2 = simplifier([...brut.slice(loin), brut[0]], TOLERANCE_CONTOUR);
+    return [...moitie1.slice(0, -1), ...moitie2.slice(0, -1)].map(ar);
+  }
+
+  /** Réunit des pièces en une seule, qui garde le nom donné (par défaut, celui de la plus grande). */
+  function fusionnerPieces(v0, ids, nom = null) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const pieces = (lg.pieces || []).filter((p) => ids.includes(p.id));
+    if (pieces.length < 2) throw new Error("il faut au moins deux pièces à réunir");
+    pieces.sort((a, b) => surfacePolygone(b.contour) - surfacePolygone(a.contour));
+    const garde = pieces[0];
+    garde.contour = contourReuni(pieces.map((p) => p.contour));
+    delete garde.surface;
+    if (nom && nom.trim()) garde.nom = nom.trim();
+    lg.pieces = lg.pieces.filter((p) => p === garde || !ids.includes(p.id));
+    marquer(v, garde);
+    return v;
+  }
+
+  const CONTACT_MAX = 0.18; // m : deux morceaux de pièce à moins de ça, sans mur entre eux, se touchent
+  const CONTACT_MIN = 0.4; // m : un contact plus court (un coin) ne compte pas
+
+  function presDUnMur(lg, p) {
+    return lg.murs.some((m) => projection(p, m.debut, m.fin).dist <= m.epaisseur / 2 + 0.005);
+  }
+
+  /** Longueur (m) le long de laquelle deux pièces se touchent sans qu'un mur les sépare. */
+  function contactSansMur(lg, a, b) {
+    const boite = (c) => [Math.min(...c.map((q) => q[0])), Math.min(...c.map((q) => q[1])), Math.max(...c.map((q) => q[0])), Math.max(...c.map((q) => q[1]))];
+    const A = boite(a.contour), B = boite(b.contour);
+    if (A[0] > B[2] + CONTACT_MAX || B[0] > A[2] + CONTACT_MAX || A[1] > B[3] + CONTACT_MAX || B[1] > A[3] + CONTACT_MAX) return 0;
+    const contacts = [];
+    for (let i = 0, n = a.contour.length; i < n; i++) {
+      const q = a.contour[i], r = a.contour[(i + 1) % n];
+      const pas = Math.max(1, Math.ceil(longueur(q, r) / 0.1));
+      for (let k = 0; k < pas; k++) {
+        const s = [q[0] + ((r[0] - q[0]) * k) / pas, q[1] + ((r[1] - q[1]) * k) / pas];
+        let best = null;
+        for (let j = 0, m = b.contour.length; j < m; j++) {
+          const u = b.contour[j], w = b.contour[(j + 1) % m];
+          const pr = projection(s, u, w);
+          if (!best || pr.dist < best.dist) {
+            const l = longueur(u, w) || 1;
+            best = { dist: pr.dist, pied: [u[0] + ((w[0] - u[0]) * pr.tt) / l, u[1] + ((w[1] - u[1]) * pr.tt) / l] };
+          }
+        }
+        if (best.dist <= CONTACT_MAX && !presDUnMur(lg, [(s[0] + best.pied[0]) / 2, (s[1] + best.pied[1]) / 2])) contacts.push(s);
+      }
+    }
+    if (contacts.length < 2) return 0;
+    const b2 = boite(contacts);
+    return Math.hypot(b2[2] - b2[0], b2[3] - b2[1]);
+  }
+
+  /** Les groupes de pièces (2 ou plus) qui semblent n'être qu'une seule pièce : aucun mur ne les sépare. */
+  function morceauxDePieces(lg) {
+    const pieces = lg.pieces || [];
+    const parent = pieces.map((_, i) => i);
+    const racineDe = (i) => (parent[i] === i ? i : (parent[i] = racineDe(parent[i])));
+    for (let i = 0; i < pieces.length; i++) for (let j = i + 1; j < pieces.length; j++) {
+      if (contactSansMur(lg, pieces[i], pieces[j]) >= CONTACT_MIN) parent[racineDe(i)] = racineDe(j);
+    }
+    const groupes = new Map();
+    pieces.forEach((p, i) => { const r = racineDe(i); if (!groupes.has(r)) groupes.set(r, []); groupes.get(r).push(p.id); });
+    return [...groupes.values()].filter((g) => g.length >= 2);
+  }
+
+  // ---------- Les points à vérifier, un par un ----------
+  //
+  // Les doutes restent ceux d'Atelya, sans aucun seuil changé : on les présente seulement autrement.
+  // Ce qui revient au même (morceaux d'une pièce, morceaux de mur voisins, petites hésitations) forme un seul point.
+
+  const REGROUPER_ZONE_M = 0.6; // m : deux doutes de mur plus proches que ça sont le même endroit du plan
+  const CODES_ZONE = new Set(["carte", "epaisseur", "zone_douteuse"]);
+  const fr = (v, d = 2) => v.toFixed(d).replace(".", ",");
+
+  function boitePixels(points) {
+    const xs = points.map((q) => q[0]), ys = points.map((q) => q[1]);
+    const x = Math.min(...xs), y = Math.min(...ys);
+    return [x, y, Math.max(...xs) - x, Math.max(...ys) - y];
+  }
+
+  function unirBoites(boites) {
+    return boitePixels(boites.flatMap(([x, y, l, h]) => [[x, y], [x + l, y + h]]));
+  }
+
+  function nomSimple(lg, id) {
+    const t = trouver(lg, id);
+    if (!t) return "cet élément";
+    if (t.genre === "piece") return `« ${t.e.nom} »`;
+    if (t.genre === "ouverture") return { porte: "cette porte", fenetre: "cette fenêtre", porte_fenetre: "cette porte-fenêtre" }[t.e.type];
+    return "ce mur";
+  }
+
+  /** Remplace, dans une phrase écrite par Atelya, les codes internes (chambre_1) par les noms des pièces. */
+  function phraseLisible(lg, raison) {
+    let t = raison;
+    for (const p of lg.pieces || []) t = t.split(p.id).join(`« ${p.nom} »`);
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function pointSeul(lg, d) {
+    const t = trouver(lg, d.element);
+    const garder = (libelle) => ({ libelle, action: { type: "regler" }, principal: false });
+    const enlever = (libelle) => ({ libelle, action: { type: "supprimer_tout" }, danger: true });
+    let titre = "À vérifier", texte = phraseLisible(lg, d.raison), actions = [garder("C'est juste")];
+    if (t && t.genre === "ouverture") {
+      const genre = { porte: ["Porte", "La"], fenetre: ["Fenêtre", "La"], porte_fenetre: ["Porte-fenêtre", "La"] }[t.e.type];
+      titre = genre[0];
+      actions = [garder(`${genre[1]} garder`), enlever(`${genre[1]} supprimer`)];
+      if (d.code === "largeur_porte" || d.code === "largeur_fenetre") {
+        const cm = /(\d+)\s*cm/.exec(d.raison);
+        const largeur = cm ? `${cm[1]} cm` : `${fr(t.e.largeur)} m`;
+        texte = `${nomSimple(lg, d.element).replace(/^c/, "C")} fait ${largeur} de large : cela paraît ${t.e.largeur < 0.6 ? "très étroit" : "inhabituel"}.`;
+      } else if (d.code === "fenetre_interieure") {
+        texte = `${nomSimple(lg, d.element).replace(/^c/, "C")} semble donner à l'intérieur du logement, pas vers l'extérieur.`;
+      }
+    } else if (t && t.genre === "piece") {
+      const surface = surfacePolygone(t.e.contour);
+      titre = `Pièce ${t.e.nom}`;
+      actions = [garder("La garder"), enlever("La supprimer")];
+      if (d.code === "surface") texte = `Cette pièce ne ferait que ${fr(surface)} m² : cela paraît ${surface < 2 ? "très petit" : "inhabituel"}.`;
+      if (d.code === "sans_acces") {
+        texte = `Aucune porte ni passage trouvés pour entrer dans cette pièce.`;
+        actions = [{ libelle: "Ajouter une porte", action: { type: "outil", outil: "porte" }, principal: true }, garder("C'est normal")];
+      }
+      if (d.code === "type_hesitant") actions = [garder("Le nom est bon")];
+    } else if (t && t.genre === "mur") {
+      titre = "Mur";
+      actions = [garder("Il est juste"), enlever("Le supprimer")];
+    } else if (d.code === "coloriage_douteux") {
+      titre = "Lecture difficile";
+      texte = "Ce plan a été difficile à lire : regardez-le avec un peu plus d'attention.";
+      actions = [garder("Compris")];
+    }
+    return { cle: `seul|${d.cle}`, genre: "element", titre, texte, elements: d.element ? [d.element] : [], doutes: [d], zone_px: d.zone_px || null, actions };
+  }
+
+  /** Tout ce que la personne doit regarder, dans l'ordre, chaque point étant expliqué en français. */
+  function pointsAVerifier(v) {
+    const lg = v.logement;
+    const m = matriceDuCalage(v.calage);
+    const px = (q) => versPixel(m, q);
+    const murs = new Map(lg.murs.map((x) => [x.id, x]));
+    const verifies = new Set(v.verifies || []);
+    const resolus = new Set(v.resolus || []);
+    const points = [];
+    let doutes = trouverDoutes(v);
+
+    const zoneDe = (id, d = null) => {
+      if (d && d.zone_px) return d.zone_px;
+      const t = trouver(lg, id);
+      if (!t) return null;
+      if (t.genre === "mur") return boitePixels(polygoneMur(t.e).map(px));
+      if (t.genre === "piece") return boitePixels(t.e.contour.map(px));
+      return murs.has(t.e.mur) ? boitePixels(polygoneOuverture(t.e, murs.get(t.e.mur)).map(px)) : null;
+    };
+
+    // 1. L'échelle d'abord : une erreur d'échelle ne se voit pas sur le dessin, puisqu'il reste posé sur le plan.
+    const etatEchelle = (v.echelle || {}).etat;
+    const doutesEchelle = doutes.filter((d) => d.code === "echelle");
+    doutes = doutes.filter((d) => d.code !== "echelle");
+    if (etatEchelle === "a_verifier" && !resolus.has("echelle")) {
+      points.push({ cle: "echelle", genre: "echelle", titre: "Les mesures sont à contrôler",
+        texte: "Atelya n'a pas pu lire l'échelle : les mesures sont approximatives. Cliquez sur un mur dont le plan donne la longueur, puis tapez cette longueur : tout le plan se met à la bonne taille.",
+        elements: [], doutes: doutesEchelle, zone_px: null, actions: [{ libelle: "Les mesures sont bonnes", action: { type: "regler" } }] });
+    } else if (etatEchelle !== "corrigee" && !resolus.has("controle-echelle") && (lg.pieces || []).length) {
+      const grande = [...lg.pieces].sort((a, b) => surfacePolygone(b.contour) - surfacePolygone(a.contour))[0];
+      const xs = grande.contour.map((q) => q[0]), ys = grande.contour.map((q) => q[1]);
+      points.push({ cle: "controle-echelle", genre: "echelle", titre: "Vérifiez une mesure",
+        texte: `Atelya lit « ${grande.nom} » à ${fr(Math.max(...xs) - Math.min(...xs))} × ${fr(Math.max(...ys) - Math.min(...ys))} m. Est-ce bien ce que dit le plan ? Sinon, cliquez sur un mur dont le plan donne la longueur et tapez-la.`,
+        elements: [grande.id], doutes: doutesEchelle, zone_px: null, actions: [{ libelle: "Oui, c'est bon", action: { type: "regler" }, principal: true }] });
+    }
+
+    // 2. Les pièces coupées en morceaux.
+    const dansUnGroupe = new Set();
+    for (const groupe of morceauxDePieces(lg)) {
+      if (groupe.every((id) => verifies.has(id))) continue;
+      groupe.forEach((id) => dansUnGroupe.add(id));
+      const pieces = groupe.map((id) => trouver(lg, id).e);
+      const liste = pieces.map((p) => `${p.nom} (${fr(surfacePolygone(p.contour), 1)} m²)`).join(", ");
+      points.push({ cle: `morceaux|${[...groupe].sort().join("+")}`, genre: "morceaux", titre: "Une seule pièce ?",
+        texte: `Aucun mur ne sépare ces ${groupe.length} morceaux : ${liste}. S'il s'agit d'une seule pièce, réunissez-les.`,
+        elements: groupe, doutes: doutes.filter((d) => groupe.includes(d.element)), zone_px: unirBoites(groupe.map((id) => zoneDe(id))),
+        actions: [{ libelle: "Les réunir", action: { type: "fusionner" }, principal: true }, { libelle: "Ce sont des pièces séparées", action: { type: "regler" } }] });
+    }
+    doutes = doutes.filter((d) => !dansUnGroupe.has(d.element));
+
+    // 3. Les petites hésitations : un seul point, à la fin.
+    const legers = doutes.filter((d) => d.gravite === "faible");
+    doutes = doutes.filter((d) => d.gravite !== "faible");
+
+    // 4. Les doutes sur les murs et les zones : ceux qui sont au même endroit ne font qu'un point.
+    const estZone = (d) => CODES_ZONE.has(d.code) || (d.element && murs.has(d.element));
+    const zones = doutes.filter(estZone);
+    const seuls = doutes.filter((d) => !estZone(d));
+    for (const d of seuls) {
+      const point = pointSeul(lg, d);
+      if (!point.zone_px && d.element) point.zone_px = zoneDe(d.element);
+      points.push(point);
+    }
+    const a = px([0, 0]), b = px([1, 0]), c = px([0, 1]);
+    const pxParM = (Math.hypot(b[0] - a[0], b[1] - a[1]) + Math.hypot(c[0] - a[0], c[1] - a[1])) / 2;
+    const seuil = REGROUPER_ZONE_M * pxParM;
+    const boites = zones.map((d) => zoneDe(d.element, d));
+    const parent = zones.map((_, i) => i);
+    const racineDe = (i) => (parent[i] === i ? i : (parent[i] = racineDe(parent[i])));
+    for (let i = 0; i < zones.length; i++) for (let j = i + 1; j < zones.length; j++) {
+      const A = boites[i], B = boites[j];
+      if (!A || !B) continue;
+      if (A[0] <= B[0] + B[2] + seuil && B[0] <= A[0] + A[2] + seuil && A[1] <= B[1] + B[3] + seuil && B[1] <= A[1] + A[3] + seuil) parent[racineDe(i)] = racineDe(j);
+    }
+    const paquets = new Map();
+    zones.forEach((d, i) => { const r = racineDe(i); if (!paquets.has(r)) paquets.set(r, []); paquets.get(r).push(i); });
+    const pointsZones = [...paquets.values()].map((indices) => {
+      const ds = indices.map((i) => zones[i]);
+      const elements = [...new Set(ds.map((d) => d.element).filter(Boolean))];
+      const nb = elements.length;
+      let texte, actions;
+      if (!nb) {
+        texte = "Atelya n'est pas sûr de ce qu'il voit à cet endroit. Regardez s'il manque quelque chose.";
+        actions = [{ libelle: "Rien à corriger", action: { type: "regler" }, principal: true }];
+      } else if (nb === 1) {
+        const d = ds.find((x) => x.element);
+        const t = trouver(lg, d.element);
+        texte = d.code === "epaisseur" ? `L'épaisseur de ${nomSimple(lg, d.element)} paraît inhabituelle.` : `Atelya n'est pas sûr de ${nomSimple(lg, d.element)}. Existe-t-il vraiment sur le plan ?`;
+        if (t && t.genre === "mur" && longueur(t.e.debut, t.e.fin) < MUR_COURT) texte = "Ce mur est très court : vrai mur, ou simple tache ?";
+        actions = [{ libelle: "C'est juste", action: { type: "regler" } }, { libelle: "Le supprimer", action: { type: "supprimer_tout" }, danger: true }];
+      } else {
+        texte = `Atelya n'est pas sûr de ces ${nb} morceaux, tous à cet endroit. Existent-ils vraiment sur le plan ?`;
+        actions = [{ libelle: "Tout est juste", action: { type: "regler" } }, { libelle: "Tout supprimer", action: { type: "supprimer_tout" }, danger: true }];
+      }
+      return { cle: `zone|${ds.map((d) => d.cle).sort().join("+")}`, genre: "zone", titre: nb === 1 ? "Mur douteux" : nb ? "Zone douteuse" : "Zone douteuse", texte,
+        elements, doutes: ds, zone_px: unirBoites(indices.map((i) => boites[i]).filter(Boolean)), actions };
+    });
+    pointsZones.sort((x, y) => y.elements.length - x.elements.length);
+    points.push(...pointsZones);
+
+    if (legers.length) {
+      const elements = [...new Set(legers.map((d) => d.element).filter(Boolean))];
+      const boitesL = legers.map((d) => zoneDe(d.element, d)).filter(Boolean);
+      points.push({ cle: "legers", genre: "legers", titre: "Petites hésitations",
+        texte: `Atelya hésite un peu sur ${legers.length > 1 ? `ces ${legers.length} éléments, entourés en orange` : "cet élément, entouré en orange"}. Si cela vous paraît juste, vous pouvez passer.`,
+        elements, doutes: legers, zone_px: boitesL.length ? unirBoites(boitesL) : null, actions: [{ libelle: "Tout est juste", action: { type: "regler" }, principal: true }] });
+    }
+    return points;
+  }
+
+  /** Applique le choix fait sur un point. Renvoie une copie corrigée. */
+  function reglerPoint(v0, point, action, nom = null) {
+    let v = v0;
+    if (action.type === "fusionner") return fusionnerPieces(v, point.elements, nom);
+    if (action.type === "supprimer_tout") {
+      for (const id of point.elements) if (trouver(v.logement, id)) v = supprimer(v, id);
+    } else if (action.type === "regler") {
+      for (const id of point.elements) if (trouver(v.logement, id)) v = confirmer(v, id);
+    } else throw new Error(`choix inconnu : ${action.type}`);
+    v = copie(v);
+    v.resolus = [...new Set([...(v.resolus || []), point.cle, ...point.doutes.filter((d) => d.element == null).map((d) => d.cle)])];
+    return v;
+  }
+
   // ---------- Viser avec la souris ----------
 
   function inverse(m) {
@@ -604,6 +963,10 @@
     confirmer,
     resoudre,
     appliquerAction,
+    fusionnerPieces,
+    morceauxDePieces,
+    pointsAVerifier,
+    reglerPoint,
     inverse,
     dansPolygone,
     elementSous,

@@ -1,6 +1,6 @@
 /*
- * L'écran de vérification : le plan d'origine en fond, la lecture d'Atelya par-dessus,
- * les doutes en orange, et les corrections (étape B).
+ * L'écran de vérification : le plan d'origine, la lecture d'Atelya par-dessus, et les points
+ * à vérifier présentés un par un, avec les corrections.
  * Les calculs (et toutes les corrections) sont dans calculs-verif.js ; ici, seulement
  * les clics, le panneau de droite et le dessin.
  */
@@ -10,20 +10,20 @@
   const C = window.CalculsVerif;
   const COULEURS = {
     mur: "#1d4ed8",
+    murFond: "rgba(29, 78, 216, 0.28)",
+    murLecture: "#334155",
     porte: "#16a34a",
     fenetre: "#0891b2",
     porte_fenetre: "#9333ea",
-    piece: "rgba(147, 197, 253, 0.35)",
     pieceBord: "#3b82f6",
+    pieceLecture: "#eef2f7",
     doute: "#ea580c",
-    douteFond: "rgba(234, 88, 12, 0.28)",
-    choisi: "#facc15",
+    douteFond: "rgba(234, 88, 12, 0.22)",
+    choisi: "#7c3aed",
   };
   const NOMS_OUVERTURES = { porte: "Porte", fenetre: "Fenêtre", porte_fenetre: "Porte-fenêtre" };
-  const CONSIGNE_COMPARER = "Comparez le plan et ce qu'Atelya a lu (curseur de transparence à droite). Glisser pour se déplacer, molette pour zoomer.";
   const CONSIGNES = {
-    choisir: "Cliquez un élément pour le corriger. Glissez un mur pour le déplacer. Glissez ailleurs pour vous déplacer.",
-    mur: "Cliquez le premier bout du mur, puis le second. Échap pour abandonner.",
+    mur: "Cliquez le premier bout du mur, puis le second.",
     porte: "Cliquez sur un mur, à l'endroit de la porte.",
     fenetre: "Cliquez sur un mur, à l'endroit de la fenêtre.",
     porte_fenetre: "Cliquez sur un mur, à l'endroit de la porte-fenêtre.",
@@ -36,12 +36,12 @@
     matrice: null,
     inverse: null,
     doutes: [],
-    douteux: new Set(),
+    points: [], // les points à vérifier, dans l'ordre
+    rangPoint: 0, // le point affiché
     resultat: null, // le dernier résultat validé
     choisi: null, // id de l'élément choisi
-    douteChoisi: null, // clé du doute choisi
     outil: "choisir",
-    corriger: false, // false : on regarde et on compare seulement ; true : les outils de correction apparaissent
+    affichage: "deux", // "plan" : le plan seul ; "lecture" : la lecture seule ; "deux" : l'une sur l'autre
     depart: null, // premier bout d'un mur en cours d'ajout (m)
     souris: null, // position de la souris (m)
     glisse: null, // {genre: "vue"|"mur", ...}
@@ -49,10 +49,8 @@
     historique: [],
     refaire: [],
     vue: { zoom: 1, dx: 0, dy: 0 },
-    calques: { pieces: true, murs: true, ouvertures: true },
-    opacite: 0.7,
   };
-  window.Verification = { etat }; // lecture seule, pour les tests automatiques
+  window.Verification = { etat, choisir }; // pour les tests automatiques
 
   // ---------- Branchement au site interne ----------
   //
@@ -94,7 +92,7 @@
     etat.historique = [];
     etat.refaire = [];
     etat.choisi = null;
-    etat.douteChoisi = null;
+    etat.rangPoint = 0;
     $("accueil").style.display = "none";
     message("");
     recalculer();
@@ -106,7 +104,8 @@
     etat.matrice = C.matriceDuCalage(etat.v.calage);
     etat.inverse = C.inverse(etat.matrice);
     etat.doutes = C.trouverDoutes(etat.v);
-    etat.douteux = new Set(etat.doutes.map((d) => d.element).filter(Boolean));
+    etat.points = C.pointsAVerifier(etat.v);
+    etat.rangPoint = Math.min(etat.rangPoint, Math.max(0, etat.points.length - 1));
     if (etat.choisi && !trouverElement(etat.choisi)) etat.choisi = null;
   }
 
@@ -192,11 +191,24 @@
 
   // ---------- Vue ----------
 
+  function pixelsParMetre() {
+    const a = px([0, 0]), b = px([1, 0]), c = px([0, 1]);
+    return (Math.hypot(b[0] - a[0], b[1] - a[1]) + Math.hypot(c[0] - a[0], c[1] - a[1])) / 2;
+  }
+
+  /** Montre tout le logement, cadré sur ses murs avec un peu de marge pour voir les cotes autour. */
   function ajuster() {
     if (!etat.image) return;
     const r = canvas.getBoundingClientRect();
-    const z = Math.min(r.width / etat.image.naturalWidth, r.height / etat.image.naturalHeight) * 0.95;
-    etat.vue = { zoom: z, dx: (r.width - etat.image.naturalWidth * z) / 2, dy: (r.height - etat.image.naturalHeight * z) / 2 };
+    let rect = [0, 0, etat.image.naturalWidth, etat.image.naturalHeight];
+    if (etat.v) {
+      const b = rectangleDe(formes(etat.v).murs.flatMap((m) => m.points));
+      const marge = Math.max(0.08 * Math.max(b[2], b[3]), pixelsParMetre());
+      const x0 = Math.max(0, b[0] - marge), y0 = Math.max(0, b[1] - marge);
+      rect = [x0, y0, Math.min(etat.image.naturalWidth, b[0] + b[2] + marge) - x0, Math.min(etat.image.naturalHeight, b[1] + b[3] + marge) - y0];
+    }
+    const z = Math.min(r.width / rect[2], r.height / rect[3]) * 0.97;
+    etat.vue = { zoom: z, dx: r.width / 2 - (rect[0] + rect[2] / 2) * z, dy: r.height / 2 - (rect[1] + rect[3] / 2) * z };
     dessiner();
   }
 
@@ -209,11 +221,11 @@
     dessiner();
   }
 
-  /** Centre la vue sur un rectangle de pixels du plan [x, y, l, h]. */
+  /** Centre la vue sur un rectangle de pixels du plan [x, y, l, h], avec environ 1,5 m autour pour se repérer. */
   function cadrer(rect) {
     const r = canvas.getBoundingClientRect();
-    const marge = 400;
-    const z = Math.min(2.5, r.width / (rect[2] + marge), r.height / (rect[3] + marge));
+    const marge = 3 * pixelsParMetre();
+    const z = Math.min(r.width / (rect[2] + marge), r.height / (rect[3] + marge));
     etat.vue = { zoom: z, dx: r.width / 2 - (rect[0] + rect[2] / 2) * z, dy: r.height / 2 - (rect[1] + rect[3] / 2) * z };
     dessiner();
   }
@@ -262,12 +274,6 @@
     return [...f.murs, ...f.ouvertures, ...f.pieces].find((x) => x.id === id) || null;
   }
 
-  function rectangleDuDoute(d) {
-    if (d.zone_px) return d.zone_px;
-    const e = formeDe(d.element);
-    return e ? rectangleDe(e.points) : null;
-  }
-
   function trouverElement(id) {
     const lg = etat.v.logement;
     for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []]]) {
@@ -297,58 +303,72 @@
     if (!etat.image) return;
     const z = etat.vue.zoom;
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * etat.vue.dx, dpr * etat.vue.dy);
-    ctx.drawImage(etat.image, 0, 0);
+    if (etat.affichage === "lecture") {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, etat.image.naturalWidth, etat.image.naturalHeight);
+    } else {
+      ctx.globalAlpha = etat.affichage === "deux" ? 0.75 : 1; // un peu estompé : la lecture ressort sans cacher le plan
+      ctx.drawImage(etat.image, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    if (etat.affichage === "plan") return;
 
+    const seule = etat.affichage === "lecture";
     const v = etat.apercu || etat.v;
     const f = formes(v);
     const trait = 1 / z; // un pixel d'écran
+    const point = etat.points[etat.rangPoint];
+    const enCours = new Set(point ? point.elements : []);
 
-    ctx.globalAlpha = etat.opacite;
-    if (etat.calques.pieces) {
-      for (const p of f.pieces) {
-        const doute = etat.douteux.has(p.id);
-        chemin(p.points);
-        ctx.fillStyle = doute ? COULEURS.douteFond : COULEURS.piece;
-        ctx.fill();
-        ctx.lineWidth = (doute ? 3 : 1.5) * trait;
-        ctx.strokeStyle = doute ? COULEURS.doute : COULEURS.pieceBord;
-        ctx.setLineDash(doute ? [] : [6 * trait, 4 * trait]);
+    for (const p of f.pieces) {
+      chemin(p.points);
+      if (seule) { ctx.fillStyle = COULEURS.pieceLecture; ctx.fill(); }
+      if (enCours.has(p.id)) { ctx.fillStyle = COULEURS.douteFond; ctx.fill(); }
+      ctx.lineWidth = trait;
+      ctx.strokeStyle = COULEURS.pieceBord;
+      ctx.setLineDash(seule ? [] : [5 * trait, 4 * trait]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    for (const m of f.murs) {
+      chemin(m.points);
+      ctx.fillStyle = seule ? COULEURS.murLecture : COULEURS.murFond;
+      ctx.fill();
+      if (!seule) {
+        ctx.lineWidth = trait;
+        ctx.strokeStyle = COULEURS.mur;
         ctx.stroke();
-        ctx.setLineDash([]);
       }
     }
-    if (etat.calques.murs) {
-      for (const m of f.murs) {
-        chemin(m.points);
-        ctx.fillStyle = etat.douteux.has(m.id) ? COULEURS.doute : COULEURS.mur;
-        ctx.fill();
-      }
-    }
-    if (etat.calques.ouvertures) {
-      for (const o of f.ouvertures) {
-        chemin(o.points);
-        ctx.fillStyle = COULEURS[o.type] || COULEURS.porte;
-        ctx.fill();
-        if (etat.douteux.has(o.id)) {
-          ctx.lineWidth = 4 * trait;
-          ctx.strokeStyle = COULEURS.doute;
-          ctx.stroke();
-        }
-      }
+    ctx.globalAlpha = seule ? 1 : 0.6; // on doit voir le symbole du plan à travers
+    for (const o of f.ouvertures) {
+      chemin(o.points);
+      ctx.fillStyle = COULEURS[o.type] || COULEURS.porte;
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
 
-    for (const d of etat.doutes) {
-      if (!d.zone_px) continue;
-      const [x, y, l, h] = d.zone_px;
+    // Le point en cours : ses éléments entourés d'orange, et sa zone s'il n'est lié à aucun élément.
+    for (const e of [...f.murs, ...f.ouvertures, ...f.pieces]) {
+      if (!enCours.has(e.id)) continue;
+      chemin(e.points);
+      ctx.lineWidth = 3 * trait;
+      ctx.strokeStyle = COULEURS.doute;
+      ctx.stroke();
+    }
+    if (point && point.zone_px && !point.elements.length) {
+      const [x, y, l, h] = point.zone_px;
+      const m = 6 * trait;
       ctx.fillStyle = COULEURS.douteFond;
       ctx.fillRect(x, y, l, h);
-      ctx.lineWidth = 2 * trait;
+      ctx.lineWidth = 3 * trait;
       ctx.strokeStyle = COULEURS.doute;
-      ctx.strokeRect(x, y, l, h);
+      ctx.setLineDash([8 * trait, 5 * trait]);
+      ctx.strokeRect(x - m, y - m, l + 2 * m, h + 2 * m);
+      ctx.setLineDash([]);
     }
 
-    // L'élément choisi : contour jaune bien visible.
+    // L'élément qu'on est en train de corriger.
     const choisi = etat.choisi && [...f.murs, ...f.ouvertures, ...f.pieces].find((x) => x.id === etat.choisi);
     if (choisi) {
       chemin(choisi.points);
@@ -357,67 +377,62 @@
       ctx.stroke();
     }
 
-    if (etat.calques.pieces) {
-      ctx.textAlign = "center";
-      for (const p of f.pieces) etiquette(p.centre, [p.nom, `${formatM(p.surface)} m²`], etat.douteux.has(p.id), z);
-    }
-
-    // Le doute choisi dans la liste : un cadre pointillé.
-    const dc = etat.doutes.find((d) => d.cle === etat.douteChoisi);
-    const rect = dc && rectangleDuDoute(dc);
-    if (rect) {
-      const m = 10 * trait;
-      ctx.lineWidth = 3 * trait;
-      ctx.strokeStyle = COULEURS.doute;
-      ctx.setLineDash([8 * trait, 5 * trait]);
-      ctx.strokeRect(rect[0] - m, rect[1] - m, rect[2] + 2 * m, rect[3] + 2 * m);
-      ctx.setLineDash([]);
-    }
-
     // Le mur en cours d'ajout.
     if (etat.outil === "mur" && etat.depart && etat.souris) {
       const fin = C.aimanter(etat.v.logement, etat.souris, etat.depart, metresPour(VISEE * 1.5, etat.souris));
-      const ep = epaisseurNouveauMur();
       if (C.longueur(etat.depart, fin) > 0.01) {
-        chemin(C.polygoneMur({ debut: etat.depart, fin, epaisseur: ep }).map(px));
+        chemin(C.polygoneMur({ debut: etat.depart, fin, epaisseur: epaisseurNouveauMur() }).map(px));
         ctx.fillStyle = "rgba(29, 78, 216, 0.5)";
         ctx.fill();
-        const a = px(etat.depart), b = px(fin);
-        etiquette([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - 18 * trait], [`${formatM(C.longueur(etat.depart, fin))} m`], false, z);
       }
+    }
+
+    dessinerEtiquettes(f, enCours, dpr);
+  }
+
+  /** Les noms des pièces, écrits à taille fixe et sans jamais se chevaucher : ceux qui n'ont plus la place attendent un zoom. */
+  function dessinerEtiquettes(f, enCours, dpr) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const places = [];
+    const avecPlace = [...f.pieces].sort((a, b) => (enCours.has(b.id) - enCours.has(a.id)) || (b.surface - a.surface));
+    for (const p of avecPlace) {
+      const x = p.centre[0] * etat.vue.zoom + etat.vue.dx, y = p.centre[1] * etat.vue.zoom + etat.vue.dy;
+      const lignes = [p.nom, `${formatM(p.surface, 1)} m²`];
+      ctx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      const larg = Math.max(...lignes.map((l) => ctx.measureText(l).width)) + 10, haut = 34;
+      const essais = [[0, 0], [0, -haut], [0, haut], [larg, 0], [-larg, 0]];
+      const place = essais.map(([a, b]) => [x + a - larg / 2, y + b - haut / 2, larg, haut])
+        .find((r) => !places.some((q) => r[0] < q[0] + q[2] && q[0] < r[0] + r[2] && r[1] < q[1] + q[3] && q[1] < r[1] + r[3]));
+      if (!place) continue;
+      places.push(place);
+      etiquette(place, lignes, enCours.has(p.id));
     }
   }
 
-  function etiquette(pos, lignes, doute, z) {
-    const taille = 13 / z;
+  function etiquette([x, y, larg, haut], lignes, doute) {
     ctx.textAlign = "center";
-    ctx.font = `600 ${taille}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-    const larg = Math.max(...lignes.map((l) => ctx.measureText(l).width)) + 10 / z;
-    const haut = lignes.length * taille * 1.3 + 6 / z;
-    const x = pos[0] - larg / 2, y = pos[1] - haut / 2;
-    ctx.fillStyle = doute ? "#fff7ed" : "rgba(255,255,255,0.9)";
-    ctx.strokeStyle = doute ? COULEURS.doute : COULEURS.pieceBord;
-    ctx.lineWidth = 1.5 / z;
+    ctx.fillStyle = doute ? "rgba(255, 247, 237, 0.95)" : "rgba(255, 255, 255, 0.85)";
+    ctx.strokeStyle = doute ? COULEURS.doute : "rgba(59, 130, 246, 0.5)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(x, y, larg, haut, 4 / z);
+    ctx.roundRect(x, y, larg, haut, 4);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = doute ? "#9a3412" : "#1e3a8a";
     lignes.forEach((l, i) => {
-      ctx.font = `${i ? 400 : 600} ${taille}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-      ctx.fillText(l, pos[0], y + 3 / z + taille * (1.05 + i * 1.3));
+      ctx.font = `${i ? 400 : 600} 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+      ctx.fillText(l, x + larg / 2, y + 14 + i * 14);
     });
   }
 
   // ---------- Panneau de droite ----------
 
   function nomDe(id) {
-    if (id == null) return "Zone du plan";
     const t = trouverElement(id);
-    if (!t) return id;
-    if (t.genre === "piece") return `Pièce « ${t.e.nom} »`;
-    if (t.genre === "ouverture") return `${NOMS_OUVERTURES[t.e.type]} ${t.e.id}`;
-    return `Mur ${id}`;
+    if (!t) return "Élément";
+    if (t.genre === "piece") return `La pièce « ${t.e.nom} »`;
+    if (t.genre === "ouverture") return `${NOMS_OUVERTURES[t.e.type]}`;
+    return "Le mur";
   }
 
   function el(balise, attributs = {}, ...enfants) {
@@ -435,75 +450,105 @@
     const v = etat.v;
     $("annuler").disabled = !etat.historique.length;
     $("valider").disabled = !etat.v;
-    $("refaire").disabled = !etat.refaire.length;
-    document.querySelectorAll("[data-outil]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.outil === etat.outil)));
-    $("consigne").textContent = etat.corriger ? CONSIGNES[etat.outil] : CONSIGNE_COMPARER;
-    document.body.classList.toggle("comparer", !etat.corriger);
-    $("mode-corriger").setAttribute("aria-pressed", String(etat.corriger));
-    canvas.style.cursor = etat.outil === "choisir" ? "default" : "crosshair";
+    $("refaire").hidden = !etat.refaire.length;
+    document.querySelectorAll("[data-vue]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vue === etat.affichage)));
+    const outilActif = etat.outil !== "choisir";
+    $("consigne-outil").hidden = !outilActif;
+    if (outilActif) $("consigne").textContent = CONSIGNES[etat.outil];
+    canvas.style.cursor = outilActif ? "crosshair" : "grab";
     if (!v) return;
     const lg = v.logement;
-    $("titre").textContent = `${lg.projet_id}${v.plan ? " — " + v.plan : ""}`;
+    $("titre").textContent = lg.projet_id;
+    $("bandeau").textContent = etat.affichage === "plan" ? "Plan tel qu'il a été déposé. Pour corriger, revenez sur « Les deux »." : "";
 
-    const ech = v.echelle || {};
-    $("bandeau").textContent = ech.etat === "a_verifier"
-      ? `Échelle à vérifier : ${ech.raison || "Atelya n'a pas pu la confirmer"}. Choisissez un mur coté et tapez sa vraie longueur.`
-      : "";
-
-    // Les doutes, avec leurs propositions en un clic.
-    $("nb-doutes").textContent = `(${etat.doutes.length})`;
-    const ul = $("doutes");
-    ul.innerHTML = "";
-    if (!etat.doutes.length) ul.append(el("p", { class: "info", texte: "Plus rien à vérifier." }));
-    for (const d of etat.doutes) {
-      const props = el("div", { class: "propositions" });
-      for (const p of d.propositions || []) {
-        props.append(el("button", {
-          texte: p.libelle,
-          onclick: (ev) => {
-            ev.stopPropagation();
-            corriger((x) => C.appliquerAction(x, p.action, d), `« ${p.libelle} » appliqué.`);
-          },
-        }));
-      }
-      const li = el("li", {
-        onclick: () => {
-          etat.douteChoisi = d.cle;
-          etat.choisi = d.element;
-          const rect = rectangleDuDoute(d);
-          if (rect) cadrer(rect);
-          rafraichir();
-        },
-      }, el("strong", { texte: nomDe(d.element) }), el("br"), d.raison, props);
-      if (d.cle === etat.douteChoisi) li.className = "choisi";
-      ul.append(li);
-    }
-
+    afficherPoint();
     afficherFiche();
-
-    const erreurs = C.verifierCoherence(lg);
-    const coh = $("coherence");
-    coh.innerHTML = "";
-    if (!erreurs.length) coh.append(el("span", { class: "ok", texte: "Oui : le logement est complet et cohérent." }));
-    else coh.append(el("span", { texte: "Pas encore :" }), el("ul", {}, ...erreurs.map((e) => el("li", { texte: e }))));
 
     const tb = $("pieces");
     tb.innerHTML = "";
+    const douteuses = new Set(etat.points.flatMap((p) => p.elements));
     let total = 0;
     for (const p of lg.pieces || []) {
       const s = C.surfacePolygone(p.contour);
       total += s;
-      const tr = el("tr", { onclick: () => choisir(p.id) }, el("td", { texte: p.nom }), el("td", { class: "nb", texte: `${formatM(s)} m²` }));
-      if (etat.douteux.has(p.id)) tr.className = "douteux";
+      const tr = el("tr", { onclick: () => { choisir(p.id); cadrer(rectangleDe(p.contour.map(px))); } }, el("td", { texte: p.nom }), el("td", { class: "nb", texte: `${formatM(s, 1)} m²` }));
+      if (douteuses.has(p.id)) tr.className = "douteux";
       tb.append(tr);
     }
+    $("ouvrir-pieces").textContent = `Pièces (${(lg.pieces || []).length})`;
     const nbP = (lg.ouvertures || []).filter((o) => o.type === "porte").length;
     const nbF = (lg.ouvertures || []).length - nbP;
-    $("resume").textContent = `Total ${formatM(total)} m² · ${lg.murs.length} murs · ${nbP} portes · ${nbF} fenêtres et portes-fenêtres`;
+    $("resume").textContent = `Total ${formatM(total, 1)} m² · ${nbP} portes · ${nbF} fenêtres et portes-fenêtres`;
     dessiner();
   }
 
-  /** La fiche de l'élément choisi : ce qu'on peut y corriger. */
+  /** Le point en cours : ce qu'il faut regarder, en français, et les choix possibles. */
+  function afficherPoint() {
+    const sec = $("point");
+    const actions = $("point-actions");
+    actions.innerHTML = "";
+    const n = etat.points.length;
+    const point = etat.points[etat.rangPoint];
+    sec.classList.toggle("fini", !n);
+    $("point-nav").hidden = n < 2;
+    $("point-precedent").disabled = etat.rangPoint === 0;
+    $("point-suivant").disabled = etat.rangPoint >= n - 1;
+    if (!point) {
+      $("point-numero").textContent = "Tout est vérifié";
+      $("point-titre").textContent = "Plus aucun point";
+      const erreurs = C.verifierCoherence(etat.v.logement);
+      $("point-texte").textContent = erreurs.length
+        ? `À corriger avant de terminer : ${erreurs.join(" ; ")}.`
+        : "Jetez un dernier coup d'œil au plan : Atelya peut s'être trompé sans le savoir. Puis cliquez sur « Terminer ».";
+      return;
+    }
+    $("point-numero").textContent = `Point ${etat.rangPoint + 1} sur ${n}`;
+    $("point-titre").textContent = point.titre;
+    $("point-texte").textContent = point.texte;
+    let nom = null;
+    if (point.genre === "morceaux") {
+      const pieces = etat.v.logement.pieces.filter((p) => point.elements.includes(p.id));
+      const grande = [...pieces].sort((a, b) => C.surfacePolygone(b.contour) - C.surfacePolygone(a.contour))[0];
+      const sansNumero = grande.nom.replace(/\s+\d+$/, "");
+      nom = el("select", { "aria-label": "Nom de la pièce réunie" }, ...[...new Set([sansNumero, ...pieces.map((p) => p.nom), ...C.NOMS_PIECES])].map((x) => el("option", { value: x, texte: `Nom : ${x}` })));
+      actions.append(nom);
+    }
+    for (const a of point.actions) {
+      actions.append(el("button", {
+        class: `bouton${a.principal ? " principal" : ""}${a.danger ? " danger" : ""}`,
+        texte: a.libelle,
+        onclick: () => choisirPourLePoint(point, a, nom && nom.value),
+      }));
+    }
+    if (point.elements.length === 1 && point.genre !== "echelle") {
+      actions.append(el("button", { class: "bouton", texte: "Modifier…", onclick: () => choisir(point.elements[0]) }));
+    }
+  }
+
+  function choisirPourLePoint(point, choix, nom) {
+    if (choix.action.type === "outil") return changerOutil(choix.action.outil);
+    const fait = { regler: "Noté.", supprimer_tout: "Supprimé.", fusionner: "Pièces réunies." }[choix.action.type];
+    if (corriger((x) => C.reglerPoint(x, point, choix.action, nom), fait)) {
+      etat.choisi = null;
+      montrerPoint();
+    }
+  }
+
+  /** Amène le plan sur le point en cours. */
+  function montrerPoint() {
+    const point = etat.points[etat.rangPoint];
+    if (point && point.zone_px) cadrer(point.zone_px);
+    else ajuster();
+    rafraichir();
+  }
+
+  function allerAuPoint(sens) {
+    etat.rangPoint = Math.max(0, Math.min(etat.points.length - 1, etat.rangPoint + sens));
+    etat.choisi = null;
+    montrerPoint();
+  }
+
+  /** La fiche de l'élément cliqué : ce qu'on peut y corriger. */
   function afficherFiche() {
     const sec = $("choix");
     const fiche = $("fiche");
@@ -512,11 +557,10 @@
     sec.hidden = !t;
     if (!t) return;
     const { genre, e } = t;
-    const boutons = el("div", { class: "ligne" },
-      el("button", { texte: "C'est juste", onclick: () => corriger((x) => C.confirmer(x, e.id), "Noté comme vérifié.") }),
-      el("button", { class: "danger", texte: "Supprimer", onclick: () => supprimerChoisi() }));
+    const supprimerBouton = (texte) => el("button", { class: "bouton danger", texte, onclick: () => supprimerChoisi() });
 
     if (genre === "piece") {
+      $("choix-titre").textContent = `${e.nom} · ${formatM(C.surfacePolygone(e.contour), 1)} m²`;
       const liste = el("select", { id: "f-nom" }, ...[...new Set([e.nom, ...C.NOMS_PIECES])].map((n) => el("option", { value: n, texte: n })));
       liste.value = e.nom;
       liste.addEventListener("change", () => corriger((x) => C.renommerPiece(x, e.id, liste.value), `Pièce renommée « ${liste.value} ».`));
@@ -524,10 +568,15 @@
       libre.addEventListener("keydown", (ev) => {
         if (ev.key === "Enter") corriger((x) => C.renommerPiece(x, e.id, libre.value), `Pièce renommée « ${libre.value.trim()} ».`);
       });
-      fiche.append(el("p", { texte: `Pièce ${e.id} · ${formatM(C.surfacePolygone(e.contour))} m²` }),
-        el("label", { texte: "Nom de la pièce" }), liste, libre, boutons);
+      const autres = (etat.v.logement.pieces || []).filter((p) => p.id !== e.id);
+      const avec = el("select", { id: "f-fusion" }, el("option", { value: "", texte: "Réunir avec une autre pièce…" }), ...autres.map((p) => el("option", { value: p.id, texte: `${p.nom} (${formatM(C.surfacePolygone(p.contour), 1)} m²)` })));
+      avec.addEventListener("change", () => {
+        if (avec.value && corriger((x) => C.fusionnerPieces(x, [e.id, avec.value], e.nom), "Pièces réunies.")) rafraichir();
+      });
+      fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre, el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
+        el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));
     } else if (genre === "ouverture") {
-      const mur = etat.v.logement.murs.find((m) => m.id === e.mur);
+      $("choix-titre").textContent = `${NOMS_OUVERTURES[e.type]} de ${formatM(e.largeur)} m`;
       const type = el("select", { id: "f-type" }, ...Object.entries(NOMS_OUVERTURES).map(([k, n]) => el("option", { value: k, texte: n })));
       type.value = e.type;
       type.addEventListener("change", () => corriger((x) => C.modifierOuverture(x, e.id, { type: type.value }), "Type changé."));
@@ -535,23 +584,22 @@
       const pos = el("input", { type: "text", id: "f-position", value: formatM(e.position) });
       const appliquer = () => {
         const l = lireNombre(larg.value), p = lireNombre(pos.value);
-        if (!(l > 0) || !(p >= 0)) return message("Largeur et position : des nombres en mètres, ex. 0,83.", true);
+        if (!(l > 0) || !(p >= 0)) return message("Tapez un nombre en mètres, par exemple 0,83.", true);
         corriger((x) => C.modifierOuverture(x, e.id, { largeur: l, position: p }), "Mesures corrigées.");
       };
       for (const champ of [larg, pos]) champ.addEventListener("keydown", (ev) => ev.key === "Enter" && appliquer());
-      fiche.append(el("p", { texte: `${NOMS_OUVERTURES[e.type]} ${e.id}, dans le mur ${e.mur}${mur ? ` (${formatM(C.longueur(mur.debut, mur.fin))} m)` : ""}` }),
-        el("label", { texte: "Type" }), type,
-        el("label", { texte: "Largeur (m)" }), larg,
-        el("label", { texte: "Distance depuis le début du mur (m)" }), pos,
-        el("div", { class: "ligne" }, el("button", { class: "plein", texte: "Appliquer les mesures", onclick: appliquer })),
-        boutons);
+      fiche.append(el("label", { texte: "C'est…" }), type,
+        el("label", { texte: "Largeur en mètres, puis Entrée" }), larg,
+        el("details", {}, el("summary", { texte: "La déplacer le long du mur" }), el("label", { texte: "Distance depuis le bout du mur (m), puis Entrée" }), pos),
+        el("div", { class: "ligne" }, supprimerBouton("Supprimer")));
     } else {
       const l = C.longueur(e.debut, e.fin);
+      $("choix-titre").textContent = `Mur de ${formatM(l)} m`;
       const cote = el("input", { type: "text", id: "f-cote", placeholder: `lue : ${formatM(l)} m` });
       const ep = el("input", { type: "text", id: "f-epaisseur", value: formatM(e.epaisseur) });
       const lue = () => {
         const n = lireNombre(cote.value);
-        if (!(n > 0)) { message("Tapez la longueur de la cote en mètres, ex. 4,80.", true); return null; }
+        if (!(n > 0)) { message("Tapez la longueur en mètres, par exemple 4,80.", true); return null; }
         return n;
       };
       ep.addEventListener("keydown", (ev) => {
@@ -559,15 +607,14 @@
         const n = lireNombre(ep.value);
         if (n > 0) corriger((x) => C.modifierMur(x, e.id, { epaisseur: n }), "Épaisseur corrigée.");
       });
-      fiche.append(el("p", { texte: `Mur ${e.id} · longueur lue ${formatM(l)} m · épaisseur ${formatM(e.epaisseur)} m` }),
-        el("label", { texte: "Corriger une cote : vraie longueur de ce mur (m)" }), cote,
+      fiche.append(el("label", { texte: "Sa vraie longueur d'après le plan (m)" }), cote,
         el("div", { class: "ligne" },
-          el("button", { texte: "Ce mur seulement", onclick: () => { const n = lue(); if (n) corriger((x) => C.longueurMur(x, e.id, n), "Longueur du mur corrigée."); } }),
-          el("button", { class: "plein", texte: "Tout le plan", title: "Toute l'échelle était fausse : on corrige toutes les longueurs dans la même proportion",
-            onclick: () => { const n = lue(); if (n) corriger((x) => C.mettreAEchelle(x, n / l), `Échelle de tout le plan corrigée (× ${formatM(n / l, 3)}).`); } })),
-        el("label", { texte: "Épaisseur (m), puis Entrée" }), ep,
-        el("p", { class: "info", texte: "Pour le déplacer : glissez-le sur le plan." }),
-        boutons);
+          el("button", { class: "bouton principal", texte: "Tout mettre à la bonne taille", title: "Toutes les mesures du plan sont corrigées dans la même proportion",
+            onclick: () => { const n = lue(); if (n) corriger((x) => C.mettreAEchelle(x, n / l), "Toutes les mesures du plan sont corrigées."); } }),
+          el("button", { class: "bouton", texte: "Ce mur seulement", onclick: () => { const n = lue(); if (n) corriger((x) => C.longueurMur(x, e.id, n), "Longueur du mur corrigée."); } })),
+        el("p", { class: "info", texte: "Pour le déplacer : faites-le glisser sur le plan." }),
+        el("details", {}, el("summary", { texte: "Changer son épaisseur" }), el("label", { texte: "Épaisseur en mètres, puis Entrée" }), ep),
+        el("div", { class: "ligne" }, supprimerBouton("Supprimer ce mur")));
     }
   }
 
@@ -579,7 +626,7 @@
   function supprimerChoisi() {
     if (!etat.choisi) return;
     const nom = nomDe(etat.choisi);
-    if (corriger((x) => C.supprimer(x, etat.choisi), `${nom} supprimé(e).`)) etat.choisi = null;
+    if (corriger((x) => C.supprimer(x, etat.choisi), `${nom} : supprimé.`)) etat.choisi = null;
     rafraichir();
   }
 
@@ -590,6 +637,9 @@
   function changerOutil(outil) {
     etat.outil = outil;
     etat.depart = null;
+    if (outil !== "choisir" && etat.affichage === "plan") etat.affichage = "deux";
+    $("menu-ajouter").hidden = true;
+    $("ouvrir-ajouter").setAttribute("aria-expanded", "false");
     rafraichir();
   }
 
@@ -608,7 +658,7 @@
     const tol = metresPour(VISEE, p);
     const lg = etat.v.logement;
 
-    if (!etat.corriger) { // mode « comparer » : on ne fait que se déplacer
+    if (etat.affichage === "plan") { // le plan seul : on ne fait que le regarder
       etat.glisse = { genre: "vue", dernier: [ev.clientX, ev.clientY] };
       return;
     }
@@ -617,8 +667,7 @@
       if (!etat.depart) { etat.depart = q; dessiner(); return; }
       if (corriger((x) => C.ajouterMur(x, etat.depart, q, epaisseurNouveauMur()), "Mur ajouté (cloison de 10 cm).")) {
         etat.choisi = etat.v.logement.murs[etat.v.logement.murs.length - 1].id;
-        etat.depart = null;
-        rafraichir();
+        changerOutil("choisir");
       }
       return;
     }
@@ -628,7 +677,7 @@
       if (corriger((x) => C.ajouterOuverture(x, m.id, etat.outil, m.le_long), `${NOMS_OUVERTURES[etat.outil]} ajoutée.`)) {
         const o = etat.v.logement.ouvertures;
         etat.choisi = o[o.length - 1].id;
-        rafraichir();
+        changerOutil("choisir");
       }
       return;
     }
@@ -660,7 +709,6 @@
         try { etat.apercu = C.deplacerMur(etat.v, g.id, delta); g.delta = delta; } catch (e) { /* on garde l'aperçu précédent */ }
       }
     }
-    $("position").textContent = `x ${formatM(p[0])} m · y ${formatM(p[1])} m`;
     dessiner();
   }
 
@@ -690,12 +738,12 @@
     if (!etat.v) return;
     const erreurs = C.verifierCoherence(etat.v.logement);
     if (erreurs.length) {
-      message("Impossible de valider : " + erreurs.join(" ; "), true);
+      message("Impossible de terminer : " + erreurs.join(" ; "), true);
       return;
     }
-    if (etat.doutes.length) {
-      const ok = await demander(`Il reste ${etat.doutes.length} point(s) à vérifier`,
-        "Vous pouvez revenir les régler (un clic sur « C'est juste » suffit si c'est bon), ou valider quand même : ils seront notés dans le rapport.");
+    if (etat.points.length) {
+      const ok = await demander(`Il reste ${etat.points.length} point(s) à vérifier`,
+        "Vous pouvez revenir les vérifier, ou terminer quand même : ce qui reste en doute sera noté dans le rapport.");
       if (!ok) return;
     }
     const r = C.resultat(etat.v, { corrections: etat.historique.length });
@@ -744,18 +792,28 @@
   $("zoom-ajuster").addEventListener("click", ajuster);
   $("annuler").addEventListener("click", annuler);
   $("valider").addEventListener("click", valider);
-  $("mode-corriger").addEventListener("click", () => {
-    etat.corriger = !etat.corriger;
-    if (!etat.corriger) { etat.choisi = null; etat.depart = null; etat.outil = "choisir"; }
+  document.querySelectorAll("[data-vue]").forEach((b) => b.addEventListener("click", () => {
+    etat.affichage = b.dataset.vue;
+    etat.choisi = null;
+    if (etat.outil !== "choisir") changerOutil("choisir");
     rafraichir();
+  }));
+  $("point-precedent").addEventListener("click", () => allerAuPoint(-1));
+  $("point-suivant").addEventListener("click", () => allerAuPoint(1));
+  $("fermer-choix").addEventListener("click", () => choisir(null));
+  $("arreter-outil").addEventListener("click", () => changerOutil("choisir"));
+  const volet = (bouton, cible) => $(bouton).addEventListener("click", () => {
+    const ouvert = $(cible).hidden;
+    $(cible).hidden = !ouvert;
+    $(bouton).setAttribute("aria-expanded", String(ouvert));
+    if (ouvert && cible !== "menu-ajouter") $(cible).scrollIntoView({ block: "start" });
   });
-  if (parametres.get("mode") === "corriger") etat.corriger = true;
+  volet("ouvrir-ajouter", "menu-ajouter");
+  volet("ouvrir-pieces", "liste-pieces");
+  volet("ouvrir-aide", "aide");
   $("abandonner").addEventListener("click", () => { versSite({ type: PREFIXE + "abandon" }); message("Vérification abandonnée."); });
   $("refaire").addEventListener("click", refaire);
   document.querySelectorAll("[data-outil]").forEach((b) => b.addEventListener("click", () => changerOutil(b.dataset.outil)));
-  $("opacite").addEventListener("input", (ev) => { etat.opacite = ev.target.value / 100; dessiner(); });
-  document.querySelectorAll("[data-calque]").forEach((c) =>
-    c.addEventListener("change", () => { etat.calques[c.dataset.calque] = c.checked; dessiner(); }));
 
   const zone = $("zone");
   zone.addEventListener("dragover", (ev) => { ev.preventDefault(); zone.classList.add("depot"); });
@@ -774,7 +832,6 @@
   window.addEventListener("keydown", (ev) => {
     const dansChamp = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName);
     const cmd = ev.metaKey || ev.ctrlKey;
-    if (!etat.corriger) { if (ev.key === "+" || ev.key === "=") zoomer(1.25); if (ev.key === "-") zoomer(0.8); return; }
     if (cmd && ev.key.toLowerCase() === "z") { ev.preventDefault(); ev.shiftKey ? refaire() : annuler(); return; }
     if (cmd && ev.key.toLowerCase() === "y") { ev.preventDefault(); refaire(); return; }
     if (dansChamp) return;
@@ -789,8 +846,6 @@
   // Au démarrage : dans le site, on se cache des boutons inutiles et on prévient qu'on est prêt.
   if (integre) {
     $("abandonner").hidden = false;
-    for (const id of ["exemple"]) $(id).hidden = true;
-    document.querySelector('label[for="fichiers"]').hidden = true;
     $("accueil").textContent = "En attente du plan envoyé par le site…";
     if (!origineSite) message("Adresse du site inconnue : ajoutez ?origine=https://… à l'adresse de l'écran.", true);
     versSite({ type: PREFIXE + "pret", version: C.VERSION_VERIFICATION });
@@ -803,3 +858,4 @@
       .catch((e) => message("Ouverture impossible : " + e.message, true));
   }
 })();
+
