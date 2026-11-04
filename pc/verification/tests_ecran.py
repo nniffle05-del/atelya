@@ -16,6 +16,7 @@ const egal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const assert = {
   ok(v, m) { if (!v) throw new Error(m || "ok : faux"); },
   equal(a, b, m) { if (!Object.is(a, b)) throw new Error(m || `${a} ≠ ${b}`); },
+  notEqual(a, b, m) { if (Object.is(a, b)) throw new Error(m || `${a} = ${b}`); },
   deepEqual(a, b, m) { if (!egal(a, b)) throw new Error(m || `${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`); },
   match(t, r, m) { if (!r.test(t)) throw new Error(m || `${t} ne correspond pas à ${r}`); },
   throws(f, attendu) {

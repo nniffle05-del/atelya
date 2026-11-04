@@ -69,6 +69,14 @@
     }
     #menu-ajouter button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; }
     #menu-ajouter button:hover { background: var(--accent-doux); }
+    .titre-menu { color: var(--doux); font-size: 12px; padding: 6px 10px 2px; }
+    #alerte-pieces { margin-top: 12px; background: #fefce8; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 12px; }
+    #alerte-pieces p { margin: 0 0 8px; font-size: 14px; }
+    #alerte-pieces .bouton, #liste-pieces .bouton { width: 100%; }
+    #liste-pieces .bouton { margin-top: 8px; }
+    .reglage { display: flex; gap: 6px; align-items: center; }
+    .reglage input { text-align: center; }
+    .reglage .bouton { flex: none !important; width: 38px; padding: 5px 0; }
 
     #point { background: var(--doute-doux); border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 14px; }
     #point.fini { background: #ecfdf3; border-color: #a7e3bd; }
@@ -162,6 +170,11 @@
       </section>
       <p id="message"></p>
 
+      <section id="alerte-pieces" hidden>
+        <p>Les murs ont changé : les pièces et leurs surfaces ne sont plus à jour.</p>
+        <button class="bouton principal" id="recalculer-pieces">Recalculer les pièces</button>
+      </section>
+
       <section id="choix" hidden>
         <h2><span id="choix-titre"></span><button id="fermer-choix" title="Fermer" aria-label="Fermer">×</button></h2>
         <div id="fiche"></div>
@@ -171,6 +184,7 @@
         <h2>Pièces lues</h2>
         <table><tbody id="pieces"></tbody></table>
         <p id="resume"></p>
+        <button class="bouton" id="recalculer-pieces-2" title="Chaque espace fermé par des murs devient une pièce">Recalculer les pièces à partir des murs</button>
       </section>
 
       <section id="aide" hidden>
@@ -184,15 +198,21 @@
           <li><span class="pastille" style="background:#ea580c"></span>Le point en cours de vérification</li>
         </ul>
         <p><strong>Corriger un élément :</strong> cliquez dessus sur le plan. Un mur se déplace en le faisant glisser.</p>
+        <p><strong>Rallonger un mur :</strong> cliquez dessus, puis tirez un des ronds à ses bouts. Il s'accroche tout seul au mur voisin.</p>
         <p><strong>Se déplacer :</strong> faites glisser le plan, et utilisez la molette pour zoomer.</p>
         <p><strong>L'orange</strong> montre un doute d'Atelya, pas une erreur certaine. Atelya peut aussi se tromper sans le savoir : regardez aussi le reste du plan.</p>
       </section>
     </div>
     <div id="bas">
-      <button class="bouton" id="ouvrir-ajouter" aria-expanded="false">+ Ajouter ▾</button>
+      <button class="bouton" id="ouvrir-ajouter" aria-expanded="false">✎ Outils ▾</button>
       <button class="bouton" id="ouvrir-pieces" aria-expanded="false">Pièces</button>
       <button class="bouton" id="ouvrir-aide" aria-expanded="false">? Aide</button>
       <div id="menu-ajouter" hidden>
+        <div class="titre-menu">Retoucher un mur</div>
+        <button data-outil="couper">Couper un mur en deux</button>
+        <button data-outil="morceau">Enlever un morceau de mur</button>
+        <button data-outil="relier">Relier deux murs</button>
+        <div class="titre-menu">Ajouter</div>
         <button data-outil="mur">Un mur</button>
         <button data-outil="porte">Une porte</button>
         <button data-outil="fenetre">Une fenêtre</button>

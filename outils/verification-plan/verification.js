@@ -27,6 +27,9 @@
     porte: "Cliquez sur un mur, à l'endroit de la porte.",
     fenetre: "Cliquez sur un mur, à l'endroit de la fenêtre.",
     porte_fenetre: "Cliquez sur un mur, à l'endroit de la porte-fenêtre.",
+    couper: "Cliquez sur un mur, là où il faut le couper.",
+    morceau: "Cliquez sur un mur au début du morceau à enlever, puis à sa fin.",
+    relier: "Cliquez sur le bout d'un mur, puis sur le bout de l'autre.",
   };
   const VISEE = 8; // pixels d'écran : à quelle distance un clic « touche » un élément
 
@@ -43,6 +46,10 @@
     outil: "choisir",
     affichage: "deux", // "plan" : le plan seul ; "lecture" : la lecture seule ; "deux" : l'une sur l'autre
     depart: null, // premier bout d'un mur en cours d'ajout (m)
+    morceau: null, // début du morceau de mur à enlever : {id, t}
+    relier: null, // premier bout à relier : {id, bout, point}
+    accroche: null, // le point où un bout de mur vient de s'accrocher (m)
+    mursReference: null, // les murs quand les pièces ont été calculées pour la dernière fois
     souris: null, // position de la souris (m)
     glisse: null, // {genre: "vue"|"mur", ...}
     apercu: null, // copie corrigée affichée pendant qu'on glisse un mur
@@ -93,12 +100,15 @@
     etat.refaire = [];
     etat.choisi = null;
     etat.rangPoint = 0;
+    etat.mursReference = empreinteMurs(verification);
     $("accueil").style.display = "none";
     message("");
     recalculer();
     ajuster();
     rafraichir();
   }
+
+  const empreinteMurs = (v) => JSON.stringify(v.logement.murs.map((m) => [m.debut, m.fin, m.epaisseur]));
 
   function recalculer() {
     etat.matrice = C.matriceDuCalage(etat.v.calage);
@@ -387,6 +397,41 @@
       }
     }
 
+    // Les poignées : à chaque bout du mur choisi, ou de tous les murs pour l'outil « relier ».
+    const rond = (q, couleur, rayon = 6) => {
+      const c = px(q);
+      ctx.beginPath();
+      ctx.arc(c[0], c[1], rayon * trait, 0, 2 * Math.PI);
+      ctx.fillStyle = couleur;
+      ctx.fill();
+      ctx.lineWidth = 1.5 * trait;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+    };
+    const murChoisi = etat.outil === "choisir" && etat.choisi && v.logement.murs.find((m) => m.id === etat.choisi);
+    if (murChoisi) { rond(murChoisi.debut, COULEURS.choisi); rond(murChoisi.fin, COULEURS.choisi); }
+    if (etat.outil === "relier") {
+      for (const m of v.logement.murs) { rond(m.debut, "#94a3b8", 4); rond(m.fin, "#94a3b8", 4); }
+      if (etat.relier) rond(etat.relier.point, COULEURS.choisi, 7);
+    }
+    if (etat.accroche) rond(etat.accroche, "#16a34a", 8);
+    if (etat.outil === "morceau" && etat.morceau && etat.souris) {
+      const m = v.logement.murs.find((x) => x.id === etat.morceau.id);
+      if (m) {
+        const l = C.longueur(m.debut, m.fin);
+        const d = [(m.fin[0] - m.debut[0]) / l, (m.fin[1] - m.debut[1]) / l];
+        const t = Math.max(0, Math.min(l, (etat.souris[0] - m.debut[0]) * d[0] + (etat.souris[1] - m.debut[1]) * d[1]));
+        const a = [m.debut[0] + d[0] * etat.morceau.t, m.debut[1] + d[1] * etat.morceau.t], b = [m.debut[0] + d[0] * t, m.debut[1] + d[1] * t];
+        const pa = px(a), pb = px(b);
+        ctx.beginPath();
+        ctx.moveTo(pa[0], pa[1]);
+        ctx.lineTo(pb[0], pb[1]);
+        ctx.lineWidth = 6 * trait;
+        ctx.strokeStyle = "#dc2626";
+        ctx.stroke();
+      }
+    }
+
     dessinerEtiquettes(f, enCours, dpr);
   }
 
@@ -463,6 +508,7 @@
 
     afficherPoint();
     afficherFiche();
+    $("alerte-pieces").hidden = empreinteMurs(v) === etat.mursReference;
 
     const tb = $("pieces");
     tb.innerHTML = "";
@@ -597,6 +643,10 @@
       $("choix-titre").textContent = `Mur de ${formatM(l)} m`;
       const cote = el("input", { type: "text", id: "f-cote", placeholder: `lue : ${formatM(l)} m` });
       const ep = el("input", { type: "text", id: "f-epaisseur", value: formatM(e.epaisseur) });
+      const pasEpaisseur = (delta) => {
+        const n = Math.round((e.epaisseur + delta) * 1000) / 1000;
+        if (n >= 0.02) corriger((x) => C.modifierMur(x, e.id, { epaisseur: n }), `Épaisseur : ${formatM(n)} m.`);
+      };
       const lue = () => {
         const n = lireNombre(cote.value);
         if (!(n > 0)) { message("Tapez la longueur en mètres, par exemple 4,80.", true); return null; }
@@ -612,8 +662,14 @@
           el("button", { class: "bouton principal", texte: "Tout mettre à la bonne taille", title: "Toutes les mesures du plan sont corrigées dans la même proportion",
             onclick: () => { const n = lue(); if (n) corriger((x) => C.mettreAEchelle(x, n / l), "Toutes les mesures du plan sont corrigées."); } }),
           el("button", { class: "bouton", texte: "Ce mur seulement", onclick: () => { const n = lue(); if (n) corriger((x) => C.longueurMur(x, e.id, n), "Longueur du mur corrigée."); } })),
-        el("p", { class: "info", texte: "Pour le déplacer : faites-le glisser sur le plan." }),
-        el("details", {}, el("summary", { texte: "Changer son épaisseur" }), el("label", { texte: "Épaisseur en mètres, puis Entrée" }), ep),
+        el("label", { texte: "Épaisseur en mètres" }),
+        el("div", { class: "reglage" },
+          el("button", { class: "bouton", id: "f-ep-moins", texte: "−", title: "1 cm de moins", onclick: () => pasEpaisseur(-0.01) }), ep,
+          el("button", { class: "bouton", id: "f-ep-plus", texte: "+", title: "1 cm de plus", onclick: () => pasEpaisseur(0.01) })),
+        el("p", { class: "info", texte: "Pour le rallonger : tirez un des ronds à ses bouts. Pour le déplacer : faites-le glisser." }),
+        el("div", { class: "ligne" },
+          el("button", { class: "bouton", texte: "Le couper", onclick: () => changerOutil("couper") }),
+          el("button", { class: "bouton", texte: "Enlever un morceau", onclick: () => changerOutil("morceau") })),
         el("div", { class: "ligne" }, supprimerBouton("Supprimer ce mur")));
     }
   }
@@ -637,6 +693,8 @@
   function changerOutil(outil) {
     etat.outil = outil;
     etat.depart = null;
+    etat.morceau = null;
+    etat.relier = null;
     if (outil !== "choisir" && etat.affichage === "plan") etat.affichage = "deux";
     $("menu-ajouter").hidden = true;
     $("ouvrir-ajouter").setAttribute("aria-expanded", "false");
@@ -681,6 +739,37 @@
       }
       return;
     }
+    if (etat.outil === "couper" || etat.outil === "morceau") {
+      const m = C.murLePlusProche(lg, p, tol * 2);
+      if (!m) return message("Cliquez sur un mur (ou tout près).", true);
+      if (etat.outil === "couper") {
+        if (corriger((x) => C.couperMur(x, m.id, m.le_long), "Mur coupé en deux : chaque morceau se retouche à part.")) changerOutil("choisir");
+        return;
+      }
+      if (!etat.morceau) { etat.morceau = { id: m.id, t: m.le_long }; message("Cliquez maintenant à la fin du morceau."); dessiner(); return; }
+      const debut = etat.morceau;
+      if (m.id !== debut.id) return message("Cliquez sur le même mur, à la fin du morceau.", true);
+      if (corriger((x) => C.enleverMorceau(x, debut.id, debut.t, m.le_long), "Morceau de mur enlevé.")) changerOutil("choisir");
+      return;
+    }
+    if (etat.outil === "relier") {
+      const b = C.boutLePlusProche(lg, p, metresPour(VISEE * 2, p), etat.relier && etat.relier.id);
+      if (!b) return message(etat.relier ? "Cliquez sur le bout de l'autre mur." : "Cliquez sur le bout d'un mur (un des petits ronds).", true);
+      if (!etat.relier) { etat.relier = b; message("Cliquez maintenant sur le bout de l'autre mur."); dessiner(); return; }
+      const a = etat.relier;
+      if (corriger((x) => C.relierMurs(x, a.id, a.bout, b.id, b.bout), "Murs reliés.")) changerOutil("choisir");
+      return;
+    }
+    const murOuvert = etat.choisi && lg.murs.find((m) => m.id === etat.choisi);
+    if (murOuvert) {
+      const rayon = metresPour(VISEE * 1.5, p);
+      for (const bout of ["debut", "fin"]) {
+        if (C.longueur(p, murOuvert[bout]) <= rayon) {
+          etat.glisse = { genre: "bout", id: murOuvert.id, bout, bouge: false };
+          return;
+        }
+      }
+    }
     const sous = C.elementSous(lg, p, tol);
     if (sous) {
       etat.choisi = sous.id;
@@ -702,6 +791,16 @@
       etat.vue.dx += ev.clientX - g.dernier[0];
       etat.vue.dy += ev.clientY - g.dernier[1];
       g.dernier = [ev.clientX, ev.clientY];
+    } else if (g && g.genre === "bout") {
+      const a = C.accrocherBout(etat.v.logement, g.id, g.bout, p, metresPour(VISEE * 1.5, p));
+      etat.accroche = a.accroche ? a.point : null;
+      try {
+        etat.apercu = C.deplacerBout(etat.v, g.id, g.bout, a.point);
+        g.point = a.point;
+        g.erreur = null;
+      } catch (e) {
+        g.erreur = e.message; // on garde l'aperçu précédent
+      }
     } else if (g && g.genre === "mur") {
       const delta = [p[0] - g.depart[0], p[1] - g.depart[1]];
       if (Math.hypot(...delta) > metresPour(3, p)) g.bouge = true;
@@ -716,7 +815,12 @@
     const g = etat.glisse;
     etat.glisse = null;
     etat.apercu = null;
-    if (g && g.genre === "mur" && g.bouge && g.delta) {
+    etat.accroche = null;
+    if (g && g.genre === "bout") {
+      if (g.erreur) message(g.erreur, true);
+      if (g.point) corriger((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
+      else dessiner();
+    } else if (g && g.genre === "mur" && g.bouge && g.delta) {
       corriger((x) => C.deplacerMur(x, g.id, g.delta), "Mur déplacé (les murs et pièces qui le touchent ont suivi).");
     } else dessiner();
   }
@@ -740,6 +844,11 @@
     if (erreurs.length) {
       message("Impossible de terminer : " + erreurs.join(" ; "), true);
       return;
+    }
+    if (empreinteMurs(etat.v) !== etat.mursReference) {
+      const ok = await demander("Les pièces ne sont pas à jour",
+        "Vous avez changé des murs sans recalculer les pièces : leurs surfaces peuvent être fausses. Revenez cliquer sur « Recalculer les pièces », ou terminez quand même.");
+      if (!ok) return;
     }
     if (etat.points.length) {
       const ok = await demander(`Il reste ${etat.points.length} point(s) à vérifier`,
@@ -798,6 +907,23 @@
     if (etat.outil !== "choisir") changerOutil("choisir");
     rafraichir();
   }));
+  function refairePieces() {
+    if (!etat.v) return;
+    const r = C.piecesDepuisMurs(etat.v.logement);
+    const parties = [`${r.pieces.length} pièce(s) après recalcul`];
+    if (r.reunies) parties.push(`${r.reunies} réunie(s) à une voisine`);
+    if (r.nouvelles) parties.push(`${r.nouvelles} nouvelle(s), à nommer`);
+    const avertir = r.ouvertes.length > 0;
+    if (avertir) parties.push(`pas fermée(s) par des murs, donc inchangée(s) : ${r.ouvertes.join(", ")}. Il manque sans doute un mur`);
+    const reference = empreinteMurs(etat.v);
+    if (corriger((x) => C.recalculerPieces(x), parties.join(" ; ") + ".")) {
+      etat.mursReference = reference;
+      if (avertir) message(parties.join(" ; ") + ".", true);
+      rafraichir();
+    }
+  }
+  $("recalculer-pieces").addEventListener("click", refairePieces);
+  $("recalculer-pieces-2").addEventListener("click", refairePieces);
   $("point-precedent").addEventListener("click", () => allerAuPoint(-1));
   $("point-suivant").addEventListener("click", () => allerAuPoint(1));
   $("fermer-choix").addEventListener("click", () => choisir(null));

@@ -61,6 +61,80 @@ window.addEventListener("load", () => setTimeout(() => {
     window.Verification.choisir(mur);
     note("fiche d'un mur", !c("choix").hidden && /^Mur de/.test(c("choix-titre").textContent), c("choix-titre").textContent);
     c("fermer-choix").click();
+    // Les gestes à la souris, joués pour de vrai sur le plan.
+    const toile = c("plan");
+    toile.setPointerCapture = () => {};
+    const K = window.CalculsVerif;
+    const ecran = (q) => { const r = toile.getBoundingClientRect(), u = K.versPixel(V.matrice, q); return [u[0] * V.vue.zoom + V.vue.dx + r.left, u[1] * V.vue.zoom + V.vue.dy + r.top]; };
+    const geste = (t, q) => { const [x, y] = ecran(q); toile.dispatchEvent(new PointerEvent(t, { clientX: x, clientY: y, pointerId: 1, bubbles: true })); };
+    const clic = (q) => { geste("pointerdown", q); geste("pointerup", q); };
+    const dir = (m) => { const l = K.longueur(m.debut, m.fin); return { l, d: [(m.fin[0] - m.debut[0]) / l, (m.fin[1] - m.debut[1]) / l] }; };
+    const sur = (m, t) => { const { d } = dir(m); return [m.debut[0] + d[0] * t, m.debut[1] + d[1] * t]; };
+    const outil = (n) => { c("ouvrir-ajouter").click(); document.querySelector(`[data-outil="${n}"]`).click(); };
+    // Un endroit du mur le plus long sans porte : un seul morceau libre suffit.
+    const lg0 = () => V.v.logement;
+    const longs = [...lg0().murs].sort((a, b) => K.longueur(b.debut, b.fin) - K.longueur(a.debut, a.fin));
+    const libre = (m) => {
+      const os = (lg0().ouvertures || []).filter((o) => o.mur === m.id);
+      for (let t = 0.3; t < dir(m).l - 0.3; t += 0.1) if (!os.some((o) => t > o.position - 0.2 && t < o.position + o.largeur + 0.2)) return t;
+      return null;
+    };
+    const cible = longs.find((m) => libre(m) !== null && !(lg0().ouvertures || []).some((o) => o.mur === m.id)) || longs.find((m) => libre(m) !== null);
+    if (cible) {
+      const id = cible.id, tL = libre(cible);
+      let nb = lg0().murs.length;
+      window.Verification.choisir(id);
+      const av = dir(cible);
+      const bout = cible.fin;
+      geste("pointerdown", bout);
+      note("poignée attrapée", V.glisse && V.glisse.genre === "bout", V.glisse && V.glisse.genre);
+      const loin = [bout[0] + av.d[0] * 0.8, bout[1] + av.d[1] * 0.8];  // assez loin pour ne pas se raccrocher à son voisin
+      geste("pointermove", loin);
+      geste("pointerup", loin);
+      note("bout du mur déplacé", lg0().murs.find((m) => m.id === id).fin.join() !== bout.join(), lg0().murs.find((m) => m.id === id).fin.join());
+      note("alerte des pièces affichée", !c("alerte-pieces").hidden);
+      c("annuler").click();
+      note("annuler le geste", lg0().murs.find((m) => m.id === id).fin.join() === bout.join());
+      note("alerte des pièces retirée", c("alerte-pieces").hidden);
+      window.Verification.choisir(id);
+      const ep = lg0().murs.find((m) => m.id === id).epaisseur;
+      c("f-ep-plus").click();
+      note("épaisseur +", Math.abs(lg0().murs.find((m) => m.id === id).epaisseur - ep - 0.01) < 1e-6);
+      c("annuler").click();
+      window.Verification.choisir(null);
+      outil("couper");
+      clic(sur(lg0().murs.find((m) => m.id === id), tL));
+      note("couper un mur", lg0().murs.length === nb + 1 && V.outil === "choisir", V.v && lg0().murs.length);
+      note("logement cohérent après coupe", K.verifierCoherence(lg0()).length === 0, K.verifierCoherence(lg0()).slice(0, 2).join(" | "));
+      c("annuler").click();
+      const m = lg0().murs.find((x) => x.id === id);
+      const tF = Math.min(tL + 0.25, dir(m).l - 0.1);
+      if (!(lg0().ouvertures || []).some((o) => o.mur === id && tF > o.position - 0.05 && tF < o.position + o.largeur + 0.05)) {
+        outil("morceau");
+        clic(sur(m, tL));
+        note("début du morceau retenu", V.morceau && V.morceau.id !== undefined);
+        clic(sur(m, tF));
+        note("enlever un morceau", lg0().murs.reduce((s, x) => s + K.longueur(x.debut, x.fin), 0) < longs.reduce((s, x) => s + K.longueur(x.debut, x.fin), 0) - 0.1 && V.outil === "choisir");
+        c("annuler").click();
+      }
+      // Relier le bout du mur à celui d'un autre, sans casser le logement.
+      const autre = longs.find((x) => x.id !== id && !(lg0().ouvertures || []).some((o) => o.mur === x.id));
+      if (autre) {
+        outil("relier");
+        clic(cible.debut);
+        note("premier bout retenu", V.relier && V.relier.id, V.relier && V.relier.id);
+        clic(autre.fin);
+        note("relier deux murs", V.outil === "choisir" && V.historique.length > 0, c("message").textContent);
+        note("logement cohérent après reliure", K.verifierCoherence(lg0()).length === 0, K.verifierCoherence(lg0()).slice(0, 2).join(" | "));
+        c("annuler").click();
+      }
+      // Supprimer un mur intérieur puis recalculer : le nombre de pièces se recalcule et rien ne plante.
+      c("recalculer-pieces-2").click();
+      note("recalculer les pièces", K.verifierCoherence(lg0()).length === 0 && lg0().pieces.length > 0, c("message").textContent);
+      note("alerte retirée après recalcul", c("alerte-pieces").hidden);
+      c("annuler").click();
+    } else note("aucun mur libre pour les gestes", true);
+
     let garde = 0;
     while (V.points.length && garde++ < 1000) {
       const p = V.points[V.rangPoint];
@@ -109,7 +183,8 @@ def main() -> int:
                     ko += 1
                 print(f"{nom} {'OK ' if x['ok'] else 'ÉCHEC'} {x['quoi']} {x['plus']}")
         vues = {"deux": "", "plan": 'document.querySelector(\'[data-vue="plan"]\').click();', "lecture": 'document.querySelector(\'[data-vue="lecture"]\').click();',
-                "point2": 'document.getElementById("point-suivant").click();'}
+                "point2": 'document.getElementById("point-suivant").click();',
+                "recalcul": 'document.getElementById("recalculer-pieces-2").click(); document.querySelector(\'[data-vue="lecture"]\').click(); window.Verification.choisir(window.Verification.etat.v.logement.murs[0].id);'}
         for vue, code in vues.items():
             h = Path(t) / f"{vue}.html"
             h.write_text(page.replace("</body>", f"<script>{VUE % code}</script></body>"), encoding="utf-8")

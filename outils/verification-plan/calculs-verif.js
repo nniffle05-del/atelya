@@ -469,22 +469,28 @@
         }
       }
     }
-    const voisinage = (entree, valeur) => { // valeur 1 : on étend ; 0 : on rétrécit
-      const sortie = new Uint8Array(l * h);
-      for (let j = 0; j < h; j++) for (let i = 0; i < l; i++) {
-        let v = valeur === 0 ? 1 : 0;
-        for (let dj = -1; dj <= 1 && v !== valeur; dj++) for (let di = -1; di <= 1; di++) {
-          const u = i + di, w = j + dj;
-          const e = u >= 0 && w >= 0 && u < l && w < h ? entree[w * l + u] : 0;
-          if (e === valeur) { v = valeur; break; }
-        }
-        sortie[j * l + i] = v;
-      }
-      return sortie;
-    };
-    for (let k = 0; k < FERMETURE_FUSION; k++) grille = voisinage(grille, 1);
-    for (let k = 0; k < FERMETURE_FUSION; k++) grille = voisinage(grille, 0);
+    for (let k = 0; k < FERMETURE_FUSION; k++) grille = voisinageGrille(grille, l, h, 1);
+    for (let k = 0; k < FERMETURE_FUSION; k++) grille = voisinageGrille(grille, l, h, 0);
+    return bordDeLaGrille(grille, l, h, X, Y);
+  }
 
+  /** Étend (valeur 1) ou rétrécit (valeur 0) d'une cellule ce qui est plein dans la grille. */
+  function voisinageGrille(entree, l, h, valeur) {
+    const sortie = new Uint8Array(l * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < l; i++) {
+      let v = valeur === 0 ? 1 : 0;
+      for (let dj = -1; dj <= 1 && v !== valeur; dj++) for (let di = -1; di <= 1; di++) {
+        const u = i + di, w = j + dj;
+        const e = u >= 0 && w >= 0 && u < l && w < h ? entree[w * l + u] : 0;
+        if (e === valeur) { v = valeur; break; }
+      }
+      sortie[j * l + i] = v;
+    }
+    return sortie;
+  }
+
+  /** Le contour extérieur, simplifié, de ce qui est plein dans la grille (en mètres, grâce à X et Y). */
+  function bordDeLaGrille(grille, l, h, X, Y) {
     // Le bord : chaque côté de cellule pleine qui touche une cellule vide, relié au suivant.
     const suivants = new Map();
     const lien = (a, b) => { if (!suivants.has(a)) suivants.set(a, []); suivants.get(a).push(b); };
@@ -584,6 +590,253 @@
     const groupes = new Map();
     pieces.forEach((p, i) => { const r = racineDe(i); if (!groupes.has(r)) groupes.set(r, []); groupes.get(r).push(p.id); });
     return [...groupes.values()].filter((g) => g.length >= 2);
+  }
+
+  // ---------- Retoucher les murs ----------
+
+  /** Change un bout de mur de place. Les portes et fenêtres gardent leur place réelle sur le plan. */
+  function deplacerBout(v0, id, bout, point) {
+    const v = copie(v0);
+    const mur = v.logement.murs.find((m) => m.id === id);
+    if (!mur) throw new Error(`mur inconnu : ${id}`);
+    const { d } = axes(mur);
+    const places = (v.logement.ouvertures || []).filter((o) => o.mur === id).map((o) => ({
+      o, depart: [mur.debut[0] + d[0] * o.position, mur.debut[1] + d[1] * o.position],
+    }));
+    mur[bout] = ar(point);
+    const l = longueur(mur.debut, mur.fin);
+    if (l < 0.05) throw new Error("ce mur serait trop court");
+    const n = axes(mur).d;
+    for (const { o, depart } of places) {
+      const t = (depart[0] - mur.debut[0]) * n[0] + (depart[1] - mur.debut[1]) * n[1];
+      if (t < -0.02 || t + o.largeur > l + 0.02) throw new Error("une porte ou une fenêtre empêche de raccourcir ce mur autant : déplacez-la ou supprimez-la d'abord");
+      o.position = arrondi(Math.max(0, Math.min(l - o.largeur - 1e-3, t)), 3);
+    }
+    marquer(v, mur);
+    return v;
+  }
+
+  /**
+   * Où poser un bout de mur que l'on fait glisser près du point `p` (m). Par ordre de préférence : sur le bout d'un
+   * autre mur ; là où le mur prolongé tout droit rencontre un autre mur ; sur le côté d'un autre mur ; tout droit.
+   * Rend {point, accroche} ; `accroche` : ce qui a retenu le bout (null si rien).
+   */
+  function accrocherBout(lg, id, bout, p, rayon) {
+    const mur = lg.murs.find((m) => m.id === id);
+    const fixe = bout === "fin" ? mur.debut : mur.fin;
+    const vers = bout === "fin" ? mur.fin : mur.debut;
+    const l = longueur(fixe, vers) || 1;
+    const dir = [(vers[0] - fixe[0]) / l, (vers[1] - fixe[1]) / l];
+    const autres = lg.murs.filter((m) => m.id !== id);
+    let meilleur = null, dist = rayon;
+    for (const m of autres) for (const b of [m.debut, m.fin]) {
+      const e = longueur(p, b);
+      if (e < dist) { dist = e; meilleur = b; }
+    }
+    if (meilleur) return { point: ar(meilleur), accroche: "bout" };
+    dist = rayon * 1.5;
+    for (const m of autres) {
+      const e = [m.fin[0] - m.debut[0], m.fin[1] - m.debut[1]];
+      const croix = dir[0] * e[1] - dir[1] * e[0];
+      if (Math.abs(croix) < 0.05) continue;
+      const w = [m.debut[0] - fixe[0], m.debut[1] - fixe[1]];
+      const t = (w[0] * e[1] - w[1] * e[0]) / croix;
+      const u = (w[0] * dir[1] - w[1] * dir[0]) / croix;
+      const marge = m.epaisseur / (longueur(m.debut, m.fin) || 1);
+      if (t <= 0.05 || u < -marge || u > 1 + marge) continue;
+      const q = [fixe[0] + dir[0] * t, fixe[1] + dir[1] * t];
+      const ecart = longueur(p, q);
+      if (ecart < dist) { dist = ecart; meilleur = q; }
+    }
+    if (meilleur) return { point: ar(meilleur), accroche: "mur" };
+    dist = rayon;
+    for (const m of autres) {
+      const pr = projection(p, m.debut, m.fin);
+      if (pr.dist < dist) {
+        const lm = longueur(m.debut, m.fin) || 1;
+        dist = pr.dist;
+        meilleur = [m.debut[0] + ((m.fin[0] - m.debut[0]) * pr.tt) / lm, m.debut[1] + ((m.fin[1] - m.debut[1]) * pr.tt) / lm];
+      }
+    }
+    if (meilleur) return { point: ar(meilleur), accroche: "mur" };
+    const t = (p[0] - fixe[0]) * dir[0] + (p[1] - fixe[1]) * dir[1];
+    const q = [fixe[0] + dir[0] * t, fixe[1] + dir[1] * t];
+    if (t > 0 && longueur(p, q) <= t * Math.tan((6 * Math.PI) / 180)) return { point: ar(q), accroche: null }; // il reste bien droit
+    return { point: ar(p), accroche: null };
+  }
+
+  const pointSurMur = (m, t) => { const { d } = axes(m); return ar([m.debut[0] + d[0] * t, m.debut[1] + d[1] * t]); };
+
+  /** Coupe un mur en deux à `t` mètres de son début : chaque morceau peut ensuite se retoucher ou se supprimer à part. */
+  function couperMur(v0, id, t) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const mur = lg.murs.find((m) => m.id === id);
+    if (!mur) throw new Error(`mur inconnu : ${id}`);
+    const l = longueur(mur.debut, mur.fin);
+    if (t < 0.03 || t > l - 0.03) throw new Error("trop près du bout du mur pour le couper");
+    const ouvertures = (lg.ouvertures || []).filter((o) => o.mur === id);
+    if (ouvertures.some((o) => o.position < t && o.position + o.largeur > t)) throw new Error("cet endroit tombe sur une porte ou une fenêtre : coupez à côté");
+    const coupe = pointSurMur(mur, t);
+    const second = { ...copie(mur), id: nouvelId(lg, "M_v"), debut: coupe };
+    mur.fin = coupe;
+    lg.murs.splice(lg.murs.indexOf(mur) + 1, 0, second);
+    for (const o of ouvertures) if (o.position >= t) { o.mur = second.id; o.position = arrondi(o.position - t, 3); }
+    marquer(v, mur);
+    marquer(v, second);
+    return v;
+  }
+
+  /** Enlève le morceau de mur entre `a` et `b` (m depuis son début), ainsi que les portes et fenêtres qui s'y trouvent. */
+  function enleverMorceau(v0, id, a, b) {
+    const t0 = Math.min(a, b), t1 = Math.max(a, b);
+    if (t1 - t0 < 0.03) throw new Error("le morceau à enlever est trop petit");
+    const mur0 = v0.logement.murs.find((m) => m.id === id);
+    if (!mur0) throw new Error(`mur inconnu : ${id}`);
+    const l = longueur(mur0.debut, mur0.fin);
+    const coupeFin = t1 <= l - 0.03, coupeDebut = t0 >= 0.03;
+    const dedans = (o) => o.position + o.largeur > t0 && o.position < t1;
+    const traverse = (o) => (o.position < t0 && o.position + o.largeur > t0) || (o.position < t1 && o.position + o.largeur > t1);
+    if ((v0.logement.ouvertures || []).some((o) => o.mur === id && traverse(o))) throw new Error("ce morceau coupe une porte ou une fenêtre : commencez ou finissez à côté");
+    let v = copie(v0);
+    v.logement.ouvertures = (v.logement.ouvertures || []).filter((o) => o.mur !== id || !dedans(o));
+    if (!coupeDebut && !coupeFin) return supprimer(v, id);
+    if (!coupeDebut) return deplacerBout(v, id, "debut", pointSurMur(mur0, t1));
+    if (!coupeFin) return deplacerBout(v, id, "fin", pointSurMur(mur0, t0));
+    v = couperMur(v, id, t1);
+    return deplacerBout(v, id, "fin", pointSurMur(mur0, t0));
+  }
+
+  /** Relie deux bouts de murs : ils se prolongent jusqu'à se rejoindre, ou un petit mur comble le trou s'ils sont alignés. */
+  function relierMurs(v0, idA, boutA, idB, boutB) {
+    if (idA === idB) throw new Error("choisissez les bouts de deux murs différents");
+    const A = v0.logement.murs.find((m) => m.id === idA), B = v0.logement.murs.find((m) => m.id === idB);
+    if (!A || !B) throw new Error("mur inconnu");
+    const pA = A[boutA], pB = B[boutB];
+    const ecart = longueur(pA, pB);
+    if (ecart < 0.005) throw new Error("ces deux bouts sont déjà reliés");
+    const da = axes(A).d, db = axes(B).d;
+    const croix = da[0] * db[1] - da[1] * db[0];
+    if (Math.abs(croix) >= 0.1) {
+      const w = [pB[0] - pA[0], pB[1] - pA[1]];
+      const t = (w[0] * db[1] - w[1] * db[0]) / croix;
+      const I = ar([pA[0] + da[0] * t, pA[1] + da[1] * t]);
+      if (longueur(I, pA) + longueur(I, pB) <= 2 * ecart + 0.5) return deplacerBout(deplacerBout(v0, idA, boutA, I), idB, boutB, I);
+    }
+    return ajouterMur(v0, pA, pB, Math.min(A.epaisseur, B.epaisseur));
+  }
+
+  /** Le bout de mur le plus proche d'un point : {id, bout, point}, ou null. */
+  function boutLePlusProche(lg, p, rayon, sauf = null) {
+    let best = null, dist = rayon;
+    for (const m of lg.murs) for (const bout of ["debut", "fin"]) {
+      if (sauf && m.id === sauf) continue;
+      const e = longueur(p, m[bout]);
+      if (e < dist) { dist = e; best = { id: m.id, bout, point: m[bout] }; }
+    }
+    return best;
+  }
+
+  // ---------- Refaire les pièces à partir des murs ----------
+
+  const PIECE_MIN = 0.25; // m² : plus petit, ce n'est pas une pièce mais un vide entre deux murs
+
+  /**
+   * Les pièces, déduites des murs : chaque espace entièrement fermé par des murs devient une pièce, qui garde le nom de
+   * la pièce qu'elle recouvre le plus. Une ancienne pièce qui n'est plus fermée (il manque un mur) reste telle quelle et
+   * est signalée dans `ouvertes`. Rend {pieces, ouvertes, reunies, nouvelles}.
+   */
+  function piecesDepuisMurs(lg) {
+    const tous = lg.murs.flatMap((m) => polygoneMur(m));
+    const x0 = Math.min(...tous.map((q) => q[0])), y0 = Math.min(...tous.map((q) => q[1]));
+    const x1 = Math.max(...tous.map((q) => q[0])), y1 = Math.max(...tous.map((q) => q[1]));
+    const c = Math.max(CELLULE_FUSION, Math.max(x1 - x0, y1 - y0) / 700);
+    const marge = 3;
+    const l = Math.ceil((x1 - x0) / c) + 2 * marge, h = Math.ceil((y1 - y0) / c) + 2 * marge;
+    const X = (i) => x0 + (i - marge) * c, Y = (j) => y0 + (j - marge) * c;
+    const remplir = (grille, contour, valeur = 1) => {
+      const ys = contour.map((q) => q[1]);
+      const jMin = Math.max(0, Math.floor((Math.min(...ys) - y0) / c) + marge - 1), jMax = Math.min(h - 1, Math.ceil((Math.max(...ys) - y0) / c) + marge + 1);
+      for (let j = jMin; j <= jMax; j++) {
+        const yc = Y(j + 0.5), coupes = [];
+        for (let k = 0, n = contour.length; k < n; k++) {
+          const [xa, ya] = contour[k], [xb, yb] = contour[(k + 1) % n];
+          if ((ya > yc) !== (yb > yc)) coupes.push(xa + ((yc - ya) * (xb - xa)) / (yb - ya));
+        }
+        coupes.sort((u, v) => u - v);
+        for (let k = 0; k + 1 < coupes.length; k += 2) {
+          const iA = Math.max(0, Math.floor((coupes[k] - x0) / c) + marge), iB = Math.min(l, Math.ceil((coupes[k + 1] - x0) / c) + marge);
+          grille.fill(valeur, j * l + iA, j * l + iB);
+        }
+      }
+    };
+    let murs = new Uint8Array(l * h);
+    for (const m of lg.murs) remplir(murs, polygoneMur(m));
+    murs = voisinageGrille(murs, l, h, 1); // bouche les jours minuscules entre deux murs qui se touchent presque
+
+    // Numérote les espaces vides ; celui qui touche le bord de la grille est l'extérieur.
+    const etiquettes = new Int32Array(l * h).fill(-1);
+    const espaces = [];
+    for (let depart = 0; depart < l * h; depart++) {
+      if (murs[depart] || etiquettes[depart] >= 0) continue;
+      const pile = [depart], cellules = [];
+      etiquettes[depart] = espaces.length;
+      let exterieur = false;
+      while (pile.length) {
+        const q = pile.pop();
+        cellules.push(q);
+        const i = q % l, j = (q - i) / l;
+        if (i === 0 || j === 0 || i === l - 1 || j === h - 1) { exterieur = true; continue; }
+        for (const r of [q - 1, q + 1, q - l, q + l]) if (!murs[r] && etiquettes[r] < 0) { etiquettes[r] = espaces.length; pile.push(r); }
+      }
+      espaces.push({ cellules, exterieur });
+    }
+
+    const anciennes = lg.pieces || [];
+    const recouvrement = anciennes.map((p) => {
+      const g = new Uint8Array(l * h);
+      remplir(g, p.contour);
+      const parEspace = new Map();
+      for (let q = 0; q < l * h; q++) if (g[q] && etiquettes[q] >= 0) parEspace.set(etiquettes[q], (parEspace.get(etiquettes[q]) || 0) + 1);
+      return parEspace;
+    });
+    const pieces = [], gardees = new Set();
+    let idsPris = { murs: lg.murs, ouvertures: lg.ouvertures, pieces: [] };
+    espaces.forEach((e, k) => {
+      if (e.exterieur || e.cellules.length * c * c < PIECE_MIN) return;
+      // L'ancienne pièce qui a le plus de surface dans cet espace donne son nom ; la plus grande en cas de morceaux.
+      let meilleure = null, plus = 0;
+      anciennes.forEach((p, i) => { const n = recouvrement[i].get(k) || 0; if (n > plus) { plus = n; meilleure = p; } });
+      const grille = new Uint8Array(l * h);
+      for (const q of e.cellules) grille[q] = 1;
+      const contour = bordDeLaGrille(voisinageGrille(grille, l, h, 1), l, h, X, Y); // rend la cellule prise par le rebouchage
+      const piece = meilleure && !gardees.has(meilleure.id)
+        ? { ...copie(meilleure), contour }
+        : { id: null, nom: meilleure ? meilleure.nom : "Pièce", contour, statut: "estime", source: "verification", confiance: 1 };
+      if (meilleure) gardees.add(meilleure.id);
+      delete piece.surface;
+      if (!piece.id) { idsPris.pieces = [...anciennes, ...pieces]; piece.id = nouvelId(idsPris, "P_v"); }
+      pieces.push(piece);
+    });
+    // Une ancienne pièce sans espace fermé à elle : il manque sans doute un mur, on ne la perd pas sans le dire.
+    const ouvertes = anciennes.filter((p, i) => {
+      if (gardees.has(p.id)) return false;
+      let ferme = 0, total = 0;
+      recouvrement[i].forEach((n, k) => { total += n; if (!espaces[k].exterieur && n * c * c >= 0) ferme += n; });
+      return total === 0 || ferme / total < 0.5;
+    });
+    const reunies = anciennes.length - gardees.size - ouvertes.length;
+    return { pieces: [...pieces, ...ouvertes.map(copie)], ouvertes: ouvertes.map((p) => p.nom), reunies, nouvelles: pieces.filter((x) => !anciennes.some((a) => a.id === x.id)).length };
+  }
+
+  /** Remplace les pièces par celles que dessinent les murs. Le détail reste calculable par piecesDepuisMurs. */
+  function recalculerPieces(v0) {
+    const v = copie(v0);
+    const r = piecesDepuisMurs(v.logement);
+    const ids = new Set(r.pieces.map((p) => p.id));
+    v.logement.pieces = r.pieces;
+    v.verifies = [...new Set([...(v.verifies || []), ...ids])];
+    return v;
   }
 
   // ---------- Les points à vérifier, un par un ----------
@@ -964,6 +1217,14 @@
     resoudre,
     appliquerAction,
     fusionnerPieces,
+    deplacerBout,
+    accrocherBout,
+    couperMur,
+    enleverMorceau,
+    relierMurs,
+    boutLePlusProche,
+    piecesDepuisMurs,
+    recalculerPieces,
     morceauxDePieces,
     pointsAVerifier,
     reglerPoint,

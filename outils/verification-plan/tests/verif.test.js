@@ -326,3 +326,106 @@ test("les textes ne montrent jamais les codes internes", () => {
   assert.ok(!/chambre_\d/.test(point.texte), point.texte);
   assert.match(point.texte, /« Chambre » et « Bureau »/);
 });
+
+// ---------- Retoucher les murs ----------
+
+const logementCarre = () => {
+  const mur = (id, debut, fin) => ({ id, debut, fin, epaisseur: 0.2, statut: "estime", source: "atelya" });
+  return fichier({
+    echelle: { etat: "corrigee" },
+    logement: {
+      schema: "logement/0.1", projet_id: "T", unites: "m", hauteur_sous_plafond: 2.5,
+      murs: [mur("S", [0, 0], [6, 0]), mur("E", [6, 0], [6, 4]), mur("N", [6, 4], [0, 4]), mur("O", [0, 4], [0, 0]), mur("C", [3, 0], [3, 4])],
+      ouvertures: [{ id: "P", type: "porte", mur: "S", position: 1, largeur: 0.8, hauteur: 2.04, allege: 0, statut: "estime", source: "atelya" }],
+      pieces: [{ id: "a", nom: "Séjour", contour: rectangle(0.1, 0.1, 2.9, 3.9), statut: "estime", source: "atelya" }, { id: "b", nom: "Chambre", contour: rectangle(3.1, 0.1, 5.9, 3.9), statut: "estime", source: "atelya" }],
+    },
+  });
+};
+const murDe = (v, id) => v.logement.murs.find((m) => m.id === id);
+
+test("rallonger un mur par son début : la porte garde sa vraie place", () => {
+  const v = C.deplacerBout(logementCarre(), "S", "debut", [-1, 0]);
+  assert.deepEqual(murDe(v, "S").debut, [-1, 0]);
+  proche(v.logement.ouvertures[0].position, 2, 1e-3);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+  assert.throws(() => C.deplacerBout(logementCarre(), "S", "fin", [1.2, 0]), /porte ou une fenêtre/);
+});
+
+test("un bout de mur s'accroche : au bout voisin, puis au mur rencontré en allant tout droit, sinon reste droit", () => {
+  const v = logementCarre();
+  const lg = C.deplacerBout(v, "C", "fin", [3, 3]).logement; // la cloison s'arrête à 1 m du mur nord
+  assert.deepEqual(C.accrocherBout(lg, "C", "fin", [3.05, 3.9], 0.3), { point: [3, 4], accroche: "mur" });
+  assert.deepEqual(C.accrocherBout(lg, "S", "fin", [6.1, 0.1], 0.3), { point: [6, 0], accroche: "bout" });
+  const libre = C.accrocherBout(lg, "C", "fin", [3.05, 3.3], 0.1);
+  assert.equal(libre.accroche, null);
+  assert.deepEqual(libre.point, [3, 3.3]);
+});
+
+test("couper un mur en deux : chaque porte suit son morceau ; on ne coupe pas à travers une porte", () => {
+  const v = C.couperMur(logementCarre(), "S", 0.5);
+  assert.equal(v.logement.murs.length, 6);
+  const o = v.logement.ouvertures[0];
+  assert.notEqual(o.mur, "S");
+  proche(o.position, 0.5, 1e-3);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+  assert.throws(() => C.couperMur(logementCarre(), "S", 1.3), /porte ou une fenêtre/);
+});
+
+test("enlever un morceau de mur : deux morceaux restent, la porte du morceau part avec", () => {
+  const v = C.enleverMorceau(logementCarre(), "S", 0.5, 2.5);
+  assert.equal(v.logement.murs.length, 6);
+  assert.equal(v.logement.ouvertures.length, 0);
+  assert.deepEqual(murDe(v, "S").fin, [0.5, 0]);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+  const bout = C.enleverMorceau(logementCarre(), "N", 0, 2);
+  assert.deepEqual(murDe(bout, "N").debut, [4, 4]);
+  assert.equal(C.enleverMorceau(logementCarre(), "C", 0, 4).logement.murs.length, 4);
+  assert.throws(() => C.enleverMorceau(logementCarre(), "S", 1.2, 3), /porte ou une fenêtre/);
+});
+
+test("relier deux bouts : en angle, ils se rejoignent ; alignés, un petit mur comble le trou", () => {
+  const base = logementCarre();
+  base.logement.murs = [{ ...murDe(base, "E"), debut: [6, 1], fin: [6, 4] }, { ...murDe(base, "S"), fin: [5, 0] }];
+  base.logement.ouvertures = [];
+  base.logement.pieces = [];
+  const coin = C.relierMurs(base, "E", "debut", "S", "fin");
+  assert.deepEqual(murDe(coin, "E").debut, [6, 0]);
+  assert.deepEqual(murDe(coin, "S").fin, [6, 0]);
+  const alignes = fichier({ logement: { ...base.logement, murs: [{ ...murDe(base, "S"), id: "A", debut: [0, 0], fin: [2, 0] }, { ...murDe(base, "S"), id: "B", debut: [3, 0], fin: [5, 0] }] } });
+  const comble = C.relierMurs(alignes, "A", "fin", "B", "debut");
+  assert.equal(comble.logement.murs.length, 3);
+  assert.deepEqual(comble.logement.murs[2].debut, [2, 0]);
+  assert.deepEqual(comble.logement.murs[2].fin, [3, 0]);
+  assert.throws(() => C.relierMurs(base, "S", "debut", "S", "fin"), /deux murs différents/);
+});
+
+test("recalculer les pièces : deux espaces fermés, les noms sont gardés, les surfaces viennent des murs", () => {
+  const v = C.recalculerPieces(logementCarre());
+  assert.deepEqual(v.logement.pieces.map((p) => p.nom).sort(), ["Chambre", "Séjour"]);
+  for (const p of v.logement.pieces) proche(C.surfacePolygone(p.contour), 2.8 * 3.8, 0.6);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+});
+
+test("recalculer après avoir supprimé la cloison : une seule pièce, au nom de la plus grande", () => {
+  const sans = C.supprimer(logementCarre(), "C");
+  const r = C.piecesDepuisMurs(sans.logement);
+  assert.equal(r.pieces.length, 1);
+  assert.equal(r.reunies, 1);
+  proche(C.surfacePolygone(r.pieces[0].contour), 5.8 * 3.8, 0.8);
+});
+
+test("recalculer avec un trou dans les murs : les pièces ouvertes ne sont pas perdues et sont signalées", () => {
+  const troue = C.enleverMorceau(logementCarre(), "N", 1, 3); // trou dans le mur nord, côté chambre
+  const r = C.piecesDepuisMurs(troue.logement);
+  assert.deepEqual(r.ouvertes, ["Chambre"]);
+  assert.equal(r.pieces.length, 2);
+  assert.deepEqual(r.pieces.find((p) => p.nom === "Chambre").contour, rectangle(3.1, 0.1, 5.9, 3.9));
+});
+
+test("une nouvelle cloison dans une pièce : deux espaces, le second reçoit un identifiant libre", () => {
+  const v = C.ajouterMur(logementCarre(), [0, 2], [3, 2], 0.1);
+  const w = C.recalculerPieces(v);
+  assert.equal(w.logement.pieces.length, 3);
+  assert.equal(new Set(w.logement.pieces.map((p) => p.id)).size, 3);
+  assert.deepEqual(C.verifierCoherence(w.logement), []);
+});
