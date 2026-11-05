@@ -1,6 +1,6 @@
 # Inventaire des vrais plans reçus le 05/11/2026 (fr-020 à fr-122)
 
-Lecture à l'œil par Claude le 05/11/2026 (planches de vignettes) + OCR. Fichiers : `..telyarais-plans\lot-2026-11-05\` (hors dépôt). Tous sont des captures d'écran d'iPhone (largeur 1 206 px) sauf 5 montages Picsew ; aucun PDF, aucune photo d'appareil au sens EXIF, mais 7 sont des photos de papier capturées à l'écran. fr-123 réservé au fichier HEIC non encore converti.
+Lecture à l'œil par Claude le 05/11/2026 (planches de vignettes) + OCR. Fichiers : `..\atelya\vrais-plans\lot-2026-11-05\` (hors dépôt). Tous sont des captures d'écran d'iPhone (largeur 1 206 px) sauf 5 montages Picsew ; aucun PDF, aucune photo d'appareil au sens EXIF, mais 7 sont des photos de papier capturées à l'écran. fr-123 réservé au fichier HEIC non encore converti.
 
 | n° | style | mesures | géométrie | niveaux | remarque |
 |---|---|---|---|---|---|
