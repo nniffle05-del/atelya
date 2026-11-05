@@ -192,12 +192,16 @@ monde (essai 6e NON mis en service) ; **A1** doutes (877967c) ; **A3** DINOv2 + 
 encore posé sur le Mac**, attend le « vas-y » de NT) ; **A2** lecture des PDF (PC ; fusionnée dans `main` sur GitHub le
 04/11/2026, fc43891 ; pas encore posée sur le Mac : accord de NT).
 
-**Étape « vérification réelle » (04-05/11/2026, branche `etape-verification-reelle`, NON fusionnée)** : lecture complète
-(`moteur/lecture_complete.py`, `outils/atelya/lire_plan.py` → `ecran.html` par plan), écran de vérification refait (un point à
-la fois, retouche des murs, recalcul des pièces, reprise du travail), Blender 5.2.2 sur le PC (`..telyalender-5.2.2`,
-rendu CUDA), 1re 3D d'un vrai plan (fr-006), 3D constructible 4/13 → 11-12/15, échelle lue sur 4/15 vrais plans
-(cotes en cm, surfaces en légende, PDF), traducteur 0.4.3. 2 plans de travail avec accords : `..telyarais-plans	ravail-2026-11-04`
-(fr-018 photo, fr-019 PDF anonymisé). Détail : `docs/projet/memoire/atelya-verification-reelle.md`. Note ~67/100 client, ~93 fabriqués, ~52 vrais plans.
+**Étape « vérification réelle » (04-05/11/2026, branche `etape-verification-reelle`, FUSIONNÉE dans `main` le 05/11/2026,
+75851c5, 406 tests)** : lecture complète (`moteur/lecture_complete.py`, `outils/atelya/lire_plan.py` → `ecran.html` par plan),
+écran de vérification refait (un point à la fois, retouche des murs, recalcul des pièces, reprise du travail), Blender 5.2.2
+sur le PC (`..\atelya\blender-5.2.2`, rendu CUDA), 1re 3D d'un vrai plan (fr-006), 3D constructible 4/13 → 11/15, échelle lue
+sur 4/15 vrais plans (cotes en cm, surfaces en légende, PDF), traducteur 0.4.3. 2 plans de travail avec accords :
+`..\atelya\vrais-plans\travail-2026-11-04` (fr-018 photo, fr-019 PDF anonymisé). Détail :
+`docs/projet/memoire/atelya-verification-reelle.md`. Note ~68/100 client, ~93 fabriqués, ~53 vrais plans. Pas encore posée sur
+le Mac (accord NT). **En cours (05/11, branche `correctif-dehors`)** : traducteur 0.4.4, le « dehors » ne se propage que par le
+fond (fr-004 : chambre de 12 m² avalée par l'extérieur à cause d'un ruban de fond à la place d'une cloison) ; bancs de
+non-recul en cours.
 
 **Prochaine étape** : à choisir par NT. Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
