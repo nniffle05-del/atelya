@@ -26,7 +26,7 @@ from moteur.banc_coloriage import TYPE_VERS_CLASSE, comparer, comparer_murs  # n
 from moteur.lecture_complete import COTE_ATELYA  # noqa: E402
 
 PAS = 0.02  # m : grille du recalage
-MARGE = 2.0  # m : translation maximale cherchée
+MARGE = 6.0  # m : translation maximale cherchée (une lecture qui n'a vu qu'une partie du plan a son origine loin de la vraie)
 
 
 def _murs_en_masque(murs: list[dict], x0: float, y0: float, forme: tuple[int, int]) -> np.ndarray:
@@ -58,7 +58,7 @@ def recaler(vrai: dict, lu: dict) -> tuple[dict, tuple[float, float]]:
     """La lecture translatée pour que ses murs retrouvent le plus de vrais murs (recherche du décalage, 10 cm puis 1 cm).
     Point de départ : les deux coins sud-ouest intérieurs superposés (c'est déjà la convention des deux origines)."""
     meilleur, (bx, by) = _score(vrai, lu), (0.0, 0.0)
-    for pas, portee in ((0.10, MARGE), (0.02, 0.12), (0.01, 0.03)):
+    for pas, portee in ((0.25, MARGE), (0.05, 0.30), (0.01, 0.06)):
         cx, cy = bx, by
         n = int(round(portee / pas))
         for i in range(-n, n + 1):
@@ -110,6 +110,9 @@ def _resume(r: dict) -> dict:
 def noter_plan(verites: Path, lectures: Path, nom: str) -> dict | None:
     dv = verites / nom
     dl = lectures / nom
+    if not dl.exists():  # un PDF est lu page par page : fr-019 → fr-019-page1
+        pages = sorted(lectures.glob(f"{nom}-page*"))
+        dl = pages[0] if pages else dl
     if not (dl / "logement.json").exists() or not (dl / "lecture.json").exists():
         return {"plan": nom, "erreur": "pas de lecture"}
     verite = json.loads((dv / "verite.json").read_text(encoding="utf-8"))
@@ -130,7 +133,7 @@ def noter_plan(verites: Path, lectures: Path, nom: str) -> dict | None:
     if lu_col and not verite["echelle_inconnue"]:
         ligne["echelle_ecart_pct"] = round(100 * (lu_col / vrai_col - 1), 2)
         ligne["echelle_erreur_silencieuse"] = e.get("etat") == "lue" and abs(ligne["echelle_ecart_pct"]) > 3
-    f = vrai_col / lu_col if lu_col else 1.0
+    f = lu_col / vrai_col if lu_col else 1.0  # 1 m lu = lu_col px ; en vrais mètres : × lu_col / vrai_col
     lu_recale, decalage = recaler(vrai, lu)
     ligne["recalage_m"] = decalage
     ligne["echelle_lue"] = _resume(comparer(vrai, lu_recale, types_vrais, types_lus))
