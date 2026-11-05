@@ -199,11 +199,17 @@ sur le PC (`..\atelya\blender-5.2.2`, rendu CUDA), 1re 3D d'un vrai plan (fr-006
 sur 4/15 vrais plans (cotes en cm, surfaces en légende, PDF), traducteur 0.4.3. 2 plans de travail avec accords :
 `..\atelya\vrais-plans\travail-2026-11-04` (fr-018 photo, fr-019 PDF anonymisé). Détail :
 `docs/projet/memoire/atelya-verification-reelle.md`. Note ~68/100 client, ~93 fabriqués, ~53 vrais plans. Pas encore posée sur
-le Mac (accord NT). **En cours (05/11, branche `correctif-dehors`)** : traducteur 0.4.4, le « dehors » ne se propage que par le
-fond (fr-004 : chambre de 12 m² avalée par l'extérieur à cause d'un ruban de fond à la place d'une cloison) ; bancs sans recul (05/11 12h35), à fusionner. **Première vraie note sur les 15 vrais plans** (vérités
+le Mac (accord NT). **Correctif « dehors » (05/11, FUSIONNÉ dans `main` en local, 94dd0fb ; NT doit pousser)** : traducteur 0.4.4, une zone coloriée pièce bordée de murs reste dedans
+(fr-004 : chambre de 12 m² avalée par l'extérieur à cause d'un ruban de fond à la place d'une cloison) ; bancs sans recul (05/11 12h35). **Première vraie note sur les 15 vrais plans** (vérités
 faites par Claude, `outils/verite/`, `verites/`) : à l'échelle vraie murs trouvés 66 %, placés 62 %, ouvertures 40 %, pièces 54 %,
 bon type 69 % ; à l'échelle lue par Atelya : murs 33 %, pièces 17 % (échelle lue 4/15, secours par les portes faux de 26-72 %).
 Verrou n° 1 = l'échelle ; puis ~58 murs en trop par plan ; puis les ouvertures.
+**En cours (05/11 après-midi, branche `chantier-echelle-vrais-plans`, NT « fait tout tout seul »)** : echelle_plan 0.11.0 + lecture_complete 0.2.0 :
+échelle de secours du brouillon dans l'ordre surfaces écrites → cotes non confirmées → portes si « fiables » (`portes_fiables` : régulières,
+pleines, ≥ 1,8 × épaisseur des murs ; 0/150 fabriqués signalés, 11/11 vrais plans) → épaisseur des murs (20 cm) → 15 m ; contradiction des
+cotes aussi sur photo (fr-010 : plus d'échelle « sûre » fausse de 12 %). 15 vrais plans : 0 erreur silencieuse (1 avant), brouillons de −72…−26 %
+à ±18 %, à l'échelle lue murs 33 → 40 %, pièces 17 → 33 %. 406 tests. **Bancs de non-recul en cours** (`banc-echelle2.ps1`). Détail :
+`docs/projet/memoire/atelya-echelle-vrais-plans.md`.
 
 **Prochaine étape** : à choisir par NT. Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
@@ -309,6 +315,7 @@ permet au projet claude.ai et au futur Claude du Mac de rester au courant à leu
 @docs/projet/memoire/atelya-doutes-a1.md
 @docs/projet/memoire/atelya-echelle-cotes.md
 @docs/projet/memoire/atelya-echelle-fine.md
+@docs/projet/memoire/atelya-echelle-vrais-plans.md
 @docs/projet/memoire/atelya-essai-3.md
 @docs/projet/memoire/atelya-essai-4.md
 @docs/projet/memoire/atelya-modele.md
