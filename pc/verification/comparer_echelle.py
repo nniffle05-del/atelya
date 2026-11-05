@@ -2,10 +2,16 @@
     ..\\atelya\\.venv\\Scripts\\python.exe pc\\verification\\comparer_echelle.py
 """
 import json
+import sys
 from pathlib import Path
 
 A = Path("../atelya")
 PAIRES = {"apres": "banc-v041-apres-e5", "pdf": "banc-a2-pdf", "reel-cotes": "banc-v041-reel-cotes-e5", "biais-e7": "banc-v041-biais-e7"}
+# comparer_echelle.py banc-dehors banc-echelle : compare les dossiers banc-dehors-* aux banc-echelle-* (références = les
+# derniers bancs complets d'un correctif précédent).
+PREFIXE = sys.argv[1] if len(sys.argv) > 1 else "banc-echelle"
+if len(sys.argv) > 2:
+    PAIRES = {nom: f"{sys.argv[2]}-{nom}" for nom in PAIRES}
 
 
 def details(dossier: Path) -> dict:
@@ -26,7 +32,7 @@ def erreur(x: dict) -> float:
 
 sortie = {}
 for nom, ref in PAIRES.items():
-    nouveau = A / f"banc-echelle-{nom}"
+    nouveau = A / f"{PREFIXE}-{nom}"
     if not (nouveau / "bilan.json").exists():
         print(f"{nom} : pas encore fini")
         continue
@@ -43,6 +49,8 @@ for nom, ref in PAIRES.items():
     pires1 = [k for k in lus1 if erreur(d1[k]) > 3]
     ligne = {"niveaux": len(communs), "lus": [len(lus0), len(lus1)], "plus_de_3pct": [len(pires0), len(pires1)],
              "murs_justes": [b0["murs"]["justes_pct"], b1["murs"]["justes_pct"]],
+             "murs_en_trop": [b0["murs"]["en_trop"], b1["murs"]["en_trop"]],
+             "pieces_trouvees": [b0["pieces"]["trouvees_pct"], b1["pieces"]["trouvees_pct"]],
              "ouvertures_justes": [b0["ouvertures"]["justes_pct"], b1["ouvertures"]["justes_pct"]],
              "bon_type": [b0["pieces"]["bon_type_pct"], b1["pieces"]["bon_type_pct"]],
              "parfaits": [b0["plans_parfaits_pct"], b1["plans_parfaits_pct"]],

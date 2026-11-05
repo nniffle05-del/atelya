@@ -33,7 +33,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.4.3"
+VERSION_COLORIAGE = "0.4.4"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -230,16 +230,30 @@ def bati_du_logement(col: np.ndarray, px_par_m: float) -> np.ndarray:
     return garde[etiq]
 
 
-def dehors_du_logement(bati: np.ndarray) -> np.ndarray:
-    """Tout ce qui n'est pas du bâti et touche le bord de l'image (par le vide) : l'extérieur."""
-    libre = (~bati).astype(np.uint8)
+def dehors_du_logement(bati: np.ndarray, col: np.ndarray | None = None) -> np.ndarray:
+    """Tout ce qui n'est pas du bâti et touche le bord de l'image par le vide : l'extérieur.
+
+    Avec `col` (le coloriage), le vide ne passe que par le FOND : une zone que le modèle a coloriée comme une pièce
+    reste dedans même si un mur manque autour d'elle (fr-004 : ruban de fond à la place d'une cloison, et la chambre
+    de 12 m² passait « dehors »). Une tache de pièce qui ne touche aucun mur (marge de la page) reste dehors."""
+    libre = (~bati) if col is None else (~bati & (col == FOND))
     h, w = libre.shape
     cadre = np.ones((h + 2, w + 2), np.uint8)
     cadre[1:-1, 1:-1] = libre
     remplissage = cadre.copy()
     masque = np.zeros((h + 4, w + 4), np.uint8)
     cv2.floodFill(remplissage, masque, (0, 0), 2)
-    return remplissage[1:-1, 1:-1] == 2
+    dehors = remplissage[1:-1, 1:-1] == 2
+    if col is None:
+        return dehors
+    n, etiq, _, _ = cv2.connectedComponentsWithStats((~bati & ~dehors).astype(np.uint8), connectivity=4)
+    if n > 1:
+        voisin = cv2.dilate(bati.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+        touche = np.zeros(n, bool)
+        touche[np.unique(etiq[voisin & ~bati])] = True
+        touche[0] = True
+        dehors |= ~touche[etiq] & ~bati
+    return dehors
 
 
 # ---------------------------------------------------------------- 3. les murs
@@ -591,7 +605,8 @@ def _bord_exterieur_courbe(bati: np.ndarray, dehors: np.ndarray, gh: Segment, gv
     return e_ligne > 1.0 and e_cercle < 0.5 * e_ligne
 
 
-def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) -> list[MurLibre]:
+def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float,
+                        dehors: np.ndarray | None = None) -> list[MurLibre]:
     """A3 : les murs en biais et arrondis, dans le bâti que les murs droits trouvés n'expliquent pas.
 
     Chaque morceau restant assez long et penché devient un mur en biais (une droite) ou, s'il est courbe,
@@ -612,7 +627,8 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float) 
         cv2.rectangle(couvert, (int(math.floor(x0)) - 2, int(math.floor(y0)) - 2),
                       (int(math.ceil(x1)) + 1, int(math.ceil(y1)) + 1), 1, -1)
     reste = (bati & (couvert == 0)).astype(np.uint8)
-    dehors = dehors_du_logement(bati)
+    if dehors is None:
+        dehors = dehors_du_logement(bati)
     reste = cv2.morphologyEx(reste, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     n, etiq, stats, _ = cv2.connectedComponentsWithStats(reste, connectivity=8)
     long_min = LONGUEUR_MIN_LIBRE * px_par_m
@@ -1042,11 +1058,11 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         raise ValueError("aucun mur trouvé dans le coloriage")
-    dehors = dehors_du_logement(bati)
+    dehors = dehors_du_logement(bati, col)
     segs = trouver_murs(bati, dehors, px_par_m)
     if not segs:
         raise ValueError("aucun mur droit trouvé dans le coloriage")
-    libres = trouver_murs_libres(bati, segs, px_par_m)
+    libres = trouver_murs_libres(bati, segs, px_par_m, dehors)
     ouvertures = trouver_ouvertures(col, bati, segs, px_par_m)
     pieces = trouver_pieces(col, bati, dehors, px_par_m, points)
 

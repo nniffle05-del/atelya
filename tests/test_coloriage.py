@@ -65,6 +65,27 @@ def test_taches_hors_du_logement_ignorees():
     assert len(log["murs"]) == 5
 
 
+def test_piece_coloriee_reste_dedans_meme_si_un_mur_manque():
+    """fr-004 : le modèle laisse un ruban de fond à la place d'une cloison, relié à l'extérieur par un trou du mur
+    extérieur. Avant, le « dehors » se propageait par ce ruban et avalait la chambre entière."""
+    c = coloriage_t2()
+    c[px(1.2):px(5.2), px(4.15):px(4.25)] = 0  # ruban de fond à la place de la cloison (porte comprise)
+    c[px(0.9):px(1.2), px(4.15):px(4.25)] = 0  # trou dans le mur extérieur nord : le ruban touche la page
+    log, details = lire_coloriage(c, S)
+    assert sorted(details["types_pieces"].values()) == ["chambre", "sejour"]
+    surfaces = sorted(round(Logement.model_validate(log).pieces[i].surface_calculee, 1) for i in range(2))
+    assert surfaces[1] == pytest.approx(11.8, abs=0.4)  # la chambre a gardé sa taille, à peu près
+    assert surfaces[0] == pytest.approx(11.8, abs=0.4)
+
+
+def test_tache_de_piece_dans_la_marge_reste_dehors():
+    c = coloriage_t2()
+    c[px(0.1):px(0.6), px(0.1):px(0.8)] = 7  # une « chambre » inventée dans le coin de la page, loin des murs
+    log, details = lire_coloriage(c, S)
+    assert sorted(details["types_pieces"].values()) == ["chambre", "sejour"]
+    assert len(log["murs"]) == 5
+
+
 def test_comparaison_parfaite_avec_soi_meme():
     log, d = lire_coloriage(coloriage_t2(), S)
     r = comparer(log, log, {}, {})

@@ -471,7 +471,7 @@ def interieur_du_logement(col: np.ndarray, px_par_m: float) -> tuple[float, floa
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
-    dedans = ~bati & ~dehors_du_logement(bati)
+    dedans = ~bati & ~dehors_du_logement(bati, col)
     ys, xs = np.nonzero(dedans)
     if not len(xs):
         return None
@@ -560,7 +560,7 @@ def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, p
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
-    dedans = ~bati & ~dehors_du_logement(bati)
+    dedans = ~bati & ~dehors_du_logement(bati, col)
 
     def projeter_col(x: float, y: float) -> tuple[float, float]:
         p = vers_col @ (x, y, 1.0)
