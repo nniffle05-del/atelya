@@ -1,0 +1,139 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-006.jpg",
+ "largeur": 1206,
+ "hauteur": 1188,
+ "px_par_m": 57.8,
+ "echelle_inconnue": false,
+ "echelle_source": "cotes (5,00 m = 289 px ; chaînes de cotes ouest 11,12 m et est 11,10 m)",
+ "origine_px": [
+  278.0,
+  968.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "salle_d_eau_1": "salle_d_eau",
+  "degagement_1": "degagement",
+  "wc_1": "wc",
+  "degagement_2": "degagement",
+  "chambre_1": "chambre",
+  "chambre_2": "chambre",
+  "chambre_3": "chambre",
+  "chambre_4": "chambre",
+  "cuisine_1": "cuisine"
+ },
+ "murs_px": [
+  [
+   270.5,
+   976.0,
+   270.5,
+   298.0,
+   14.0
+  ],
+  [
+   266.0,
+   306.5,
+   895.0,
+   306.5,
+   18.0
+  ],
+  [
+   889.0,
+   976.0,
+   889.0,
+   298.0,
+   14.0
+  ],
+  [
+   266.0,
+   976.0,
+   895.0,
+   976.0,
+   15.0
+  ],
+  [
+   570.5,
+   976.0,
+   570.5,
+   304.0,
+   6.0
+  ],
+  [
+   270.0,
+   639.0,
+   571.0,
+   639.0,
+   7.0
+  ],
+  [
+   270.0,
+   819.5,
+   571.0,
+   819.5,
+   8.0
+  ],
+  [
+   571.0,
+   406.0,
+   889.0,
+   406.0,
+   7.0
+  ],
+  [
+   726.0,
+   401.0,
+   726.0,
+   304.0,
+   7.0
+  ],
+  [
+   820.0,
+   401.0,
+   820.0,
+   304.0,
+   7.0
+  ],
+  [
+   645.0,
+   494.0,
+   889.0,
+   494.0,
+   7.0
+  ],
+  [
+   647.0,
+   895.0,
+   647.0,
+   490.0,
+   7.0
+  ],
+  [
+   645.0,
+   657.5,
+   889.0,
+   657.5,
+   8.0
+  ],
+  [
+   645.0,
+   763.0,
+   889.0,
+   763.0,
+   7.0
+  ],
+  [
+   571.0,
+   898.0,
+   645.0,
+   898.0,
+   7.0
+  ]
+ ],
+ "incertain": [
+  "Pièce sans nom entre la salle de bains et les toilettes : type posé en dégagement",
+  "Aucune porte d'entrée dessinée sur le plan",
+  "Fenêtre est 405-492 (cote 1,40) : prise pour une fenêtre, peut-être une porte-fenêtre",
+  "Deux portes entre pièces côté ouest (salon → chambre, chambre → chambre) lues sur les arcs"
+ ]
+}

@@ -230,30 +230,46 @@ def bati_du_logement(col: np.ndarray, px_par_m: float) -> np.ndarray:
     return garde[etiq]
 
 
-def dehors_du_logement(bati: np.ndarray, col: np.ndarray | None = None) -> np.ndarray:
-    """Tout ce qui n'est pas du bâti et touche le bord de l'image par le vide : l'extérieur.
-
-    Avec `col` (le coloriage), le vide ne passe que par le FOND : une zone que le modèle a coloriée comme une pièce
-    reste dedans même si un mur manque autour d'elle (fr-004 : ruban de fond à la place d'une cloison, et la chambre
-    de 12 m² passait « dehors »). Une tache de pièce qui ne touche aucun mur (marge de la page) reste dehors."""
-    libre = (~bati) if col is None else (~bati & (col == FOND))
+def dehors_du_logement(bati: np.ndarray) -> np.ndarray:
+    """Tout ce qui n'est pas du bâti et touche le bord de l'image (par le vide) : l'extérieur."""
+    libre = (~bati).astype(np.uint8)
     h, w = libre.shape
     cadre = np.ones((h + 2, w + 2), np.uint8)
     cadre[1:-1, 1:-1] = libre
     remplissage = cadre.copy()
     masque = np.zeros((h + 4, w + 4), np.uint8)
     cv2.floodFill(remplissage, masque, (0, 0), 2)
-    dehors = remplissage[1:-1, 1:-1] == 2
-    if col is None:
+    return remplissage[1:-1, 1:-1] == 2
+
+
+SURFACE_PIECE_RECUPEREE = 1.0  # m² : une pièce coloriée au moins aussi grande, avalée par le dehors, est récupérée
+BORD_EN_MURS = 0.5  # part de son bord qui longe des murs : un halo bavé hors du bâtiment n'en a qu'un côté
+
+
+def dehors_pour_les_pieces(bati: np.ndarray, dehors: np.ndarray, col: np.ndarray, px_par_m: float) -> np.ndarray:
+    """Le « dehors » utilisé pour chercher les pièces : le même, moins les pièces que le vide a avalées.
+
+    fr-004 : le modèle a laissé un ruban de fond à la place d'une cloison, relié au bord de la page par un trou du mur
+    extérieur ; le remplissage passait par ce ruban et la chambre de 12 m², pourtant coloriée « chambre », devenait
+    « dehors ». On rend au dedans toute zone coloriée pièce, d'au moins SURFACE_PIECE_RECUPEREE, dont le bord longe des
+    murs sur au moins BORD_EN_MURS de sa longueur (un halo de couleur bavé le long d'un mur extérieur n'a de mur que
+    d'un côté : il reste dehors). Les murs eux-mêmes se cherchent avec le dehors d'origine, inchangé."""
+    pieces = (dehors & (col >= PREMIERE_PIECE)).astype(np.uint8)
+    n, etiq, stats, _ = cv2.connectedComponentsWithStats(pieces, connectivity=4)
+    if n <= 1:
         return dehors
-    n, etiq, _, _ = cv2.connectedComponentsWithStats((~bati & ~dehors).astype(np.uint8), connectivity=4)
-    if n > 1:
-        voisin = cv2.dilate(bati.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
-        touche = np.zeros(n, bool)
-        touche[np.unique(etiq[voisin & ~bati])] = True
-        touche[0] = True
-        dehors |= ~touche[etiq] & ~bati
-    return dehors
+    sortie = dehors.copy()
+    noyau = np.ones((3, 3), np.uint8)
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_AREA] < SURFACE_PIECE_RECUPEREE * px_par_m ** 2:
+            continue
+        x, y, w, h = stats[i, :4]
+        y0, y1, x0, x1 = max(0, y - 1), y + h + 1, max(0, x - 1), x + w + 1
+        zone = (etiq[y0:y1, x0:x1] == i).astype(np.uint8)
+        bord = cv2.dilate(zone, noyau).astype(bool) & ~zone.astype(bool)
+        if bord.any() and (bord & bati[y0:y1, x0:x1]).sum() / bord.sum() >= BORD_EN_MURS:
+            sortie[y0:y1, x0:x1][zone.astype(bool)] = False
+    return sortie
 
 
 # ---------------------------------------------------------------- 3. les murs
@@ -1058,13 +1074,13 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         raise ValueError("aucun mur trouvé dans le coloriage")
-    dehors = dehors_du_logement(bati, col)
+    dehors = dehors_du_logement(bati)
     segs = trouver_murs(bati, dehors, px_par_m)
     if not segs:
         raise ValueError("aucun mur droit trouvé dans le coloriage")
     libres = trouver_murs_libres(bati, segs, px_par_m, dehors)
     ouvertures = trouver_ouvertures(col, bati, segs, px_par_m)
-    pieces = trouver_pieces(col, bati, dehors, px_par_m, points)
+    pieces = trouver_pieces(col, bati, dehors_pour_les_pieces(bati, dehors, col, px_par_m), px_par_m, points)
 
     dedans = ~bati & ~dehors
     ys, xs = np.nonzero(dedans)

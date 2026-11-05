@@ -1,0 +1,155 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-009.jpg",
+ "largeur": 1206,
+ "hauteur": 1927,
+ "px_par_m": 148.0,
+ "echelle_inconnue": false,
+ "echelle_source": "surfaces écrites entre parenthèses : cuisine 5,91 et salle d'eau 2,07 → ~150,6 px/m, chambre 7,03 → 144 ; 148 retenu",
+ "origine_px": [
+  35.0,
+  1720.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "chambre_1": "chambre",
+  "entree_1": "entree",
+  "cuisine_1": "cuisine",
+  "salle_d_eau_1": "salle_d_eau"
+ },
+ "murs_px": [
+  [
+   716.0,
+   890.0,
+   716.0,
+   205.0,
+   12.0
+  ],
+  [
+   1190.0,
+   895.0,
+   1190.0,
+   205.0,
+   12.0
+  ],
+  [
+   715.0,
+   207.0,
+   1195.0,
+   207.0,
+   4.0
+  ],
+  [
+   15.0,
+   880.0,
+   740.0,
+   880.0,
+   12.0
+  ],
+  [
+   740.0,
+   885.0,
+   1192.0,
+   885.0,
+   12.0
+  ],
+  [
+   28.0,
+   1248.0,
+   28.0,
+   885.0,
+   12.0
+  ],
+  [
+   15.0,
+   1235.5,
+   410.0,
+   1235.5,
+   12.0
+  ],
+  [
+   553.0,
+   1030.0,
+   553.0,
+   885.0,
+   10.0
+  ],
+  [
+   405.0,
+   1024.5,
+   740.0,
+   1024.5,
+   10.0
+  ],
+  [
+   740.0,
+   1275.0,
+   740.0,
+   1025.0,
+   12.0
+  ],
+  [
+   657.5,
+   1336.9,
+   737.5,
+   1271.9,
+   15.0
+  ],
+  [
+   664.5,
+   1730.0,
+   664.5,
+   1340.0,
+   12.0
+  ],
+  [
+   413.5,
+   1730.0,
+   413.5,
+   1025.0,
+   12.0
+  ],
+  [
+   402.0,
+   1725.5,
+   668.0,
+   1725.5,
+   12.0
+  ],
+  [
+   525.0,
+   1515.5,
+   660.0,
+   1515.5,
+   8.0
+  ],
+  [
+   410.0,
+   1520.0,
+   525.0,
+   1520.0,
+   4.0
+  ],
+  [
+   740.0,
+   1165.0,
+   946.0,
+   1165.0,
+   12.0
+  ],
+  [
+   944.5,
+   1170.0,
+   944.5,
+   888.0,
+   12.0
+  ]
+ ],
+ "incertain": [
+  "Séjour tronqué par le cadrage (coupé en haut) : fermé par un trait virtuel au bord de l'image, sa surface vraie (14,13 m²) n'est pas celle de la zone",
+  "Placards de l'entrée (petits retours de murs) ignorés ; porte d'entrée supposée au sud de l'entrée",
+  "Passage cuisine → salle d'eau sans battant : trait virtuel + porte",
+  "Couloir entre chambre, cuisine et entrée compté dans l'entrée (ouvert)"
+ ]
+}

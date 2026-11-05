@@ -1,0 +1,219 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-005.jpg",
+ "largeur": 1184,
+ "hauteur": 2576,
+ "px_par_m": 54.723,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune (ni cote, ni surface, ni barre) : posée sur la largeur médiane des portes",
+ "origine_px": [
+  134.0,
+  1828.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "salle_d_eau_1": "salle_d_eau",
+  "placard_1": "placard",
+  "wc_1": "wc",
+  "sejour_1": "sejour"
+ },
+ "murs_px": [
+  [
+   304.0,
+   829.5,
+   987.0,
+   829.5,
+   8.0
+  ],
+  [
+   128.2,
+   916.4,
+   302.2,
+   826.4,
+   8.0
+  ],
+  [
+   215.6,
+   1135.6,
+   128.6,
+   920.6,
+   8.0
+  ],
+  [
+   217.0,
+   1132.0,
+   248.0,
+   1132.0,
+   8.0
+  ],
+  [
+   244.0,
+   1245.0,
+   244.0,
+   1096.0,
+   8.0
+  ],
+  [
+   248.0,
+   1093.5,
+   572.0,
+   1093.5,
+   8.0
+  ],
+  [
+   482.5,
+   1245.0,
+   482.5,
+   1096.0,
+   8.0
+  ],
+  [
+   248.0,
+   1239.5,
+   508.0,
+   1239.5,
+   8.0
+  ],
+  [
+   247.7,
+   1245.4,
+   339.7,
+   1312.4,
+   8.0
+  ],
+  [
+   340.0,
+   1312.0,
+   394.0,
+   1245.0,
+   8.0
+  ],
+  [
+   570.5,
+   1245.0,
+   570.5,
+   830.0,
+   8.0
+  ],
+  [
+   507.5,
+   1303.0,
+   507.5,
+   1245.0,
+   8.0
+  ],
+  [
+   508.0,
+   1298.0,
+   573.0,
+   1298.0,
+   8.0
+  ],
+  [
+   637.4,
+   1513.0,
+   576.4,
+   1302.0,
+   8.0
+  ],
+  [
+   566.3,
+   1527.1,
+   633.3,
+   1511.1,
+   8.0
+  ],
+  [
+   783.6,
+   1834.8,
+   564.6,
+   1531.8,
+   8.0
+  ],
+  [
+   572.0,
+   1005.0,
+   752.0,
+   1005.0,
+   3.0
+  ],
+  [
+   747.5,
+   1245.0,
+   747.5,
+   1066.0,
+   4.0
+  ],
+  [
+   572.0,
+   1245.0,
+   749.0,
+   1245.0,
+   8.0
+  ],
+  [
+   1049.5,
+   1697.7,
+   991.5,
+   829.7,
+   8.0
+  ],
+  [
+   954.0,
+   1245.0,
+   1010.0,
+   1245.0,
+   8.0
+  ],
+  [
+   836.0,
+   1698.0,
+   1045.0,
+   1698.0,
+   8.0
+  ],
+  [
+   777.0,
+   1740.0,
+   836.0,
+   1698.0,
+   8.0
+  ],
+  [
+   777.0,
+   1740.0,
+   833.0,
+   1796.0,
+   8.0
+  ],
+  [
+   831.4,
+   1792.4,
+   924.4,
+   1750.4,
+   8.0
+  ],
+  [
+   926.0,
+   1754.0,
+   881.0,
+   1698.0,
+   8.0
+  ],
+  [
+   786.0,
+   1833.0,
+   833.0,
+   1796.0,
+   8.0
+  ]
+ ],
+ "incertain": [
+  "Capture de téléphone, traits fins : murs lus à ±4 px ; échelle inconnue",
+  "Salon, coin nuit, dégagement, cuisine et entrée forment une seule zone ouverte (cloisons partielles du coin nuit gardées comme murs)",
+  "Triangle sous la salle de bain pris pour le placard (étiquette « Placard » écrite à côté)",
+  "Réduit entre salle de bain et coin nuit : ouvert vers le bas, c'est le haut du dégagement (zone ouverte)",
+  "Fenêtres du mur nord et des biais lues sur les traits fins (doubles lignes)"
+ ]
+}

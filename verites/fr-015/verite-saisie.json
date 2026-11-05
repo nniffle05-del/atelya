@@ -1,0 +1,52 @@
+{
+ "image": "fr-015.jpg",
+ "echelle": {"inconnue": true, "porte_m": 0.83},
+ "echelle_source": "aucune (ni cote ni surface) : posée sur les portes",
+ "hsp": 2.5,
+ "affiner": true,
+ "murs": [
+  [695, 465, 1105, 465, 5],
+  [697, 465, 697, 688, 5],
+  [955, 465, 955, 688, 5],
+  [1103, 465, 1103, 688, 5],
+  [695, 688, 1105, 688, 5],
+  [400, 575, 697, 575, 5],
+  [510, 575, 510, 688, 5],
+  [510, 688, 697, 688, 5],
+  [402, 575, 402, 795, 5],
+  [68, 795, 402, 795, 5],
+  [68, 795, 68, 1090, 5],
+  [68, 1090, 808, 1090, 5],
+  [510, 870, 510, 1090, 5],
+  [510, 870, 808, 870, 5],
+  [808, 688, 808, 1090, 5],
+  [402, 795, 510, 795, 3],
+  [510, 795, 510, 870, 3]
+ ],
+ "ouvertures": [
+  ["porte", 727, 688, 770, 688],
+  ["porte", 955, 520, 955, 565],
+  ["porte", 595, 688, 632, 688],
+  ["porte", 440, 575, 478, 575],
+  ["porte", 545, 870, 592, 870],
+  ["porte", 410, 795, 500, 795],
+  ["fenetre", 840, 688, 910, 688],
+  ["fenetre", 1000, 688, 1065, 688],
+  ["fenetre", 808, 740, 808, 805],
+  ["fenetre", 808, 960, 808, 1035],
+  ["fenetre", 68, 870, 68, 960]
+ ],
+ "pieces": [
+  ["Chambre 1", "chambre", 820, 560],
+  ["Salle de bain + Wc", "salle_d_eau", 1030, 620],
+  ["Salle d'eau + Wc", "salle_d_eau", 600, 630],
+  ["Entrée", "entree", 600, 760],
+  ["Cuisine / Séjour", "sejour", 250, 950],
+  ["Chambre 2", "chambre", 660, 990]
+ ],
+ "incertain": [
+  "Traits fins (~4 px) ; échelle inconnue (portes ≈ 0,83 m)",
+  "Cuisine/séjour ouvert sur l'entrée : fermé par deux traits virtuels (y 795 de x 402 à 510, puis x 510 de 795 à 870) + une porte",
+  "Porte palière supposée en haut à gauche de l'entrée (battant à x 440, y 575)"
+ ]
+}

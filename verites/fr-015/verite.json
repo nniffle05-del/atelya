@@ -1,0 +1,148 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-015.jpg",
+ "largeur": 1206,
+ "hauteur": 1382,
+ "px_par_m": 53.012,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune (ni cote ni surface) : posée sur les portes",
+ "origine_px": [
+  73.0,
+  1090.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "salle_d_eau_1": "salle_d_eau",
+  "salle_d_eau_2": "salle_d_eau",
+  "entree_1": "entree",
+  "sejour_1": "sejour",
+  "chambre_2": "chambre"
+ },
+ "murs_px": [
+  [
+   695.0,
+   466.5,
+   1105.0,
+   466.5,
+   4.0
+  ],
+  [
+   695.5,
+   688.0,
+   695.5,
+   465.0,
+   4.0
+  ],
+  [
+   953.5,
+   688.0,
+   953.5,
+   465.0,
+   4.0
+  ],
+  [
+   1101.5,
+   688.0,
+   1101.5,
+   465.0,
+   4.0
+  ],
+  [
+   695.0,
+   687.0,
+   1105.0,
+   687.0,
+   5.0
+  ],
+  [
+   400.0,
+   576.5,
+   697.0,
+   576.5,
+   4.0
+  ],
+  [
+   511.5,
+   688.0,
+   511.5,
+   575.0,
+   4.0
+  ],
+  [
+   510.0,
+   687.5,
+   697.0,
+   687.5,
+   4.0
+  ],
+  [
+   400.5,
+   795.0,
+   400.5,
+   575.0,
+   4.0
+  ],
+  [
+   68.0,
+   798.0,
+   402.0,
+   798.0,
+   3.0
+  ],
+  [
+   69.0,
+   1090.0,
+   69.0,
+   795.0,
+   5.0
+  ],
+  [
+   68.0,
+   1092.5,
+   808.0,
+   1092.5,
+   4.0
+  ],
+  [
+   511.5,
+   1090.0,
+   511.5,
+   870.0,
+   4.0
+  ],
+  [
+   510.0,
+   872.0,
+   808.0,
+   872.0,
+   5.0
+  ],
+  [
+   806.0,
+   1090.0,
+   806.0,
+   688.0,
+   5.0
+  ],
+  [
+   402.0,
+   795.0,
+   510.0,
+   795.0,
+   3.0
+  ],
+  [
+   510.0,
+   870.0,
+   510.0,
+   795.0,
+   3.0
+  ]
+ ],
+ "incertain": [
+  "Traits fins (~4 px) ; échelle inconnue (portes ≈ 0,83 m)",
+  "Cuisine/séjour ouvert sur l'entrée : fermé par deux traits virtuels (y 795 de x 402 à 510, puis x 510 de 795 à 870) + une porte",
+  "Porte palière supposée en haut à gauche de l'entrée (battant à x 440, y 575)"
+ ]
+}

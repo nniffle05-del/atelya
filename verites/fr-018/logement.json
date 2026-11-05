@@ -1,0 +1,739 @@
+{
+ "schema": "logement/0.1",
+ "projet_id": "fr-018",
+ "unites": "m",
+ "hauteur_sous_plafond": 2.5,
+ "murs": [
+  {
+   "id": "M1",
+   "debut": [
+    4.271,
+    9.423
+   ],
+   "fin": [
+    11.664,
+    9.423
+   ],
+   "epaisseur": 0.164,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M2",
+   "debut": [
+    4.271,
+    6.114
+   ],
+   "fin": [
+    4.271,
+    9.423
+   ],
+   "epaisseur": 0.235,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M3",
+   "debut": [
+    -0.129,
+    6.114
+   ],
+   "fin": [
+    4.389,
+    6.114
+   ],
+   "epaisseur": 0.117,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M4",
+   "debut": [
+    -0.07,
+    3.732
+   ],
+   "fin": [
+    -0.07,
+    6.196
+   ],
+   "epaisseur": 0.117,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M5",
+   "debut": [
+    -0.129,
+    3.79
+   ],
+   "fin": [
+    3.039,
+    3.79
+   ],
+   "epaisseur": 0.117,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M6",
+   "debut": [
+    2.981,
+    -0.082
+   ],
+   "fin": [
+    2.981,
+    3.79
+   ],
+   "epaisseur": 0.164,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M7",
+   "debut": [
+    3.016,
+    3.79
+   ],
+   "fin": [
+    3.016,
+    6.114
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M8",
+   "debut": [
+    3.039,
+    4.788
+   ],
+   "fin": [
+    4.506,
+    4.788
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M9",
+   "debut": [
+    4.506,
+    3.497
+   ],
+   "fin": [
+    4.506,
+    4.788
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M10",
+   "debut": [
+    3.039,
+    4.084
+   ],
+   "fin": [
+    4.506,
+    4.084
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M11",
+   "debut": [
+    3.039,
+    3.497
+   ],
+   "fin": [
+    4.506,
+    3.497
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M12",
+   "debut": [
+    4.506,
+    4.788
+   ],
+   "fin": [
+    5.68,
+    4.788
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M13",
+   "debut": [
+    5.68,
+    4.729
+   ],
+   "fin": [
+    6.442,
+    4.729
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M14",
+   "debut": [
+    6.442,
+    3.438
+   ],
+   "fin": [
+    6.442,
+    4.729
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M15",
+   "debut": [
+    5.68,
+    3.438
+   ],
+   "fin": [
+    6.442,
+    3.438
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M16",
+   "debut": [
+    5.68,
+    3.438
+   ],
+   "fin": [
+    5.68,
+    4.729
+   ],
+   "epaisseur": 0.07,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M17",
+   "debut": [
+    6.442,
+    4.788
+   ],
+   "fin": [
+    7.733,
+    4.788
+   ],
+   "epaisseur": 0.035,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M18",
+   "debut": [
+    6.442,
+    -0.082
+   ],
+   "fin": [
+    6.442,
+    3.438
+   ],
+   "epaisseur": 0.094,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M19",
+   "debut": [
+    6.56,
+    6.02
+   ],
+   "fin": [
+    6.56,
+    9.423
+   ],
+   "epaisseur": 0.094,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M20",
+   "debut": [
+    4.271,
+    6.114
+   ],
+   "fin": [
+    6.56,
+    6.114
+   ],
+   "epaisseur": 0.117,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M21",
+   "debut": [
+    6.56,
+    6.02
+   ],
+   "fin": [
+    11.547,
+    6.02
+   ],
+   "epaisseur": 0.117,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M22",
+   "debut": [
+    7.733,
+    4.025
+   ],
+   "fin": [
+    7.733,
+    6.02
+   ],
+   "epaisseur": 0.141,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M23",
+   "debut": [
+    7.851,
+    4.025
+   ],
+   "fin": [
+    11.547,
+    4.025
+   ],
+   "epaisseur": 0.035,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M24",
+   "debut": [
+    11.547,
+    -0.082
+   ],
+   "fin": [
+    11.547,
+    9.423
+   ],
+   "epaisseur": 0.235,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M25",
+   "debut": [
+    2.981,
+    -0.082
+   ],
+   "fin": [
+    11.84,
+    -0.082
+   ],
+   "epaisseur": 0.164,
+   "statut": "mesure",
+   "source": "verite_claude"
+  }
+ ],
+ "ouvertures": [
+  {
+   "id": "O1",
+   "type": "porte",
+   "mur": "M7",
+   "position": 1.173,
+   "largeur": 0.821,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O2",
+   "type": "porte",
+   "mur": "M3",
+   "position": 3.344,
+   "largeur": 0.821,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O3",
+   "type": "porte",
+   "mur": "M20",
+   "position": 1.326,
+   "largeur": 0.552,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O4",
+   "type": "porte",
+   "mur": "M21",
+   "position": 0.094,
+   "largeur": 0.904,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O5",
+   "type": "porte",
+   "mur": "M12",
+   "position": 0.059,
+   "largeur": 0.821,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O6",
+   "type": "porte",
+   "mur": "M17",
+   "position": 0.059,
+   "largeur": 1.173,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O7",
+   "type": "porte",
+   "mur": "M23",
+   "position": 0.117,
+   "largeur": 3.403,
+   "hauteur": 2.04,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O8",
+   "type": "porte_fenetre",
+   "mur": "M25",
+   "position": 0.411,
+   "largeur": 1.995,
+   "hauteur": 2.15,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O9",
+   "type": "porte_fenetre",
+   "mur": "M25",
+   "position": 5.105,
+   "largeur": 3.051,
+   "hauteur": 2.15,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O10",
+   "type": "porte_fenetre",
+   "mur": "M24",
+   "position": 6.454,
+   "largeur": 1.526,
+   "hauteur": 2.15,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "O11",
+   "type": "porte_fenetre",
+   "mur": "M24",
+   "position": 3.286,
+   "largeur": 1.291,
+   "hauteur": 2.15,
+   "allege": 0.0,
+   "statut": "mesure",
+   "source": "verite_claude"
+  }
+ ],
+ "pieces": [
+  {
+   "id": "salle_d_eau_1",
+   "nom": "Salle d'eau 2",
+   "contour": [
+    [
+     0.0,
+     6.043
+    ],
+    [
+     0.0,
+     3.849
+    ],
+    [
+     2.94,
+     3.849
+    ],
+    [
+     2.94,
+     6.043
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "degagement_1",
+   "nom": "Dégagement",
+   "contour": [
+    [
+     3.063,
+     6.043
+    ],
+    [
+     3.063,
+     4.817
+    ],
+    [
+     7.663,
+     4.817
+    ],
+    [
+     7.663,
+     5.996
+    ],
+    [
+     4.283,
+     5.996
+    ],
+    [
+     4.283,
+     6.043
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "salle_d_eau_2",
+   "nom": "Salle d'eau 1",
+   "contour": [
+    [
+     4.401,
+     9.329
+    ],
+    [
+     4.401,
+     6.172
+    ],
+    [
+     6.513,
+     6.172
+    ],
+    [
+     6.513,
+     9.329
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "chambre_1",
+   "nom": "Chambre 1",
+   "contour": [
+    [
+     6.665,
+     9.329
+    ],
+    [
+     6.665,
+     6.079
+    ],
+    [
+     11.43,
+     6.079
+    ],
+    [
+     11.43,
+     9.329
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "chambre_2",
+   "nom": "Chambre 2",
+   "contour": [
+    [
+     4.541,
+     4.741
+    ],
+    [
+     4.541,
+     3.421
+    ],
+    [
+     3.074,
+     3.421
+    ],
+    [
+     3.074,
+     0.0
+    ],
+    [
+     6.395,
+     0.0
+    ],
+    [
+     6.395,
+     3.403
+    ],
+    [
+     5.586,
+     3.403
+    ],
+    [
+     5.586,
+     4.741
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "cuisine_1",
+   "nom": "Cuisine",
+   "contour": [
+    [
+     7.815,
+     5.95
+    ],
+    [
+     7.815,
+     4.048
+    ],
+    [
+     11.43,
+     4.048
+    ],
+    [
+     11.43,
+     5.95
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "sejour_1",
+   "nom": "Séjour",
+   "contour": [
+    [
+     6.525,
+     4.753
+    ],
+    [
+     6.525,
+     0.0
+    ],
+    [
+     11.43,
+     0.0
+    ],
+    [
+     11.43,
+     3.914
+    ],
+    [
+     7.704,
+     3.914
+    ],
+    [
+     7.704,
+     4.753
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "placard_1",
+   "nom": "PL",
+   "contour": [
+    [
+     3.063,
+     4.741
+    ],
+    [
+     3.063,
+     4.119
+    ],
+    [
+     4.471,
+     4.119
+    ],
+    [
+     4.471,
+     4.741
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  },
+  {
+   "id": "placard_2",
+   "nom": "PL",
+   "contour": [
+    [
+     3.069,
+     4.037
+    ],
+    [
+     3.069,
+     3.779
+    ],
+    [
+     3.074,
+     3.779
+    ],
+    [
+     3.074,
+     3.532
+    ],
+    [
+     4.471,
+     3.532
+    ],
+    [
+     4.471,
+     4.037
+    ]
+   ],
+   "statut": "mesure",
+   "source": "verite_claude"
+  }
+ ]
+}

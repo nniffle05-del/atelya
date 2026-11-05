@@ -1,0 +1,179 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-019.png",
+ "largeur": 4963,
+ "hauteur": 3509,
+ "px_par_m": 236.2,
+ "echelle_inconnue": false,
+ "echelle_source": "échelle écrite 1:50 sur un rendu 300 dpi (236,2 px/m), confirmée par la cote 5,76 m = 1 360 px",
+ "origine_px": [
+  941.0,
+  2680.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "placard_1": "placard",
+  "sejour_1": "sejour",
+  "salle_d_eau_1": "salle_d_eau",
+  "entree_1": "entree",
+  "cuisine_1": "cuisine",
+  "chambre_2": "chambre",
+  "sejour_2": "sejour"
+ },
+ "murs_px": [
+  [
+   915.0,
+   2730.0,
+   915.0,
+   370.0,
+   50.0
+  ],
+  [
+   890.0,
+   395.0,
+   2380.0,
+   395.0,
+   50.0
+  ],
+  [
+   2355.0,
+   690.0,
+   2355.0,
+   370.0,
+   50.0
+  ],
+  [
+   2330.0,
+   690.0,
+   3090.0,
+   690.0,
+   50.0
+  ],
+  [
+   3067.0,
+   1310.0,
+   3067.0,
+   370.0,
+   50.0
+  ],
+  [
+   2310.0,
+   1290.0,
+   3080.0,
+   1290.0,
+   25.0
+  ],
+  [
+   2831.0,
+   1290.0,
+   2831.0,
+   1070.0,
+   20.0
+  ],
+  [
+   1607.0,
+   1640.0,
+   1607.0,
+   420.0,
+   40.0
+  ],
+  [
+   1115.0,
+   1420.0,
+   1500.0,
+   1420.0,
+   20.0
+  ],
+  [
+   1496.0,
+   1640.0,
+   1496.0,
+   1420.0,
+   20.0
+  ],
+  [
+   890.0,
+   1650.0,
+   3330.0,
+   1650.0,
+   40.0
+  ],
+  [
+   2830.0,
+   2730.0,
+   2830.0,
+   1660.0,
+   50.0
+  ],
+  [
+   890.0,
+   2705.0,
+   2860.0,
+   2705.0,
+   50.0
+  ],
+  [
+   1745.0,
+   2700.0,
+   1745.0,
+   1680.0,
+   40.0
+  ],
+  [
+   2330.0,
+   1640.0,
+   2330.0,
+   1290.0,
+   30.0
+  ],
+  [
+   3325.0,
+   1640.0,
+   3325.0,
+   1130.0,
+   40.0
+  ],
+  [
+   3030.0,
+   1129.5,
+   4120.0,
+   1129.5,
+   50.0
+  ],
+  [
+   4100.0,
+   2730.0,
+   4100.0,
+   370.0,
+   50.0
+  ],
+  [
+   3310.0,
+   1660.0,
+   4120.0,
+   1660.0,
+   50.0
+  ],
+  [
+   1117.0,
+   1640.0,
+   1117.0,
+   1420.0,
+   20.0
+  ],
+  [
+   2330.0,
+   1290.0,
+   2330.0,
+   690.0,
+   40.0
+  ]
+ ],
+ "incertain": [
+  "PDF vectoriel rendu à 300 dpi : échelle exacte ; murs épais lus à ±10 px (4 cm)",
+  "Cloison chambre 02 / SàM : deux portes (en haut 0,89 et en bas 0,89), lues sur les arcs",
+  "Vitrage entre l'entrée et le salon (2,72 m) lu comme fenêtre ; porte palière supposée sur le mur sud de l'entrée (arc 2995-3180)",
+  "Couloir extérieur à droite et sous la cuisine (cotes 0,91/0,71/1,00) traité comme hors logement"
+ ]
+}

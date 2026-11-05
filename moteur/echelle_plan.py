@@ -62,7 +62,7 @@ import cv2
 import numpy as np
 
 from moteur.barre_echelle import lire_barre
-from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, estimer_rotation, redresser
+from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, dehors_pour_les_pieces, estimer_rotation, redresser
 from moteur.lecture_cotes import (COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle,
                                   lire_textes, plan_en_cm, valeur_de_cote)
 from moteur.redressement import Redressement
@@ -471,7 +471,8 @@ def interieur_du_logement(col: np.ndarray, px_par_m: float) -> tuple[float, floa
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
-    dedans = ~bati & ~dehors_du_logement(bati, col)
+    dehors = dehors_du_logement(bati)
+    dedans = ~bati & ~dehors_pour_les_pieces(bati, dehors, col, px_par_m)
     ys, xs = np.nonzero(dedans)
     if not len(xs):
         return None
@@ -560,7 +561,8 @@ def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, p
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
-    dedans = ~bati & ~dehors_du_logement(bati, col)
+    dehors = dehors_du_logement(bati)
+    dedans = ~bati & ~dehors_pour_les_pieces(bati, dehors, col, px_par_m)
 
     def projeter_col(x: float, y: float) -> tuple[float, float]:
         p = vers_col @ (x, y, 1.0)

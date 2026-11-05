@@ -1,0 +1,110 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-016.jpg",
+ "largeur": 1206,
+ "hauteur": 1695,
+ "px_par_m": 49.398,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune (plan de diagnostiqueur à lettres) : posée sur les portes",
+ "origine_px": [
+  96.0,
+  1213.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "chambre_2": "chambre",
+  "sejour_1": "sejour",
+  "salle_d_eau_1": "salle_d_eau"
+ },
+ "murs_px": [
+  [
+   90.0,
+   584.0,
+   1035.0,
+   584.0,
+   7.0
+  ],
+  [
+   92.5,
+   882.0,
+   92.5,
+   582.0,
+   6.0
+  ],
+  [
+   93.0,
+   884.5,
+   432.0,
+   884.5,
+   6.0
+  ],
+  [
+   430.5,
+   1220.0,
+   430.5,
+   582.0,
+   6.0
+  ],
+  [
+   432.0,
+   1215.5,
+   1035.0,
+   1215.5,
+   6.0
+  ],
+  [
+   1032.0,
+   1220.0,
+   1032.0,
+   582.0,
+   5.0
+  ],
+  [
+   432.0,
+   696.5,
+   620.0,
+   696.5,
+   6.0
+  ],
+  [
+   618.5,
+   765.0,
+   618.5,
+   695.0,
+   8.0
+  ],
+  [
+   620.0,
+   766.5,
+   1033.0,
+   766.5,
+   6.0
+  ],
+  [
+   735.0,
+   1030.5,
+   848.0,
+   1030.5,
+   6.0
+  ],
+  [
+   734.0,
+   1220.0,
+   734.0,
+   1025.0,
+   5.0
+  ],
+  [
+   846.0,
+   1220.0,
+   846.0,
+   1025.0,
+   5.0
+  ]
+ ],
+ "incertain": [
+  "Scan flou, murs ~6 px ; échelle inconnue (portes ≈ 0,83 m)",
+  "Porte palière = porte sur le mur sud (x 548-590)"
+ ]
+}

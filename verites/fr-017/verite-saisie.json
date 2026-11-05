@@ -1,0 +1,62 @@
+{
+ "image": "fr-017.jpg",
+ "surfaces": {"Salon / Séjour": 48.30, "Entrée": 4.60, "WC": 1.80, "Cuisine": 7.44},
+ "echelle_source": "surfaces écrites dans les pièces (Carrez ; salon 50,80 au sol)",
+ "hsp": 2.5,
+ "affiner": true,
+ "murs": [
+  [258, 680, 1035, 680, 14],
+  [265, 673, 265, 970, 14],
+  [258, 963, 457, 963, 14],
+  [450, 897, 450, 963, 14],
+  [450, 970, 450, 1045, 14],
+  [450, 687, 450, 740, 14],
+  [450, 1038, 640, 1038, 14],
+  [535, 1045, 625, 1295, 14],
+  [625, 1290, 745, 1290, 14],
+  [742, 1085, 742, 1295, 14],
+  [640, 1030, 640, 1127, 6],
+  [682, 1030, 682, 1127, 6],
+  [640, 1127, 682, 1127, 6],
+  [640, 1030, 682, 1030, 3],
+  [732, 983, 922, 983, 14],
+  [740, 983, 740, 1090, 14],
+  [682, 1085, 852, 1085, 14],
+  [852, 1092, 922, 1045, 14],
+  [922, 1045, 922, 985, 14],
+  [790, 988, 812, 1032, 10],
+  [812, 1038, 922, 1038, 10],
+  [852, 1032, 852, 1092, 10],
+  [922, 985, 1035, 880, 20],
+  [1030, 673, 1030, 880, 14],
+  [985, 687, 985, 865, 10],
+  [980, 865, 1035, 880, 10],
+  [450, 970, 732, 970, 3]
+ ],
+ "ouvertures": [
+  ["porte", 450, 977, 450, 1015],
+  ["porte", 560, 1038, 612, 1038],
+  ["porte", 740, 990, 740, 1030],
+  ["porte", 460, 970, 720, 970],
+  ["fenetre", 295, 680, 375, 680],
+  ["fenetre", 500, 680, 590, 680],
+  ["fenetre", 700, 680, 790, 680],
+  ["fenetre", 875, 680, 970, 680],
+  ["fenetre", 655, 1290, 720, 1290]
+ ],
+ "pieces": [
+  ["Salon / Séjour", "sejour", 600, 820],
+  ["Entrée", "entree", 540, 1000],
+  ["WC", "wc", 790, 1040],
+  ["Placard", "placard", 860, 1010],
+  ["Pl.", "placard", 1008, 780],
+  ["Cuisine", "cuisine", 680, 1200],
+  ["Escalier", "escalier", 660, 1080]
+ ],
+ "incertain": [
+  "Entrée ouverte sur le salon : trait virtuel (y 970, x 450-732) + grande ouverture comptée comme porte",
+  "Escalier (vers le rez-de-chaussée) fermé en haut par un trait virtuel",
+  "Angle nord-est en biais épais : tracé approché ; petit placard « Pl. » en colonne",
+  "Réduit entre l'escalier, le WC et la cuisine laissé dans la cuisine"
+ ]
+}

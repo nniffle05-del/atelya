@@ -1,0 +1,203 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-010.jpg",
+ "largeur": 1206,
+ "hauteur": 1288,
+ "px_par_m": 64.0,
+ "echelle_inconnue": false,
+ "echelle_source": "cotes en cm (457 → 295 px, 405 → 260 px, 370 → 240 px : 64-65 px/m)",
+ "origine_px": [
+  116.0,
+  981.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "chambre_1": "chambre",
+  "entree_1": "entree",
+  "sejour_2": "sejour",
+  "chambre_2": "chambre",
+  "escalier_1": "escalier",
+  "wc_1": "wc",
+  "cuisine_1": "cuisine",
+  "salle_d_eau_1": "salle_d_eau"
+ },
+ "murs_px": [
+  [
+   85.0,
+   468.0,
+   1140.0,
+   468.0,
+   8.0
+  ],
+  [
+   100.0,
+   1000.0,
+   100.0,
+   465.0,
+   30.0
+  ],
+  [
+   115.0,
+   985.0,
+   700.0,
+   985.0,
+   8.0
+  ],
+  [
+   115.0,
+   740.0,
+   430.0,
+   740.0,
+   8.0
+  ],
+  [
+   418.0,
+   985.0,
+   418.0,
+   465.0,
+   20.0
+  ],
+  [
+   430.0,
+   598.0,
+   530.0,
+   598.0,
+   12.0
+  ],
+  [
+   600.0,
+   595.0,
+   700.0,
+   595.0,
+   8.0
+  ],
+  [
+   430.0,
+   810.0,
+   700.0,
+   810.0,
+   12.0
+  ],
+  [
+   700.0,
+   985.0,
+   700.0,
+   465.0,
+   8.0
+  ],
+  [
+   700.0,
+   510.0,
+   785.0,
+   510.0,
+   8.0
+  ],
+  [
+   785.0,
+   510.0,
+   838.0,
+   524.0,
+   8.0
+  ],
+  [
+   838.0,
+   524.0,
+   876.0,
+   562.0,
+   8.0
+  ],
+  [
+   890.0,
+   615.0,
+   876.0,
+   562.0,
+   8.0
+  ],
+  [
+   876.0,
+   668.0,
+   890.0,
+   615.0,
+   8.0
+  ],
+  [
+   838.0,
+   706.0,
+   876.0,
+   668.0,
+   8.0
+  ],
+  [
+   785.0,
+   720.0,
+   838.0,
+   706.0,
+   8.0
+  ],
+  [
+   700.0,
+   720.0,
+   785.0,
+   720.0,
+   8.0
+  ],
+  [
+   905.0,
+   580.0,
+   900.0,
+   468.0,
+   8.0
+  ],
+  [
+   935.0,
+   670.0,
+   905.0,
+   580.0,
+   8.0
+  ],
+  [
+   905.0,
+   705.0,
+   935.0,
+   670.0,
+   8.0
+  ],
+  [
+   840.0,
+   705.0,
+   1140.0,
+   705.0,
+   8.0
+  ],
+  [
+   1045.0,
+   705.0,
+   1045.0,
+   465.0,
+   8.0
+  ],
+  [
+   1140.0,
+   705.0,
+   1140.0,
+   465.0,
+   8.0
+  ],
+  [
+   530.0,
+   598.0,
+   600.0,
+   598.0,
+   4.0
+  ]
+ ],
+ "incertain": [
+  "Plan d'architecte à la main, tourné : murs = doubles traits fins, épaisseurs estimées",
+  "Mur salon/entrée (x 418) : piliers et grandes ouvertures (baies entre pièces) lus comme des portes",
+  "Escalier rond approché par 7 segments ; WC en croissant entre l'escalier et la cuisine (mur courbe approché)",
+  "Porte du WC non trouvée ; porte d'entrée = battant « 101 » sur le mur x 700",
+  "Pas d'affinage sur l'encre (traits trop fins et lignes de cotes partout)",
+  "Passage entrée → S.A.M. (530-600, y 598) sans battant : trait virtuel + porte"
+ ]
+}
