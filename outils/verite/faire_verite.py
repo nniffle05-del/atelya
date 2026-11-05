@@ -308,9 +308,34 @@ def _controle(img: np.ndarray, murs, ouvertures, zones, etiq, sortie: Path) -> N
     Image.alpha_composite(base.convert("RGBA"), calque).convert("RGB").save(sortie)
 
 
+def apercu(saisie: Path, sortie: Path | None = None) -> Path:
+    """La saisie dessinée telle quelle sur le plan (murs rouges, ouvertures en couleur, points des pièces), SANS vérifier
+    que les zones sont fermées : pour relire un brouillon avant qu'il passe par `verite`."""
+    s = json.loads(saisie.read_text(encoding="utf-8"))
+    img = lire_image(saisie.parent / s["image"])
+    base = Image.fromarray(img[:, :, ::-1] if img.ndim == 3 else img).convert("RGB")
+    calque = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(calque)
+    for k, (x0, y0, x1, y1, ep) in enumerate(s["murs"]):
+        d.line([(x0, y0), (x1, y1)], fill=(255, 0, 0, 150), width=max(1, int(ep)))
+        d.text(((x0 + x1) / 2, (y0 + y1) / 2), str(k), fill=(120, 0, 0, 255), font=_police(11))
+    for t, x0, y0, x1, y1 in s["ouvertures"]:
+        coul = {"porte": (0, 160, 0, 255), "fenetre": (0, 90, 255, 255), "porte_fenetre": (0, 200, 200, 255)}[t]
+        d.line([(x0, y0), (x1, y1)], fill=coul, width=5)
+    for nom, type_, x, y in s["pieces"]:
+        d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 140, 0, 255))
+        d.text((x + 7, y - 7), f"{nom} ({type_})", fill=(0, 0, 0, 255), font=_police(13))
+    sortie = sortie or saisie.with_name(saisie.stem.replace("-saisie", "") + "-apercu.png")
+    Image.alpha_composite(base.convert("RGBA"), calque).convert("RGB").save(sortie)
+    return sortie
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest="cmd", required=True)
+    ap_ = sp.add_parser("apercu")
+    ap_.add_argument("saisie", type=Path)
+    ap_.add_argument("--sortie", type=Path)
     g = sp.add_parser("grille")
     g.add_argument("image", type=Path)
     g.add_argument("--pas", type=int, default=50)
@@ -319,7 +344,9 @@ def main() -> int:
     v = sp.add_parser("verite")
     v.add_argument("saisie", type=Path, nargs="+")
     a = ap.parse_args()
-    if a.cmd == "grille":
+    if a.cmd == "apercu":
+        print(apercu(a.saisie, a.sortie))
+    elif a.cmd == "grille":
         print(grille(a.image, a.pas, a.zoom, a.sortie))
     else:
         for s in a.saisie:
