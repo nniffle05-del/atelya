@@ -192,7 +192,14 @@ monde (essai 6e NON mis en service) ; **A1** doutes (877967c) ; **A3** DINOv2 + 
 encore posé sur le Mac**, attend le « vas-y » de NT) ; **A2** lecture des PDF (PC ; fusionnée dans `main` sur GitHub le
 04/11/2026, fc43891 ; pas encore posée sur le Mac : accord de NT).
 
-**Prochaine étape** : à choisir par NT (fin A2 le 03/11/2026). Restes d'A2 :
+**Étape « vérification réelle » (04-05/11/2026, branche `etape-verification-reelle`, NON fusionnée)** : lecture complète
+(`moteur/lecture_complete.py`, `outils/atelya/lire_plan.py` → `ecran.html` par plan), écran de vérification refait (un point à
+la fois, retouche des murs, recalcul des pièces, reprise du travail), Blender 5.2.2 sur le PC (`..telyalender-5.2.2`,
+rendu CUDA), 1re 3D d'un vrai plan (fr-006), 3D constructible 4/13 → 11-12/15, échelle lue sur 4/15 vrais plans
+(cotes en cm, surfaces en légende, PDF), traducteur 0.4.3. 2 plans de travail avec accords : `..telyarais-plans	ravail-2026-11-04`
+(fr-018 photo, fr-019 PDF anonymisé). Détail : `docs/projet/memoire/atelya-verification-reelle.md`. Note ~67/100 client, ~93 fabriqués, ~52 vrais plans.
+
+**Prochaine étape** : à choisir par NT. Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
 option A2-7 (marques des cotes lues dans les traits du PDF : défaut ancien de ~0,5 % quand deux cotes se
 touchent de part et d'autre d'une cloison fine), essai sur de VRAIS PDF dès qu'on en aura.

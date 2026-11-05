@@ -81,3 +81,17 @@ def test_coin_un_peu_arrondi_reste_un_angle_droit():
     col = np.array(Image.open(Path(__file__).parent / "donnees" / "coin-arrondi-bruite.png"), np.uint8)
     _, d = lire_coloriage(col, 44.956)
     assert d["murs_libres"] == []
+
+
+def test_deux_ouvertures_collees_de_types_differents_n_en_font_qu_une():
+    """fr-006 : une fenêtre de 1,20 m lue en fenêtre de 0,33 m + porte-fenêtre de 0,84 m → une seule, du type de la plus large."""
+    from moteur.coloriage import _fusionner_ouvertures_voisines
+
+    def o(id_, type_, mur, pos, larg):
+        return {"id": id_, "type": type_, "mur": mur, "position": pos, "largeur": larg, "hauteur": 2.15 if type_ != "fenetre" else 1.25,
+                "allege": 0.0 if type_ != "fenetre" else 0.95, "statut": "estime", "source": "atelya"}
+
+    lues = [o("O1", "fenetre", "M20", 2.071, 0.327), o("O2", "porte_fenetre", "M20", 2.40, 0.84), o("O3", "porte", "M20", 4.0, 0.8), o("O4", "porte", "M3", 0.5, 0.8)]
+    sortie = _fusionner_ouvertures_voisines(lues)
+    assert [(x["id"], x["type"], x["mur"], round(x["largeur"], 2)) for x in sortie] == [("O1", "porte_fenetre", "M20", 1.17), ("O2", "porte", "M20", 0.8), ("O3", "porte", "M3", 0.8)]
+    assert sortie[0]["allege"] == 0.0 and sortie[0]["position"] == 2.071
