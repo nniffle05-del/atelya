@@ -210,14 +210,18 @@ pleines, ≥ 1,8 × épaisseur des murs ; 0/150 fabriqués signalés, 11/11 vrai
 cotes aussi sur photo (fr-010 : plus d'échelle « sûre » fausse de 12 %). 15 vrais plans : 0 erreur silencieuse (1 avant), brouillons de −72…−26 %
 à ±18 %, à l'échelle lue murs 33 → 40 %, pièces 17 → 33 %. 406 tests. **4 bancs de non-recul SANS AUCUN RECUL** (`banc-echelle2.ps1`, 05/11 17h13 : images et PDF et biais strictement identiques, photos 2 échelles bougées < 0,2 %). Détail :
 `docs/projet/memoire/atelya-echelle-vrais-plans.md`.
-**Chantier « murs en trop » (05/11 soir, branche `chantier-murs-en-trop`, bancs en cours)** : traducteur 0.4.5 = plafond d'épaisseur 70 cm
+**Chantier « murs en trop » (05/11 soir, FUSIONNÉ dans `main` en local le 05/11 20h20 ; NT doit pousser)** : traducteur 0.4.5 = plafond d'épaisseur 70 cm
 (murs droits et libres ; sols hachurés / dessins à la main coloriés « mur » donnaient des arcs de 1 à 4 m d'épaisseur), arcs écartés
 comptés dans l'aiguillage e5/e7b (sinon fr-010 et fr-015 changeaient de modèle). A/B : images 1 034 → 947 murs en trop, biais 844 → 681,
-rien d'autre ne bouge ; 15 vrais plans : murs en trop 828 → 634, pièces identiques. 407 tests. Détail : `docs/projet/memoire/atelya-murs-en-trop.md`.
-**Décision NT (05/11 soir)** : étape suivante = **lot 2 du générateur** (styles vus sur les vrais plans), à partir de captures d'annonces
-envoyées par NT comme références de style ; **aucune aspiration de sites** (règle réaffirmée).
+rien d'autre ne bouge ; 15 vrais plans : murs en trop 828 → 634, pièces identiques. 407 tests. **4 bancs de non-recul SANS RECUL** (images en trop
+1 079 → 994, PDF 3 154 → 3 113, photos =, biais 921 → 745 et murs justes 75,2 → 75,5 ; 0 échelle changée, 0 nouvelle erreur > 3 %).
+Détail : `docs/projet/memoire/atelya-murs-en-trop.md`.
+**Décision NT (05/11 soir)** : étape suivante = **lot 2 du générateur** (styles vus sur les vrais plans) ; **aucune aspiration de sites**
+(règle réaffirmée). **NT a obtenu 105 VRAIS PLANS** (05/11 soir) → nouvelle conversation : accords + RGPD, ~25 à l'examen (40 juges au total,
+jamais touchés) / ~80 à l'entraînement, vérités des 80 (Claude + validation NT à l'écran), catalogue de styles pour le lot 2, puis essai 8
+(e5 + DINOv2 + fabriqués + 80 vrais plans), jugé sur les 40 d'examen. Plan détaillé dans `atelya-murs-en-trop.md` (fin).
 
-**Prochaine étape** : à choisir par NT. Restes d'A2 :
+**Prochaine étape** : les 105 vrais plans (ci-dessus). Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
 option A2-7 (marques des cotes lues dans les traits du PDF : défaut ancien de ~0,5 % quand deux cotes se
 touchent de part et d'autre d'une cloison fine), essai sur de VRAIS PDF dès qu'on en aura.
