@@ -86,6 +86,30 @@ def test_tache_de_piece_dans_la_marge_reste_dehors():
     assert len(log["murs"]) == 5
 
 
+def test_un_bloc_trop_epais_n_est_pas_un_mur(monkeypatch):
+    """0.4.5 : un sol hachuré ou un dessin à la main colorié « mur » donne des murs de 1 à 4 m d'épaisseur (fr-005, fr-010 :
+    blocs droits ; fr-008, fr-018 : arcs). Aucun vrai mur ne dépasse 47 cm : au-delà de 70 cm, ce n'est pas un mur."""
+    from moteur import coloriage as C
+    c = coloriage_t2()
+    c[px(1.2):px(2.2), px(3.6):px(6.2)] = MUR  # un bloc de 1,0 × 2,6 m collé au mur nord de la chambre
+    yy, xx = np.mgrid[0:c.shape[0], 0:c.shape[1]]
+    r = np.hypot(xx - px(1.2), yy - px(5.2))  # un quart d'anneau de 1,0 m d'épaisseur dans le coin sud-ouest du séjour
+    c[(r >= px(1.2)) & (r <= px(2.2)) & (xx >= px(1.2)) & (yy <= px(5.2))] = MUR
+    monkeypatch.setattr(C, "EPAISSEUR_MAX_MUR", None)
+    monkeypatch.setattr(C, "EPAISSEUR_MAX_LIBRE", None)
+    sans_plafond, _ = lire_coloriage(c, S)
+    assert any(m["epaisseur"] > 0.7 for m in sans_plafond["murs"])  # sans plafond, les taches deviennent des murs
+    monkeypatch.setattr(C, "EPAISSEUR_MAX_MUR", 0.70)
+    monkeypatch.setattr(C, "EPAISSEUR_MAX_LIBRE", 0.70)
+    log, d = lire_coloriage(c, S)
+    assert all(m["epaisseur"] <= 0.7 for m in log["murs"]) and d["murs_libres"] == []
+    assert 1.5 <= d["libres_ecartes_m"] <= 4.0  # l'arc refusé (rayon ~1,7 m) est compté pour l'aiguillage e5 / e7b
+    # Les 5 vraies lignes de murs restent (le mur nord est coupé en deux là où le bloc le recouvrait : un trou,
+    # que l'écran de vérification signale comme « pièce non fermée », plutôt qu'un faux mur de 1,2 m d'épaisseur).
+    lignes = {("h", round(m["debut"][1], 1)) if m["debut"][1] == m["fin"][1] else ("v", round(m["debut"][0], 1)) for m in log["murs"]}
+    assert lignes == {("h", 4.1), ("h", -0.1), ("v", -0.1), ("v", 6.1), ("v", 3.0)}
+
+
 def test_comparaison_parfaite_avec_soi_meme():
     log, d = lire_coloriage(coloriage_t2(), S)
     r = comparer(log, log, {}, {})

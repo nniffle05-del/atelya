@@ -39,8 +39,10 @@ def longueur_libre(logement: dict) -> float:
     return sum(math.dist(m["debut"], m["fin"]) for m in _murs(logement) if est_libre(m))
 
 
-def choisir(lecture_e5: dict, lecture_e7: dict, seuil: float = SEUIL_LIBRES_M) -> tuple[str, dict]:
-    """Renvoie (« e5 » ou « e7 », lecture gardée)."""
-    if longueur_libre(lecture_e7) >= seuil:
+def choisir(lecture_e5: dict, lecture_e7: dict, seuil: float = SEUIL_LIBRES_M, en_plus: float = 0.0) -> tuple[str, dict]:
+    """Renvoie (« e5 » ou « e7 », lecture gardée).
+    `en_plus` : mètres de murs libres que le traducteur 0.4.5 a refusés pour excès d'épaisseur (details
+    « libres_ecartes_m ») : ils comptent dans la décision, comme avant ce plafond (règle réglée sur les bancs)."""
+    if longueur_libre(lecture_e7) + en_plus >= seuil:
         return "e7", lecture_e7
     return "e5", lecture_e5

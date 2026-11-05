@@ -248,7 +248,7 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
     except Exception as err:  # noqa: BLE001 — un plan illisible est un résultat (refusé), pas un plantage
         erreur = f"{type(err).__name__}: {str(err)[:200]}"
         return Lecture(modele, None, None, examiner(None, erreur=erreur), echelle, R, col, carte, infos, erreur)
-    infos["murs_libres_m"] = round(longueur_libre(logement), 2)
+    infos["murs_libres_m"] = round(longueur_libre(logement) + details.get("libres_ecartes_m", 0.0), 2)
     examen = examiner(logement, details, carte=carte, redressement=R, autres=autres)
     return Lecture(modele, logement, details, examen, echelle, R, col, carte, infos)
 
@@ -279,7 +279,8 @@ def _aiguiller(e5: Lecture, e7: Lecture) -> tuple[Lecture, str]:
         return e5, "l'essai 7b n'a rien lu"
     if e5.logement is None:
         return e7, "l'essai 5 n'a rien lu"
-    nom, _ = choisir(e5.logement, e7.logement)
-    libres = longueur_libre(e7.logement)
+    ecartes = (e7.details or {}).get("libres_ecartes_m", 0.0)
+    nom, _ = choisir(e5.logement, e7.logement, en_plus=ecartes)
+    libres = longueur_libre(e7.logement) + ecartes
     signe = "≥" if nom == "e7" else "<"
     return (e7 if nom == "e7" else e5), f"{libres:.1f} m de murs en biais/arrondis lus par l'essai 7b ({signe} {SEUIL_LIBRES_M} m)"

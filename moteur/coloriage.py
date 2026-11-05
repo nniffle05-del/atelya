@@ -33,7 +33,7 @@ import numpy as np
 from moteur.logement import Logement
 from moteur.redressement import Redressement
 
-VERSION_COLORIAGE = "0.4.4"
+VERSION_COLORIAGE = "0.4.5"
 
 FOND, MUR, PORTE, FENETRE, PORTE_FENETRE = 0, 1, 2, 3, 4
 OUVERTURES = {PORTE: "porte", FENETRE: "fenetre", PORTE_FENETRE: "porte_fenetre"}
@@ -83,6 +83,14 @@ RAYON_MIN_ANGLE = 0.5  # m (axe) : un « arrondi » plus serré est un coin de m
 ECART_COURBE_MIN = 0.03  # m : un mur dont le milieu s'écarte plus de la corde (en plus de son épaisseur) est courbe
 RAPPORT_ARC = 0.85  # arrondi si la ligne du milieu colle au cercle bien mieux qu'à une droite
 COURT_MAX = 0.6  # m : un bout de mur droit plus court peut être un morceau d'« escalier » d'un pan coupé
+# Plafonds d'épaisseur (m, None = pas de plafond). Un « mur » plus épais est une tache coloriée mur à tort (sol hachuré,
+# dessin à la main, meuble) : sur les vrais plans, aucun mur ne dépasse 47 cm, mais le traducteur en lisait de 1 à 4 m.
+EPAISSEUR_MAX_LIBRE: float | None = 0.70  # murs en biais / arrondis (fr-008, fr-010, fr-018 : arcs de 0,7 à 4 m d'« épaisseur »)
+EPAISSEUR_MAX_MUR: float | None = 0.70  # murs droits (même borne que les doutes ; les vieux murs de pierre font 50-60 cm)
+# A/B (0.4.5) : plafond des libres 0,5 / 0,6 / 0,7 / 0,8 / 1,0 m sur le banc biais (351 niveaux) → murs en trop 844 → 606 / 628 /
+# 681 / 712 / 785, murs trouvés 96,45 → 95,94 / 96,30 / 96,40 / 96,43 / 96,45 : 0,7 m enlève 19 % des murs en trop pour 0,05 pt
+# de murs trouvés (quelques vrais arcs ont une épaisseur mesurée gonflée par les raccords). Images à plat : 1 034 → 947 en trop
+# (0,5 m), rien d'autre ne bouge ; le plafond des droits ne change rien sur les fabriqués (aucun mur fabriqué > 40 cm).
 LARGEUR_MIN_OUVERTURE = 0.25
 ECART_FUSION_OUVERTURE = 0.10  # deux morceaux d'une même fenêtre séparés de moins : une seule
 FUSION_TYPES_DIFFERENTS = True  # deux ouvertures de types différents collées = une seule (voir _fusionner_ouvertures_voisines)
@@ -354,7 +362,15 @@ def trouver_murs(bati: np.ndarray, dehors: np.ndarray, px_par_m: float) -> list[
         s.a, s.b = a, b
     # Après ajustement, un « mur » plus court que LONGUEUR_MIN_MUR ou plus fin que 3 cm
     # est un reste de coloriage (bavure dans un angle, trait de meuble), pas un mur.
-    return [s for s in segs if s.b - s.a >= long_min and s.epaisseur >= EPAISSEUR_MIN * px_par_m]
+    segs = [s for s in segs if s.b - s.a >= long_min and s.epaisseur >= EPAISSEUR_MIN * px_par_m]
+    if EPAISSEUR_MAX_MUR is not None:
+        segs = [s for s in segs if s.epaisseur <= EPAISSEUR_MAX_MUR * px_par_m]
+    return segs
+
+
+def _trop_epais(ep_px: float, px_par_m: float) -> bool:
+    """Un mur libre plus épais que le plafond n'est pas un mur (tache coloriée mur par erreur)."""
+    return EPAISSEUR_MAX_LIBRE is not None and ep_px > EPAISSEUR_MAX_LIBRE * px_par_m
 
 
 def _cotes_dehors(s: Segment, dehors: np.ndarray, bati: np.ndarray) -> np.ndarray:
@@ -622,12 +638,16 @@ def _bord_exterieur_courbe(bati: np.ndarray, dehors: np.ndarray, gh: Segment, gv
 
 
 def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float,
-                        dehors: np.ndarray | None = None) -> list[MurLibre]:
+                        dehors: np.ndarray | None = None, ecartes_px: list[float] | None = None) -> list[MurLibre]:
     """A3 : les murs en biais et arrondis, dans le bâti que les murs droits trouvés n'expliquent pas.
 
     Chaque morceau restant assez long et penché devient un mur en biais (une droite) ou, s'il est courbe,
     un arc de cercle découpé en segments de 7,5°. Ses bouts rejoignent l'axe des murs droits voisins.
-    Sur un plan sans mur penché, il ne reste que des miettes : rien n'est ajouté et rien ne change."""
+    Sur un plan sans mur penché, il ne reste que des miettes : rien n'est ajouté et rien ne change.
+    `ecartes_px` : si donné, reçoit la longueur (px) de chaque mur libre refusé pour excès d'épaisseur (0.4.5) :
+    l'aiguillage e5 / e7b compte ces mètres comme avant, pour décider comme avant."""
+    if ecartes_px is None:
+        ecartes_px = []
     couvert = np.zeros(bati.shape, np.uint8)
     # Un pan coupé peu penché est « vu » par le suivi des murs droits comme un escalier de petits bouts
     # de murs : ces bouts courts ne couvrent rien ici ; s'ils tombent dans un mur libre, ils sont retirés.
@@ -673,6 +693,9 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float,
             if (e_arc < RAPPORT_ARC * e_ligne and e_ligne > 0.6 or courbe_dehors) and longueur >= 0.25 * px_par_m:
                 rr = np.hypot(xs - cx, ys - cy)
                 ep = float(np.percentile(rr, 98) - np.percentile(rr, 2)) + 1.0
+                if _trop_epais(ep, px_par_m):
+                    ecartes_px.append(r * math.pi / 2)
+                    continue
                 nb = max(2, round(90 / PAS_ARC_DEG))
                 pts = []
                 for k in range(nb + 1):  # du point de contact sur le mur H à celui sur le mur V
@@ -691,6 +714,9 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float,
         mil = (t >= tq1) & (t <= tq3)  # le milieu du mur : sans les raccords avec les murs voisins
         ep = float(np.percentile(dperp[mil], 98) - np.percentile(dperp[mil], 2)) + 1.0 if mil.sum() > 10 else aire / longueur
         if ep < EPAISSEUR_MIN * px_par_m or longueur < 2.5 * ep:
+            continue
+        if _trop_epais(ep, px_par_m):
+            ecartes_px.append(longueur)
             continue
         angle = abs(math.degrees(math.atan2(vy, vx))) % 90
         courbe = float(np.percentile(np.abs(dperp - np.median(dperp[mil])), 97)) > 0.5 * ep + ECART_COURBE_MIN * px_par_m + 1
@@ -740,6 +766,9 @@ def trouver_murs_libres(bati: np.ndarray, segs: list[Segment], px_par_m: float,
         milieu = math.atan2(float(np.mean(np.sin(ang))), float(np.mean(np.cos(ang))))
         rel = (ang - milieu + math.pi) % (2 * math.pi) - math.pi
         t0, t1 = float(np.percentile(rel, 0.5)), float(np.percentile(rel, 99.5))
+        if _trop_epais(ep, px_par_m):
+            ecartes_px.append(r * (t1 - t0))
+            continue
         nb = max(2, round(math.degrees(t1 - t0) / PAS_ARC_DEG))
         pts = [(cx + r * math.cos(milieu + t0 + (t1 - t0) * k / nb), cy + r * math.sin(milieu + t0 + (t1 - t0) * k / nb))
                for k in range(nb + 1)]
@@ -1078,7 +1107,8 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
     segs = trouver_murs(bati, dehors, px_par_m)
     if not segs:
         raise ValueError("aucun mur droit trouvé dans le coloriage")
-    libres = trouver_murs_libres(bati, segs, px_par_m, dehors)
+    ecartes_px: list[float] = []
+    libres = trouver_murs_libres(bati, segs, px_par_m, dehors, ecartes_px)
     ouvertures = trouver_ouvertures(col, bati, segs, px_par_m)
     pieces = trouver_pieces(col, bati, dehors_pour_les_pieces(bati, dehors, col, px_par_m), px_par_m, points)
 
@@ -1172,5 +1202,6 @@ def lire_coloriage(coloriage: np.ndarray, px_par_m: float, *, projet_id: str = "
     details = {"version": VERSION_COLORIAGE, "angle_deg": round(angle, 3), "px_par_m": px_par_m,
                "redresse": redressement is not None, "origine_px": [ox, oy],
                "types_pieces": types_pieces, "pieces_nom_lu": noms_lus,
-               "murs_libres": [{"forme": g.forme, "segments": len(g.points) - 1} for g in libres]}
+               "murs_libres": [{"forme": g.forme, "segments": len(g.points) - 1} for g in libres],
+               "libres_ecartes_m": round(sum(ecartes_px) / s, 2)}  # murs libres refusés pour excès d'épaisseur
     return logement, details
