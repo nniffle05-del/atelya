@@ -200,8 +200,10 @@ sur 4/15 vrais plans (cotes en cm, surfaces en légende, PDF), traducteur 0.4.3.
 `..\atelya\vrais-plans\travail-2026-11-04` (fr-018 photo, fr-019 PDF anonymisé). Détail :
 `docs/projet/memoire/atelya-verification-reelle.md`. Note ~68/100 client, ~93 fabriqués, ~53 vrais plans. Pas encore posée sur
 le Mac (accord NT). **En cours (05/11, branche `correctif-dehors`)** : traducteur 0.4.4, le « dehors » ne se propage que par le
-fond (fr-004 : chambre de 12 m² avalée par l'extérieur à cause d'un ruban de fond à la place d'une cloison) ; bancs de
-non-recul en cours.
+fond (fr-004 : chambre de 12 m² avalée par l'extérieur à cause d'un ruban de fond à la place d'une cloison) ; bancs sans recul (05/11 12h35), à fusionner. **Première vraie note sur les 15 vrais plans** (vérités
+faites par Claude, `outils/verite/`, `verites/`) : à l'échelle vraie murs trouvés 66 %, placés 62 %, ouvertures 40 %, pièces 54 %,
+bon type 69 % ; à l'échelle lue par Atelya : murs 33 %, pièces 17 % (échelle lue 4/15, secours par les portes faux de 26-72 %).
+Verrou n° 1 = l'échelle ; puis ~58 murs en trop par plan ; puis les ouvertures.
 
 **Prochaine étape** : à choisir par NT. Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
