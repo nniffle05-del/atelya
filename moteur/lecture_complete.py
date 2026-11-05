@@ -9,8 +9,9 @@ Ce module ne dépend pas de PyTorch (le Mac n'en a pas) : colorier est fourni de
 outils/atelya/lire_plan.py qui les construit à partir des modèles entraînés.
 
 Différences voulues avec le banc :
-- échelle non lue : le banc note avec l'échelle exacte, inconnue ici. On prend l'échelle approchée par les portes,
-  sinon une échelle de secours (logement de PLAN_SECOURS_M mètres). Le logement n'est alors qu'un brouillon à
+- échelle non lue : le banc note avec l'échelle exacte, inconnue ici. On prend la moins mauvaise échelle de secours
+  (voir _echelle_de_secours : surfaces écrites, cotes non confirmées, portes si elles ont l'air de vraies portes,
+  épaisseur des murs, sinon un logement de PLAN_SECOURS_M mètres). Le logement n'est alors qu'un brouillon à
   recaler à l'écran : `echelle["etat"]` vaut « a_verifier » et un doute fort l'annonce ;
 - noms de pièces lus par défaut (le banc ne les lit que sur demande) ;
 - photo de téléphone : on la remet à l'endroit (orientation EXIF), comme le navigateur l'affichera à l'écran.
@@ -27,13 +28,14 @@ from PIL import Image, ImageOps
 from moteur.aiguillage import SEUIL_LIBRES_M, choisir, longueur_libre
 from moteur.coloriage import lire_coloriage
 from moteur.doutes import examiner
-from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan, sans_taches_au_bord
+from moteur.echelle_plan import (LOGEMENT_MAX, LOGEMENT_MIN, EchelleLue, coloriage_douteux, decider, lire_echelle_plan,
+                                 sans_taches_au_bord)
 from moteur.lecture_cotes import TexteLu
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere,
                                  rapport_par_optique, rapport_plausible)
 
-VERSION_LECTURE_COMPLETE = "0.1.0"
+VERSION_LECTURE_COMPLETE = "0.2.0"
 COTE_ATELYA = 768  # grand côté de l'image donnée à Atelya (comme à l'entraînement)
 PLAN_SECOURS_M = 15.0  # échelle de secours, quand rien ne la donne : un logement d'environ 15 m (même repli que l'échelle)
 FORMATS_IMAGE = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
@@ -141,9 +143,36 @@ def noms_du_plan(source: PlanSource) -> list:
     return noms_depuis_textes(lire_textes(source.image))
 
 
-def _echelle_de_secours(approchee: float | None, forme: tuple[int, int]) -> tuple[float, str]:
-    if approchee:
-        return float(approchee), "approchée par les portes"
+def _taille_vraisemblable(px_par_m: float | None, interieur_px: tuple[float, float] | None) -> bool:
+    """Avec cette échelle, le logement colorié mesure-t-il entre LOGEMENT_MIN et LOGEMENT_MAX mètres de côté ?"""
+    if not px_par_m:
+        return False
+    for cote in interieur_px or ():
+        if cote and not LOGEMENT_MIN <= cote / px_par_m <= LOGEMENT_MAX:
+            return False
+    return True
+
+
+def _echelle_de_secours(e: EchelleLue, forme: tuple[int, int]) -> tuple[float, str]:
+    """L'échelle du BROUILLON quand aucune n'a pu être retenue : la moins mauvaise information disponible, dans l'ordre.
+
+    Jamais utilisée pour construire ; elle sert à montrer un plan presque à la bonne taille à la personne qui vérifie,
+    dont le premier point est justement de confirmer une mesure. Mesuré sur 11 vrais plans à l'échelle connue : surfaces
+    écrites même peu sûres ±6 % (médiane), cotes non confirmées ±9 %, portes ±36 % (jusqu'à 72 % : fragments coloriés
+    « porte » sur les styles jamais vus), épaisseur des murs ±19 % (jamais pire que 50 %). Avant la version 0.11, seules
+    les portes servaient."""
+    il_ih = e.interieur_px
+    if _taille_vraisemblable(e.surfaces, il_ih):
+        return float(e.surfaces), "approchée par les surfaces écrites (non confirmées)"
+    cotes = [v for v in (e.largeur, e.hauteur) if v]
+    if cotes and _taille_vraisemblable(sum(cotes) / len(cotes), il_ih):
+        return float(sum(cotes) / len(cotes)), "approchée par les cotes (non confirmées)"
+    if e.portes_fiables and _taille_vraisemblable(e.approchee, il_ih):
+        return float(e.approchee), "approchée par les portes"
+    if _taille_vraisemblable(e.epaisseur, il_ih):
+        return float(e.epaisseur), "approchée par l'épaisseur des murs"
+    if e.approchee:
+        return float(e.approchee), "approchée par les portes (peu sûres)"
     return max(forme) / PLAN_SECOURS_M, "aucune mesure sur le plan (taille supposée)"
 
 
@@ -188,6 +217,7 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
               "cotes": [[c.valeur, round(c.px_par_m, 2), "V" if c.verticale else "H"] for c in e.cotes],
               "sure": e.sure, "contredite": e.contredite, "barre": e.barre_detail or None, "surfaces": e.surfaces_detail or None,
               "surfaces_px_par_m": e.surfaces, "ecrite": e.ecrite_detail or None, "portes_px_par_m": e.approchee,
+              "portes_fiables": e.portes_fiables, "epaisseur_px_par_m": e.epaisseur,
               "interieur_px": list(e.interieur_px) if e.interieur_px else None, "coloriage_douteux": douteux,
               "largeur_px_par_m": e.largeur, "hauteur_px_par_m": e.hauteur, "cote_max": [e.cote_max_largeur, e.cote_max_hauteur],
               "de_biais": R is not None, "optique": optique}
@@ -199,7 +229,7 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
             R = corriger_proportions(R, vx / vy)
         s = vx
     else:
-        s, comment = _echelle_de_secours(e.approchee, col.shape)
+        s, comment = _echelle_de_secours(e, col.shape)
         echelle = {"etat": "a_verifier", "source": origine, "provisoire": s, "raison": f"échelle non lue : {comment}",
                    "cotes": len(e.cotes), "detail": detail}
         autres.append({"code": "echelle", "element": None, "gravite": "fort",

@@ -1,0 +1,887 @@
+{
+ "plans": 15,
+ "echelle": {
+  "avec_verite": 11,
+  "lues": 3,
+  "lues_justes_3pct": 3,
+  "erreurs_silencieuses": 0
+ },
+ "a_echelle_lue": {
+  "murs_trouves_pct": 40.0,
+  "murs_places_pct": 36.4,
+  "murs_justes_pct": 0.8,
+  "ouv_trouvees_pct": 19.5,
+  "ouv_justes_pct": 5.6,
+  "pieces_trouvees_pct": 32.7,
+  "pieces_bon_type_pct": 45.7
+ },
+ "a_echelle_vraie": {
+  "murs_trouves_pct": 66.6,
+  "murs_places_pct": 63.3,
+  "murs_justes_pct": 2.8,
+  "ouv_trouvees_pct": 37.4,
+  "ouv_justes_pct": 9.8,
+  "pieces_trouvees_pct": 57.6,
+  "pieces_bon_type_pct": 66.2
+ },
+ "murs_en_trop": 828,
+ "parfaits": 0,
+ "decisions": {
+  "lu": 0,
+  "a_verifier": 15,
+  "refuse": 0
+ },
+ "plans_detail": [
+  {
+   "plan": "fr-003",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Murs en biais lus à ±5 px ; angles du WC et du dégagement approximatifs",
+    "Cuisine ouverte sur le salon : une seule pièce « Salon / Cuisine » (38,49 m² = salon seul sur la légende ? non : cuisine comprise dans la zone)",
+    "Fenêtres du mur sud (422-480 et 745-795) : rectangles en saillie, peut-être des radiateurs",
+    "Porte dressing ↔ salle d'eau : symbole de porte coulissante"
+   ],
+   "echelle_ecart_pct": 0.7,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    1.04,
+    -0.02
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 37.9,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 31.0,
+    "murs_en_trop": 39,
+    "ouv_trouvees_pct": 19.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 60.0,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 54.6,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 37.9,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 31.0,
+    "murs_en_trop": 39,
+    "ouv_trouvees_pct": 19.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 60.0,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 45.0,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 29,
+    "murs_lus": 54,
+    "ouv_vraies": 21,
+    "ouv_lues": 14,
+    "pieces_vraies": 10,
+    "pieces_lues": 9
+   }
+  },
+  {
+   "plan": "fr-004",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "lue",
+   "echelle_source": "surfaces",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Débarras : pas de classe propre, rangé en placard",
+    "Dégagement → séjour : passage dessiné en pointillés blancs (575-610, y 1055) ignoré, seule la porte à battant comptée",
+    "Traits blancs en pointillé sur les murs (500-525 et 640-655 à y 780) : pris comme du mur"
+   ],
+   "echelle_ecart_pct": 1.32,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    0.0,
+    0.12
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 77.3,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 63.6,
+    "murs_en_trop": 16,
+    "ouv_trouvees_pct": 20.0,
+    "ouv_justes_pct": 10.0,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 83.3,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 25.8,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 77.3,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 77.3,
+    "murs_en_trop": 16,
+    "ouv_trouvees_pct": 20.0,
+    "ouv_justes_pct": 10.0,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 83.3,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 16.6,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 22,
+    "murs_lus": 36,
+    "ouv_vraies": 10,
+    "ouv_lues": 6,
+    "pieces_vraies": 6,
+    "pieces_lues": 6
+   }
+  },
+  {
+   "plan": "fr-005",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": true,
+   "doutes_forts": 0,
+   "incertain": [
+    "Capture de téléphone, traits fins : murs lus à ±4 px ; échelle inconnue",
+    "Salon, coin nuit, dégagement, cuisine et entrée forment une seule zone ouverte (cloisons partielles du coin nuit gardées comme murs)",
+    "Triangle sous la salle de bain pris pour le placard (étiquette « Placard » écrite à côté)",
+    "Réduit entre salle de bain et coin nuit : ouvert vers le bas, c'est le haut du dégagement (zone ouverte)",
+    "Fenêtres du mur nord et des biais lues sur les traits fins (doubles lignes)"
+   ],
+   "recalage_m": [
+    0.95,
+    -4.3
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 11.1,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 11.1,
+    "murs_en_trop": 27,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 1,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 308.6,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 7.4,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 7.4,
+    "murs_en_trop": 28,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 1,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 854.8,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 27,
+    "murs_lus": 34,
+    "ouv_vraies": 14,
+    "ouv_lues": 15,
+    "pieces_vraies": 5,
+    "pieces_lues": 7
+   }
+  },
+  {
+   "plan": "fr-006",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "lue",
+   "echelle_source": "cotes",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Pièce sans nom entre la salle de bains et les toilettes : type posé en dégagement",
+    "Aucune porte d'entrée dessinée sur le plan",
+    "Fenêtre est 405-492 (cote 1,40) : prise pour une fenêtre, peut-être une porte-fenêtre",
+    "Deux portes entre pièces côté ouest (salon → chambre, chambre → chambre) lues sur les arcs"
+   ],
+   "echelle_ecart_pct": 0.05,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    -0.01,
+    -0.03
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 100.0,
+    "murs_justes_pct": 6.7,
+    "murs_places_pct": 100.0,
+    "murs_en_trop": 9,
+    "ouv_trouvees_pct": 90.5,
+    "ouv_justes_pct": 33.3,
+    "ouv_bon_type_pct": 68.4,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 100.0,
+    "pieces_bon_type_pct": 80.0,
+    "hors_tout_cm": 8.4,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 100.0,
+    "murs_justes_pct": 13.3,
+    "murs_places_pct": 100.0,
+    "murs_en_trop": 9,
+    "ouv_trouvees_pct": 90.5,
+    "ouv_justes_pct": 33.3,
+    "ouv_bon_type_pct": 68.4,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 100.0,
+    "pieces_bon_type_pct": 80.0,
+    "hors_tout_cm": 9.0,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 15,
+    "murs_lus": 25,
+    "ouv_vraies": 21,
+    "ouv_lues": 21,
+    "pieces_vraies": 10,
+    "pieces_lues": 14
+   }
+  },
+  {
+   "plan": "fr-007",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Plan scanné tourné (textes verticaux) ; surfaces lues avec doute (6,55 / 8,55 ?)",
+    "Cour/vide entre la chambre 3 et le séjour (aucun mur dessiné) : traité comme extérieur",
+    "Escalier bas fermé par un trait virtuel en haut (y 752) pour en faire une zone ; escalier haut laissé dans le séjour",
+    "Porte de la salle de bain (240-280, y 735) déduite, arc confondu avec celui de la porte dégagement 1 → 2",
+    "Fenêtres du mur est : changements d'épaisseur pris pour des fenêtres (dont une de 2,4 m)",
+    "Passage dégagement 2 → séjour (du pilier au coin du WC) : ouverture sans battant, fermée par un trait virtuel + porte",
+    "Zone Wc trop large : comprend le réduit entre l'escalier et le WC (x 495-565)"
+   ],
+   "echelle_ecart_pct": 9.68,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    0.02,
+    0.45
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 44.8,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 41.4,
+    "murs_en_trop": 39,
+    "ouv_trouvees_pct": 50.0,
+    "ouv_justes_pct": 20.0,
+    "ouv_bon_type_pct": 80.0,
+    "ouv_en_trop": 4,
+    "pieces_trouvees_pct": 44.4,
+    "pieces_bon_type_pct": 75.0,
+    "hors_tout_cm": 133.9,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 72.4,
+    "murs_justes_pct": 3.4,
+    "murs_places_pct": 65.5,
+    "murs_en_trop": 32,
+    "ouv_trouvees_pct": 40.0,
+    "ouv_justes_pct": 10.0,
+    "ouv_bon_type_pct": 75.0,
+    "ouv_en_trop": 4,
+    "pieces_trouvees_pct": 44.4,
+    "pieces_bon_type_pct": 75.0,
+    "hors_tout_cm": 8.3,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 29,
+    "murs_lus": 56,
+    "ouv_vraies": 10,
+    "ouv_lues": 14,
+    "pieces_vraies": 9,
+    "pieces_lues": 6
+   }
+  },
+  {
+   "plan": "fr-008",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Photo de biais : l'échelle varie de ~103 (haut) à ~118 px/m (bas) ; vérité en pixels bruts avec 109 px/m",
+    "Murs épais (~22 px) : axes lus à ±5 px",
+    "Porte d'entrée supposée sur le mur est de l'entrée (arc double)",
+    "Fenêtres = rectangles blancs dans les murs noirs (chambre ouest et sud, séjour sud, SAM sud et est)",
+    "Niche extérieure à gauche de l'entrée (A : 0,95 / L : 1,44) traitée comme extérieur"
+   ],
+   "echelle_ecart_pct": -14.95,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    -2.25,
+    1.21
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 21.7,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 21.7,
+    "murs_en_trop": 142,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 14.3,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 190.8,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 87.0,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 82.6,
+    "murs_en_trop": 126,
+    "ouv_trouvees_pct": 21.4,
+    "ouv_justes_pct": 7.1,
+    "ouv_bon_type_pct": 66.7,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 57.1,
+    "pieces_bon_type_pct": 50.0,
+    "hors_tout_cm": 15.0,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 23,
+    "murs_lus": 148,
+    "ouv_vraies": 14,
+    "ouv_lues": 8,
+    "pieces_vraies": 7,
+    "pieces_lues": 4
+   }
+  },
+  {
+   "plan": "fr-009",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Séjour tronqué par le cadrage (coupé en haut) : fermé par un trait virtuel au bord de l'image, sa surface vraie (14,13 m²) n'est pas celle de la zone",
+    "Placards de l'entrée (petits retours de murs) ignorés ; porte d'entrée supposée au sud de l'entrée",
+    "Passage cuisine → salle d'eau sans battant : trait virtuel + porte",
+    "Couloir entre chambre, cuisine et entrée compté dans l'entrée (ouvert)"
+   ],
+   "echelle_ecart_pct": 10.72,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    0.35,
+    3.05
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 50.0,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 44.4,
+    "murs_en_trop": 27,
+    "ouv_trouvees_pct": 10.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 4,
+    "pieces_trouvees_pct": 80.0,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 76.6,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 83.3,
+    "murs_justes_pct": 11.1,
+    "murs_places_pct": 83.3,
+    "murs_en_trop": 23,
+    "ouv_trouvees_pct": 80.0,
+    "ouv_justes_pct": 30.0,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 4,
+    "pieces_trouvees_pct": 100.0,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 143.6,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 18,
+    "murs_lus": 40,
+    "ouv_vraies": 10,
+    "ouv_lues": 14,
+    "pieces_vraies": 5,
+    "pieces_lues": 6
+   }
+  },
+  {
+   "plan": "fr-010",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Plan d'architecte à la main, tourné : murs = doubles traits fins, épaisseurs estimées",
+    "Mur salon/entrée (x 418) : piliers et grandes ouvertures (baies entre pièces) lus comme des portes",
+    "Escalier rond approché par 7 segments ; WC en croissant entre l'escalier et la cuisine (mur courbe approché)",
+    "Porte du WC non trouvée ; porte d'entrée = battant « 101 » sur le mur x 700",
+    "Pas d'affinage sur l'encre (traits trop fins et lignes de cotes partout)",
+    "Passage entrée → S.A.M. (530-600, y 598) sans battant : trait virtuel + porte"
+   ],
+   "echelle_ecart_pct": -49.95,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    -5.25,
+    5.97
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 16.7,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 16.7,
+    "murs_en_trop": 157,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 26,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 1709.9,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 58.3,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 50.0,
+    "murs_en_trop": 146,
+    "ouv_trouvees_pct": 45.5,
+    "ouv_justes_pct": 18.2,
+    "ouv_bon_type_pct": 100.0,
+    "ouv_en_trop": 26,
+    "pieces_trouvees_pct": 55.6,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 59.7,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 24,
+    "murs_lus": 165,
+    "ouv_vraies": 11,
+    "ouv_lues": 37,
+    "pieces_vraies": 9,
+    "pieces_lues": 17
+   }
+  },
+  {
+   "plan": "fr-012",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Plan très irrégulier (murs en biais partout) : angles lus à ±8 px",
+    "Échelle déduite de la seule dimension écrite (cuisine 1,32 × 5,17 m) : ±5 %",
+    "Cuisine ouverte sur le salon (bande sous la fenêtre) : comptée dans le salon",
+    "Deux portes dans l'entrée (biais ouest et biais sud-est) : l'une est la porte palière, sans savoir laquelle",
+    "Cloison chambre 1 / chambre 2 approchée par une droite (x 845) alors qu'elle a un décrochement en biais vers 400-430"
+   ],
+   "echelle_ecart_pct": 16.0,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    6.0,
+    5.0
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 16.2,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 13.5,
+    "murs_en_trop": 53,
+    "ouv_trouvees_pct": 5.9,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 100.0,
+    "ouv_en_trop": 1,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 355.5,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 16.2,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 16.2,
+    "murs_en_trop": 54,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 1,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 155.5,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 37,
+    "murs_lus": 60,
+    "ouv_vraies": 17,
+    "ouv_lues": 18,
+    "pieces_vraies": 8,
+    "pieces_lues": 8
+   }
+  },
+  {
+   "plan": "fr-014",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": true,
+   "doutes_forts": 0,
+   "incertain": [
+    "Traits fins (~3 px) : épaisseur des cloisons posée à 4 px ; murs du séjour épais (10 px)",
+    "Cuisine → dégagement : ouverture sans battant (x 385, y 895-960), comptée comme porte",
+    "Échelle inconnue (portes ≈ 0,83 m)"
+   ],
+   "recalage_m": [
+    0.51,
+    -0.47
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 23.8,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 23.8,
+    "murs_en_trop": 35,
+    "ouv_trouvees_pct": 8.3,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 100.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 28.6,
+    "pieces_bon_type_pct": 50.0,
+    "hors_tout_cm": 269.4,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 85.7,
+    "murs_justes_pct": 9.5,
+    "murs_places_pct": 81.0,
+    "murs_en_trop": 18,
+    "ouv_trouvees_pct": 41.7,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 20.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 85.7,
+    "pieces_bon_type_pct": 66.7,
+    "hors_tout_cm": 14.6,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 21,
+    "murs_lus": 43,
+    "ouv_vraies": 12,
+    "ouv_lues": 12,
+    "pieces_vraies": 7,
+    "pieces_lues": 8
+   }
+  },
+  {
+   "plan": "fr-015",
+   "decision": "a_verifier",
+   "modele": "e7",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": true,
+   "doutes_forts": 0,
+   "incertain": [
+    "Traits fins (~4 px) ; échelle inconnue (portes ≈ 0,83 m)",
+    "Cuisine/séjour ouvert sur l'entrée : fermé par deux traits virtuels (y 795 de x 402 à 510, puis x 510 de 795 à 870) + une porte",
+    "Porte palière supposée en haut à gauche de l'entrée (battant à x 440, y 575)"
+   ],
+   "recalage_m": [
+    -4.46,
+    1.29
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 29.4,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 29.4,
+    "murs_en_trop": 45,
+    "ouv_trouvees_pct": 9.1,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 4,
+    "pieces_trouvees_pct": 16.7,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 1033.9,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 94.1,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 94.1,
+    "murs_en_trop": 31,
+    "ouv_trouvees_pct": 72.7,
+    "ouv_justes_pct": 18.2,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 4,
+    "pieces_trouvees_pct": 83.3,
+    "pieces_bon_type_pct": 100.0,
+    "hors_tout_cm": 10.9,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 17,
+    "murs_lus": 53,
+    "ouv_vraies": 11,
+    "ouv_lues": 15,
+    "pieces_vraies": 6,
+    "pieces_lues": 9
+   }
+  },
+  {
+   "plan": "fr-016",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": true,
+   "doutes_forts": 0,
+   "incertain": [
+    "Scan flou, murs ~6 px ; échelle inconnue (portes ≈ 0,83 m)",
+    "Porte palière = porte sur le mur sud (x 548-590)"
+   ],
+   "recalage_m": [
+    0.19,
+    -3.24
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 33.3,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 33.3,
+    "murs_en_trop": 47,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 21,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 312.8,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 100.0,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 100.0,
+    "murs_en_trop": 36,
+    "ouv_trouvees_pct": 28.6,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 50.0,
+    "ouv_en_trop": 21,
+    "pieces_trouvees_pct": 75.0,
+    "pieces_bon_type_pct": 66.7,
+    "hors_tout_cm": 10.1,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 12,
+    "murs_lus": 53,
+    "ouv_vraies": 7,
+    "ouv_lues": 28,
+    "pieces_vraies": 4,
+    "pieces_lues": 5
+   }
+  },
+  {
+   "plan": "fr-017",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Entrée ouverte sur le salon : trait virtuel (y 970, x 450-732) + grande ouverture comptée comme porte",
+    "Escalier (vers le rez-de-chaussée) fermé en haut par un trait virtuel",
+    "Angle nord-est en biais épais : tracé approché ; petit placard « Pl. » en colonne",
+    "Réduit entre l'escalier, le WC et la cuisine laissé dans la cuisine"
+   ],
+   "echelle_ecart_pct": -18.04,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    -0.66,
+    3.17
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 33.3,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 25.9,
+    "murs_en_trop": 64,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 7,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 270.7,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 66.7,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 66.7,
+    "murs_en_trop": 55,
+    "ouv_trouvees_pct": 22.2,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 7,
+    "pieces_trouvees_pct": 57.1,
+    "pieces_bon_type_pct": 75.0,
+    "hors_tout_cm": 6.5,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 27,
+    "murs_lus": 76,
+    "ouv_vraies": 9,
+    "ouv_lues": 16,
+    "pieces_vraies": 7,
+    "pieces_lues": 7
+   }
+  },
+  {
+   "plan": "fr-018",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "a_verifier",
+   "echelle_source": "à vérifier",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "Photo sombre, légèrement de biais ; pas d'affinage sur l'encre",
+    "Cuisine ouverte sur le séjour et dégagement ouvert sur le séjour : traits virtuels + portes",
+    "Porte palière supposée sur le mur nord du dégagement (flèche ▽ du plan)",
+    "Gaines (GTL, croix) tracées comme des boîtes de murs sans pièce ; placards PL comptés en placards",
+    "Porte-fenêtres (PF) sur les murs est et sud lues sur les étiquettes PF"
+   ],
+   "echelle_ecart_pct": -39.4,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    1.81,
+    -4.22
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 28.0,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 28.0,
+    "murs_en_trop": 115,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 868.1,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 36.0,
+    "murs_justes_pct": 0.0,
+    "murs_places_pct": 32.0,
+    "murs_en_trop": 109,
+    "ouv_trouvees_pct": 0.0,
+    "ouv_justes_pct": 0.0,
+    "ouv_bon_type_pct": 0.0,
+    "ouv_en_trop": 0,
+    "pieces_trouvees_pct": 0.0,
+    "pieces_bon_type_pct": 0.0,
+    "hors_tout_cm": 250.0,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 25,
+    "murs_lus": 120,
+    "ouv_vraies": 11,
+    "ouv_lues": 0,
+    "pieces_vraies": 9,
+    "pieces_lues": 7
+   }
+  },
+  {
+   "plan": "fr-019",
+   "decision": "a_verifier",
+   "modele": "e5",
+   "echelle_etat": "lue",
+   "echelle_source": "échelle écrite",
+   "echelle_inconnue": false,
+   "doutes_forts": 0,
+   "incertain": [
+    "PDF vectoriel rendu à 300 dpi : échelle exacte ; murs épais lus à ±10 px (4 cm)",
+    "Cloison chambre 02 / SàM : deux portes (en haut 0,89 et en bas 0,89), lues sur les arcs",
+    "Vitrage entre l'entrée et le salon (2,72 m) lu comme fenêtre ; porte palière supposée sur le mur sud de l'entrée (arc 2995-3180)",
+    "Couloir extérieur à droite et sous la cuisine (cotes 0,91/0,71/1,00) traité comme hors logement"
+   ],
+   "echelle_ecart_pct": 0.01,
+   "echelle_erreur_silencieuse": false,
+   "recalage_m": [
+    -0.04,
+    -0.03
+   ],
+   "echelle_lue": {
+    "murs_trouves_pct": 76.2,
+    "murs_justes_pct": 4.8,
+    "murs_places_pct": 61.9,
+    "murs_en_trop": 13,
+    "ouv_trouvees_pct": 80.0,
+    "ouv_justes_pct": 20.0,
+    "ouv_bon_type_pct": 87.5,
+    "ouv_en_trop": 3,
+    "pieces_trouvees_pct": 62.5,
+    "pieces_bon_type_pct": 80.0,
+    "hors_tout_cm": 49.1,
+    "parfait": false
+   },
+   "echelle_vraie": {
+    "murs_trouves_pct": 76.2,
+    "murs_justes_pct": 4.8,
+    "murs_places_pct": 61.9,
+    "murs_en_trop": 13,
+    "ouv_trouvees_pct": 80.0,
+    "ouv_justes_pct": 20.0,
+    "ouv_bon_type_pct": 87.5,
+    "ouv_en_trop": 3,
+    "pieces_trouvees_pct": 62.5,
+    "pieces_bon_type_pct": 80.0,
+    "hors_tout_cm": 49.2,
+    "parfait": false
+   },
+   "nb": {
+    "murs_vrais": 21,
+    "murs_lus": 32,
+    "ouv_vraies": 20,
+    "ouv_lues": 23,
+    "pieces_vraies": 8,
+    "pieces_lues": 11
+   }
+  }
+ ]
+}

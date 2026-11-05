@@ -63,12 +63,12 @@ import numpy as np
 
 from moteur.barre_echelle import lire_barre
 from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, dehors_pour_les_pieces, estimer_rotation, redresser
-from moteur.lecture_cotes import (COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle,
+from moteur.lecture_cotes import (CONTRADICTION, COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle,
                                   lire_textes, plan_en_cm, valeur_de_cote)
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import FORME_LEGENDE, SurfaceLue, echelle_par_surfaces, surfaces_dans_textes, surfaces_de_legende
 
-VERSION_ECHELLE = "0.10.0"
+VERSION_ECHELLE = "0.11.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -82,6 +82,15 @@ ACCORD_OPTIQUE = 0.08  # photo aux proportions de l'optique : échelles des cote
 ACCORD_SENS_UNIQUE = 0.01  # photo cotée dans un seul sens : la 2e mesure doit la confirmer à 1 % près
 MORCEAU, RECOUVREMENT = 1000, 200  # photo : lecture par morceaux de 1 000 pixels qui se recouvrent de 200
 LOGEMENT_MIN, LOGEMENT_MAX = 1.5, 40.0  # mètres : la largeur et la hauteur intérieures d'un logement vraisemblable
+# Portes « fiables » (version 0.11) : sur un vrai plan jamais vu, le modèle colorie en « porte » des bouts d'arcs et de
+# symboles, et la médiane de leurs largeurs se trompe de 26 à 72 % (11 vrais plans). Les vraies portes coloriées sont
+# régulières (largeurs à ±20 %), pleines (rectangle rempli à 60 % au moins), plus longues que les murs ne sont épais
+# (1,8 fois) et peu nombreuses (≤ 30). Sur 150 plans fabriqués : aucun n'est signalé ; sur les 11 vrais : tous le sont.
+PORTES_CV_MAX = 0.20  # écart-type des largeurs gardées / médiane
+PORTES_REMPLISSAGE_MIN = 0.60  # aire de la tache / (longueur × largeur de sa boîte)
+PORTES_SUR_EPAISSEUR_MIN = 1.8  # largeur médiane des portes / épaisseur médiane des murs
+PORTES_MAX = 30  # au-delà, ce ne sont pas des portes
+EPAISSEUR_MUR_COURANTE = 0.20  # m : l'épaisseur de mur courante ; en secours seulement (±20 % en médiane sur les vrais plans)
 
 
 @dataclass
@@ -117,6 +126,10 @@ class EchelleLue:
     # Pour le diagnostic : les cotes qui ont fait l'échelle, et si les autres la contredisent (version 0.10).
     retenues: list[CoteLue] = field(default_factory=list)
     contredite: bool = False
+    # Les portes coloriées ont-elles l'air de vraies portes (voir portes_fiables) ? Et l'échelle qu'on tirerait de
+    # l'épaisseur des murs (voir echelle_par_epaisseur), dernier secours d'un brouillon (version 0.11).
+    portes_fiables: bool = False
+    epaisseur: float | None = None
 
     @property
     def px_par_m(self) -> float | None:
@@ -333,6 +346,52 @@ def echelle_par_portes(col: np.ndarray) -> float | None:
     return round(float(np.median(largeurs)) / LARGEUR_PORTE, 3)
 
 
+def epaisseur_des_murs(col: np.ndarray) -> float | None:
+    """L'épaisseur médiane des murs coloriés, en pixels (deux fois la distance au bord sur la crête des murs)."""
+    murs = (col == MUR).astype(np.uint8)
+    if murs.sum() < 50:
+        return None
+    d = cv2.distanceTransform(murs, cv2.DIST_L2, 3)
+    cretes = d[(d >= cv2.dilate(d, np.ones((3, 3), np.uint8)) - 1e-3) & (d > 0.5)]
+    if len(cretes) < 20:
+        return None
+    return float(2 * np.median(cretes))
+
+
+def portes_fiables(col: np.ndarray) -> bool:
+    """Les taches coloriées « porte » ressemblent-elles à de vraies portes ? Voir PORTES_CV_MAX et suivants.
+
+    Faux quand le modèle a semé des fragments (vrais plans d'un style jamais vu) : l'échelle approchée par les portes
+    ne vaut alors rien, et il ne faut pas s'en servir même pour un brouillon."""
+    n, _, stats, _ = cv2.connectedComponentsWithStats((col == PORTE).astype(np.uint8), connectivity=4)
+    taches = [(max(stats[i, 2], stats[i, 3]), min(stats[i, 2], stats[i, 3]), stats[i, 4])
+              for i in range(1, n) if min(stats[i, 2], stats[i, 3]) >= 2]
+    if not PORTES_MIN <= len(taches) <= PORTES_MAX:
+        return False
+    longueurs = np.array([t[0] for t in taches], float)
+    gardees = longueurs >= 0.6 * np.percentile(longueurs, 75)
+    if gardees.sum() < PORTES_MIN:
+        return False
+    L = longueurs[gardees]
+    petites = np.array([t[1] for t in taches], float)[gardees]
+    aires = np.array([t[2] for t in taches], float)[gardees]
+    mediane = float(np.median(L))
+    if np.std(L) / mediane > PORTES_CV_MAX:
+        return False
+    if np.median(aires / (L * petites)) < PORTES_REMPLISSAGE_MIN:
+        return False
+    ep = epaisseur_des_murs(col)
+    return not ep or mediane / ep >= PORTES_SUR_EPAISSEUR_MIN
+
+
+def echelle_par_epaisseur(col: np.ndarray) -> float | None:
+    """Une échelle très approchée (px par m) : les murs coloriés font EPAISSEUR_MUR_COURANTE. Secours d'un brouillon quand
+    rien d'autre n'est lisible : ±20 % en médiane sur les vrais plans, jamais pire que 50 %, quand les portes se trompaient
+    de 36 % en médiane et jusqu'à 72 %. Jamais pour construire."""
+    ep = epaisseur_des_murs(col)
+    return round(ep / EPAISSEUR_MUR_COURANTE, 3) if ep else None
+
+
 def _barre_plausible(barre: float, il: float | None, ih: float | None, cote_max_largeur: float | None,
                      cote_max_hauteur: float | None) -> bool:
     """Le logement mesuré avec l'échelle de la barre (ou des surfaces) a-t-il une taille vraisemblable ?"""
@@ -351,6 +410,17 @@ def _mediane_accordee(valeurs: list[CoteLue]) -> float | None:
     m = float(np.median([c.px_par_m for c in valeurs]))
     gardees = [c for c in valeurs if abs(c.px_par_m - m) / m <= ECART_MAX] or valeurs
     return sum(c.longueur_px for c in gardees) / sum(c.valeur for c in gardees)  # les longues pèsent plus
+
+
+def _sens_contredit(valeurs: list[CoteLue]) -> bool:
+    """Dans un sens d'une photo : plus de cotes franchement loin (CONTRADICTION) de la médiane que de cotes d'accord
+    avec elle (même règle qu'Echelle.contredite, sens par sens)."""
+    if len(valeurs) < 2:
+        return False
+    m = float(np.median([c.px_par_m for c in valeurs]))
+    gardees = sum(abs(c.px_par_m - m) / m <= ECART_MAX for c in valeurs)
+    loin = sum(abs(c.px_par_m - m) / m > CONTRADICTION for c in valeurs)
+    return loin > gardees
 
 
 def _cadre_entier(G: np.ndarray, forme: tuple[int, int], taille: tuple[int, int], k: float,
@@ -527,15 +597,21 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
         echelle, nombres, textes = _lire(vu, photo=redressement is not None)
     barre = lire_barre(vu, textes)
     cotes = echelle.retenues + echelle.ecartees
+    contredite = echelle.contredite
     if redressement is not None:
-        # Sur une photo, largeur et hauteur peuvent différer : chaque sens a sa propre médiane.
-        largeur = _mediane_accordee([c for c in cotes if not c.verticale])
-        hauteur = _mediane_accordee([c for c in cotes if c.verticale])
+        # Sur une photo, largeur et hauteur peuvent différer : chaque sens a sa propre médiane, et sa propre
+        # contradiction (version 0.11 : les deux sens mélangés ne veulent rien dire quand leurs échelles diffèrent).
+        horizontales, verticales = [c for c in cotes if not c.verticale], [c for c in cotes if c.verticale]
+        largeur, hauteur = _mediane_accordee(horizontales), _mediane_accordee(verticales)
+        contredite = _sens_contredit(horizontales) or _sens_contredit(verticales)
     else:
         largeur = hauteur = echelle.px_par_m
-    if redressement is None and echelle.contredite:
-        # Sur un plan à plat, les cotes justes s'accordent presque toutes. Si la plupart sont écartées, l'accord des
-        # autres peut être un hasard (fr-006 : deux cotes mesurées sur le même mur, 12 % d'erreur sans alerte).
+    if contredite:
+        # Les cotes justes s'accordent presque toutes. Si la plupart sont écartées, l'accord des autres peut être un
+        # hasard (fr-006 : deux cotes mesurées sur le même mur, 12 % d'erreur sans alerte). Version 0.11 : sur une photo
+        # aussi (fr-010, dessin à la main photographié : deux cotes d'accord à 58,5 px/m, quatre autres à 61-64 et les
+        # grandes cotes à 64,5 ; l'échelle « sûre » se trompait de 12 % sans alerte) ; un dessin dont un sens est
+        # contredit n'est pas fiable dans l'autre non plus.
         largeur = hauteur = None
     largeur = largeur * facteur if largeur else None
     hauteur = hauteur * facteur if hauteur else None
@@ -548,7 +624,8 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
                       surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage),
-                      ecrite, ecrite_detail, retenues=echelle.retenues, contredite=echelle.contredite)
+                      ecrite, ecrite_detail, retenues=echelle.retenues, contredite=contredite,
+                      portes_fiables=portes_fiables(col), epaisseur=echelle_par_epaisseur(col))
 
 
 def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):

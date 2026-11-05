@@ -109,3 +109,24 @@ def test_pdf_vectoriel_donne_ses_textes_et_reste_a_plat(tmp_path):
     assert s.nature == "vectorielle" and s.a_plat and s.px_par_pt > 4 and s.page == 1
     assert {"Séjour", "22,08 m²"} <= {t.texte for t in s.textes}
     assert s.image.ndim == 3 and s.image.shape[2] == 3
+
+
+def test_echelle_de_secours_prend_la_moins_mauvaise_information():
+    """Le brouillon d'un plan sans échelle retenue : surfaces écrites, puis cotes non confirmées, puis portes si elles ont
+    l'air de vraies portes, puis épaisseur des murs, puis portes douteuses, puis un logement supposé de 15 m."""
+    from moteur.echelle_plan import EchelleLue
+
+    forme, interieur = (600, 800), (600.0, 400.0)  # un logement de 6 × 4 m à 100 px par m
+
+    def e(**k):
+        return EchelleLue(k.pop("largeur", None), k.pop("hauteur", None), False, interieur_px=interieur, **k)
+
+    assert L._echelle_de_secours(e(surfaces=98.0, largeur=90.0, approchee=80.0), forme) == (98.0, "approchée par les surfaces écrites (non confirmées)")
+    assert L._echelle_de_secours(e(largeur=90.0, hauteur=94.0, approchee=80.0), forme)[0] == 92.0
+    assert L._echelle_de_secours(e(approchee=80.0, portes_fiables=True, epaisseur=120.0), forme) == (80.0, "approchée par les portes")
+    s, pourquoi = L._echelle_de_secours(e(approchee=30.0, portes_fiables=False, epaisseur=120.0), forme)
+    assert s == 120.0 and "épaisseur" in pourquoi
+    assert L._echelle_de_secours(e(approchee=30.0), forme) == (30.0, "approchée par les portes (peu sûres)")
+    assert L._echelle_de_secours(e(), forme) == (800 / L.PLAN_SECOURS_M, "aucune mesure sur le plan (taille supposée)")
+    # Une information qui donne un logement absurde (600 px → 60 m) est sautée.
+    assert L._echelle_de_secours(e(surfaces=10.0, approchee=80.0, portes_fiables=True), forme)[1] == "approchée par les portes"

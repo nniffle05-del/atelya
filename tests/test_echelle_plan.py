@@ -145,3 +145,62 @@ def test_photocopie_pale_relue_aux_gris_etires():
     dessin = np.clip(pale, 0, 255).astype(np.uint8)
     e = lire_echelle_plan(dessin, coloriage_t2())
     assert e.sure and e.px_par_m == pytest.approx(S, rel=0.01)
+
+
+def test_portes_fiables_ou_fragments():
+    """Quatre vraies portes régulières dans un mur : fiables. Vingt bouts d'arcs et de symboles coloriés « porte »
+    (styles jamais vus, vrais plans) : pas fiables, l'échelle approchée par les portes ne vaut rien."""
+    from moteur.coloriage import MUR, PORTE
+    from moteur.echelle_plan import echelle_par_portes, portes_fiables
+
+    col = np.zeros((400, 600), np.uint8)
+    col[50:60, 50:550] = MUR
+    col[200:210, 50:550] = MUR
+    for x, larg in ((80, 83), (220, 83), (360, 73), (480, 83)):
+        col[50:60, x:x + larg] = PORTE
+    assert portes_fiables(col)
+    fragments = np.zeros((400, 600), np.uint8)
+    fragments[50:60, 50:550] = MUR
+    fragments[200:210, 50:550] = MUR
+    rng = np.random.default_rng(1)
+    for _ in range(20):  # des petits bouts irréguliers, de 5 à 25 px, semés hors des murs
+        x, y, larg = int(rng.integers(20, 560)), int(rng.integers(230, 380)), int(rng.integers(5, 25))
+        fragments[y:y + 3, x:x + larg] = PORTE
+        fragments[y + 3, x:x + larg // 3] = PORTE
+    assert echelle_par_portes(fragments) is not None  # la médiane se calcule quand même…
+    assert not portes_fiables(fragments)  # … mais on sait qu'elle ne vaut rien
+
+
+def test_echelle_par_l_epaisseur_des_murs():
+    """Des murs de 20 px d'épaisseur à 100 px par m : 20 cm, l'épaisseur courante → 100 px par m."""
+    from moteur.coloriage import MUR
+    from moteur.echelle_plan import echelle_par_epaisseur
+
+    col = np.zeros((400, 600), np.uint8)
+    col[50:70, 50:550] = MUR
+    col[50:350, 50:70] = MUR
+    col[330:350, 50:550] = MUR
+    assert echelle_par_epaisseur(col) == pytest.approx(100, rel=0.06)
+    assert echelle_par_epaisseur(np.zeros((400, 600), np.uint8)) is None
+
+
+def test_photo_aux_cotes_contradictoires_ne_donne_pas_d_echelle():
+    """Dessin à la main photographié (fr-010) : deux cotes justes d'accord entre elles, mais trois autres toutes
+    différentes et loin. Avant, sur une photo, les deux cotes d'accord suffisaient (« sûre », 12 % d'erreur sans
+    alerte) ; à présent la contradiction vaut aussi sur une photo : pas d'échelle, le plan part à la vérification."""
+    from moteur.echelle_plan import lire_echelle_plan
+
+    g = dessin_t2()
+    _cote(g, (300, 1120), (700, 1120), "1,00")  # 400 px pour 1,00 m : faux (le vrai : 200 px par m)
+    _cote(g, (800, 1120), (1200, 1120), "1,50")  # faux aussi, et autrement
+    _cote(g, (1500, 300), (1500, 700), "2,50")  # faux encore
+    W = cv2.getPerspectiveTransform(COINS, VUS).astype(np.float64)
+    col = cv2.warpPerspective(coloriage_t2(), W, (820, 660), flags=cv2.INTER_NEAREST)
+    D = np.diag([K, K, 1.0])
+    dessin = cv2.warpPerspective(g, D @ W @ np.linalg.inv(D), (820 * K, 660 * K), flags=cv2.INTER_LINEAR, borderValue=255)
+    r = estimer_redressement(col)
+    assert r is not None and r.de_biais
+    e = lire_echelle_plan(dessin, col, r)
+    assert len(e.cotes) >= 4 and e.contredite
+    assert e.largeur is None and e.hauteur is None
+    # Les mêmes deux vraies cotes seules (test_photo_de_biais_largeur_et_hauteur) donnent bien l'échelle : rien de perdu.
