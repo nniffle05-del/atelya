@@ -204,11 +204,11 @@ le Mac (accord NT). **Correctif « dehors » (05/11, FUSIONNÉ dans `main` en lo
 faites par Claude, `outils/verite/`, `verites/`) : à l'échelle vraie murs trouvés 66 %, placés 62 %, ouvertures 40 %, pièces 54 %,
 bon type 69 % ; à l'échelle lue par Atelya : murs 33 %, pièces 17 % (échelle lue 4/15, secours par les portes faux de 26-72 %).
 Verrou n° 1 = l'échelle ; puis ~58 murs en trop par plan ; puis les ouvertures.
-**En cours (05/11 après-midi, branche `chantier-echelle-vrais-plans`, NT « fait tout tout seul »)** : echelle_plan 0.11.0 + lecture_complete 0.2.0 :
+**Chantier « échelle des vrais plans » (05/11 après-midi, NT « fait tout tout seul », FUSIONNÉ dans `main` en local 7e36adc ; NT doit pousser)** : echelle_plan 0.11.0 + lecture_complete 0.2.0 :
 échelle de secours du brouillon dans l'ordre surfaces écrites → cotes non confirmées → portes si « fiables » (`portes_fiables` : régulières,
 pleines, ≥ 1,8 × épaisseur des murs ; 0/150 fabriqués signalés, 11/11 vrais plans) → épaisseur des murs (20 cm) → 15 m ; contradiction des
 cotes aussi sur photo (fr-010 : plus d'échelle « sûre » fausse de 12 %). 15 vrais plans : 0 erreur silencieuse (1 avant), brouillons de −72…−26 %
-à ±18 %, à l'échelle lue murs 33 → 40 %, pièces 17 → 33 %. 406 tests. **Bancs de non-recul en cours** (`banc-echelle2.ps1`). Détail :
+à ±18 %, à l'échelle lue murs 33 → 40 %, pièces 17 → 33 %. 406 tests. **4 bancs de non-recul SANS AUCUN RECUL** (`banc-echelle2.ps1`, 05/11 17h13 : images et PDF et biais strictement identiques, photos 2 échelles bougées < 0,2 %). Détail :
 `docs/projet/memoire/atelya-echelle-vrais-plans.md`.
 
 **Prochaine étape** : à choisir par NT. Restes d'A2 :
