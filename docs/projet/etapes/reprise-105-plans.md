@@ -41,3 +41,6 @@ Après chaque paquet, copier la saisie, `verite.json` et `logement.json` dans `v
 - `sources.txt` note l'accord de l'ami promoteur tel que NT l'a décrit, sans document : NT prévenu qu'il faudra un accord écrit pour vendre.
 - Les plans fr-018 et fr-019 ont servi de plans de travail : juges un peu moins purs.
 - Comptes de l'inventaire à revoir à la fin : 6 photos de papier selon le comptage, « 7 » écrit dans l'en-tête de l'inventaire.
+- fr-030 : sa saisie doit passer à `"echelle": {"inconnue": true, "px_par_m": 42.2}` (échelle posée sur la seule vraie porte, à exclure de la note d'échelle). fr-027 : échelle posée sur des portes dessinées trop petites, sans doute 2 fois trop grande ; le masque reste bon pour l'entraînement.
+- fr-025 : le lecteur actuel ne lit qu'un niveau sur 3 (il garde le plus gros morceau). 11 plans du lot ont plusieurs niveaux sur la même image : à regarder dans la note « avant ».
+- Pièges du script : dans un texte JS, une barre oblique inversée seule casse les chemins (`\f`, `\v`) : écrire `/` ; une conversation garde le CLAUDE.md lu à son ouverture.
