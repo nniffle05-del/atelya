@@ -1,0 +1,209 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-023.jpg",
+ "largeur": 1206,
+ "hauteur": 806,
+ "px_par_m": 84.337,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune cote, surface ni barre sur le plan : échelle posée sur la largeur médiane des portes (0,83 m)",
+ "origine_px": [
+  55.0,
+  713.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "chambre_2": "chambre",
+  "cuisine_1": "cuisine",
+  "sejour_1": "sejour",
+  "degagement_1": "degagement",
+  "entree_1": "entree",
+  "wc_1": "wc",
+  "salle_d_eau_1": "salle_d_eau"
+ },
+ "murs_px": [
+  [
+   87.5,
+   37.0,
+   1158.0,
+   37.0,
+   4.0
+  ],
+  [
+   87.0,
+   359.0,
+   87.0,
+   37.5,
+   4.0
+  ],
+  [
+   52.0,
+   608.4,
+   87.0,
+   358.9,
+   4.0
+  ],
+  [
+   52.5,
+   609.0,
+   408.5,
+   609.0,
+   4.0
+  ],
+  [
+   409.0,
+   536.0,
+   409.0,
+   37.5,
+   4.0
+  ],
+  [
+   408.5,
+   608.5,
+   408.5,
+   536.0,
+   2.0
+  ],
+  [
+   409.0,
+   716.0,
+   409.0,
+   608.5,
+   4.0
+  ],
+  [
+   408.5,
+   145.0,
+   480.0,
+   145.0,
+   4.0
+  ],
+  [
+   480.0,
+   288.0,
+   480.0,
+   144.5,
+   5.0
+  ],
+  [
+   515.0,
+   288.0,
+   515.0,
+   217.0,
+   4.0
+  ],
+  [
+   408.5,
+   287.5,
+   587.0,
+   287.5,
+   3.0
+  ],
+  [
+   587.0,
+   359.0,
+   587.0,
+   37.5,
+   5.0
+  ],
+  [
+   87.5,
+   359.5,
+   408.5,
+   359.5,
+   4.0
+  ],
+  [
+   408.5,
+   359.0,
+   587.0,
+   359.0,
+   2.0
+  ],
+  [
+   587.0,
+   359.5,
+   837.0,
+   359.5,
+   4.0
+  ],
+  [
+   836.5,
+   716.0,
+   836.5,
+   37.5,
+   4.0
+  ],
+  [
+   909.0,
+   537.5,
+   909.0,
+   144.5,
+   4.0
+  ],
+  [
+   908.5,
+   145.0,
+   1158.0,
+   145.0,
+   4.0
+  ],
+  [
+   908.5,
+   537.0,
+   1158.0,
+   537.0,
+   4.0
+  ],
+  [
+   1158.0,
+   144.5,
+   1158.0,
+   37.5,
+   5.0
+  ],
+  [
+   1158.0,
+   716.0,
+   1158.0,
+   537.5,
+   5.0
+  ],
+  [
+   408.5,
+   716.0,
+   1158.0,
+   716.0,
+   5.0
+  ],
+  [
+   408.5,
+   608.5,
+   481.0,
+   608.5,
+   2.0
+  ],
+  [
+   481.0,
+   609.0,
+   515.5,
+   609.0,
+   4.0
+  ],
+  [
+   515.0,
+   716.0,
+   515.0,
+   608.5,
+   4.0
+  ]
+ ],
+ "incertain": [
+  "Pas de cote, de surface ni de barre d'échelle : échelle posée sur la largeur médiane des portes (0,83 m), à ne pas noter en échelle.",
+  "Pièces non nommées sur le plan, types déduits : WC (petite pièce 72×143 px avec porte, x 408-480 / y 144-288), Salle d'eau (pièce en L avec fenêtre en haut, x 408-587 / y 38-288, porte 515-587 à y 287), Dégagement (hall entre les deux portes de chambres, x 408-587 / y 288-359), Entrée (x 408-515 / y 608-716, porte d'entrée en bas à y 716).",
+  "Trois passages ouverts fermés par un trait virtuel de 2 px + une « porte » de toute la largeur : hall → séjour (y 359, x 408-587, 176 px), cuisine → séjour (x 408, y 536-608), entrée → séjour (y 608, x 408-481).",
+  "Zone en C à droite (x 837-1158, autour du creux x 908-1158 / y 144-537 ouvert sur le bord droit) : extérieur probable (balcon/loggia : trois fenêtres du séjour et de la chambre 2 donnent dessus) ; ses traits sont tracés comme des murs, aucune pièce.",
+  "Mur gauche de la cuisine en biais (de (87,359) à (52,608)) avec une fenêtre inclinée vers y 440-500 : position de la fenêtre approximative à ±4 px.",
+  "Tous les traits font 3 px : murs extérieurs et cloisons dessinés à la même épaisseur, aucune distinction possible."
+ ]
+}

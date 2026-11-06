@@ -1,0 +1,192 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-029.jpg",
+ "largeur": 998,
+ "hauteur": 1185,
+ "px_par_m": 89.838,
+ "echelle_inconnue": false,
+ "echelle_source": "surfaces écrites (aucune cote) : les 11 pièces, échelle = racine(somme px / somme m²)",
+ "origine_px": [
+  67.0,
+  1098.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "salle_d_eau_1": "salle_d_eau",
+  "chambre_2": "chambre",
+  "chambre_3": "chambre",
+  "degagement_1": "degagement",
+  "salle_d_eau_2": "salle_d_eau",
+  "placard_1": "placard",
+  "degagement_2": "degagement",
+  "wc_1": "wc",
+  "cuisine_1": "cuisine",
+  "sejour_1": "sejour"
+ },
+ "murs_px": [
+  [
+   51.5,
+   1110.0,
+   51.5,
+   29.0,
+   28.0
+  ],
+  [
+   52.0,
+   33.5,
+   930.0,
+   33.5,
+   28.0
+  ],
+  [
+   935.0,
+   557.0,
+   935.0,
+   29.0,
+   25.0
+  ],
+  [
+   893.0,
+   544.5,
+   930.0,
+   544.5,
+   22.0
+  ],
+  [
+   895.5,
+   1110.0,
+   895.5,
+   545.0,
+   26.0
+  ],
+  [
+   52.0,
+   1112.0,
+   893.0,
+   1112.0,
+   27.0
+  ],
+  [
+   411.0,
+   466.0,
+   411.0,
+   29.0,
+   11.0
+  ],
+  [
+   415.0,
+   229.0,
+   578.0,
+   229.0,
+   7.0
+  ],
+  [
+   576.0,
+   235.0,
+   576.0,
+   29.0,
+   11.0
+  ],
+  [
+   516.5,
+   646.0,
+   516.5,
+   229.0,
+   10.0
+  ],
+  [
+   520.0,
+   301.0,
+   930.0,
+   301.0,
+   11.0
+  ],
+  [
+   520.0,
+   538.0,
+   930.0,
+   538.0,
+   11.0
+  ],
+  [
+   52.0,
+   471.0,
+   415.0,
+   471.0,
+   11.0
+  ],
+  [
+   359.5,
+   646.0,
+   359.5,
+   466.0,
+   10.0
+  ],
+  [
+   52.0,
+   648.5,
+   641.0,
+   648.5,
+   12.0
+  ],
+  [
+   308.5,
+   856.0,
+   308.5,
+   646.0,
+   11.0
+  ],
+  [
+   52.0,
+   861.5,
+   307.0,
+   861.5,
+   14.0
+  ],
+  [
+   642.0,
+   646.0,
+   642.0,
+   536.0,
+   11.0
+  ],
+  [
+   781.5,
+   630.0,
+   781.5,
+   536.0,
+   10.0
+  ],
+  [
+   641.0,
+   634.0,
+   780.0,
+   634.0,
+   11.0
+  ],
+  [
+   780.0,
+   634.5,
+   900.0,
+   634.5,
+   12.0
+  ]
+ ],
+ "incertain": [
+  "Plan 3D « vue de dessus » d'agence, murs noirs épais aux bords flous (JPEG) : axes lus à ±3 px, épaisseurs à ±4 px.",
+  "Aucune cote : échelle par les 11 surfaces écrites (vérifier l'avis de chaque pièce).",
+  "Surfaces écrites peu cohérentes avec le dessin : à l'échelle commune (~89,7 px/m) la salle de bains 1 dessinée fait +20 %, les toilettes −16 %, la cuisine −10 %, le couloir +9 % ; les quatre grandes pièces (salon, chambres 1-3) sont à ±5 % : l'échelle est portée par elles, les murs ont été relus et sont bien ceux du dessin.",
+  "Fenêtres = cases blanches/bleues qui traversent les murs extérieurs (11 relevées) ; la case blanche posée hors du mur gauche derrière la tête de lit de la chambre 1 (x 20-35, y 46-216) n'est PAS comptée (ne traverse pas le mur : radiateur ou appui ?).",
+  "Chambre 2 et chambre 3 : chacune a une baie (x 525-578 / 525-585) qui déborde dans le couloir ; les portes sont sur x≈520 (battants dessinés ouverts à plat entre y 297 et 315, ce ne sont pas des murs) ; la cloison chambre 2 / chambre 3 y est dessinée très fine.",
+  "Salle de bains 2 (3,00 m²) : son seul accès est le trou de 60 px (0,67 m, même largeur que les autres portes du plan : 57-65 px) dans le mur de la chambre 1 (x≈415, y 163-223, mesuré au zoom ×2 : l'encre s'arrête à y≈162 et reprend à y≈222 au ras du mur bas de la salle de bains), sans arc dessiné : salle de bains attenante à la chambre 1 ; la bande gris clair sous la baie de la chambre 2 (x 525-578, y≈229) est prise pour un mur (cloison basse ou vitrée), pas pour une porte.",
+  "Toilettes : aucune porte dessinée (mur x≈780 et mur y≈630 pleins, aucun arc) ; l'accès logique serait par le couloir 2 à x≈780, y≈565-622 : oubli du rendu 3D, aucune porte inventée.",
+  "« Autre » (1,18 m²) : typé placard ; sa limite basse vers le salon est un trait clair (x 562-638) pris pour une porte coulissante.",
+  "Cuisine : trou sans porte dans le mur bas (x 150-235) → noté « porte » (passage ouvert vers le salon).",
+  "Porte d'entrée : la seule porte du mur extérieur bas (x 125-200), battant dessiné à l'extérieur ; porte-fenêtre du salon sur le mur droit (y 675-747) vers l'extérieur.",
+  "Mur extérieur droit en deux parties : x≈930 en haut (chambres 2 et 3) jusqu'au coin extérieur du décroché (y≈557 : l'encre sur x=930 s'arrête à y≈555, blanc au-delà), puis x≈893 (encre x 880-907, ~28 px) de y≈545 jusqu'en bas (toilettes puis salon) ; la face extérieure du décroché (encre y≈533-557 entre x 893 et 930 : le mur extérieur y est épais de ~24 px, il englobe la cloison basse de la chambre 3) est un petit segment [893-930, y 545, 24 px], qui recouvre cette cloison. La fenêtre des toilettes est dans la façade x≈893 (trou y≈565-611).",
+  "Relecture du 06/11 (soir) : trois corrections mesurées au zoom ×2 : la façade x≈930 était prolongée de 75 px dans le vide (jusqu'à y 632) ; un bloc de 40 px à x≈900 (y 545-632) mettait ~11 px de mur dans le vide à droite des toilettes, remplacé par la vraie façade x≈893 et sa fenêtre ; le trou de la salle de bains 2 était saisi 43 px (y 177-220) au lieu de 60 px (y 163-223).",
+  "Relecture n° 2 du 06/11 (après le relecteur, zooms ×4 revue/v3-*.png) : trois corrections confirmées : porte des toilettes retirée (cloison x≈780 noire et continue de y 545 à 630, aucun battant ni arc ; une vraie porte de ce plan se voit comme une coupure du noir remplacée par un trait gris fin, cf. portes de la chambre 1 et de la cuisine) ; porte couloir 2 → salon recalée sur le trou réel x 674-725 (le noir s'arrête à x≈674, battant à x≈675, le mur reprend à x≈725 ; 665 était dans le mur) ; cloison basse de la salle de bains 2 (mur 7) ramenée de 13 à 9 px (encre y≈224-233 cernes compris ; l'affinage l'avait gardée à 13 car sa moitié droite x 520-578 est gris clair).",
+  "Meubles, sanitaires et plan de travail ne sont pas tracés."
+ ]
+}

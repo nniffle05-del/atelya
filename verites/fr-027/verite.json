@@ -1,0 +1,100 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-027.jpg",
+ "largeur": 1206,
+ "hauteur": 896,
+ "px_par_m": 59.036,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune mesure sur le plan (ni cote, ni surface, ni barre) : échelle posée sur la largeur médiane des portes (0,83 m)",
+ "origine_px": [
+  188.0,
+  869.0
+ ],
+ "types_pieces": {
+  "cuisine_1": "cuisine",
+  "sejour_1": "sejour",
+  "salle_d_eau_1": "salle_d_eau",
+  "entree_1": "entree"
+ },
+ "murs_px": [
+  [
+   183.0,
+   873.5,
+   183.0,
+   7.0,
+   8.0
+  ],
+  [
+   182.5,
+   6.5,
+   1012.5,
+   6.5,
+   10.0
+  ],
+  [
+   1012.0,
+   873.5,
+   1012.0,
+   7.0,
+   6.0
+  ],
+  [
+   182.5,
+   873.0,
+   1012.5,
+   873.0,
+   8.0
+  ],
+  [
+   438.0,
+   658.5,
+   438.0,
+   7.0,
+   6.0
+  ],
+  [
+   182.5,
+   420.0,
+   325.5,
+   420.0,
+   7.0
+  ],
+  [
+   325.0,
+   873.5,
+   325.0,
+   420.0,
+   8.0
+  ],
+  [
+   325.5,
+   563.0,
+   438.5,
+   563.0,
+   8.0
+  ],
+  [
+   438.5,
+   657.0,
+   551.5,
+   657.0,
+   8.0
+  ],
+  [
+   551.0,
+   873.5,
+   551.0,
+   658.5,
+   8.0
+  ]
+ ],
+ "incertain": [
+  "Échelle inconnue : aucune cote, surface ni barre sur le plan ; posée sur la largeur médiane des portes (49 px = 0,83 m, soit ~59 px/m), ce qui donne un logement d'environ 14 × 14,6 m, sans doute trop grand : les portes sont dessinées petites (40 à 54 px) par rapport aux pièces, l'échelle réelle est probablement plus serrée (plus de px par mètre)",
+  "Nom de la pièce ouest coupé par le bord gauche de l'image (« d'eau + Wc » visible) : complété en « Salle d'eau + Wc », une seule zone salle d'eau + WC → type salle_d_eau",
+  "Image recadrée en haut : le mur haut est entier (encre y 3-11) mais les symboles des trois fenêtres sont coupés par le bord",
+  "Fenêtres : largeur = trou dans le mur haut (265-361, 533-640, 752-876) ; le symbole dessiné (caissons gris, vitrage bleu) déborde dans les pièces",
+  "Portes : largeur prise du bout de l'encre du mur au bord extérieur du battant (cuisine 40 px, entrée-salon 46, salle d'eau 52, porte d'entrée 54), cohérente à ±5 px avec le rayon de chaque arc",
+  "Porte d'entrée dans le mur bas (arc vers l'intérieur de l'entrée) ; aucune porte dessinée entre la cuisine et le salon-séjour : la cuisine n'est accessible que par l'entrée"
+ ]
+}

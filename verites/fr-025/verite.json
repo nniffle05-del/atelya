@@ -1,0 +1,290 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-025.jpg",
+ "largeur": 1196,
+ "hauteur": 1416,
+ "px_par_m": 68.578,
+ "echelle_inconnue": false,
+ "echelle_source": "surfaces écrites (aucune cote) : 11 pièces sur les 3 niveaux, échelle = racine(somme px / somme m²)",
+ "origine_px": [
+  183.0,
+  1319.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "placard_1": "placard",
+  "salle_d_eau_1": "salle_d_eau",
+  "cuisine_1": "cuisine",
+  "sejour_1": "sejour",
+  "escalier_1": "escalier",
+  "chambre_2": "chambre",
+  "chambre_3": "chambre",
+  "degagement_1": "degagement",
+  "placard_2": "placard",
+  "wc_1": "wc",
+  "salle_d_eau_2": "salle_d_eau",
+  "escalier_2": "escalier"
+ },
+ "murs_px": [
+  [
+   206.5,
+   293.0,
+   206.5,
+   59.0,
+   17.0
+  ],
+  [
+   206.5,
+   59.0,
+   796.5,
+   59.0,
+   16.0
+  ],
+  [
+   796.5,
+   293.0,
+   796.5,
+   59.0,
+   15.0
+  ],
+  [
+   206.5,
+   293.0,
+   796.5,
+   293.0,
+   18.0
+  ],
+  [
+   518.5,
+   293.0,
+   518.5,
+   176.0,
+   13.0
+  ],
+  [
+   518.5,
+   176.0,
+   639.5,
+   176.0,
+   12.0
+  ],
+  [
+   639.5,
+   293.0,
+   639.5,
+   59.0,
+   12.0
+  ],
+  [
+   174.5,
+   520.0,
+   918.0,
+   520.0,
+   16.0
+  ],
+  [
+   918.0,
+   839.5,
+   918.0,
+   520.0,
+   17.0
+  ],
+  [
+   484.0,
+   839.5,
+   918.0,
+   839.5,
+   17.0
+  ],
+  [
+   484.0,
+   839.5,
+   484.0,
+   753.0,
+   16.0
+  ],
+  [
+   299.0,
+   753.0,
+   484.0,
+   753.0,
+   15.0
+  ],
+  [
+   174.5,
+   666.0,
+   299.0,
+   753.0,
+   17.0
+  ],
+  [
+   174.5,
+   666.0,
+   174.5,
+   520.0,
+   15.0
+  ],
+  [
+   394.5,
+   550.0,
+   394.5,
+   520.0,
+   11.0
+  ],
+  [
+   394.5,
+   636.0,
+   394.5,
+   550.0,
+   2.0
+  ],
+  [
+   394.5,
+   753.0,
+   394.5,
+   636.0,
+   11.0
+  ],
+  [
+   394.5,
+   636.0,
+   457.0,
+   636.0,
+   2.0
+  ],
+  [
+   457.0,
+   753.0,
+   457.0,
+   636.0,
+   2.0
+  ],
+  [
+   392.0,
+   950.0,
+   918.0,
+   950.0,
+   16.0
+  ],
+  [
+   918.0,
+   1327.0,
+   918.0,
+   950.0,
+   17.0
+  ],
+  [
+   669.0,
+   1327.0,
+   918.0,
+   1327.0,
+   16.0
+  ],
+  [
+   576.5,
+   1300.0,
+   669.0,
+   1327.0,
+   17.0
+  ],
+  [
+   576.5,
+   1300.0,
+   576.5,
+   1213.0,
+   17.0
+  ],
+  [
+   392.0,
+   1213.0,
+   762.5,
+   1213.0,
+   17.0
+  ],
+  [
+   392.0,
+   1213.0,
+   392.0,
+   950.0,
+   16.0
+  ],
+  [
+   392.0,
+   1066.0,
+   455.0,
+   1066.0,
+   11.0
+  ],
+  [
+   455.0,
+   1153.0,
+   455.0,
+   1066.0,
+   12.0
+  ],
+  [
+   455.0,
+   1213.0,
+   455.0,
+   1153.0,
+   2.0
+  ],
+  [
+   450.0,
+   1153.0,
+   762.5,
+   1153.0,
+   12.0
+  ],
+  [
+   669.5,
+   1153.0,
+   669.5,
+   950.0,
+   14.0
+  ],
+  [
+   669.5,
+   1327.0,
+   669.5,
+   1213.0,
+   14.0
+  ],
+  [
+   762.5,
+   1239.0,
+   762.5,
+   1124.5,
+   13.0
+  ],
+  [
+   756.0,
+   1124.5,
+   918.0,
+   1124.5,
+   12.0
+  ],
+  [
+   762.5,
+   1239.0,
+   918.0,
+   1239.0,
+   11.0
+  ]
+ ],
+ "incertain": [
+  "3 niveaux sur l'image (Rez de chaussée en haut, Rez de jardin au milieu, 1er étage en bas) : maison / triplex ; chaque niveau tracé avec ses murs et ses pièces.",
+  "Recalage automatique désactivé (affiner: false) : murs gris cernés de noir, le recalage accrochait un cerne et décalait 30 murs de 3,5 à 6,5 px ; axes et épaisseurs saisis sur l'encre (cernes compris : murs extérieurs 15-18 px, cloisons 11-14 px), contrôlés avec « controler » (aucun mur décalé de plus de 3 px).",
+  "Aucune cote : échelle par les surfaces écrites. Les trois niveaux ne sont pas dessinés exactement à la même échelle : à l'échelle commune (~70 px/m), le rez de chaussée est juste à ±6 %, le rez de jardin ressort ~5 % plus grand (séjour +15 %) et le 1er étage ~5 % plus petit (chambre 2 −21 %, chambre 1 −13 %, dégagement −14 %). Contre-vérification indépendante : largeur des deux escaliers 63 px ≈ 0,85-0,90 m → 70-74 px/m ; murs extérieurs 16-17 px ≈ 0,22-0,25 m → 65-75 px/m. 70 px/m gardé comme compromis, ±5 % selon le niveau.",
+  "Surfaces écrites qui ne collent pas à leur dessin à cette échelle : Dressing (3,95 m² écrit pour une boîte de ~2,3 m², −43 %), Dressing 1 (1,65 m² écrit pour ~2,8 m², +69 %) et Wc (1 m² écrit pour ~1,7 m², +68 %) : surfaces écrites douteuses, elles pèsent peu dans l'échelle commune.",
+  "Rez de jardin : cuisine et séjour ouverts l'un sur l'autre ; mur virtuel 2 px dans le prolongement du retour de mur à x≈394 + porte de toute la largeur.",
+  "Escaliers (rez de jardin et étage) ouverts : zone « escalier » fermée par des murs virtuels 2 px (traits fins du dessin) + une porte sur le côté ouvert (choix du côté ouvert = hypothèse).",
+  "Toutes les baies vitrées (bandes cyan pointillées) notées « fenetre » : aucun arc ni seuil dessiné ; certaines (séjour du rez de jardin, chambre du RDC) sont peut-être des portes-fenêtres.",
+  "Aucune porte d'entrée dessinée sur les 3 niveaux ; le segment plein du mur haut du RDC (x 384-453) est gardé comme mur.",
+  "Battants de porte dessinés comme des barres pleines (même style que les murs) : NON tracés. Rez de chaussée : barre à y≈131 (x 640-687) = battant de la porte de la salle d'eau (charnière en bas du trou y 84-128, arc jusqu'à son bout) ; 1er étage : barre x≈658 (y 1110-1153) = battant de la porte de la chambre 1, barre x≈861 (y 1084-1124) = battant de la porte du dressing 1 ; les battants du Wc (x≈605) et de la salle d'eau 1 (x≈690), y 1213-1250, idem.",
+  "1er étage : chambre 2 sans porte dessinée vers le dégagement (mur y≈1153 plein de x 670 à 762, mur x≈762 plein de y 1124 à 1239) ; desservie seulement par le dressing 1, lui-même fermé : oubli du dessinateur, aucune porte inventée.",
+  "Le rectangle fin dans la cuisine (x 300-390, y 526-550) est un meuble, pas un mur ; seul le retour plein à x≈394 est un mur.",
+  "Types : « Dressing » et « Dressing 1 » → placard ; « Wc » → wc ; les deux « Salle d'Eau » → salle_d_eau."
+ ]
+}

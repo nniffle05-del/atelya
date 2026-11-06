@@ -1,0 +1,389 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-021.jpg",
+ "largeur": 1206,
+ "hauteur": 1262,
+ "px_par_m": 48.0,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune cote, surface ni barre : échelle posée sur les portes à un battant (médiane 40 px = 0,83 m), passages et doubles portes exclus",
+ "origine_px": [
+  257.0,
+  1204.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "cuisine_1": "cuisine",
+  "chambre_1": "chambre",
+  "placard_1": "placard",
+  "entree_1": "entree",
+  "chambre_2": "chambre",
+  "chambre_3": "chambre",
+  "entree_2": "entree",
+  "chambre_4": "chambre",
+  "salle_d_eau_1": "salle_d_eau",
+  "placard_2": "placard",
+  "entree_3": "entree",
+  "sejour_2": "sejour",
+  "sejour_3": "sejour",
+  "chambre_5": "chambre"
+ },
+ "murs_px": [
+  [
+   373.0,
+   24.5,
+   763.0,
+   24.5,
+   24.0
+  ],
+  [
+   391.0,
+   186.0,
+   385.0,
+   13.0,
+   25.0
+  ],
+  [
+   750.0,
+   151.0,
+   750.0,
+   13.0,
+   26.0
+  ],
+  [
+   378.0,
+   168.5,
+   802.0,
+   168.5,
+   36.0
+  ],
+  [
+   253.0,
+   127.5,
+   403.0,
+   127.5,
+   24.0
+  ],
+  [
+   266.5,
+   172.0,
+   266.5,
+   127.5,
+   27.0
+  ],
+  [
+   344.0,
+   268.0,
+   266.5,
+   172.0,
+   24.0
+  ],
+  [
+   350.0,
+   784.0,
+   344.0,
+   262.0,
+   24.0
+  ],
+  [
+   750.5,
+   397.0,
+   750.5,
+   151.0,
+   39.0
+  ],
+  [
+   746.0,
+   468.0,
+   746.0,
+   397.0,
+   24.0
+  ],
+  [
+   786.0,
+   255.0,
+   786.0,
+   108.0,
+   32.0
+  ],
+  [
+   739.0,
+   120.0,
+   962.0,
+   120.0,
+   24.0
+  ],
+  [
+   950.5,
+   336.0,
+   950.5,
+   108.0,
+   24.0
+  ],
+  [
+   814.0,
+   324.0,
+   962.0,
+   324.0,
+   24.0
+  ],
+  [
+   829.5,
+   324.0,
+   829.5,
+   282.0,
+   6.0
+  ],
+  [
+   829.5,
+   282.0,
+   950.5,
+   282.0,
+   2.0
+  ],
+  [
+   750.5,
+   318.0,
+   826.0,
+   318.0,
+   2.0
+  ],
+  [
+   826.0,
+   399.0,
+   826.0,
+   318.0,
+   24.0
+  ],
+  [
+   746.0,
+   399.0,
+   826.0,
+   399.0,
+   2.0
+  ],
+  [
+   334.0,
+   469.0,
+   766.0,
+   466.5,
+   6.0
+  ],
+  [
+   524.0,
+   610.0,
+   524.0,
+   465.0,
+   12.0
+  ],
+  [
+   336.0,
+   610.5,
+   527.0,
+   610.5,
+   6.0
+  ],
+  [
+   528.0,
+   784.0,
+   528.0,
+   610.0,
+   5.0
+  ],
+  [
+   580.0,
+   784.0,
+   580.0,
+   464.0,
+   6.0
+  ],
+  [
+   577.0,
+   610.5,
+   699.0,
+   610.5,
+   6.0
+  ],
+  [
+   754.5,
+   625.5,
+   754.5,
+   468.0,
+   24.0
+  ],
+  [
+   676.0,
+   625.5,
+   766.0,
+   625.5,
+   24.0
+  ],
+  [
+   687.0,
+   916.0,
+   687.0,
+   610.0,
+   24.0
+  ],
+  [
+   578.0,
+   735.5,
+   699.0,
+   735.5,
+   6.0
+  ],
+  [
+   578.0,
+   781.5,
+   699.0,
+   781.5,
+   6.0
+  ],
+  [
+   232.0,
+   773.0,
+   532.0,
+   773.0,
+   22.0
+  ],
+  [
+   532.0,
+   779.0,
+   578.0,
+   779.0,
+   2.0
+  ],
+  [
+   244.0,
+   1228.0,
+   244.0,
+   761.0,
+   24.0
+  ],
+  [
+   232.0,
+   1216.5,
+   447.0,
+   1216.5,
+   24.0
+  ],
+  [
+   436.5,
+   1228.0,
+   436.5,
+   878.0,
+   22.0
+  ],
+  [
+   469.0,
+   894.5,
+   469.0,
+   784.0,
+   6.0
+  ],
+  [
+   426.0,
+   894.5,
+   549.0,
+   894.5,
+   30.0
+  ],
+  [
+   549.0,
+   900.0,
+   609.0,
+   900.0,
+   2.0
+  ],
+  [
+   609.0,
+   904.5,
+   699.0,
+   904.5,
+   23.0
+  ],
+  [
+   628.5,
+   1094.0,
+   628.5,
+   893.0,
+   23.0
+  ],
+  [
+   600.0,
+   1061.0,
+   600.0,
+   1007.0,
+   34.0
+  ],
+  [
+   628.5,
+   1203.5,
+   628.5,
+   1094.0,
+   2.0
+  ],
+  [
+   640.0,
+   1040.5,
+   805.0,
+   1040.5,
+   24.0
+  ],
+  [
+   793.0,
+   1215.0,
+   793.0,
+   1029.0,
+   25.0
+  ],
+  [
+   426.0,
+   1203.5,
+   805.0,
+   1203.5,
+   24.0
+  ],
+  [
+   352.0,
+   899.0,
+   352.0,
+   890.0,
+   9.0
+  ],
+  [
+   353.0,
+   1055.0,
+   353.0,
+   1045.0,
+   9.0
+  ],
+  [
+   810.0,
+   399.0,
+   810.0,
+   374.0,
+   12.0
+  ]
+ ],
+ "incertain": [
+  "Aucune cote, surface ni barre d'échelle : échelle posée sur les portes à un battant (≈ 40 px = 0,83 m → 48 px/m) ; l'échelle ne compte pas.",
+  "Deux vérandas fermées (murs vitrés tout autour) tracées comme pièces de type sejour, selon la convention « véranda fermée ».",
+  "Pièce 2 (sans nom) : zone grise sans étiquette entre la cuisine et la pièce « Pièce » ; type chambre proposé. Pièce 3 et Pièce 5 (étiquette « Pièce ») : type chambre proposé ; Pièce 1 et Pièce 4 (étiquette « Pièce », 0,6 m de profondeur) : placards.",
+  "Entrée 2 = petit vestibule en haut à droite (étiquette « Entrée » reliée par un trait) ; sa porte d'entrée (bas, vers l'extérieur) et sa porte vers Chambre 1 (ligne y=318) sont posées sur des murs virtuels de 2 px : aucun mur n'est dessiné sur ces deux lignes.",
+  "Passage sans battant Cuisine → Entrée 2 (flèche dessinée, 35 px) tracé comme porte sur le mur épais.",
+  "Passage sans battant Cuisine → Véranda (x 571-627) tracé comme porte ; sa voisine (495-563) est une fenêtre.",
+  "Placard de Chambre 1 (Pièce 1) : ouvert sur la chambre par un simple trait fin → mur virtuel 2 px + porte de toute la largeur.",
+  "Entrée 3 = couloir (x 528-580, y 469-779) étiqueté « Entrée » par ligne de rappel (boîte « Entrée » à (720-770, 640-665), point d'ancrage à (553,657) au milieu du couloir, même procédé que pour le vestibule) ; il dessert Pièce 2, Pièce 3, Chambre 2, Salle de bains et Pièce 4 (fonctionnellement un dégagement) ; nom écrit et type entree respectés.",
+  "Mur gauche de la cuisine : ouverture y 361-400 sans symbole (le sol beige traverse l'épaisseur du mur et déborde en petite alcôve vers l'extérieur, x 328-345, y 365-395 ; trait fin à x≈345 sur y 383-400 : alcôve ou porte de service sans battant), comptée dans la fenêtre 361-447 ; seul y 400-447 porte le symbole blanc de fenêtre.",
+  "Passages ouverts sans porte : Entrée 3 (couloir) → Entrée (x 532-578, y 779) ; Entrée → Séjour (x 549-609, y 900) ; Séjour → Pièce 5 (x 628, y 1094-1192) : murs virtuels 2 px + porte de toute la largeur.",
+  "Paroi fine entre Véranda 2 et Entrée (x 469) : porte à un battant (y 790-832) puis panneau vitré fixe (y 850-878) tracé comme fenêtre bien qu'intérieur.",
+  "Bloc de mur épais à droite du séjour (x 583-640, y 1007-1061) tracé comme mur ; sa petite niche blanche (x 583-601, y 1019-1048, symbole arrondi) laissée dans le mur.",
+  "Deux carrés noirs dans Véranda 2 (x≈352, y 890 et 1050) = poteaux, tracés comme mini-murs de 9 px.",
+  "Mur de gauche de la cuisine légèrement incliné (l'image est tournée d'environ 0,8°) : tracé en un segment de (344,262) à (350,784).",
+  "Encoche rose du vestibule dans son mur de droite (x 814-838, y 336-352) ignorée : mur tracé continu.",
+  "Mur extérieur gauche de Véranda 2 : vitrages séparés par des meneaux de 4-7 px (y 968-971, 1051-1057) tracés comme quatre fenêtres.",
+  "Porte Entrée → extérieur (x 636-674, y 904) et porte d'entrée d'Entrée 2 : portes vers l'extérieur tracées comme « porte ».",
+  "affiner=false : axes et épaisseurs mesurés directement sur l'encre (balayage des lignes et colonnes) ; l'affinage automatique amincissait le mur droit de Chambre 2 à cause de sa fenêtre."
+ ]
+}

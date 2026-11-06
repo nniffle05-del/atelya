@@ -1,0 +1,266 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-022.jpg",
+ "largeur": 1206,
+ "hauteur": 730,
+ "px_par_m": 47.0,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune cote, surface ni barre : échelle posée sur les portes à un battant (médiane ≈ 39 px = 0,83 m), passages et doubles portes exclus",
+ "origine_px": [
+  174.0,
+  624.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "sejour_2": "sejour",
+  "salle_d_eau_1": "salle_d_eau",
+  "wc_1": "wc",
+  "chambre_1": "chambre",
+  "placard_1": "placard",
+  "degagement_1": "degagement",
+  "placard_2": "placard",
+  "cuisine_1": "cuisine",
+  "chambre_2": "chambre",
+  "bureau_1": "bureau",
+  "sejour_3": "sejour"
+ },
+ "murs_px": [
+  [
+   167.0,
+   14.5,
+   815.0,
+   14.5,
+   6.0
+  ],
+  [
+   169.5,
+   626.0,
+   169.5,
+   12.0,
+   6.0
+  ],
+  [
+   167.0,
+   502.0,
+   815.0,
+   502.0,
+   5.0
+  ],
+  [
+   812.5,
+   670.0,
+   812.5,
+   12.0,
+   6.0
+  ],
+  [
+   366.5,
+   58.0,
+   366.5,
+   12.0,
+   6.0
+  ],
+  [
+   366.5,
+   147.0,
+   366.5,
+   58.0,
+   2.0
+  ],
+  [
+   346.0,
+   201.0,
+   346.0,
+   150.0,
+   46.0
+  ],
+  [
+   366.5,
+   344.0,
+   366.5,
+   201.0,
+   6.0
+  ],
+  [
+   366.5,
+   431.0,
+   366.5,
+   344.0,
+   2.0
+  ],
+  [
+   366.5,
+   504.0,
+   366.5,
+   431.0,
+   6.0
+  ],
+  [
+   323.0,
+   201.5,
+   815.0,
+   201.5,
+   6.0
+  ],
+  [
+   419.0,
+   297.0,
+   419.0,
+   199.0,
+   6.0
+  ],
+  [
+   366.5,
+   294.5,
+   421.0,
+   294.5,
+   6.0
+  ],
+  [
+   501.5,
+   204.0,
+   501.5,
+   12.0,
+   6.0
+  ],
+  [
+   499.0,
+   118.5,
+   556.0,
+   118.5,
+   6.0
+  ],
+  [
+   553.0,
+   204.0,
+   553.0,
+   116.0,
+   6.0
+  ],
+  [
+   605.0,
+   204.0,
+   605.0,
+   12.0,
+   6.0
+  ],
+  [
+   688.0,
+   170.0,
+   742.0,
+   170.0,
+   6.0
+  ],
+  [
+   688.0,
+   201.5,
+   688.0,
+   170.0,
+   6.0
+  ],
+  [
+   739.5,
+   201.5,
+   739.5,
+   170.0,
+   6.0
+  ],
+  [
+   468.0,
+   274.5,
+   815.0,
+   274.5,
+   5.0
+  ],
+  [
+   470.5,
+   626.0,
+   470.5,
+   272.0,
+   6.0
+  ],
+  [
+   646.5,
+   504.0,
+   646.5,
+   271.0,
+   6.0
+  ],
+  [
+   169.5,
+   626.0,
+   470.5,
+   626.0,
+   3.0
+  ],
+  [
+   810.0,
+   190.5,
+   838.0,
+   190.5,
+   6.0
+  ],
+  [
+   877.0,
+   190.5,
+   1074.0,
+   190.5,
+   6.0
+  ],
+  [
+   916.5,
+   325.5,
+   916.5,
+   188.0,
+   6.0
+  ],
+  [
+   913.0,
+   325.5,
+   1074.0,
+   325.5,
+   5.0
+  ],
+  [
+   1071.5,
+   670.0,
+   1071.5,
+   188.0,
+   6.0
+  ],
+  [
+   810.0,
+   667.5,
+   837.0,
+   667.5,
+   6.0
+  ],
+  [
+   888.0,
+   667.5,
+   908.0,
+   667.5,
+   6.0
+  ],
+  [
+   1059.0,
+   667.5,
+   1074.0,
+   667.5,
+   6.0
+  ]
+ ],
+ "incertain": [
+  "Aucune cote, surface ni barre d'échelle : échelle posée sur les portes à un battant (≈ 39 px = 0,83 m → 47 px/m) ; l'échelle ne compte pas.",
+  "Garage (et son renfoncement en haut à gauche, x 815-914 y 193-325, ouvert sur lui) : pas de pièce ; ses murs sont tracés ; sa porte de garage (x 908-1059) et sa fenêtre (x 837-888) dans le mur du bas ne sont pas déclarées comme ouvertures (pas une pièce) ; la porte du renfoncement vers l'extérieur (x 838-877, y 190) laissée comme simple trou du mur.",
+  "Véranda (bas gauche) : contour dessiné en trait fin sans fenêtres ; tracée comme pièce de type sejour (« véranda fermée »), son trait du bas (3 px) comme mur ; les deux portes depuis la maison (double 242-319, simple 383-436) comptées comme portes intérieures.",
+  "Salon et Séjour ne sont séparés que par un bout de mur en haut (y 12-58), le bloc hachuré et le mur du couloir : passage ouvert x 366, y 58-147 → mur virtuel 2 px + porte ; de même Séjour → Couloir (x 366, y 344-431) et Couloir → Cuisine (x 470, y 375-421, sans battant dessiné).",
+  "Bloc hachuré 323-369 × 147-204 (conduit / cheminée, sans étiquette) tracé comme un mur de 46 px d'épaisseur.",
+  "« CHEMINEE » : rectangle en trait fin contre le mur gauche du séjour (x 172-213, y 212-295) laissé dans le séjour (pas un mur).",
+  "Placard 1 = petit rectangle à murs épais sous Chambre 1 (x 691-737, y 173-201), sans porte dessinée : sa face du haut (y 170) déclarée comme porte. Le second rangement de Chambre 1 (trait fin y≈145 + deux arcs, x 748-808) est pris pour un meuble : rien tracé.",
+  "Placard 2 = petit local sans nom dans le couloir (x 369-416, y 204-292) à double porte (65 px) ; type placard proposé.",
+  "Porte du Couloir vers le garage (x 812, y 219-254) et porte du Bureau sur le garage (x 917, y 276-312) : portes vers une dépendance, tracées comme « porte ».",
+  "Porte de Chambre 2 étroite (30 px ≈ 0,64 m) : lue telle quelle sur le trait (trou de 674 à 704)."
+ ]
+}

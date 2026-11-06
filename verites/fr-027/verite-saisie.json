@@ -1,0 +1,42 @@
+{
+ "image": "fr-027.jpg",
+ "echelle": {"inconnue": true, "porte_m": 0.83},
+ "echelle_source": "aucune mesure sur le plan (ni cote, ni surface, ni barre) : échelle posée sur la largeur médiane des portes (0,83 m)",
+ "hsp": 2.5,
+ "affiner": true,
+ "murs": [
+  [182.5, 7, 182.5, 873.5, 8],
+  [182.5, 7, 1012.5, 7, 9],
+  [1012.5, 7, 1012.5, 873.5, 8],
+  [182.5, 873.5, 1012.5, 873.5, 8],
+  [438.5, 7, 438.5, 658.5, 8],
+  [182.5, 420, 325.5, 420, 9],
+  [325.5, 420, 325.5, 873.5, 8],
+  [325.5, 562.5, 438.5, 562.5, 8],
+  [438.5, 658.5, 551.5, 658.5, 8],
+  [551.5, 658.5, 551.5, 873.5, 8]
+ ],
+ "ouvertures": [
+  ["porte", 357, 562.5, 397, 562.5],
+  ["porte", 488, 658.5, 534, 658.5],
+  ["porte", 325.5, 777, 325.5, 829],
+  ["porte", 462, 873.5, 516, 873.5],
+  ["fenetre", 265, 7, 361, 7],
+  ["fenetre", 533, 7, 640, 7],
+  ["fenetre", 752, 7, 876, 7]
+ ],
+ "pieces": [
+  ["Cuisine", "cuisine", 300, 250],
+  ["Salon-séjour", "sejour", 750, 400],
+  ["Salle d'eau + Wc", "salle_d_eau", 255, 560],
+  ["Entrée", "entree", 450, 760]
+ ],
+ "incertain": [
+  "Échelle inconnue : aucune cote, surface ni barre sur le plan ; posée sur la largeur médiane des portes (49 px = 0,83 m, soit ~59 px/m), ce qui donne un logement d'environ 14 × 14,6 m, sans doute trop grand : les portes sont dessinées petites (40 à 54 px) par rapport aux pièces, l'échelle réelle est probablement plus serrée (plus de px par mètre)",
+  "Nom de la pièce ouest coupé par le bord gauche de l'image (« d'eau + Wc » visible) : complété en « Salle d'eau + Wc », une seule zone salle d'eau + WC → type salle_d_eau",
+  "Image recadrée en haut : le mur haut est entier (encre y 3-11) mais les symboles des trois fenêtres sont coupés par le bord",
+  "Fenêtres : largeur = trou dans le mur haut (265-361, 533-640, 752-876) ; le symbole dessiné (caissons gris, vitrage bleu) déborde dans les pièces",
+  "Portes : largeur prise du bout de l'encre du mur au bord extérieur du battant (cuisine 40 px, entrée-salon 46, salle d'eau 52, porte d'entrée 54), cohérente à ±5 px avec le rayon de chaque arc",
+  "Porte d'entrée dans le mur bas (arc vers l'intérieur de l'entrée) ; aucune porte dessinée entre la cuisine et le salon-séjour : la cuisine n'est accessible que par l'entrée"
+ ]
+}
