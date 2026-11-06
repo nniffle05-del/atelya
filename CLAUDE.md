@@ -306,56 +306,26 @@ bibliothèques matières/meubles ; comparatif de rendu ; soleil réel.
   projet claude.ai, et `RC` = session Remote Control (ancienne méthode). Les chiffres et règles y sont
   à jour ; l'état d'Atelya fait foi en section 5 ci-dessus.
 
-## 10. Mémoire complète chargée automatiquement
+## 10. Mémoire à la demande (allégée le 06/11/2026, décision de NT)
 
-NT veut que Claude Code soit au courant de TOUT, comme dans le projet claude.ai, sans rien lui réexpliquer.
-Les lignes ci-dessous (« @chemin ») font charger chaque fichier de mémoire à chaque démarrage. Les
-considérer comme connus : ne pas reposer à NT une question dont la réponse y est.
+**Pourquoi** : charger toute la mémoire coûtait ~157 000 tokens à chaque agent et à chaque démarrage, soit ~70 % de ce qu'il relit à chaque tour, pour un travail qui n'en utilise presque rien. NT a dit « oui » le 06/11/2026 : ce budget sert mieux à la qualité (réflexion maximale, double tracé). **Rien n'est supprimé.** À la fin du chantier des 105 vrais plans, **proposer à NT de remettre la mémoire complète** : le texte d'origine est dans `docs/projet/memoire/SECTION-10-COMPLETE.txt`.
 
-Règle : tout ce que tu apprends d'important (décision de NT, règle, chiffre, piège, état d'une étape)
-s'écrit dans le fichier de `docs/projet/memoire/` qui couvre le sujet (ou un nouveau, ajouté à la liste
-ci-dessous et à `MEMORY.md`), dans le même tour, puis se pousse sur GitHub avec le reste. C'est ce qui
-permet au projet claude.ai et au futur Claude du Mac de rester au courant à leur tour.
+**Règle** : avant de toucher un sujet ci-dessous, LIRE son fichier dans `docs/projet/memoire/` : ne pas deviner, ne pas reposer à NT une question dont la réponse y est. `MEMORY.md` est l'index général. Les chiffres et règles de ce CLAUDE.md suffisent pour le reste.
 
-@docs/projet/memoire/MEMORY.md
-@docs/projet/memoire/atelya-barre-coupee.md
-@docs/projet/memoire/atelya-barre-echelle.md
-@docs/projet/memoire/atelya-biais-sans-cotes.md
-@docs/projet/memoire/atelya-dinov2-biais-a3.md
-@docs/projet/memoire/atelya-doutes-a1.md
-@docs/projet/memoire/atelya-echelle-cotes.md
-@docs/projet/memoire/atelya-echelle-fine.md
-@docs/projet/memoire/atelya-echelle-vrais-plans.md
-@docs/projet/memoire/atelya-murs-en-trop.md
-@docs/projet/memoire/atelya-essai-3.md
-@docs/projet/memoire/atelya-essai-4.md
-@docs/projet/memoire/atelya-modele.md
-@docs/projet/memoire/atelya-petites-pieces.md
-@docs/projet/memoire/atelya-pdf-a2.md
-@docs/projet/memoire/atelya-photos-realistes.md
-@docs/projet/memoire/atelya-redressement.md
-@docs/projet/memoire/atelya-styles-monde.md
-@docs/projet/memoire/atelya-surfaces.md
-@docs/projet/memoire/atelya-verification.md
-@docs/projet/memoire/atelya-verification-reelle.md
-@docs/projet/memoire/audit-technologique-2026-10-31.md
-@docs/projet/memoire/calculs-sur-pc.md
-@docs/projet/memoire/carte-atelya-associe.md
-@docs/projet/memoire/ecran-verification.md
-@docs/projet/memoire/environnement-poste-nt.md
-@docs/projet/memoire/feuille-de-route-a-jour.md
-@docs/projet/memoire/generateur-dataset.md
-@docs/projet/memoire/gros-calculs-sur-pc.md
-@docs/projet/memoire/objectif-global-nt.md
-@docs/projet/memoire/passage-vscode.md
-@docs/projet/memoire/plan-2d-propre-p7.md
-@docs/projet/memoire/preference-explications-simples.md
-@docs/projet/memoire/preference-note-realiste.md
-@docs/projet/memoire/produit-livre-client.md
-@docs/projet/memoire/projet-reconstruction-3d-decisions.md
-@docs/projet/memoire/sauvegarde-atelya.md
-@docs/projet/memoire/suivi-moteur-associe.md
-@docs/projet/memoire/sujets-produit-non-traites.md
-@docs/projet/memoire/surveiller-entrainements.md
-@docs/projet/memoire/vrais-plans-francais.md
-@docs/projet/etapes/memoire-a3-detail-2026-11-02.md
+| Sujet | Fichier(s) |
+|---|---|
+| Vrais plans, accords, lots, coupe, vérités, coût des agents | `vrais-plans-francais.md` |
+| Écran de vérification, lecture complète, 3D d'un vrai plan, vérités (outils) | `atelya-verification-reelle.md`, `ecran-verification.md` |
+| Échelle | `atelya-echelle-vrais-plans.md`, `atelya-echelle-cotes.md`, `atelya-echelle-fine.md`, `atelya-barre-echelle.md`, `atelya-barre-coupee.md`, `atelya-surfaces.md` |
+| Traducteur, murs en trop, petites pièces | `atelya-murs-en-trop.md`, `atelya-petites-pieces.md`, `atelya-modele.md` |
+| Entraînements et modèles | `atelya-modele.md`, `atelya-essai-3.md`, `atelya-essai-4.md`, `atelya-photos-realistes.md`, `atelya-styles-monde.md`, `atelya-dinov2-biais-a3.md`, `../etapes/memoire-a3-detail-2026-11-02.md` |
+| Surveillance des calculs, PC | `surveiller-entrainements.md`, `gros-calculs-sur-pc.md`, `calculs-sur-pc.md`, `environnement-poste-nt.md`, `passage-vscode.md` |
+| Générateur | `generateur-dataset.md`, `atelya-styles-monde.md`, `../etapes/catalogue-styles-lot2.md` |
+| Photos de biais, redressement | `atelya-redressement.md`, `atelya-biais-sans-cotes.md`, `atelya-verification.md` |
+| Doutes, PDF, plan 2D | `atelya-doutes-a1.md`, `atelya-pdf-a2.md`, `plan-2d-propre-p7.md` |
+| Licences, technologies | `audit-technologique-2026-10-31.md` |
+| Produit, objectifs, décisions | `objectif-global-nt.md`, `produit-livre-client.md`, `projet-reconstruction-3d-decisions.md`, `sujets-produit-non-traites.md` |
+| Sauvegarde, feuille de route, carte, associé | `sauvegarde-atelya.md`, `feuille-de-route-a-jour.md`, `carte-atelya-associe.md`, `suivi-moteur-associe.md` |
+| Façon de parler à NT, note /100 | `preference-explications-simples.md`, `preference-note-realiste.md` |
+
+Règle inchangée : tout ce que tu apprends d'important (décision de NT, règle, chiffre, piège, état d'une étape) s'écrit dans le fichier de `docs/projet/memoire/` qui couvre le sujet (ou un nouveau, ajouté à ce tableau et à `MEMORY.md`), dans le même tour, puis se pousse sur GitHub avec le reste.

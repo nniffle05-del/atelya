@@ -1,0 +1,56 @@
+Section 10 de CLAUDE.md telle qu'elle était jusqu'au 06/11/2026 (toute la mémoire chargée à chaque démarrage, ~157 000 tokens).
+Pour la remettre : remplacer la section 10 de CLAUDE.md par tout ce qui suit la ligne de tirets.
+----------
+## 10. Mémoire complète chargée automatiquement
+
+NT veut que Claude Code soit au courant de TOUT, comme dans le projet claude.ai, sans rien lui réexpliquer.
+Les lignes ci-dessous (« @chemin ») font charger chaque fichier de mémoire à chaque démarrage. Les
+considérer comme connus : ne pas reposer à NT une question dont la réponse y est.
+
+Règle : tout ce que tu apprends d'important (décision de NT, règle, chiffre, piège, état d'une étape)
+s'écrit dans le fichier de `docs/projet/memoire/` qui couvre le sujet (ou un nouveau, ajouté à la liste
+ci-dessous et à `MEMORY.md`), dans le même tour, puis se pousse sur GitHub avec le reste. C'est ce qui
+permet au projet claude.ai et au futur Claude du Mac de rester au courant à leur tour.
+
+@docs/projet/memoire/MEMORY.md
+@docs/projet/memoire/atelya-barre-coupee.md
+@docs/projet/memoire/atelya-barre-echelle.md
+@docs/projet/memoire/atelya-biais-sans-cotes.md
+@docs/projet/memoire/atelya-dinov2-biais-a3.md
+@docs/projet/memoire/atelya-doutes-a1.md
+@docs/projet/memoire/atelya-echelle-cotes.md
+@docs/projet/memoire/atelya-echelle-fine.md
+@docs/projet/memoire/atelya-echelle-vrais-plans.md
+@docs/projet/memoire/atelya-murs-en-trop.md
+@docs/projet/memoire/atelya-essai-3.md
+@docs/projet/memoire/atelya-essai-4.md
+@docs/projet/memoire/atelya-modele.md
+@docs/projet/memoire/atelya-petites-pieces.md
+@docs/projet/memoire/atelya-pdf-a2.md
+@docs/projet/memoire/atelya-photos-realistes.md
+@docs/projet/memoire/atelya-redressement.md
+@docs/projet/memoire/atelya-styles-monde.md
+@docs/projet/memoire/atelya-surfaces.md
+@docs/projet/memoire/atelya-verification.md
+@docs/projet/memoire/atelya-verification-reelle.md
+@docs/projet/memoire/audit-technologique-2026-10-31.md
+@docs/projet/memoire/calculs-sur-pc.md
+@docs/projet/memoire/carte-atelya-associe.md
+@docs/projet/memoire/ecran-verification.md
+@docs/projet/memoire/environnement-poste-nt.md
+@docs/projet/memoire/feuille-de-route-a-jour.md
+@docs/projet/memoire/generateur-dataset.md
+@docs/projet/memoire/gros-calculs-sur-pc.md
+@docs/projet/memoire/objectif-global-nt.md
+@docs/projet/memoire/passage-vscode.md
+@docs/projet/memoire/plan-2d-propre-p7.md
+@docs/projet/memoire/preference-explications-simples.md
+@docs/projet/memoire/preference-note-realiste.md
+@docs/projet/memoire/produit-livre-client.md
+@docs/projet/memoire/projet-reconstruction-3d-decisions.md
+@docs/projet/memoire/sauvegarde-atelya.md
+@docs/projet/memoire/suivi-moteur-associe.md
+@docs/projet/memoire/sujets-produit-non-traites.md
+@docs/projet/memoire/surveiller-entrainements.md
+@docs/projet/memoire/vrais-plans-francais.md
+@docs/projet/etapes/memoire-a3-detail-2026-11-02.md

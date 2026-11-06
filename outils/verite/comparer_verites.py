@@ -42,6 +42,7 @@ def main() -> int:
     ap.add_argument("reference", type=Path)
     ap.add_argument("autre", type=Path)
     ap.add_argument("plans", nargs="+")
+    ap.add_argument("--carte", action="store_true", help="écrit desaccord.png dans le dossier de référence (différences en rouge)")
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     for p in a.plans:
@@ -53,6 +54,11 @@ def main() -> int:
         r = comparer(ref, aut)
         e = [json.loads((d / p / "verite.json").read_text(encoding="utf-8"))["px_par_m"] for d in (a.reference, a.autre)]
         print(f"{p} : {json.dumps(r, ensure_ascii=False)} ; échelles {e[0]} / {e[1]} px/m ({100 * (e[1] / e[0] - 1):+.1f} %)")
+        if a.carte:  # le plan en gris, en rouge là où les deux tracés ne disent pas la même chose : ce que le relecteur doit trancher
+            image = next(f for f in (a.reference / p).glob(f"{p}.*") if f.suffix.lower() in (".jpg", ".jpeg", ".png"))
+            fond = np.array(Image.open(image).convert("RGB"))
+            fond[ref != aut] = (255, 0, 0)
+            Image.fromarray(fond).save(a.reference / p / "desaccord.png")
     return 0
 
 
