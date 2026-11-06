@@ -187,8 +187,9 @@ def faire_verite(saisie: Path) -> dict:
     if inconnue:
         # Pas d'échelle sur le plan : on la pose sur la largeur des portes (0,83 m) pour avoir des mètres plausibles ;
         # la note d'échelle ne comptera pas ce plan.
+        # "px_par_m" dans "echelle" : valeur posée à la main (ex. sur la seule vraie porte, quand les passages ouverts fausseraient la médiane).
         largeurs = [math.hypot(o[3] - o[1], o[4] - o[2]) for o in s["ouvertures"] if o[0] == "porte"]
-        px_par_m = float(np.median(largeurs)) / float(echelle.get("porte_m", 0.83))
+        px_par_m = float(echelle.get("px_par_m") or float(np.median(largeurs)) / float(echelle.get("porte_m", 0.83)))
     else:
         px_par_m = float(s.get("px_par_m", 0.0))  # 0 : viendra des surfaces écrites
 
@@ -308,6 +309,102 @@ def _controle(img: np.ndarray, murs, ouvertures, zones, etiq, sortie: Path) -> N
     Image.alpha_composite(base.convert("RGBA"), calque).convert("RGB").save(sortie)
 
 
+def controler(saisie: Path) -> str:
+    """Compare la saisie à l'ENCRE du plan et liste ce qui semble faux, pour le relire au lieu de réécrire ces mesures à chaque
+    plan : mur mal placé ou d'épaisseur fausse, trou du mur non déclaré, porte posée sur un mur plein, trait long non tracé,
+    largeur de porte impossible à l'échelle. Ce sont des SIGNAUX à vérifier sur le plan, pas des erreurs certaines."""
+    s = json.loads(saisie.read_text(encoding="utf-8"))
+    img = lire_image(saisie.parent / s["image"])
+    gris = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    H, W = gris.shape
+    sombre = gris < float(np.percentile(gris, 90)) - 30
+    murs = [list(map(float, m)) for m in s["murs"]]
+    if s.get("affiner", True):
+        murs = [affiner_mur(gris, m) for m in murs]
+    lignes = []
+    trace = np.zeros((H, W), np.uint8)
+    for k, (x0, y0, x1, y1, ep) in enumerate(murs):
+        cv2.line(trace, (round(x0), round(y0)), (round(x1), round(y1)), 1, max(1, round(ep)) + 10)
+        L = math.hypot(x1 - x0, y1 - y0)
+        if L < 8:
+            continue
+        ux, uy = (x1 - x0) / L, (y1 - y0) / L
+        nx, ny = -uy, ux
+        demi = int(ep / 2 + 8)
+        ts = np.arange(0.0, L, 1.0)
+        decal = np.arange(-demi, demi + 1)
+        xs = np.clip(np.round(x0 + np.outer(ts, np.full_like(decal, 1)) * ux + np.outer(np.ones_like(ts), decal) * nx).astype(int), 0, W - 1)
+        ys = np.clip(np.round(y0 + np.outer(ts, np.full_like(decal, 1)) * uy + np.outer(np.ones_like(ts), decal) * ny).astype(int), 0, H - 1)
+        bande = sombre[ys, xs]  # une ligne par position le long du mur, une colonne par décalage en travers
+        coeur = np.abs(decal) <= max(1, ep / 2)
+        plein = bande[:, coeur].mean(1) >= 0.25
+        ouv = []
+        for o in s["ouvertures"]:
+            cx, cy = (o[1] + o[3]) / 2, (o[2] + o[4]) / 2
+            t_ = (cx - x0) * ux + (cy - y0) * uy
+            if -2 <= t_ <= L + 2 and abs((cx - x0) * nx + (cy - y0) * ny) <= 12:
+                a, b = sorted(((o[1] - x0) * ux + (o[2] - y0) * uy, (o[3] - x0) * ux + (o[4] - y0) * uy))
+                ouv.append((o[0], a, b))
+                dedans = plein[max(0, int(a)):max(0, int(b)) + 1]
+                if o[0] == "porte" and len(dedans) and dedans.mean() > 0.9:
+                    lignes.append(f"mur {k} : porte ({o[1]:.0f},{o[2]:.0f})-({o[3]:.0f},{o[4]:.0f}) sur un mur plein d'encre (passage virtuel ou erreur ?)")
+        i = 0
+        while i < len(plein):  # les trous du trait non déclarés
+            if plein[i]:
+                i += 1
+                continue
+            j = i
+            while j + 1 < len(plein) and not plein[j + 1]:
+                j += 1
+            couvert = sum(max(0, min(b, j) - max(a, i)) for _, a, b in ouv)
+            if j - i >= 12 and i > 4 and j < len(plein) - 5 and couvert < 0.5 * (j - i):
+                lignes.append(f"mur {k} : trou non déclaré ({x0 + i * ux:.0f},{y0 + i * uy:.0f})-({x0 + j * ux:.0f},{y0 + j * uy:.0f}), {j - i} px")
+            i = j + 1
+        hors_ouv = np.ones(len(ts), bool)
+        for _, a, b in ouv:
+            hors_ouv[max(0, int(a)):max(0, int(b)) + 1] = False
+        if hors_ouv.sum() >= 10:
+            prof = bande[hors_ouv].mean(0) >= 0.5  # épaisseur et position mesurées là où le mur est plein
+            if prof.any():
+                c = int(np.argmin(np.abs(decal)))
+                ids = np.nonzero(prof)[0]
+                g = ids[np.argmin(np.abs(ids - c))]
+                a = b = g
+                while a > 0 and prof[a - 1]:
+                    a -= 1
+                while b + 1 < len(prof) and prof[b + 1]:
+                    b += 1
+                # Trait flou : le seuil large gonfle sa largeur. On prend la mi-profondeur, sauf si elle coupe la bande en deux
+                # (mur gris cerné de noir : seuls les deux cernes passeraient, et c'est la bande entière qui compte).
+                gris_prof = gris[ys, xs][hors_ouv].mean(0)
+                moitie = (float(np.percentile(gris_prof, 90)) + float(gris_prof[a:b + 1].min())) / 2
+                sous = gris_prof[a:b + 1] < moitie
+                bords = np.flatnonzero(np.diff(np.concatenate(([0], sous.astype(int), [0]))) == 1)
+                if len(bords) == 1:
+                    ids2 = np.flatnonzero(sous)
+                    a, b = a + ids2[0], a + ids2[-1]
+                mesure, centre = b - a + 1, (decal[a] + decal[b]) / 2
+                if abs(mesure - ep) > max(2.5, 0.35 * ep) or abs(centre) > 3:
+                    lignes.append(f"mur {k} ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) : encre {mesure} px de large, décalée de {centre:+.1f} px (saisi {ep:.0f} px)")
+            else:
+                lignes.append(f"mur {k} ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) : presque pas d'encre sous le mur")
+    # Les traits longs et droits du dessin qu'aucun mur ne couvre (cloison oubliée, mais aussi cotes, balcons, meubles : à trier).
+    s8 = (gris < (float(np.percentile(gris, 90)) + float(np.percentile(gris, 1))) / 2).astype(np.uint8)  # seuil strict : le texte flou ne fait pas de longs traits
+    longs = cv2.morphologyEx(s8, cv2.MORPH_OPEN, np.ones((1, 40), np.uint8)) | cv2.morphologyEx(s8, cv2.MORPH_OPEN, np.ones((40, 1), np.uint8))
+    n, _, st, _ = cv2.connectedComponentsWithStats(longs & (trace == 0).astype(np.uint8), connectivity=8)
+    restes = sorted((st[i] for i in range(1, n) if max(st[i][2], st[i][3]) >= 40), key=lambda v: -max(v[2], v[3]))[:15]
+    for x, y, w, h, _ in restes:
+        lignes.append(f"trait long non tracé : ({x},{y})-({x + w},{y + h})")
+    vj = saisie.parent / "verite.json"
+    if vj.exists():
+        e = json.loads(vj.read_text(encoding="utf-8"))["px_par_m"]
+        for o in s["ouvertures"]:
+            m = math.hypot(o[3] - o[1], o[4] - o[2]) / e
+            if o[0] == "porte" and not 0.55 <= m <= 1.15:
+                lignes.append(f"porte ({o[1]:.0f},{o[2]:.0f})-({o[3]:.0f},{o[4]:.0f}) : {m:.2f} m à {e} px/m (passage ouvert, ou échelle/saisie fausse ?)")
+    return "\n".join(lignes) if lignes else "rien à signaler"
+
+
 def apercu(saisie: Path, sortie: Path | None = None) -> Path:
     """La saisie dessinée telle quelle sur le plan (murs rouges, ouvertures en couleur, points des pièces), SANS vérifier
     que les zones sont fermées : pour relire un brouillon avant qu'il passe par `verite`."""
@@ -333,6 +430,8 @@ def apercu(saisie: Path, sortie: Path | None = None) -> Path:
 def main() -> int:
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest="cmd", required=True)
+    c_ = sp.add_parser("controler")
+    c_.add_argument("saisie", type=Path)
     ap_ = sp.add_parser("apercu")
     ap_.add_argument("saisie", type=Path)
     ap_.add_argument("--sortie", type=Path)
@@ -344,7 +443,10 @@ def main() -> int:
     v = sp.add_parser("verite")
     v.add_argument("saisie", type=Path, nargs="+")
     a = ap.parse_args()
-    if a.cmd == "apercu":
+    if a.cmd == "controler":
+        sys.stdout.reconfigure(encoding="utf-8")
+        print(controler(a.saisie))
+    elif a.cmd == "apercu":
         print(apercu(a.saisie, a.sortie))
     elif a.cmd == "grille":
         print(grille(a.image, a.pas, a.zoom, a.sortie))

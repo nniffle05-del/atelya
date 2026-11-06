@@ -1,0 +1,46 @@
+Atelya, essai 8 (œil vits14, vrais plans) : calcul sur NVIDIA GeForce RTX 2070
+  apprentissage : repris du cache apprentissage-8219-sm.pkl
+  controle : repris du cache controle-997.pkl
+  photos-apprentissage : repris du cache photos-apprentissage-1147-sm.pkl
+  photos-controle : repris du cache photos-controle-141.pkl
+  monde-apprentissage : repris du cache monde-apprentissage-2761-sm.pkl
+  monde-controle : repris du cache monde-controle-317.pkl
+  biais-apprentissage : repris du cache biais-apprentissage-2717-sm.pkl
+  biais-controle : repris du cache biais-controle-313.pkl
+  vrais-apprentissage : 8/8 plans lus (3 s)
+  vrais-controle : 1/1 plans lus (2 s)
+Lecture : 11238 dessins anciens, 1230 photos, 3794 monde, 3768 biais, 8 vrais (2 plans) ; contrôles 1079 anciens, 157 photos, 346 monde, 343 biais, 1 vrais
+Parts effectives des morceaux : vrais 30.0%, biais 14.0%, monde 11.2%, photos 25.2%, anciens 19.6%
+Départ resultats-essai-5\atelya-essai-4.pt : œil vits14, fusion à zéro (répond comme le départ), 19.8 millions de réglages qui apprennent (dégelés 0)
+Maître figé : resultats-essai-5\atelya-essai-4.pt (poids 3.0)
+Départ anciens : IoU moyen 87.0%  murs 92.5%  portes 72.1%  fenêtres 86.8%  taches marges 0.0%
+Départ photos  : IoU moyen 87.9%  murs 93.5%  portes 75.3%  fenêtres 87.5%  taches marges 0.0%
+Départ monde   : IoU moyen 55.5%  murs 38.1%  portes 50.0%  fenêtres 41.3%  taches marges 50.0%
+Départ biais   : IoU moyen 91.3%  murs 89.4%  portes 67.7%  fenêtres 87.3%  taches marges 0.0%
+Départ vrais   : IoU moyen 45.4%  murs 86.1%  portes 74.7%  fenêtres 0.3%  taches marges 0.0%
+Règle : meilleure note vrais sans recul > 0.5 sur anciens (min 86.5), photos (min 87.4), biais (min 90.8)
+[  0.6 min] pas    100  perte 2.163  GPU 78 °C  lots sautés 0
+    anciens : IoU moyen 80.2%  murs 92.1%  portes 72.3%  fenêtres 82.2%  taches marges 0.0%
+    photos  : IoU moyen 84.1%  murs 93.5%  portes 72.3%  fenêtres 87.9%  taches marges 0.0%
+    monde   : IoU moyen 54.6%  murs 50.2%  portes 49.4%  fenêtres 33.5%  taches marges 40.0%
+    biais   : IoU moyen 84.0%  murs 89.0%  portes 64.6%  fenêtres 87.6%  taches marges 0.0%
+    vrais   : IoU moyen 38.5%  murs 86.0%  portes 70.8%  fenêtres 0.3%  taches marges 0.0%
+    (recul : anciens 80.2 (min 86.5), photos 84.1 (min 87.4), biais 84.0 (min 90.8) ; pas gardé)
+[  1.1 min] pas    178  perte 1.183  GPU 82 °C  lots sautés 0
+    anciens : IoU moyen 81.8%  murs 92.3%  portes 74.0%  fenêtres 84.3%  taches marges 0.0%
+    photos  : IoU moyen 88.1%  murs 93.5%  portes 74.3%  fenêtres 87.9%  taches marges 0.0%
+    monde   : IoU moyen 57.9%  murs 49.8%  portes 51.9%  fenêtres 43.8%  taches marges 20.0%
+    biais   : IoU moyen 85.9%  murs 88.7%  portes 67.6%  fenêtres 88.4%  taches marges 0.0%
+    vrais   : IoU moyen 43.1%  murs 86.0%  portes 72.8%  fenêtres 0.2%  taches marges 0.0%
+    (recul : anciens 81.8 (min 86.5), biais 85.9 (min 90.8) ; pas gardé)
+BILAN dernier anciens : IoU moyen 81.8%  murs 92.3%  portes 74.0%  fenêtres 84.3%  taches marges 0.0%
+BILAN dernier photos : IoU moyen 88.1%  murs 93.5%  portes 74.3%  fenêtres 87.9%  taches marges 0.0%
+BILAN dernier monde : IoU moyen 57.9%  murs 49.8%  portes 51.9%  fenêtres 43.8%  taches marges 20.0%
+BILAN dernier biais : IoU moyen 85.9%  murs 88.7%  portes 67.6%  fenêtres 88.4%  taches marges 0.0%
+BILAN dernier vrais : IoU moyen 43.1%  murs 86.0%  portes 72.8%  fenêtres 0.2%  taches marges 0.0%
+AUCUN MODÈLE GARDÉ : chaque tour reculait sur les anciens plans, les photos ou les biais. On garde le départ.
+BILAN depart_meme_controle anciens : IoU moyen 87.0%  murs 92.5%  portes 72.1%  fenêtres 86.8%  taches marges 0.0%
+BILAN depart_meme_controle photos : IoU moyen 87.9%  murs 93.5%  portes 75.3%  fenêtres 87.5%  taches marges 0.0%
+BILAN depart_meme_controle monde : IoU moyen 55.5%  murs 38.1%  portes 50.0%  fenêtres 41.3%  taches marges 50.0%
+BILAN depart_meme_controle biais : IoU moyen 91.3%  murs 89.4%  portes 67.7%  fenêtres 87.3%  taches marges 0.0%
+BILAN depart_meme_controle vrais : IoU moyen 45.4%  murs 86.1%  portes 74.7%  fenêtres 0.3%  taches marges 0.0%
