@@ -221,6 +221,8 @@ Détail : `docs/projet/memoire/atelya-murs-en-trop.md`.
 jamais touchés) / ~80 à l'entraînement, vérités des 80 (Claude + validation NT à l'écran), catalogue de styles pour le lot 2, puis essai 8
 (e5 + DINOv2 + fabriqués + 80 vrais plans), jugé sur les 40 d'examen. Plan détaillé dans `atelya-murs-en-trop.md` (fin).
 
+**CHANTIER EN COURS (06/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans. Lire d'abord `docs/projet/etapes/reprise-105-plans.md`.**
+
 **Prochaine étape** : les 105 vrais plans (ci-dessus). Restes d'A2 :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
 option A2-7 (marques des cotes lues dans les traits du PDF : défaut ancien de ~0,5 % quand deux cotes se
