@@ -49,23 +49,19 @@
    "ouvertures": 14,
    "pieces": 15,
    "px_par_m": 42.2,
-   "echelle_source": "INCONNUE (ni cote, ni surface, ni barre) : px_par_m posé à la main sur la seule porte dessinée (entrée, 35 px = 0,83 m). Pas d'echelle.inconnue dans la saisie car la médiane des « portes » de l'outil aurait été faussée par les 3 passages ouverts (41-102 px) ; verite.json dit donc echelle_inconnue=false à tort : ne pas noter l'échelle d'Atelya sur ce plan.",
+   "echelle_source": "INCONNUE (ni cote, ni surface, ni barre) : posée à la main sur la seule porte dessinée (entrée, 35 px = 0,83 m), via echelle.inconnue + px_par_m, exclue de la note d'échelle",
    "niveaux": 1,
    "incertain": [
-    "Échelle inconnue : 42,2 px/m approché sur la porte d'entrée seule (hors-tout 14,3 × 12,8 m, pièces 0,9-27,5 m², plausible mais non vérifiable) ; echelle_inconnue=false dans verite.json (limite de l'outil)",
-    "Aucune porte intérieure dessinée sur ce plan : toutes les pièces (chambres, bureau, arrière bureau, dressing, placard, salle d'eau, cuisine, dégagt 1, WC) sont fermées ; seule l'entrée (arc) est une ouverture ; aucune porte inventée",
-    "Salle à manger, Hall d'entrée et Salon = un seul espace ouvert coupé par des refends courts : deux traits virtuels (x 262, y 261-363 ; x 451, y 261-362) + une porte de toute la largeur (2,4 m)",
-    "Dégagt 2 ouvert sur le Hall (y 141, x 338-379) : trait virtuel + porte de 0,97 m",
-    "« Arrière bureau » typé bureau (pourrait être un dégagement ou un rangement)",
-    "« Salle d'eau / WC » = une seule zone typée salle_d_eau",
-    "Fenêtres lues sur l'amincissement du mur extérieur avec ligne bleue (5 à gauche, 5 à droite, aucune en haut ni en bas)",
-    "Réduit sous le WC (x 250-290, y 513-534) ouvert sur la cuisine : compté dans la cuisine",
-    "Zone sous le hall entre x 305 et 443 (palier, porte d'entrée) laissée en extérieur",
-    "affiner désactivé : murs gris cernés de noir, le recalage accrochait le trait noir du bord (décalage 4-5 px) ; axes et épaisseurs mesurés sur les emprises d'encre au pixel (profils de colonnes/lignes)"
+    "Échelle inconnue, posée sur la porte d'entrée (35 px = 0,83 m)",
+    "Aucune porte intérieure dessinée : seule l'entrée (arc) est une ouverture, aucune porte inventée",
+    "Salle à manger / Hall d'entrée / Salon = un seul espace ouvert : deux traits virtuels (x 262 et x 451, y 261-363) + portes de toute la largeur",
+    "Dégagt 2 ouvert sur le Hall (y 141, x 338-379) : trait virtuel + porte (vérifié au zoom : pas de trait)",
+    "« Arrière bureau » typé bureau ; « Salle d'eau / WC » une seule zone salle_d_eau",
+    "Réduit sous le WC compté dans la cuisine ; zone sous le hall (x 305-443) = extérieur (palier)",
+    "affiner désactivé : murs gris cernés de noir"
    ],
-   "confiance": 85,
-   "remarques": "Plan propre de promoteur/agence (724×626 px), murs gris cernés de noir, sans cotes ni surfaces. Brouillon Atelya inutilisable (28 pièces, 69 murs) : vérité faite de zéro. Positions des murs lues par profils d'encre (seuil gris < 238) : murs extérieurs 13-15 px, cloisons 10-11 px ; trous cherchés le long de chaque mur : seuls l'entrée (x 356-391) et le passage Dégagt 2 → Hall sont ouverts. Attention pour la notation : verite.json porte echelle_inconnue=false alors que l'échelle est inconnue (42,2 px/m = porte d'entrée 0,83 m) ; si le noteur doit exclure ce plan de la note d'échelle, le mettre à true à la main, ou améliorer faire_verite.py pour que echelle.inconnue puisse ignorer les portes de passage. Fichiers : D:\\Modélisation immobilière\\atelya\\verites-lot2\\fr-030\\ (verite-saisie.json, logement.json, verite.json, masque_semantique.png, controle.png, aperçus et zooms). Masque sémantique : les 3 passages ouverts contiennent un trait « porte » de 2 px (convention des 15 premières vérités).",
-   "source": "wf_8f4a72e6-56d"
+   "confiance": 80,
+   "remarques": "Saisie de la session précédente relue, déjà au format echelle.inconnue + px_par_m 42,2 demandé par la fiche de reprise ; le seul point douteux (ouverture du Dégagt 2 sur le hall) vérifié au zoom x2 : le mur de la chambre 3 commence bien à x 379, passage réel. Contrôle d'encre : aucun mur décalé, seuls les deux passages virtuels signalés (normal). Vérité régénérée (controle.png relu : 15 zones, une couleur chacune, fenêtres et porte posées)."
   },
   "fr-021": {
    "plan": "fr-021",
@@ -220,6 +216,157 @@
    ],
    "confiance": 85,
    "remarques": "Les 3 erreurs du relecteur VÉRIFIÉES sur le plan et toutes CONFIRMÉES (zooms ×2 par faire_verite grille + agrandissements ×4 avec graduations tous les 10 px, fichiers ..\\atelya\\verites-lot2\\fr-029\\revue\\v3-toilettes.png, v3-toilettes-x4.png, v3-couloir2-porte.png, v3-couloir2-porte-x4.png, v3-mur7.png, v3-mur7-x4.png, v3-porte-ch1-x4.png, v3-porte-cuisine-x4.png, v3-controle-toilettes-couloir2.png, v3-controle-mur7.png : aucun zoom du relecteur écrasé). (1) Toilettes : la cloison x≈777-790 est noire et continue de y≈545 à 630, le mur bas y≈630 aussi, aucun battant ni arc ; sur ce plan une vraie porte se voit comme une coupure du noir remplacée par un trait gris fin (battant à plat : portes de la chambre 1 et de la cuisine, mes crops) → ouverture [porte 780,565-622] SUPPRIMÉE, entrée « incertain » remplacée par le texte du relecteur. (2) Porte couloir 2 → salon : le noir s'arrête à x≈673-674, battant en trait fin à x≈675 (y 635-683), arc jusqu'au mur qui reprend à x≈725-726 → [porte 674,634,725,634] (51 px, 0,57 m). (3) Mur 7 : encre y≈224-233 (cœur 226-232), 8-9 px cernes compris ; verite.json montrait que l'affinage l'avait gardé à 13 px → [415,229,578,229,9]. Une note « Relecture n° 2 » ajoutée dans incertain. verite relancé : OK, 21 murs, 11 pièces, 23 ouvertures (24 − 1), 89,838 px/m (89,78 avant, +0,06 %), aucune zone ouverte, logement.json / verite.json / masque_semantique.png / controle.png régénérés. controler relancé : les signaux « mur 7 encre 7 px (saisi 13) » et « mur 18 porte sur mur plein » ont DISPARU ; restent « porte sur mur plein » pour mur 6 (415, 268-336, chambre 1) et mur 15 (307, 755-820, cuisine) = vraies portes dont le battant est dessiné à plat le long de l'axe du mur (vérifié ×4 : noir interrompu, trait gris fin entre les deux), plus 10 « trait long non tracé » = symboles de fenêtres, meubles, trait du placard (normal). controle.png lu en entier et découpé sur les deux zones : porte verte sur x 674-725 alignée sur battant et arc, cloison des toilettes rouge pleine, zone wc fermée et coloriée, mur 7 ~9 px collé sur son trait noir. Fichiers modifiés : uniquement ..\\atelya\\verites-lot2\\fr-029\\verite-saisie.json (+ sorties régénérées) et les nouveaux zooms revue/v3-*. Aucune installation, aucun git."
+  },
+  "fr-031": {
+   "plan": "fr-031",
+   "reussi": true,
+   "murs": 15,
+   "ouvertures": 17,
+   "pieces": 8,
+   "px_par_m": 115,
+   "echelle_source": "cotes en m (plan 1/50) : 8,04 m = 925 px, 8,15 m = 937 px, 4,28 m = 494 px, 5,03 m = 577 px -> 115 px/m",
+   "niveaux": 1,
+   "incertain": [
+    "Salon et Salle à manger sans cloison : une seule zone sejour",
+    "Cuisine ouverte sur la salle à manger (cote 2,42, seule la cote rouge passe là) : trait virtuel x 704 + porte de toute la largeur",
+    "Placards : fronts en pointillés tracés mur fin + porte de toute la largeur",
+    "Pièce aux vasques/WC sans nom : salle_d_eau ; Douche voisine aussi salle_d_eau (passage 0,99 m entre les deux, trait fin de cote dans l'ouverture)",
+    "Baie 2,37 m du mur ouest lue porte-fenêtre ; porte d'entrée supposée = porte à battant du mur ouest (0,90)",
+    "Murs extérieurs creux (double trait) : axe au milieu, épaisseurs 0,21-0,30 m",
+    "Portes chambre est (0,71) et salle d'eau (0,73) : positions confirmées par les cotes et les trous du mur"
+   ],
+   "confiance": 88,
+   "remarques": "Saisie de la session précédente vérifiée au zoom x2 sur les quatre points douteux (portes de la chambre 2 et de la salle d'eau, cloison douche, limite cuisine) : tout concorde avec les cotes. Les signaux du contrôle d'encre sur les murs extérieurs (encre 5 px décalée de 12-17 px) viennent des murs creux à double trait : attendus. Un essai de recalage du mur douche (x 940, 8 px) a été annulé, la saisie d'origine (x 939, 12 px, deux traits) est la plus juste ; contenu final identique à la saisie reprise."
+  },
+  "fr-032": {
+   "plan": "fr-032",
+   "reussi": true,
+   "murs": 36,
+   "ouvertures": 21,
+   "pieces": 16,
+   "px_par_m": 72.69,
+   "echelle_source": "surfaces écrites (Cuisine 19,05, Séjour 13,5, Salon 11,55, Salle d'eau 4,85, Wc 0,95, Placard 2 1,22, Cellier 2, placard cuisine 0,59) : √(Σpx/Σm²) = 72,7 px/m ; grandes pièces à ±0,9 %, petites à -7…+3 %",
+   "niveaux": 1,
+   "incertain": [
+    "Chambre 1 (11 m², placard compris chez l'auteur), Entrée (8,79) et Placard 1 (0,57) hors du calcul d'échelle",
+    "Murs extérieurs : blocs violets à fond gris = trumeaux pleins, blancs à double trait fin = fenêtres (sinon une fenêtre chevaucherait la cloison cuisine/chambre)",
+    "Mur de droite en biais (axe x 983 en haut, 933 en bas), violet + bande grise = un mur de 26 px",
+    "Mur du bas sur balcon : 565-635 et 762-867 lues fenêtres, 635-697 (double trait décalé) lue porte-fenêtre : le style ne le dit pas",
+    "Cellier (2 m², placard) : porte = trou de 39 px (0,53 m) dans le mur violet x 404 entre y 329 et 368, vu au zoom x6 et par le contrôle d'encre ; trou à double trait du mur bas lu fenêtre",
+    "Wc sans trait vers la Salle d'eau : virtuel 2 px + porte",
+    "Trois réduits sans nom typés placard : Gaine (wc), Gaine (salle d'eau) (bande à diagonale fermée par le trait fin x 915, sans quoi la salle d'eau fait +9 %), Gaine (cuisine) (0,59 m² = 559-638 seulement)",
+    "Placard chambre 1 : front trait fin -> virtuel + porte ; Placard 2 : côté entrée coupé 732-813 sans battant -> porte",
+    "Placard 1 = boîte haute avec battant (porte 730-797) ; boîte basse à diagonale nommée « Placard (bas) » sans porte ; étiquettes peut-être inversées",
+    "Porte cuisine/entrée à deux vantaux inégaux (1,18 m) ; porte d'entrée sur le mur gauche (0,83 m)",
+    "Deux poteaux violets tracés murs courts épais ; murs violets du palier tracés, escalier/ascenseur/balcon ignorés",
+    "Épaisseurs lues sur les profils de gris (bord externe des traits sombres) : violets 14-16 px, cloisons 8-9 px"
+   ],
+   "confiance": 72,
+   "remarques": "Plan d'agence à murs violets (style jamais vu dans le lot) : la clé était de lire les blocs gris comme des trumeaux et les trous à double trait comme fenêtres. Brouillon Atelya abandonné (zones fausses). 12 zooms x2 + 18 zooms fins x3-x6 ; épaisseurs calées sur les profils de gris après deux allers-retours avec les surfaces (le contrôle d'encre ne voit que le cœur sombre des bandes violettes). Trois petites gaines sans nom typées placard plutôt que laissées en trous : à relire par NT. Surface totale écrite 73,18 m²."
+  },
+  "fr-033": {
+   "plan": "fr-033",
+   "reussi": true,
+   "murs": 24,
+   "ouvertures": 29,
+   "pieces": 16,
+   "px_par_m": 38,
+   "echelle_source": "INCONNUE (ni cote, ni surface, ni barre) : px_par_m posé sur les 12 portes simples dessinées (battants 29,5-34 px, médiane 31,5 px = 0,83 m), via echelle.inconnue + px_par_m ; portes doubles et passages virtuels exclus",
+   "niveaux": 1,
+   "incertain": [
+    "Échelle inconnue, exclue de la note ; grand logement (~18 m de large) si les portes font 0,83 m",
+    "Murs extérieurs = bande grise 9-10 px ; tronçons à double trait fin = fenêtres (5 en haut, 3 à gauche, 3 à droite ; aucune sur le mur bas ni à droite du Salon)",
+    "Battants dessinés en trait épais comme les murs (barres de ~31 px + arc pointillé) : non tracés comme murs",
+    "Quatre portes doubles/larges : Salle à manger/Entrée (361-425), porte d'entrée du logement (362-424, mur bas de l'entrée), Chambre 4 (528-592), Salon/Dégagement 2 (529-592, battant droit rabattu sur le mur du Wc)",
+    "Entrée ouverte des deux côtés entre y 322 et 412 : traits virtuels + portes vers les deux dégagements",
+    "Chambre 3 en L avec un renfoncement ouvert (le mur y 231 s'arrête à x 252) ; sa porte sur le Dégagement + une porte vers la Salle à manger",
+    "Placard 2 : aucun trait vers le renfoncement (vérifié au pixel) -> front virtuel + porte ; petit Placard : porte sur la Chambre 2",
+    "Réduit sans nom à droite du Wc (porte depuis le Wc) nommé « Placard (wc) », pourrait faire partie du Wc",
+    "Cellier ~2 m² typé placard ; zone entre les deux blocs = cour (extérieur)",
+    "Quatre portes dessinées (arc + battant) sans trou dans le trait du mur (petit placard, renfoncement, cellier, double Salon) gardées comme portes"
+   ],
+   "confiance": 70,
+   "remarques": "Plan gris sans cotes ni surfaces, 5 chambres et deux blocs séparés par une cour. Brouillon Atelya abandonné (pièces coupées, 50 murs). Lecture sur 4 zooms x2, 9 zooms fins x3-x6, 8 bandes des murs extérieurs et profils de gris pour les fenêtres et la cloison manquante du Placard 2. Contrôle d'encre : seuls signaux = les 4 portes dessinées sans trou (vérifiées : arcs et battants bien présents) et les passages larges attendus. controle.png relu : 16 zones distinctes, 11 fenêtres, 18 portes."
+  },
+  "fr-034": {
+   "plan": "fr-034",
+   "reussi": true,
+   "murs": 22,
+   "ouvertures": 13,
+   "pieces": 9,
+   "px_par_m": 74.915,
+   "echelle_source": "surfaces écrites des 9 pièces intérieures (36,2 / 11,8 / 10,3 / 2,8 / 2,7 / 2,7 / 1,1 / 1,4 / 9 m²), moyenne pondérée calculée par l'outil ; aucune cote ni barre",
+   "niveaux": 1,
+   "incertain": [
+    "Plan schématique pas à l'échelle : chaque pièce s'écarte de l'échelle moyenne (chambres ~70 px/m, salle d'eau 2,8 et WC ~80, cellier 1,4 m² dessiné à ~100), terrasses 46/40 m² dessinées bien trop petites",
+    "Séjour et Cuisine forment une zone ouverte : mur virtuel 2 px posé à y=452 (prolongement du mur haut des parties communes) + porte de toute la largeur ; vraie limite non dessinée",
+    "Aucune porte dessinée pour Chambre n°1 (sauf vers sa salle d'eau) ni Chambre n°2 (sauf vers sa salle d'eau) : aucune porte inventée ; rectangles pointillés (placards ou gaines ?) laissés dans les pièces",
+    "Les 5 baies cyan donnent sur les terrasses : classées porte_fenetre ; certaines sont peut-être de simples fenêtres",
+    "Portes dessinées ~40 px (0,5 m à cette échelle) : trop étroites par construction du dessin",
+    "Terrasse n°1, Terrasse n°2, Parties communes : pas de pièce, murs tracés ; cellier 1,4 m² classé placard"
+   ],
+   "confiance": 70,
+   "remarques": "Reprise d'une session interrompue (brouillon, grille et 4 zooms existaient, pas de verite-saisie.json) ; 10 zooms supplémentaires. Deux portes vers les parties communes (entrée dans le séjour, porte de service dans les dégagements). Mur haut en pente tracé en deux segments (291,10)→(770,47)→(1102,119). Contrôle sur l'encre propre (seuls les cadres des baies ressortent en « trait long »)."
+  },
+  "fr-035": {
+   "plan": "fr-035",
+   "reussi": true,
+   "murs": 22,
+   "ouvertures": 14,
+   "pieces": 8,
+   "px_par_m": 65,
+   "echelle_source": "échelle inconnue (aucune cote, surface ni barre) : 65 px/m posé à la main (WC ~0,95 m, chambres 9-16 m², séjour/cuisine ~37 m²) ; la médiane des portes (~35 px) donnerait 43 px/m et un logement de 180 m², invraisemblable",
+   "niveaux": 1,
+   "incertain": [
+    "Échelle posée à la main (65 px/m) : les portes sont dessinées trop étroites (même dessinateur que fr-034) ; verite.json porte echelle_inconnue=true",
+    "Passage sans porte Dégagements → Entrée : mur x=447 interrompu entre y 542 et 625 (deux blocs hachurés de part et d'autre, trait fin de seuil) noté « porte » de toute la largeur",
+    "Entrée / Séjour-Cuisine sans trait entre (582,541) et (582,657) : mur virtuel 2 px + porte de toute la largeur",
+    "Cloison hachurée y=533 (447-582, 16 px) avec passage sans porte 482-528 traversé d'un trait fin ; retour hachuré (573, 440-533) ; blocs hachurés (215-248 × 457-473 ; 447-480 × 625-641) tracés comme murs épais (gaines ou piliers ?)",
+    "Portes du WC (252-280) et de la salle d'eau (347-382) : coulissantes (deux traits décalés)",
+    "Balcon : pas de pièce, traits fins tracés ; les deux baies du séjour y donnent (porte_fenetre), les 3 autres sont des fenêtres"
+   ],
+   "confiance": 65,
+   "remarques": "Brouillon Atelya trop bruyant (84 murs) : repris de zéro sur 11 zooms. Affinage désactivé (le recalage accrochait les cadres des baies du mur gauche et le bord des blocs hachurés) ; mur x=250 posé à 249 (trait légèrement penché). Contrôle sur l'encre propre (seule la flèche d'entrée ressort)."
+  },
+  "fr-036": {
+   "plan": "fr-036",
+   "reussi": true,
+   "murs": 15,
+   "ouvertures": 4,
+   "pieces": 3,
+   "px_par_m": 132,
+   "echelle_source": "cotes 409 (face du mur gauche x≈99 → mur droit x 635 = 536 px → 131,1) et 386 (face basse du mur SDB y≈360 → mur bas y 872 = 512 px → 132,5) ; contrôle terrasse 423 ↔ 560 px (132,4) ; cote 190 de la terrasse incohérente (134-141)",
+   "niveaux": 1,
+   "incertain": [
+    "Studio : séjour / cuisine / chambre en une pièce (sejour) ; entrée séparée par un pointillé y≈377 : mur virtuel 2 px + porte de toute la largeur",
+    "Le trait épais haut/gauche est la limite du lot (il entoure aussi la terrasse) ; faces intérieures lues à x≈99 (trait fin) et y≈82 : mur gauche tracé 70-99 (29 px), mur haut 65-82 (17 px)",
+    "Porte d'entrée dans le mur haut (x 105-227, battant 0,92 m) : le trait de limite de lot la traverse sans interruption",
+    "Bande pointillée x 602-635 dans la SDB/WC (deux bandes, trait fin au milieu) tracée comme mur épais de 33 px (gaine ou coffrage probable ; peut-être un simple habillage)",
+    "Échelle ±1 % selon qu'on lit les cotes face à face (131-132,5) ou sur leurs repères (133-134)",
+    "Kitchenette, placard « pl » dans la SDB, cercle Ø150 et rectangle 80x130 d'accessibilité, trait épais du bas de la niche frigo : non tracés ; terrasse : contour fin tracé (3 px), pas de pièce"
+   ],
+   "confiance": 85,
+   "remarques": "Plan scanné bleuté avec cotes en cm. Affinage désactivé (traits de limite épais à côté des traits fins des faces). Murs droit et bas tracés sur leur motif en chaîne (20 et 18 px). Baie à deux vantaux vers la terrasse : porte_fenetre 122→420. Contrôle sur l'encre : signaux restants expliqués (bandes épaisses posées sur un trait fin + un trait de limite)."
+  },
+  "fr-037": {
+   "plan": "fr-037",
+   "reussi": true,
+   "murs": 35,
+   "ouvertures": 16,
+   "pieces": 10,
+   "px_par_m": 64.467,
+   "echelle_source": "surfaces du tableau (Séjour 17,85, Cuisine 8,44, Entrée 4,73, Bains 3,84, W.C 1,38, Dégt 3,59) et dimensions écrites des chambres (2,70×4,33 = 11,69 ; 2,70×3,91 = 10,56, hors placards) ; moyenne pondérée de l'outil, pièces entre −5,7 % (WC) et +3,4 % (chambre 2) ; contrôle séjour 3,30×5,45 ↔ 208×353 px",
+   "niveaux": 1,
+   "incertain": [
+    "Vieux plan scanné : dimensions écrites un peu contradictoires (63-68 px/m selon la pièce) ; les 12,46 et 11,32 m² des chambres incluent sans doute les placards PL. (zones placard à part, portes pliantes en V notées « porte » bien que le trait du placard soit continu) ; « Rangt 2,28 » non localisé",
+    "Passage sans porte Entrée → Dégt (mur x≈762 interrompu de y 445 à 502) noté « porte » de toute la largeur",
+    "Portes des chambres, bains et WC dessinées étroites (40-43 px ≈ 0,66 m), battants en barres épaisses ; porte d'entrée (x≈877, y 402-452) dessinée fermée dans le plan du mur",
+    "Parties communes tracées sans pièce : cage d'escalier (marches non tracées), palier, ASC, Gs (ouverture 1012-1049 notée porte), bloc hachuré 960-1005 × 587-622 et vide-ordures V.O (contours) ; façade droite non dessinée entre y 107-395 et 415-472",
+    "Séch. (séchoir) et Balcon : extérieurs, pas de pièce, contours tracés (3 et 9 px) ; porte cuisine → séchoir x≈899, y 110-155",
+    "Mur gauche en deux bandes noires séparées d'un filet blanc tracé comme un seul mur de 23 px"
+   ],
+   "confiance": 80,
+   "remarques": "Brouillon Atelya inutilisable (20 pièces, 45 px/m) : repris de zéro sur 26 zooms. Affinage désactivé ; chaque mur recalé d'après les décalages signalés par « controler » (axe à ±1 px). Porte à deux vantaux entre entrée et séjour (775-860). Contrôle sur l'encre : il ne reste que les signaux attendus (portes sur traits continus des placards et de l'entrée, petit carré du vide-ordures aux traits qui se chevauchent)."
   }
  },
  "revues": {
@@ -363,6 +510,92 @@
    ],
    "resume": "corrigé, non relu. Relecture d'avant : ÉCHELLE recalculée par deux chemins différents du traceur : (1) médiane des portes intérieures 65 px → 0,73 m ⇒ 89,0 px/m (porte d'entrée 75 px ⇒ 0,84 m, porte-fenêtre 72 px ⇒ 0,80 m, cohérents) ; (2) les quatre grandes pièces seules (chambres 1-3 + salon : 627 294 px² / 79,13 m²) ⇒ 89,0 px/m. Traceur 89,78 (+0,9 %) : plausible. Pièce par pièce (contours de logement.json, en px/m) : salon +2,0 %, chambre 2 −1,0 %, chambre 3 −3,4 %, chambre 1 −4,8 %, SdB 2 +4,3 %, autre +5,2 %, couloir 2 −2,6 %, couloir +9,7 %, cuisine −9,9 %, toilettes −15,5 %, SdB 1 +19,8 % : surfaces écrites du rendu 3D peu fiables pour les petites pièces, échelle globale robuste à ~1 %. Géométrie : 21 murs, 11 pièces et 22 des 24 ouvertures conformes à l'encre sur mes zooms ×2 : façade droite en deux parties avec décroché y≈545 confirmée, trou chambre 1 → SdB 2 de 60 px avec une porte fermée dessinée en trait fin (bien « porte »), portes des chambres 2 et 3 sur x≈520 (battants à plat le long du mur y≈303, pas des murs), case blanche hors du mur gauche y 46-216 sans interruption du mur → pas une fenêtre (choix défendable, noté), contour fin sous le mur bas x 555-670 = seuil, pas une fenêtre (revue\\r3-bas-milieu.png), cuisine : porte 755-819 et passage 150-235 OK, « Autre » placard fermé par un trait clair vers le salon OK. Types corrects, aucun extérieur compté, aucune fuite de zone. Sorties cohérentes avec la saisie (18:50). Mes zooms : ..\\atelya\\verites-lot2\\fr-029\\revue\\r2-hautgauche.png, r2-hautdroit.png, r2-milieu.png, r2-bas.png (ATTENTION : ils ont écrasé quatre zooms homonymes d'un relecteur précédent, fichiers dérivés régénérés depuis la même image), r3-toilettes.png, r3-couloir2-porte.png, r3-bas-milieu.png, r3-gauche-haut.png, r3-cuisine-porte.png. Erreurs vues : [{\"gravite\":\"moyenne\",\"quoi\":\"Porte des toilettes INVENTÉE : [\\\"porte\\\", 780, 565, 780, 622] est posée sur un mur plein. Zoom ×2 revue\\\\r3-toilettes.png : le mur x≈780 est noir continu de y 536 à 630, le mur bas y≈630 est noir continu de x 780 à 885 avec un meuble du salon collé dessous, aucun arc ni battant nulle part autour des toilettes (controler : « porte sur un mur plein d'encre »). La convention du lot dit « n'invente aucune porte qui n'est pas dessinée », et le même traceur l'a appliquée strictement à la chambre 2 de fr-025 (laissée sans porte) : incohérent. En vérité d'entraînement, cela apprend au lecteur une porte sur de l'encre pleine ; en notation, Atelya ne pourra jamais la trouver.\",\"correction\":\"supprimer l'ouverture [\\\"porte\\\", 780, 565, 780, 622] ; remplacer l'entrée d'incertain par « Toilettes : aucune porte dessinée (mur x≈780 et mur y≈630 pleins, aucun arc) ; l'accès logique serait par le couloir 2 à x≈780, y≈565-622 : oubli du rendu 3D, aucune porte inventée » ; relancer verite (la zone reste fermée, comme la chambre 2 de fr-025)\"},{\"gravite\":\"legere\",\"quoi\":\"Porte couloir 2 → salon sur le mur y=634 saisie x 665-722 (57 px). Zoom ×2 revue\\\\r3-couloir2-porte.png : le mur noir s'arrête à x≈674, le battant est dessiné ouvert à x≈675 (y 635-682) avec son arc jusqu'à x≈725 où le mur reprend : trou de 51 px (0,57 m) ; 665 est dans le mur (9 px).\",\"correction\":\"[\\\"porte\\\", 674, 634, 725, 634]\"},{\"gravite\":\"legere\",\"quoi\":\"Mur 7 [415,229 → 578,229] saisi 13 px : l'encre de la cloison basse de la salle de bains 2 fait 8-9 px (controler : 7 px ; zoom : bande y≈225-233). Tracée 0,15 m au lieu de ~0,10 m, elle mord de 2-3 px dans la salle de bains 2 et l'alcôve de la chambre 2.\",\"correction\":\"[415, 229, 578, 229, 9]\"}]",
    "tours": 2
+  },
+  "fr-030": {
+   "plan": "fr-030",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [
+    {
+     "gravite": "legere",
+     "quoi": "Échelle (inconnue, exclue de la note) : le symbole d'entrée (x 350-396, y 380-404) est une porte à DEUX vantaux (deux arcs pointillés qui se rejoignent à x 372, battants de ~17 px chacun), pas une porte simple de 0,83 m. Vérification par un autre chemin : à 42,2 px/m le WC fait 1,04 x 1,30 m, le placard 0,54 m de profondeur, murs 0,33/0,24 m (plausible) ; mais la Chambre 3 n'aurait que 1,85 m de profondeur et la bande Dégagt 2 0,57 m de large. Une double porte de 1,2-1,4 m donnerait 25-29 px/m.",
+     "correction": "Rien à changer dans la saisie (echelle.inconnue) ; ajouter à « incertain » : « symbole = porte à deux vantaux, échelle possible entre 25 et 42 px/m »."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Mur virtuel Dégagt 2 / Hall posé à y 141 (x 338-379) : le couloir x 338-379 × y 141-231 (0,97 x 2,1 m, ~2 m²) est compté dans le Hall d'entrée alors que la limite naturelle est le bord du hall, y 231 (le mur [36,231,338,231] s'arrête à 338 et [379,229,639,229] reprend à 379 ; vérifié au zoom revue\\z-degagt2.png : aucun trait aux deux endroits).",
+     "correction": "Remplacer [338,141,379,141,2] et [\"porte\",338,141,379,141] par [338,231,379,231,2] et [\"porte\",338,231,379,231] (le Dégagt 2 devient un L de ~3,3 m²). Facultatif, les deux lectures se défendent."
+    }
+   ],
+   "resume": "Relecture indépendante : 29 murs tous retrouvés sur l'encre (axes et épaisseurs à ±2 px, murs gris cernés de noir, affiner=false justifié), les 5+5 fenêtres relues sur deux bandes ×2 des murs extérieurs (revue\\z-mur-gauche.png, z-mur-droit.png) à ±3 px des positions saisies, 15 zones = 15 étiquettes du plan, types corrects, zone sous le hall (x 305-443) bien laissée en extérieur, aucune porte intérieure inventée (toutes les pièces sont dessinées fermées). Contrôle d'encre : seuls les deux passages virtuels 2,4 m signalés (attendu). Aucune erreur grave ni moyenne ; deux réserves légères (nature du symbole d'entrée, position du virtuel Dégagt 2). Zooms : ..\\atelya\\verites-lot2\\fr-030\\revue\\.",
+   "tours": 0
+  },
+  "fr-031": {
+   "plan": "fr-031",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [
+    {
+     "gravite": "legere",
+     "quoi": "Mur 12 (cloison salle d'eau / douche, [939, 978.5, 939, 1276.5, 12]) : au zoom ×2 (revue\\z-c.png) l'encre est UN trait de 4-5 px à x ≈ 940-942, pas 12 px (le contrôle d'encre le dit aussi : « encre 4 px, décalée de +5,5 px »). 12 px = 0,10 m au lieu de 0,04 m.",
+     "correction": "[941, 978.5, 941, 1276.5, 5] et la porte [\"porte\", 941, 1068, 941, 1183]."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Niche 0,80 x 0,47 devant la porte de la Chambre 1 (x 540-631, y 372-432, traits fins, ligne médiane à y 405, revue\\z-e.png) laissée dans la chambre : si c'est une embrasure, ses deux côtés sont des retours de mur de 0,47 m (0,38 m² d'écart, 2 % de la chambre).",
+     "correction": "Pas de changement imposé ; garder dans « incertain »."
+    }
+   ],
+   "resume": "Échelle recalculée par d'autres cotes que le traceur : 3,04 m = 350 px (x 710-1060, revue\\z-g.png) → 115,1 px/m ; 3,12 m = 359 px → 115,1 ; 2,42 m = 278 px → 114,9 ; Chambre 1 recalculée 20,13 m² contre 8,04 x 2,52 = 20,26 : les 115 px/m sont confirmés. Portes de la Chambre 2 (677-756) et de la salle d'eau (1059-1141) vérifiées au zoom (z-a, z-b) : trous réels dans le mur x 704,5, les barres à x 691-698 / 729-736 sont des panneaux coulissants ou la cote rouge, pas des murs. Fenêtres du mur droit (z-h, z-j), baie 2,37 à face extérieure pointillée = porte-fenêtre (z-i), entrée 0,90 à battant intérieur (z-d), cuisine ouverte (seule la cote 2,42 passe à x 700, z-f) : tout concorde. Les 6 signaux « encre 5 px décalée de 12-17 px » du contrôle sont les murs creux à double trait (attendus). 8 zones, types justes, Salon/Salle à manger fusionnés faute de toute limite dessinée. Aucune erreur grave ni moyenne. Zooms : ..\\atelya\\verites-lot2\\fr-031\\revue\\.",
+   "tours": 0
+  },
+  "fr-032": {
+   "plan": "fr-032",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [
+    {
+     "gravite": "legere",
+     "quoi": "Trois réduits techniques typés placard : « Gaine (cuisine) » 0,14 m² (410-452 × 537-557), « Gaine (wc) » 0,18 m² (932-948 × 642-704), « Gaine (salle d'eau) » 0,74 m² (917-943 × 711-865) : des gaines, pas des rangements ; ils portent le compte à 16 zones pour 13 pièces étiquetées, ce qui pèsera sur la note « pièces ».",
+     "correction": "Décision NT : garder (déjà signalé dans incertain) ou retirer les trois entrées de « pieces » en conservant leurs traits fins ([454.5,536,454.5,639,6], [915,708,915,868,3], [930,639,930,708,5]) pour que la Salle d'eau reste à 4,85 m²."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Porte du Cellier dans le mur violet x 404,5 : au zoom ×4 (revue\\z-cellier-x4.png) le trou va de y ≈ 327 à 372 (45 px = 0,62 m), le petit carré noir (387-397, 372-382) est la butée ; saisi 329-368 (39 px).",
+     "correction": "[\"porte\", 404.5, 327, 404.5, 372]."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Mur du bas sur balcon : le double trait fin descend de ~5 px à x ≈ 632 (revue\\z-g.png), ce qui appuie deux ouvertures distinctes 565-635 et 635-697, mais rien ne dit laquelle est la porte-fenêtre (l'ensemble 565-697 = 1,8 m pourrait aussi être une seule porte-fenêtre à deux vantaux).",
+     "correction": "Pas de changement ; garder dans incertain."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Wc ouvert sur toute sa face basse vers la Salle d'eau (x 835-917 à y 708 : aucun trait au zoom ×4 revue\\z-wc-bas-x4.png) tout en ayant sa porte sur l'Entrée (836, 652-702) : virtuel + porte conforme à la convention, mais c'est sans doute un trait oublié par l'auteur.",
+     "correction": "Rien à changer ; le segment virtuel pourrait commencer à 835 plutôt que 840."
+    }
+   ],
+   "resume": "Échelle vérifiée par les pièces que le traceur a laissées hors calcul : Entrée 8,60 m² recalculée contre 8,79 écrite (-2,2 %, soit 73,5 px/m), Chambre 1 9,99 + placard 0,83 = 10,82 contre 11 (-1,6 %), Salon 11,48 / 11,55, Séjour 13,59 / 13,5, Wc 1,00 / 0,95 ; total recalculé hors gaines 74,2 m² contre 74,1 (somme des étiquettes) : 72,7 px/m tient. Lecture des murs extérieurs confirmée sur bandes ×2 (z-h haut, z-g bas) : blocs violet+gris = trumeaux, doubles traits fins = fenêtres (une lecture inverse ferait chevaucher la fenêtre 720-800 à la cloison cuisine/chambre x 765). Mur en biais relu en deux bandes (z-i, z-j) : axe 982 en haut, 934 en bas, conforme (léger décroché ≤ 8 px vers y 600-640, négligeable). Porte cuisine à deux vantaux (z-c), poteaux, placards 1/bas (z-f : étiquette 0,57 = boîte haute 0,58 m² recalculée, attribution du traceur cohérente), porte Wc, placard chambre (z-d) : tout concorde. Aucune erreur grave ni moyenne. Zooms : ..\\atelya\\verites-lot2\\fr-032\\revue\\.",
+   "tours": 0
+  },
+  "fr-033": {
+   "plan": "fr-033",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [
+    {
+     "gravite": "legere",
+     "quoi": "« Placard (wc) » (665-730 × 278-345, ~3 m², 1,7 x 1,75 m) : au zoom ×4 (revue\\z-a-x4.png) la pièce n'est accessible que par le Wc (mur x 662 de y 276 à 305, porte 305-335 dont le battant épais 626-662 à y 305 ouvre dans le Wc). Une pièce de 3 m² derrière le Wc est plus probablement la cuvette elle-même (Wc à antichambre) ou un débarras qu'un placard.",
+     "correction": "Type « wc » et nom « Wc (fond) » (ou « degagement ») ; à défaut garder placard mais le signaler comme type deviné."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Porte Chambre 3 → Salle à manger sur x 296,5 : au zoom (revue\\z-i.png) le trou du mur va de y ≈ 152 à 192 (40 px), saisi 158-190 (32 px).",
+     "correction": "[\"porte\", 296.5, 152, 296.5, 192]."
+    }
+   ],
+   "resume": "Échelle inconnue (exclue de la note) : contrôle par un autre chemin = les trois portes doubles (62-64 px) font exactement 2 × les portes simples (31,5 px), mur extérieur 9-10 px = 0,25 m, fenêtres 0,9-1,8 m : la pose 38 px/m est cohérente (37 px/m si les portes font 0,83, 43 si 0,73). Murs relus sur zooms ×2 : 24 murs justes, battants épais (barres perpendiculaires ~30 px) bien exclus, fenêtres (5 haut, 3 gauche, 3 droite) retrouvées (z-i, z-j), aucune sur les murs bas, droit du Salon et gauche de la Chambre 3. Portes vérifiées au zoom : doubles Salle à manger/Entrée (z-d), entrée (z-e), Chambre 4 (z-h), Salon (z-c), renfoncement et absence de trait entre Placard 2 et renfoncement (z-b), petit placard (z-f), cellier (z-g), Wc et réduit (z-a-x4). Les 4 « porte sur mur plein » du contrôle d'encre sont les portes dessinées sans trou (confirmées), les 6 « 1,6-2,3 m » sont les doubles portes et les virtuels (attendus). 16 zones = 15 étiquettes + le réduit, cour laissée en extérieur. Aucune erreur grave ni moyenne. Zooms : ..\\atelya\\verites-lot2\\fr-033\\revue\\.",
+   "tours": 0
   }
  }
 }

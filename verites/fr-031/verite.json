@@ -1,0 +1,142 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-031.jpg",
+ "largeur": 1206,
+ "hauteur": 1600,
+ "px_par_m": 115.0,
+ "echelle_inconnue": false,
+ "echelle_source": "cotes en m (plan 1/50) : 8,04 m = 925 px (chambre nord, faces 130,5 à 1055,5), 8,15 m = 937 px (largeur basse), 4,28 m = 494 px (chambre est 483 à 977), 5,03 m = 577 px (salon) -> 115 px/m",
+ "origine_px": [
+  121.0,
+  1559.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "placard_1": "placard",
+  "chambre_2": "chambre",
+  "sejour_1": "sejour",
+  "placard_2": "placard",
+  "salle_d_eau_1": "salle_d_eau",
+  "salle_d_eau_2": "salle_d_eau",
+  "cuisine_1": "cuisine"
+ },
+ "murs_px": [
+  [
+   113.0,
+   454.5,
+   113.0,
+   121.0,
+   34.0
+  ],
+  [
+   108.0,
+   1572.0,
+   108.0,
+   454.5,
+   24.0
+  ],
+  [
+   113.0,
+   121.0,
+   1070.0,
+   121.0,
+   32.0
+  ],
+  [
+   1070.0,
+   454.5,
+   1070.0,
+   121.0,
+   29.0
+  ],
+  [
+   1072.0,
+   1572.0,
+   1072.0,
+   454.5,
+   25.0
+  ],
+  [
+   108.0,
+   1572.0,
+   1072.0,
+   1572.0,
+   26.0
+  ],
+  [
+   113.0,
+   454.5,
+   1070.0,
+   454.5,
+   56.0
+  ],
+  [
+   640.0,
+   671.5,
+   640.0,
+   454.5,
+   8.0
+  ],
+  [
+   640.0,
+   671.5,
+   705.0,
+   671.5,
+   11.0
+  ],
+  [
+   704.5,
+   1276.5,
+   704.5,
+   454.5,
+   11.0
+  ],
+  [
+   704.5,
+   916.0,
+   1072.0,
+   916.0,
+   3.0
+  ],
+  [
+   704.5,
+   978.5,
+   1072.0,
+   978.5,
+   8.0
+  ],
+  [
+   940.0,
+   1276.5,
+   940.0,
+   978.5,
+   8.0
+  ],
+  [
+   704.5,
+   1276.5,
+   1072.0,
+   1276.5,
+   9.0
+  ],
+  [
+   704.5,
+   1572.0,
+   704.5,
+   1276.5,
+   2.0
+  ]
+ ],
+ "incertain": [
+  "Salon et Salle à manger : aucune cloison dessinée entre eux (cotes 5,03 seulement) -> une seule zone « Salon / Salle à manger » (sejour)",
+  "Cuisine ouverte sur la salle à manger (cote 2,42, aucun trait noir) : mur virtuel 2 px (x 704) + porte de toute la largeur (1282-1558)",
+  "Mur entre la chambre nord et le salon : 0,48 m d'épaisseur (traits 427 et 482) ; la niche 0,80 x 0,47 devant la porte (540-631, 372-435) laissée dans la chambre, non tracée en murs",
+  "Placards : fronts en pointillés (x 710 pour le placard nord, y 916 pour le placard est) tracés en mur fin + porte de toute la largeur",
+  "Pièce aux vasques et au WC (sans nom écrit, « Vasques » seulement) : type salle_d_eau ; la Douche voisine (avec Banc et Niche, pointillés ignorés) aussi salle_d_eau",
+  "Baie 2,37 m du mur ouest (1166-1436, face extérieure en pointillés) : lue comme porte-fenêtre, peut-être une simple fenêtre ; porte d'entrée supposée = porte à battant du mur ouest (0,90, y 917-1016)",
+  "Murs extérieurs : axe au milieu entre le trait extérieur fin (x 96, y 105, x 1084, y 1584) et le trait intérieur ; épaisseurs 0,21 à 0,30 m",
+  "Portes du chambre est (0,71) et de la salle d'eau (0,73) : battants dessinés rabattus le long du mur (barres à x 692-698), pas d'arc",
+  "Deux fenêtres accolées du mur est de la chambre 2 (1,13 + 0,08 + 1,13) tracées en deux fenêtres"
+ ]
+}

@@ -1,0 +1,216 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-033.jpg",
+ "largeur": 798,
+ "hauteur": 825,
+ "px_par_m": 38.0,
+ "echelle_inconnue": true,
+ "echelle_source": "INCONNUE : aucune cote, surface ni barre. px_par_m posé sur les 12 portes simples dessinées (battants de 29,5 à 34 px, médiane 31,5 px = 0,83 m) ; les 3 portes doubles (62-64 px) et les 2 passages virtuels exclus",
+ "origine_px": [
+  73.0,
+  593.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "placard_1": "placard",
+  "placard_2": "placard",
+  "sejour_1": "sejour",
+  "sejour_2": "sejour",
+  "chambre_2": "chambre",
+  "entree_1": "entree",
+  "degagement_1": "degagement",
+  "degagement_2": "degagement",
+  "wc_1": "wc",
+  "placard_3": "placard",
+  "salle_d_eau_1": "salle_d_eau",
+  "chambre_3": "chambre",
+  "cuisine_1": "cuisine",
+  "placard_4": "placard",
+  "chambre_4": "chambre"
+ },
+ "murs_px": [
+  [
+   62.5,
+   69.5,
+   735.5,
+   69.5,
+   10.0
+  ],
+  [
+   67.0,
+   602.5,
+   67.0,
+   65.0,
+   9.0
+  ],
+  [
+   731.0,
+   602.5,
+   731.0,
+   65.0,
+   9.0
+  ],
+  [
+   62.5,
+   598.0,
+   302.5,
+   598.0,
+   9.0
+  ],
+  [
+   298.0,
+   602.5,
+   298.0,
+   410.5,
+   9.0
+  ],
+  [
+   293.5,
+   415.0,
+   504.5,
+   415.0,
+   9.0
+  ],
+  [
+   500.0,
+   602.5,
+   500.0,
+   410.5,
+   9.0
+  ],
+  [
+   495.5,
+   598.0,
+   735.5,
+   598.0,
+   9.0
+  ],
+  [
+   67.0,
+   231.0,
+   252.0,
+   231.0,
+   7.0
+  ],
+  [
+   112.0,
+   278.0,
+   112.0,
+   231.0,
+   6.0
+  ],
+  [
+   251.0,
+   276.5,
+   251.0,
+   231.0,
+   2.0
+  ],
+  [
+   67.0,
+   276.5,
+   731.0,
+   276.5,
+   6.0
+  ],
+  [
+   296.5,
+   322.0,
+   296.5,
+   69.5,
+   6.0
+  ],
+  [
+   501.5,
+   322.0,
+   501.5,
+   69.5,
+   6.0
+  ],
+  [
+   250.5,
+   598.0,
+   250.5,
+   276.5,
+   6.0
+  ],
+  [
+   67.0,
+   390.5,
+   250.5,
+   390.5,
+   6.0
+  ],
+  [
+   67.0,
+   482.5,
+   250.5,
+   482.5,
+   6.0
+  ],
+  [
+   250.5,
+   527.5,
+   298.0,
+   527.5,
+   7.0
+  ],
+  [
+   296.5,
+   412.0,
+   296.5,
+   322.0,
+   2.0
+  ],
+  [
+   501.5,
+   412.0,
+   501.5,
+   322.0,
+   2.0
+  ],
+  [
+   592.5,
+   459.0,
+   592.5,
+   276.5,
+   6.0
+  ],
+  [
+   660.5,
+   344.5,
+   660.5,
+   276.5,
+   6.0
+  ],
+  [
+   592.5,
+   344.5,
+   731.0,
+   344.5,
+   6.0
+  ],
+  [
+   500.0,
+   459.0,
+   731.0,
+   459.0,
+   6.0
+  ]
+ ],
+ "incertain": [
+  "Échelle INCONNUE (ni cote, ni surface, ni barre) : px_par_m = 38 posé à la main sur les portes simples (31,5 px = 0,83 m) ; exclu de la note d'échelle. Grand logement (~18 m de large) si les portes font 0,83 m",
+  "Style : murs extérieurs = bande grise épaisse (9-10 px) ; les tronçons à double trait fin dans les murs extérieurs sont les fenêtres (haut : 105-140, 193-250, 363-431, 547-585, 639-677 ; gauche : 303-339, 408-449, 518-559 ; droite : 377-403, 470-503, 529-553) ; aucune fenêtre dessinée sur le mur bas ni sur le mur droit du Salon",
+  "Battants de portes dessinés en trait épais comme les murs (barres de ~31 px perpendiculaires au mur + arc pointillé) : non tracés comme murs",
+  "Portes doubles (deux battants, deux arcs) : Salle à manger/Entrée (361-425, y 276), porte d'entrée du logement (362-424, mur bas de l'entrée y 415, battants ouvrant dans l'entrée), Chambre 4 (528-592, y 459, battants ouvrant dans le dégagement 2), Salon/Dégagement 2 (529-592, y 276 : battant gauche libre, battant droit rabattu le long du mur du Wc)",
+  "Entrée ouverte des deux côtés entre y 322 et 412 (cloisons x 296,5 et x 501,5 arrêtées à y 322) : traits virtuels 2 px + portes de toute la largeur vers le Dégagement (gauche) et le Dégagement 2 (droite)",
+  "Chambre 3 : en L, avec un renfoncement (253-295 x 233-276) ouvert sur la chambre (le mur y 231 s'arrête à x 252), dont la porte (265-295, y 276) donne sur le Dégagement ; deuxième porte vers la Salle à manger (x 296,5, 158-190)",
+  "Placard 2 (115-250 x 233-276) : aucun trait entre lui et le renfoncement (x 251, vérifié au pixel : blanc) -> front = trait virtuel 2 px + porte de toute la largeur (233-275) ; le petit « Placard » (71-111) a sa porte sur la Chambre 2 (70-103, y 276, battant rabattu sur le mur gauche)",
+  "Quatre portes dessinées (arc + battant) sans trou dans le trait du mur : petit Placard (70-103), renfoncement (265-295), Cellier (267-297) et la double Salon/Dégagement 2 (trait fin sous l'ouverture) ; gardées comme portes puisque dessinées",
+  "Wc : porte depuis le Dégagement 2 (x 592,5, 301-331) ; une seconde porte (x 660,5, 303-337, battant ouvrant dans le Wc) mène à un réduit sans nom (665-730 x 278-345) nommé « Placard (wc) » (type placard) ; il pourrait aussi faire partie du Wc",
+  "Cellier (255-297 x 530-597, ~2 m²) typé placard, porte vers le Dégagement (267-297, y 527,5)",
+  "Zone entre les deux blocs (300-500 x 415-600) : extérieur (cour) ; le mur bas de l'entrée (y 415) est un mur extérieur avec la porte d'entrée",
+  "Épaisseurs : mur extérieur 9-10 px (0,25 m), cloisons 5-7 px (0,15 m) mesurées sur les profils de gris"
+ ]
+}

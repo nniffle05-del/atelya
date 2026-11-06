@@ -1,0 +1,305 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-032.jpg",
+ "largeur": 1206,
+ "hauteur": 1455,
+ "px_par_m": 72.691,
+ "echelle_inconnue": false,
+ "echelle_source": "surfaces écrites (Cuisine 19,05, Séjour 13,5, Salon 11,55, Salle d'eau 4,85, Wc 0,95, Placard 2 1,22, Cellier 2, placard cuisine 0,59) ; aucune cote ni barre ; Chambre 1 (11 m², placard compris chez l'auteur) et Entrée (8,79) hors calcul",
+ "origine_px": [
+  286.0,
+  1201.0
+ ],
+ "types_pieces": {
+  "placard_1": "placard",
+  "cuisine_1": "cuisine",
+  "chambre_1": "chambre",
+  "placard_2": "placard",
+  "placard_3": "placard",
+  "entree_1": "entree",
+  "placard_4": "placard",
+  "wc_1": "wc",
+  "placard_5": "placard",
+  "salle_d_eau_1": "salle_d_eau",
+  "placard_6": "placard",
+  "placard_7": "placard",
+  "placard_8": "placard",
+  "placard_9": "placard",
+  "sejour_1": "sejour",
+  "sejour_2": "sejour"
+ },
+ "murs_px": [
+  [
+   277.5,
+   285.0,
+   414.0,
+   285.0,
+   14.0
+  ],
+  [
+   277.5,
+   391.0,
+   277.5,
+   285.0,
+   14.0
+  ],
+  [
+   277.5,
+   390.5,
+   404.0,
+   390.5,
+   16.0
+  ],
+  [
+   404.5,
+   720.0,
+   404.5,
+   285.0,
+   15.0
+  ],
+  [
+   404.0,
+   310.5,
+   990.0,
+   310.5,
+   30.0
+  ],
+  [
+   933.0,
+   1228.0,
+   983.5,
+   297.0,
+   26.0
+  ],
+  [
+   455.0,
+   1216.0,
+   950.0,
+   1216.0,
+   30.0
+  ],
+  [
+   506.0,
+   1216.0,
+   506.0,
+   720.0,
+   14.0
+  ],
+  [
+   147.0,
+   720.0,
+   512.0,
+   720.0,
+   14.0
+  ],
+  [
+   152.5,
+   650.0,
+   152.5,
+   567.0,
+   14.0
+  ],
+  [
+   120.0,
+   650.0,
+   152.5,
+   650.0,
+   6.0
+  ],
+  [
+   404.0,
+   639.0,
+   955.0,
+   639.0,
+   8.0
+  ],
+  [
+   765.0,
+   639.0,
+   765.0,
+   310.0,
+   9.0
+  ],
+  [
+   556.0,
+   639.0,
+   556.0,
+   601.0,
+   6.0
+  ],
+  [
+   679.0,
+   642.0,
+   679.0,
+   601.0,
+   22.0
+  ],
+  [
+   836.0,
+   708.0,
+   836.0,
+   592.0,
+   7.0
+  ],
+  [
+   838.0,
+   593.0,
+   955.0,
+   593.0,
+   2.0
+  ],
+  [
+   930.0,
+   708.0,
+   930.0,
+   639.0,
+   5.0
+  ],
+  [
+   690.0,
+   708.0,
+   840.0,
+   708.0,
+   8.0
+  ],
+  [
+   840.0,
+   708.0,
+   916.0,
+   708.0,
+   2.0
+  ],
+  [
+   916.0,
+   708.0,
+   955.0,
+   708.0,
+   8.0
+  ],
+  [
+   915.0,
+   868.0,
+   915.0,
+   708.0,
+   3.0
+  ],
+  [
+   690.0,
+   868.0,
+   690.0,
+   706.0,
+   3.0
+  ],
+  [
+   735.5,
+   868.0,
+   735.5,
+   706.0,
+   8.0
+  ],
+  [
+   506.0,
+   868.0,
+   942.0,
+   868.0,
+   8.0
+  ],
+  [
+   506.0,
+   710.0,
+   557.0,
+   710.0,
+   4.0
+  ],
+  [
+   557.0,
+   797.0,
+   557.0,
+   710.0,
+   3.0
+  ],
+  [
+   506.0,
+   796.0,
+   560.0,
+   796.0,
+   4.0
+  ],
+  [
+   558.0,
+   868.0,
+   558.0,
+   796.0,
+   4.0
+  ],
+  [
+   568.0,
+   868.0,
+   568.0,
+   852.0,
+   20.0
+  ],
+  [
+   739.0,
+   982.0,
+   739.0,
+   868.0,
+   9.0
+  ],
+  [
+   739.0,
+   1216.0,
+   739.0,
+   1131.0,
+   9.0
+  ],
+  [
+   739.0,
+   1131.0,
+   739.0,
+   982.0,
+   2.0
+  ],
+  [
+   404.0,
+   536.0,
+   455.0,
+   536.0,
+   2.0
+  ],
+  [
+   404.0,
+   558.0,
+   455.0,
+   558.0,
+   2.0
+  ],
+  [
+   454.5,
+   639.0,
+   454.5,
+   536.0,
+   6.0
+  ]
+ ],
+ "incertain": [
+  "Échelle par les surfaces écrites (aucune cote) ; Chambre 1 (11 m² : l'auteur y compte le placard, -4,6 % sinon), Entrée (8,79 m², zone de l'auteur incertaine) et Placard 1 (0,57, étiquette incertaine) hors du calcul",
+  "Lecture des murs extérieurs : les blocs violets à fond gris sont les trumeaux pleins, les blancs à double trait fin sont les fenêtres (sinon une fenêtre chevaucherait la cloison cuisine/chambre et dépasserait le mur droit)",
+  "Mur de droite en biais (axe x 983 en haut, 933 en bas ; encre 24-30 px) : violet + bande grise comptés comme un seul mur de 28 px (0,38 m) ; murs haut et bas 30-32 px (trumeaux), cloisons 10-11 px (double trait sombre)",
+  "Mur du bas sur balcon : deux ouvertures accolées 565-635 (double trait haut) et 635-697 (double trait décalé) + 762-867 ; la décalée lue porte-fenêtre, les deux autres fenêtres (le style ne le dit pas)",
+  "Cellier (2 m², typé placard) : porte = trou de 39 px (0,53 m) dans le mur violet x 404 entre y 329 et 368 (vu au zoom x6 et par le contrôle d'encre), sans battant ; le petit carré noir à (387-398, 372-384) non lu ; le trou à double trait du mur bas (298-325) lu fenêtre/ventilation",
+  "Wc (0,95 m²) : aucun trait entre le Wc et la Salle d'eau (840-916, y 708) -> trait virtuel 2 px + porte de toute la largeur",
+  "Trois réduits sans nom typés placard : « Gaine (wc) » (932-948 x 642-704, deux diagonales fines), « Gaine (salle d'eau) » (917-943 x 711-865, bande à diagonale le long du mur extérieur, fermée par le trait fin x 915 ; sans ce trait la Salle d'eau faisait +9 %), « Gaine (cuisine) » (410-452 x 537-557, boîte à diagonale au-dessus du placard de la cuisine ; 0,59 m² correspond à 559-638 seulement)",
+  "Placard de la chambre 1 : front = trait fin y 593 -> mur virtuel 2 px + porte de toute la largeur (838-953)",
+  "Placard 2 (1,22 m²) : côté entrée (x 690) coupé entre y 732 et 813 sans battant dessiné -> lu porte (front du placard)",
+  "Placard 1 (0,57) = boîte haute (512-556, 712-796) avec battant rabattu dans l'entrée (porte 730-797 sur x 557) ; la boîte basse (512-556, 798-866) à diagonale, étiquette « Placard » tournée, nommée « Placard (bas) », sans porte dessinée (diagonale = symbole de placard) ; l'attribution des deux étiquettes peut être inversée",
+  "Placard (cuisine) 0,59 m² : zone 410-453 x 559-638 avec sa porte sur x 454 (581-639, battant rabattu dans la cuisine)",
+  "Porte cuisine/entrée à deux vantaux inégaux (572-658, 0,71 + 0,5 m) ; porte d'entrée du logement sur le mur gauche x 404 (649-712, 0,83 m) donnant sur le palier",
+  "Deux poteaux violets (668-690 x 601-642 ; 558-578 x 852-868) tracés comme murs courts épais ; refend court x 556 (601-639) dans la cuisine",
+  "Séjour et Salon séparés par deux bouts de refend (x 739, 868-982 et 1131-1216) : trait virtuel + porte entre 983 et 1130",
+  "Parties communes : palier, escalier, ascenseur = pas de pièce ; murs violets du palier tracés (y 720 de 147 à 512 avec sa porte 187-247 ; x 152 ; y 650) ; traits fins (escalier, arcs) ignorés. Balcon (4,93 m²) : pas de pièce, garde-corps fins non tracés",
+  "Épaisseurs mesurées sur les profils de gris, du bord externe d'un trait sombre à l'autre (seuil ~200, sans le halo clair) : murs violets 14-16 px, cloisons 8-9 px ; le contrôle d'encre ne voit que le cœur sombre des murs violets (8-10 px)",
+  "Surface totale écrite 73,18 m²"
+ ]
+}
