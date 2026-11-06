@@ -1,0 +1,221 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-038.jpg",
+ "largeur": 1206,
+ "hauteur": 678,
+ "px_par_m": 39.2,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune cote ni surface ; px_par_m posé sur la médiane des 8 vraies portes intérieures (32,5 px = 0,83 m), les passages ouverts (cuisine, entrée) et la double porte d'entrée exclus",
+ "origine_px": [
+  93.0,
+  595.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "cuisine_1": "cuisine",
+  "chambre_1": "chambre",
+  "wc_1": "wc",
+  "degagement_1": "degagement",
+  "salle_d_eau_1": "salle_d_eau",
+  "chambre_2": "chambre",
+  "degagement_2": "degagement",
+  "entree_1": "entree",
+  "placard_1": "placard",
+  "placard_2": "placard",
+  "chambre_3": "chambre"
+ },
+ "murs_px": [
+  [
+   91.0,
+   97.0,
+   1121.0,
+   97.0,
+   5.0
+  ],
+  [
+   90.5,
+   598.0,
+   90.5,
+   96.0,
+   4.0
+  ],
+  [
+   91.0,
+   598.5,
+   507.0,
+   598.5,
+   6.0
+  ],
+  [
+   787.0,
+   598.5,
+   1121.0,
+   598.5,
+   6.0
+  ],
+  [
+   1121.0,
+   598.0,
+   1121.0,
+   96.0,
+   5.0
+  ],
+  [
+   507.5,
+   291.0,
+   507.5,
+   96.0,
+   6.0
+  ],
+  [
+   397.0,
+   292.0,
+   507.0,
+   292.0,
+   5.0
+  ],
+  [
+   507.0,
+   292.0,
+   732.0,
+   292.0,
+   5.0
+  ],
+  [
+   730.5,
+   291.0,
+   730.5,
+   96.0,
+   6.0
+  ],
+  [
+   783.5,
+   291.0,
+   783.5,
+   96.0,
+   4.0
+  ],
+  [
+   732.0,
+   236.0,
+   782.0,
+   236.0,
+   6.0
+  ],
+  [
+   732.0,
+   292.0,
+   782.0,
+   292.0,
+   6.0
+  ],
+  [
+   782.0,
+   292.0,
+   927.0,
+   292.0,
+   5.0
+  ],
+  [
+   925.5,
+   347.0,
+   925.5,
+   96.0,
+   6.0
+  ],
+  [
+   870.0,
+   347.5,
+   1121.0,
+   347.5,
+   6.0
+  ],
+  [
+   870.5,
+   598.0,
+   870.5,
+   291.0,
+   6.0
+  ],
+  [
+   367.0,
+   403.5,
+   870.0,
+   403.5,
+   6.0
+  ],
+  [
+   368.5,
+   598.0,
+   368.5,
+   402.0,
+   6.0
+  ],
+  [
+   507.5,
+   598.0,
+   507.5,
+   402.0,
+   6.0
+  ],
+  [
+   786.5,
+   598.0,
+   786.5,
+   402.0,
+   6.0
+  ],
+  [
+   368.5,
+   150.0,
+   368.5,
+   96.0,
+   2.0
+  ],
+  [
+   340.4,
+   180.4,
+   370.4,
+   150.4,
+   2.0
+  ],
+  [
+   340.5,
+   291.0,
+   340.5,
+   180.0,
+   2.0
+  ],
+  [
+   340.0,
+   291.0,
+   397.0,
+   291.0,
+   2.0
+  ],
+  [
+   367.0,
+   402.0,
+   367.0,
+   291.0,
+   2.0
+  ]
+ ],
+ "incertain": [
+  "Échelle inconnue : aucune cote, aucune surface, pas de barre ; px_par_m = 39,2 posé sur la médiane des vraies portes intérieures (32,5 px = 0,83 m) ; l'appartement en sort très grand (~26 × 13 m) : à confirmer.",
+  "Fourchette d'échelle 39-50 px/m : à 39,2 (portes intérieures de 0,83 m) la double porte d'entrée (592-672 = 80 px) ferait 2,04 m et les baies à deux vantaux (76-82 px) 1,9-2,1 m ; à 43-50 px/m la double porte ferait 1,6-1,85 m et les fenêtres de façade (56-61 px) 1,1-1,4 m, mais les portes intérieures 0,65-0,75 m. Le dessin n'est pas strictement cohérent : aucune des deux valeurs n'est sûre (relecture du 07/11/2026).",
+  "Terrasse (à gauche, x 48-91, y 96-431) : extérieur, pas de pièce ; sa limite est un trait fin (x 48) qui tourne à y 431 et rejoint le mur en biais jusqu'en (86, 455), non tracé comme mur. Seules les deux baies hautes du mur gauche (y 130-206 et 290-372) donnent sur la terrasse ; la baie basse (y 487-568) est en dehors.",
+  "Zone x 507-787, y 402-598 (sous le couloir d'entrée, entre les deux dressings) : sans mur bas, atteinte par la double porte d'entrée → palier d'immeuble (parties communes), pas de pièce.",
+  "Cuisine ouverte sur le séjour : limite = trait fin (x 370 de y 96 à 150, biais jusqu'à (340,180), puis x 340 jusqu'à y 291) + trou entre x 340 et 397 à y 291 ; murs virtuels de 2 px avec « porte » sur toute la largeur.",
+  "Entrée ouverte sur le séjour : mur virtuel x 367 de y 291 à 402 (dans l'axe du mur du Dressing 2) avec « porte » sur toute la hauteur.",
+  "Petit sas sans nom entre le Wc et l'entrée (x 732-782, y 236-291, cloison fine à y 236 avec porte) : nommé « Sas WC », type degagement.",
+  "Passage de 25 px (~0,6 m) sans porte dessinée entre l'entrée et le dégagement (x 870, y 305-330) : noté « porte ».",
+  "Façade haute : segments bleus entre les petits carrés = fenêtres (6, dont une très petite de 21 px au-dessus du Wc) ; ouvertures tracées de centre à centre des carrés.",
+  "Baies à deux vantaux (arcs de battants) : 3 sur le mur gauche, 4 sur le mur droit (chambres 2 et 3). Cinq d'entre elles portent un rectangle extérieur : la baie basse gauche (x 73-91, 18 px de profondeur, y 483-574) et les 4 de droite (x 1121-1149, 29 px) ; les deux baies hautes gauches, sur la terrasse, n'en ont pas. Dans ce logiciel une fenêtre se dessine en trait bleu entre carrés (façade haute) et un symbole à battants est une porte : les 7 baies sont classées porte_fenetre, le rectangle extérieur étant lu comme un balconnet (relecture du 07/11/2026 : avant, les 4 de droite étaient « fenetre » et celle du bas à gauche « porte_fenetre » avec le même symbole). Si NT y voit des fenêtres à appui, passer en « fenetre » les 5 baies à rectangle (les 4 de droite ET la basse gauche), jamais l'une sans les autres.",
+  "Trois rectangles croisés (x 200-255/y 97-125, x 732-782/y 100-128, x 955-1010/y 570-598) = gaines ou radiateurs, pas des murs ; rectangle noir dans le Wc (x 771-782, y 152-236) = équipement, pas un mur.",
+  "Deux petits refends de 30 px dans le Dressing 2 (y 570, x 367-397 et 480-507) = aménagement de placard, non tracés.",
+  "Petit segment gris épais sur le mur haut de la Chambre 2 (x 1007-1037, y 93-97) : peut-être une fenêtre dessinée autrement, non tracée.",
+  "Hauteur sous plafond non écrite : 2,5 m par défaut."
+ ]
+}

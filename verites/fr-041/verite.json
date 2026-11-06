@@ -1,0 +1,347 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-041.jpg",
+ "largeur": 754,
+ "hauteur": 568,
+ "px_par_m": 54.3,
+ "echelle_inconnue": false,
+ "echelle_source": "cotes : 6.62 m = 360 px (séjour, y 76→436) et 3.40 m = 185 px (séjour, x 60→245) → 54,4 px/m ; vérifié sur 2.50 (135 px, 54,0), 2.95 (159 px, 53,9), 2.80 (155 px, 55,4), 5.35 (286 px, 53,5), 3.85 (207 px, 53,8)",
+ "origine_px": [
+  61.0,
+  507.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "buanderie_1": "buanderie",
+  "entree_1": "entree",
+  "wc_1": "wc",
+  "salle_d_eau_1": "salle_d_eau",
+  "degagement_1": "degagement",
+  "chambre_1": "chambre",
+  "chambre_2": "chambre",
+  "chambre_3": "chambre",
+  "placard_1": "placard",
+  "placard_2": "placard",
+  "placard_3": "placard",
+  "placard_4": "placard"
+ },
+ "murs_px": [
+  [
+   55.0,
+   443.0,
+   55.0,
+   40.0,
+   10.0
+  ],
+  [
+   55.0,
+   72.0,
+   272.0,
+   72.0,
+   10.0
+  ],
+  [
+   55.0,
+   40.0,
+   255.0,
+   40.0,
+   4.0
+  ],
+  [
+   104.0,
+   70.0,
+   104.0,
+   42.0,
+   5.0
+  ],
+  [
+   152.0,
+   70.0,
+   152.0,
+   42.0,
+   5.0
+  ],
+  [
+   184.0,
+   70.0,
+   184.0,
+   42.0,
+   5.0
+  ],
+  [
+   255.0,
+   72.0,
+   255.0,
+   40.0,
+   11.0
+  ],
+  [
+   255.0,
+   45.0,
+   708.0,
+   45.0,
+   10.0
+  ],
+  [
+   708.0,
+   517.0,
+   708.0,
+   45.0,
+   14.0
+  ],
+  [
+   376.0,
+   517.0,
+   708.0,
+   517.0,
+   20.0
+  ],
+  [
+   376.0,
+   517.0,
+   376.0,
+   448.0,
+   18.0
+  ],
+  [
+   55.0,
+   443.0,
+   383.0,
+   443.0,
+   17.0
+  ],
+  [
+   238.0,
+   109.0,
+   238.0,
+   72.0,
+   4.0
+  ],
+  [
+   238.0,
+   109.0,
+   272.0,
+   109.0,
+   4.0
+  ],
+  [
+   272.0,
+   154.0,
+   272.0,
+   45.0,
+   8.0
+  ],
+  [
+   272.0,
+   154.0,
+   425.0,
+   154.0,
+   5.0
+  ],
+  [
+   425.0,
+   155.0,
+   425.0,
+   45.0,
+   6.0
+  ],
+  [
+   406.0,
+   155.0,
+   406.0,
+   120.0,
+   4.0
+  ],
+  [
+   406.0,
+   120.0,
+   425.0,
+   120.0,
+   4.0
+  ],
+  [
+   501.0,
+   157.0,
+   501.0,
+   45.0,
+   6.0
+  ],
+  [
+   501.0,
+   157.0,
+   572.0,
+   157.0,
+   6.0
+  ],
+  [
+   571.0,
+   157.0,
+   571.0,
+   45.0,
+   6.0
+  ],
+  [
+   619.0,
+   87.0,
+   619.0,
+   45.0,
+   5.0
+  ],
+  [
+   572.0,
+   87.0,
+   619.0,
+   87.0,
+   7.0
+  ],
+  [
+   572.0,
+   157.0,
+   620.0,
+   157.0,
+   6.0
+  ],
+  [
+   620.0,
+   222.0,
+   620.0,
+   157.0,
+   6.0
+  ],
+  [
+   595.0,
+   224.0,
+   708.0,
+   224.0,
+   6.0
+  ],
+  [
+   546.0,
+   222.0,
+   600.0,
+   222.0,
+   5.0
+  ],
+  [
+   546.0,
+   517.0,
+   546.0,
+   222.0,
+   5.0
+  ],
+  [
+   382.0,
+   225.0,
+   546.0,
+   225.0,
+   6.0
+  ],
+  [
+   242.0,
+   225.0,
+   382.0,
+   225.0,
+   6.0
+  ],
+  [
+   245.0,
+   443.0,
+   245.0,
+   222.0,
+   6.0
+  ],
+  [
+   383.0,
+   452.0,
+   383.0,
+   222.0,
+   6.0
+  ],
+  [
+   417.0,
+   297.0,
+   417.0,
+   222.0,
+   5.0
+  ],
+  [
+   417.0,
+   260.0,
+   487.0,
+   260.0,
+   5.0
+  ],
+  [
+   382.0,
+   295.0,
+   487.0,
+   295.0,
+   6.0
+  ],
+  [
+   486.0,
+   297.0,
+   486.0,
+   222.0,
+   6.0
+  ],
+  [
+   622.0,
+   260.0,
+   622.0,
+   224.0,
+   5.0
+  ],
+  [
+   622.0,
+   260.0,
+   708.0,
+   260.0,
+   5.0
+  ],
+  [
+   272.0,
+   225.0,
+   272.0,
+   154.0,
+   2.0
+  ],
+  [
+   425.0,
+   170.0,
+   501.0,
+   170.0,
+   2.0
+  ],
+  [
+   425.0,
+   170.0,
+   425.0,
+   153.0,
+   2.0
+  ],
+  [
+   501.0,
+   170.0,
+   501.0,
+   155.0,
+   2.0
+  ]
+ ],
+ "incertain": [
+  "affiner=false : l'affinage automatique accrochait le mur bas du séjour sur le cadre des fenêtres (décalage de 7 px) et les triangles noirs des gaines ; axes et épaisseurs posés à la main d'après des zooms ×4 à ×6.",
+  "Image de 754 px de large pour ~12 m de logement (54 px/m) : chaque pixel vaut ~2 cm, précision des axes ±2 px.",
+  "Échelle sur les cotes : 6.62 et 3.40 (séjour) donnent 54,4 px/m ; 5.35 (chambre 1) donne 53,5 et 2.80 (chambre 1) 55,4 : repères de ces deux cotes moins nets ; 54,3 retenu.",
+  "Bande en haut à gauche (x 55-255, y 40-72) : quatre caissons croisés en pointillé entre la façade et le mur de la cuisine (gaines ou placards des parties communes) : hors logement, pas de pièce ; leur trait haut, leurs séparations et leur bout droit, dessinés comme des murs, sont tracés (fins).",
+  "Deux gaines techniques (carrés à moitié noirs) : dans la cuisine (x 238-272, y 72-109) et entre le WC et la douche (x 572-619, y 45-87) : contours tracés en murs fins, intérieur hors pièce. Petite boîte « N » avec flèche dans l'angle de la buanderie (x 406-425, y 120-155, symbole non identifié, contour en mur) : tracée en murs fins, hors pièce.",
+  "Séjour ouvert sur le dégagement (pas de cloison sous la buanderie) : mur virtuel 2 px à x 272 (prolongement du mur gauche de la buanderie) de y 154 à 225, « porte » sur toute la hauteur ; la porte de la chambre 3 (x 330-376) donne ainsi sur le dégagement.",
+  "Entrée séparée du dégagement par un rectangle en pointillé seulement : mur virtuel 2 px à y 170 de x 425 à 501, « porte » sur toute la largeur.",
+  "Placards (caissons croisés) à portes coulissantes signalées par des flèches « ↔ » : Placard 2 ouvre sur le dégagement (haut), Placard 3 et Placard 4 sur les chambres 2 et 1 (bas) : « porte » de la largeur du caisson. Placard 1 (x 383-417) sans flèche visible : aucune porte tracée.",
+  "Douche à l'italienne = zone de la Sde (pas de cloison côté Sde). Cuisine ouverte = une seule pièce « Cuisine/Séjour », type sejour. Buanderie ~5 m² : type buanderie.",
+  "Baie du séjour (x 82-227, « VR Marche », battant dessiné) : porte_fenetre ; baies « VR » des chambres : fenetre.",
+  "Grands cercles en pointillé (cercles de giration PMR), meubles (lits, LL, CU, LV, R, lavabos, cuvette, TV) et cotes : non tracés.",
+  "Murs extérieurs épais (17-20 px) au sud et à l'ouest de la chambre 2, 10-14 px ailleurs. « Emplacement vélos » en bas : extérieur.",
+  "Hauteur sous plafond non écrite : 2,5 m par défaut."
+ ]
+}

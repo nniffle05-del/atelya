@@ -1,0 +1,41 @@
+{
+  "image": "fr-040.jpg",
+  "surfaces": {
+    "Coin cuisine Salon Sejour": 17.56,
+    "Entrée": 1.26,
+    "Salle d'eau + Wc": 4.92
+  },
+  "echelle_source": "surfaces écrites sous les noms (17.56, 1.26, 4.92 ; total 23,74 m²) ; aucune cote, aucune barre ; dessin pas à l'échelle des surfaces (voir incertain)",
+  "hsp": 2.5,
+  "affiner": true,
+  "murs": [
+    [113, 62, 610, 69, 6],
+    [610, 69, 622, 700, 6],
+    [115, 698, 622, 700, 6],
+    [113, 62, 115, 698, 6],
+    [283, 456, 622, 459, 6],
+    [286, 456, 287, 698, 6],
+    [115, 456, 283, 456, 2]
+  ],
+  "ouvertures": [
+    ["fenetre", 399, 66, 507, 67],
+    ["fenetre", 398, 457, 472, 457],
+    ["porte", 150, 698, 238, 698],
+    ["porte", 286, 527, 286, 582],
+    ["porte", 118, 456, 280, 456]
+  ],
+  "pieces": [
+    ["Coin cuisine Salon Sejour", "sejour", 350, 250],
+    ["Entrée", "entree", 200, 500],
+    ["Salle d'eau + Wc", "salle_d_eau", 450, 620]
+  ],
+  "incertain": [
+    "Photo d'un plan imprimé, légèrement en trapèze : le mur haut monte de y 62 (gauche) à y 69 (droite), le mur droit va de x 610 à x 622 ; murs tracés sur l'encre réelle (segments légèrement obliques).",
+    "ÉCHELLE : surfaces écrites incohérentes avec le dessin. Séjour seul → ~106 px/m, salle d'eau → ~127, entrée → ~180 (1,26 m² écrit pour une zone dessinée ~3 m²). px_par_m = valeur globale de l'outil sur les 3 pièces (~115 px/m, qui rend le total 23,74 m² juste). La porte d'entrée (88 px) fait alors 0,76 m et la porte de salle d'eau (55 px) 0,48 m : le dessin n'est pas à l'échelle.",
+    "Entrée ouverte sur le séjour (pas de cloison dessinée) : mur virtuel 2 px à y 456 (prolongement du mur haut de la salle d'eau) de x 115 à 283, « porte » sur toute la largeur.",
+    "Symbole de fenêtre (deux carrés + double trait) sur le mur HAUT de la salle d'eau, mur intérieur : tracé en fenetre (second jour vers le séjour) ; à confirmer.",
+    "Fenêtres (symbole deux carrés + double trait) : ouverture prise d'un bord extérieur des carrés à l'autre (mur haut x 399-507, cloison de la salle d'eau x 398-472).",
+    "Pas de cuisine séparée : « Coin cuisine Salon Sejour » = une seule pièce, type sejour. « Salle d'eau + Wc » = une seule zone, type salle_d_eau.",
+    "Hauteur sous plafond non écrite : 2,5 m par défaut."
+  ]
+}

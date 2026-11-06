@@ -1,0 +1,73 @@
+{
+  "image": "fr-039.jpg",
+  "px_par_m": 77.96,
+  "echelle": {"inconnue": true, "px_par_m": 77.96},
+  "surfaces": {
+    "Séjour / Cuisine": 30.80,
+    "Dégagement": 3.34,
+    "WC / Buanderie": 1.84,
+    "Chambre 1": 11.04,
+    "Chambre 2": 12.19,
+    "Salle de Bains": 4.43
+  },
+  "echelle_source": "ÉCHELLE INCONNUE (dessin pas à l'échelle, relecture du 07/11/2026) : les surfaces écrites (6 pièces, 63,64 m²) donnent un ajustement global de 77,96 px/m mais chaque pièce donne de 70 à 83 px/m ; la barre 0-5 m (x 122→432, 310-313 px) donne 62,0-62,6 px/m, cohérente avec les portes et la baignoire mais pas avec les surfaces. px_par_m = 77,96 posé à la main dans « echelle » ET en tête (sinon l'outil recalcule sur les surfaces et efface « inconnue ») : la vérité garde ainsi la surface habitable écrite ; « surfaces » conservé seulement pour l'avis de l'outil pièce par pièce.",
+  "hsp": 2.5,
+  "affiner": true,
+  "murs": [
+    [185, 670, 972, 670, 13],
+    [972, 670, 972, 1238, 13],
+    [591, 1238, 972, 1238, 13],
+    [591, 1213, 591, 1238, 12],
+    [537, 1213, 591, 1213, 13],
+    [537, 1016, 537, 1279, 12],
+    [185, 1279, 537, 1279, 13],
+    [185, 670, 185, 1279, 13],
+    [591, 670, 591, 1016, 12],
+    [591, 802, 688, 802, 11],
+    [688, 670, 688, 1016, 11],
+    [747, 670, 747, 813, 10],
+    [688, 813, 747, 813, 10],
+    [688, 922, 972, 922, 11],
+    [532, 869, 532, 1016, 10],
+    [532, 869, 591, 869, 12],
+    [532, 1016, 763, 1016, 12],
+    [712, 1016, 712, 1106, 9],
+    [718, 1106, 718, 1238, 11],
+    [763, 1016, 763, 1238, 12]
+  ],
+  "ouvertures": [
+    ["porte_fenetre", 185, 750, 185, 891],
+    ["porte_fenetre", 185, 1008, 185, 1149],
+    ["fenetre", 518, 670, 584, 670],
+    ["fenetre", 972, 753, 972, 844],
+    ["fenetre", 972, 1018, 972, 1111],
+    ["porte", 591, 814, 591, 859],
+    ["porte", 638, 802, 681, 802],
+    ["porte", 688, 838, 688, 882],
+    ["porte", 688, 955, 688, 1000],
+    ["porte", 607, 1016, 652, 1016]
+  ],
+  "pieces": [
+    ["Séjour / Cuisine", "sejour", 300, 1150],
+    ["WC / Buanderie", "wc", 615, 740],
+    ["Placard 1", "placard", 718, 740],
+    ["Chambre 1", "chambre", 860, 760],
+    ["Dégagement", "degagement", 640, 900],
+    ["Placard 2", "placard", 560, 940],
+    ["Chambre 2", "chambre", 870, 1100],
+    ["Placard 3", "placard", 733, 1120],
+    ["Salle de Bains", "salle_d_eau", 600, 1150]
+  ],
+  "incertain": [
+    "ÉCHELLE INCONNUE, DESSIN PAS À L'ÉCHELLE : la barre 0-5 m mesure 310-313 px (x 122→432 : 62,0-62,6 px/m) ; les portes (43-45 px = 0,70 m), la baignoire (110 px = 1,76 m), le plan de travail (0,64 m) et les meubles sont à cette échelle-là (celle du logiciel de rendu). Mais à 62,6 px/m les pièces feraient ~100 m² habitables au lieu des 63,64 m² écrits (+55 %) ; et les surfaces écrites, mesurées pièce par pièce sur le dessin, donnent 70 (chambre 1), 73 (chambre 2, WC, dégagement), 82 (séjour) et 83 px/m (salle de bains), soit ±7-10 % autour de l'ajustement global 77,96 : les murs ont été tracés trop grands, et pas uniformément. Choix : echelle.inconnue = true (l'échelle d'Atelya n'est pas notée sur ce plan) avec px_par_m = 77,96 pour que la vérité ait la surface habitable légale ; un lecteur qui prendrait la barre (62,6) ferait 20 % d'écart sans être en faute, un lecteur qui prendrait les surfaces aussi.",
+    "Pas de porte d'entrée dessinée (aucun battant sur les murs extérieurs hors portes-fenêtres de la terrasse) : aucune porte inventée. L'ouverture du mur haut (x 517-584, y 670, rectangle blanc à cadre fin, même dessin que les fenêtres du mur droit) est la seule porte d'entrée possible ; elle reste tracée « fenetre » comme elle est dessinée.",
+    "Terrasse 11,91 m² (x 25-178, y 680-1270, à gauche) : extérieur, pas de pièce ; sa limite est un trait fin gris, non tracé comme mur.",
+    "Trois placards (gris, « Placard ») sans porte dessinée : zones fermées nommées Placard 1 (haut, entre WC et chambre 1), Placard 2 (côté séjour), Placard 3 (entre salle de bains et chambre 2) ; leurs surfaces ne sont pas dans le tableau (63,64 m² = somme des 6 pièces).",
+    "« WC / Buanderie » 1,84 m² (cuvette + lave-linge) : type wc.",
+    "Baies du mur gauche sur la terrasse dessinées en deux panneaux accolés (750-819 + 823-891 ; 1008-1077 + 1080-1149) : une porte_fenetre chacune, de toute la largeur.",
+    "Cuisine ouverte dans le séjour (plan de travail en L en bas à droite) : une seule pièce « Séjour / Cuisine », type sejour.",
+    "Mur entre la salle de bains et le Placard 3 avec un décroché à y ≈ 1106 : encre à x 708-716 (axe 712, 9 px) de y 1016 à 1106, puis à x 713-723 (axe 718, 11 px) de y 1106 à 1238 ; tracé en deux segments. Le liseré de la baignoire (x 701-708) et le blanc 709-712 ne sont pas du mur (relecture du 07/11/2026 : le segment bas était posé à tort sur le bord de la baignoire, 22 px d'épaisseur).",
+    "Tache plus claire sur le mur haut entre x 422 et 457 (rien de visible au zoom) : pas d'ouverture tracée.",
+    "Hauteur sous plafond non écrite : 2,5 m par défaut."
+  ]
+}
