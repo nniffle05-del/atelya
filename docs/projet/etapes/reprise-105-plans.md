@@ -2,6 +2,14 @@
 
 À lire en entier par la conversation qui reprend, puis `docs/projet/memoire/vrais-plans-francais.md` (fin du fichier : décisions de NT).
 
+## État au 07/11/2026 00h50 (à lire d'abord)
+
+- **20 plans relus sur 103** et copiés dans `verites/` : fr-021 à fr-027, fr-029 à fr-041. Résumés et verdicts plan par plan : `verites/journal-verites.json`.
+- **fr-042, fr-044, fr-046, fr-047 : tracés, pas relus** (résumés dans le journal). Les relancer avec `args.deja_traces` : le paquet saute le traceur et va droit au relecteur.
+- **Suite** : les autres plans d'entraînement à partir de fr-048 (paquets de 4, dans l'ordre de `entrainement`), puis les 25 d'examen. Par passes de 2 paquets : à la fin de chaque passe, `python pc\verites\reporter_paquets.py <sortie du workflow>`, commit, push. Reprendre une passe interrompue dans la même conversation : `resumeFromRunId` + mêmes `args`.
+- **Limites** : la limite de 5 h tombe après ~1,9 M de tokens d'agents. Le 07/11 à ~00h45, une AUTRE limite est tombée : « You've reached your Fable limit », sans heure de reprise, proposant de changer de modèle. **Ne pas changer de modèle sans l'accord écrit de NT** : il veut Fable pour les vérités. À vérifier sur https://claude.ai/settings/usage.
+- Coût mesuré : ~1 M de tokens et ~1 h pour une passe de 2 paquets (8 plans tracés + relus, dont 1 seul paquet relu quand la limite coupe).
+
 ## Pourquoi une nouvelle conversation
 
 CLAUDE.md a été allégé (section 10) pour que chaque agent ne recharge plus ~157 000 tokens de mémoire. Mesure : les agents lancés après l'allègement démarrent encore à ~176 000 tokens, car une conversation garde le CLAUDE.md lu à son ouverture. Seule une conversation neuve profite de l'allègement. À vérifier dès les premiers agents : ils doivent démarrer vers 35 000 tokens (sinon le dire à NT).
@@ -24,9 +32,9 @@ Script du chantier : `pc/verites/verites-fable-paquets.js`, à lancer avec l'out
 - Plans déjà relus : lire les résultats dans le journal de l'ancienne conversation (une ligne `"type":"result"` par agent, avec verdicts et incertitudes), à conserver pour le bilan :
   `C:\Users\nniff\.claude\projects\d--Mod-lisation-immobili-re-atelya-code\12595479-af70-4106-9404-afab1a23348e\subagents\workflows\wf_9f8ca2ee-5c6\journal.jsonl`
 - Un plan tracé mais non relu (masque présent, pas de verdict dans le journal) repart dans un paquet : l'agent reprend sa saisie existante, il ne recommence pas de zéro.
-- Dans le script, `OPTS_TRACE` garde l'effort `high` pour les paquets commençant par fr-021 et fr-025 (cache de l'ancien run) : sans objet dans un nouveau run, tout passe en `max` si ces paquets ne sont plus là.
+- Le script n'a plus `OPTS_TRACE` : tout est en effort `max`.
 
-Après chaque paquet, copier la saisie, `verite.json` et `logement.json` dans `verites/<plan>/` du dépôt (sans images), et commiter.
+Après chaque paquet, copier la saisie, `verite.json` et `logement.json` dans `verites/<plan>/` du dépôt (sans images), et commiter : c'est ce que fait `pc/verites/reporter_paquets.py`.
 
 ## La suite, dans l'ordre
 
