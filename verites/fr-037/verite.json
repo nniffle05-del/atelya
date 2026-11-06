@@ -1,0 +1,286 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-037.jpg",
+ "largeur": 1206,
+ "hauteur": 1113,
+ "px_par_m": 64.467,
+ "echelle_inconnue": false,
+ "echelle_source": "surfaces écrites du tableau (Séjour 17,85, Cuisine 8,44, Entrée 4,73, Bains 3,84, W.C 1,38, Dégt 3,59) et dimensions écrites des chambres (2,70×4,33 = 11,69 et 2,70×3,91 = 10,56, hors placards) ; contrôle : séjour 3,30×5,45 ↔ 208×353 px (63-65 px/m)",
+ "origine_px": [
+  587.0,
+  984.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "cuisine_1": "cuisine",
+  "entree_1": "entree",
+  "degagement_1": "degagement",
+  "salle_d_eau_1": "salle_d_eau",
+  "wc_1": "wc",
+  "placard_1": "placard",
+  "placard_2": "placard",
+  "chambre_2": "chambre",
+  "sejour_1": "sejour"
+ },
+ "murs_px": [
+  [
+   550.0,
+   93.5,
+   899.0,
+   93.5,
+   22.0
+  ],
+  [
+   1065.0,
+   96.0,
+   1115.0,
+   96.0,
+   22.0
+  ],
+  [
+   573.5,
+   992.0,
+   573.5,
+   93.5,
+   23.0
+  ],
+  [
+   550.0,
+   992.0,
+   800.0,
+   992.0,
+   15.0
+  ],
+  [
+   762.0,
+   952.0,
+   985.0,
+   952.0,
+   19.0
+  ],
+  [
+   762.0,
+   992.0,
+   762.0,
+   93.5,
+   11.0
+  ],
+  [
+   899.0,
+   398.0,
+   899.0,
+   93.5,
+   10.0
+  ],
+  [
+   762.0,
+   398.0,
+   899.0,
+   398.0,
+   9.0
+  ],
+  [
+   877.0,
+   583.5,
+   877.0,
+   398.0,
+   8.0
+  ],
+  [
+   762.0,
+   583.5,
+   1100.0,
+   583.5,
+   12.0
+  ],
+  [
+   981.0,
+   1078.0,
+   981.0,
+   583.5,
+   10.0
+  ],
+  [
+   585.0,
+   387.0,
+   690.5,
+   387.0,
+   5.0
+  ],
+  [
+   585.0,
+   433.0,
+   762.0,
+   433.0,
+   6.0
+  ],
+  [
+   585.0,
+   608.0,
+   690.5,
+   608.0,
+   7.0
+  ],
+  [
+   585.0,
+   667.0,
+   762.0,
+   667.0,
+   6.0
+  ],
+  [
+   585.0,
+   720.0,
+   690.5,
+   720.0,
+   5.0
+  ],
+  [
+   690.5,
+   720.0,
+   690.5,
+   387.0,
+   5.0
+  ],
+  [
+   899.0,
+   193.5,
+   1070.0,
+   193.5,
+   14.0
+  ],
+  [
+   1070.0,
+   405.0,
+   1070.0,
+   152.0,
+   12.0
+  ],
+  [
+   905.0,
+   26.0,
+   1069.0,
+   26.0,
+   3.0
+  ],
+  [
+   905.0,
+   100.0,
+   905.0,
+   26.0,
+   3.0
+  ],
+  [
+   1069.0,
+   152.0,
+   1069.0,
+   26.0,
+   3.0
+  ],
+  [
+   966.0,
+   141.0,
+   1006.0,
+   141.0,
+   6.0
+  ],
+  [
+   966.0,
+   169.0,
+   1006.0,
+   169.0,
+   6.0
+  ],
+  [
+   971.0,
+   169.0,
+   971.0,
+   141.0,
+   10.0
+  ],
+  [
+   1000.0,
+   169.0,
+   1000.0,
+   141.0,
+   12.0
+  ],
+  [
+   1093.0,
+   598.0,
+   1093.0,
+   472.0,
+   13.0
+  ],
+  [
+   1060.0,
+   405.0,
+   1102.0,
+   405.0,
+   12.0
+  ],
+  [
+   877.0,
+   484.0,
+   1093.0,
+   484.0,
+   5.0
+  ],
+  [
+   975.5,
+   583.5,
+   975.5,
+   484.0,
+   10.0
+  ],
+  [
+   960.0,
+   620.5,
+   1005.0,
+   620.5,
+   5.0
+  ],
+  [
+   959.0,
+   620.5,
+   959.0,
+   590.0,
+   5.0
+  ],
+  [
+   1003.0,
+   620.5,
+   1003.0,
+   590.0,
+   5.0
+  ],
+  [
+   800.0,
+   1078.0,
+   800.0,
+   992.0,
+   9.0
+  ],
+  [
+   800.0,
+   1078.0,
+   985.0,
+   1078.0,
+   9.0
+  ]
+ ],
+ "incertain": [
+  "Vieux plan scanné (traits noirs épais, parfois granuleux) : les dimensions écrites se contredisent un peu (chambre 1 : 63,7 px/m en largeur, 65 en longueur ; cuisine 1,98×4,45 ↔ 67-68 px/m ; séjour 63-65 ; WC et dégagement dessinés plus petits que leur surface) : l'échelle est la moyenne pondérée des surfaces/dimensions des 8 pièces principales (~64,7 px/m).",
+  "Chambre 1 12,46 et Chambre 2 11,32 m² du tableau incluent sans doute les placards PL. (2,70×4,33 = 11,69 et 2,70×3,91 = 10,56 hors placard) : les zones des chambres sont rapprochées des dimensions, les deux PL. sont des zones « placard » à part, ouvertes sur les chambres par des portes pliantes (symboles en V) : notées « porte » bien que le trait du placard passe sous les V (PL. 2 surtout). « Rangt 2,28 » du tableau n'est pas localisé sur le plan.",
+  "Passage sans porte entre l'Entrée et le Dégt : le mur x≈762 s'interrompt de y 445 à 502 : ouverture « porte » de toute la largeur (aucun battant dessiné).",
+  "Portes des chambres (43 px ≈ 0,66 m), de la salle de bains (43 px) et du WC (40 px) dessinées étroites : battants dessinés comme des barres épaisses près du mur (chambres), lues au mieux.",
+  "Porte entre l'Entrée et le Séjour à deux vantaux (deux arcs), ouverture 775-860. Porte d'entrée sur le palier : mur x≈877, y 402-452, dessinée fermée (le battant est un trait épais dans le plan du mur) avec son arc de débattement vers l'entrée.",
+  "Parties communes tracées sans pièce : cage d'escalier (x 899-1070, y 194-405, marches non tracées), palier (y 405-484, ouvert à droite entre y 415 et 472 : façade non dessinée là), ASC (ascenseur) et Gs (gaines) : murs tracés ; le trait du haut des gaines s'interrompt sous son symbole en triangle (1012-1049) : noté « porte », celui de l'ascenseur est continu : rien de noté ; bloc hachuré sous le mur commun (960-1005 × 587-622) tracé en contour ; vide-ordures « V.O » (carré 965-1005 × 130-180) tracé en contour, son tuyau vertical (x≈985, y 26-130) non tracé.",
+  "Séch. (séchoir, en haut à droite, x 905-1069, y 26-194) : extérieur, pas de pièce ; son contour fin (double trait) tracé en murs de 3 px ; accessible depuis la cuisine par la petite porte x≈899, y 110-155.",
+  "Balcon (x 800-985, y 957-1078, croisillons) : pas de pièce ; contour tracé (gauche à partir de y 992 car le trait manque entre 969 et 992, et bas ; traits de 9 px), mur épais à droite dans le prolongement du mur droit du séjour ; petit décroché (955-985, 1070-1085) non tracé. Baie du séjour vers le balcon (815-935) : porte_fenetre.",
+  "Mur gauche de l'immeuble (x 562-585) dessiné en deux bandes noires séparées d'un filet blanc : tracé comme un seul mur de 23 px. Le mur haut déborde à gauche jusqu'à x 550, le mur bas de la chambre 2 aussi.",
+  "Façade droite (x≈1093-1115) : seuls les tronçons épais sont tracés (haut 1065-1115 × 85-107, palier 1060-1102 × 400-410, droite 472-598) ; entre y 107 et 395 et entre 415 et 472 rien n'est dessiné (baies de la cage ?).",
+  "Radiateurs, sanitaires, baignoire, évier, appareils de cuisine, flèches du palier, petit rectangle contre le mur séjour/chambre 2 (747-760 × 665-705), tableau des surfaces à gauche : non tracés."
+ ]
+}

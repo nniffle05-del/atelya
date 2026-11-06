@@ -1,0 +1,189 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-035.jpg",
+ "largeur": 859,
+ "hauteur": 1020,
+ "px_par_m": 65.0,
+ "echelle_inconnue": true,
+ "echelle_source": "aucune cote, surface ni barre : échelle inconnue ; 65 px/m posé à la main (WC ~0,95 m de large, chambres 9-16 m², séjour/cuisine ~37 m² ; les portes sont dessinées trop étroites, ~35 px, comme sur fr-034 du même dessinateur)",
+ "origine_px": [
+  16.0,
+  757.0
+ ],
+ "types_pieces": {
+  "chambre_1": "chambre",
+  "chambre_2": "chambre",
+  "chambre_3": "chambre",
+  "degagement_1": "degagement",
+  "wc_1": "wc",
+  "salle_d_eau_1": "salle_d_eau",
+  "entree_1": "entree",
+  "sejour_1": "sejour"
+ },
+ "murs_px": [
+  [
+   14.5,
+   290.0,
+   848.0,
+   290.0,
+   3.0
+  ],
+  [
+   13.5,
+   759.0,
+   13.5,
+   290.0,
+   2.0
+  ],
+  [
+   14.5,
+   759.0,
+   250.0,
+   759.0,
+   3.0
+  ],
+  [
+   249.0,
+   759.0,
+   249.0,
+   290.0,
+   3.0
+  ],
+  [
+   250.0,
+   742.0,
+   447.0,
+   742.0,
+   3.0
+  ],
+  [
+   447.0,
+   758.0,
+   447.0,
+   290.0,
+   3.0
+  ],
+  [
+   447.0,
+   758.0,
+   580.0,
+   758.0,
+   3.0
+  ],
+  [
+   580.0,
+   758.0,
+   580.0,
+   657.0,
+   3.0
+  ],
+  [
+   580.0,
+   657.0,
+   848.0,
+   657.0,
+   3.0
+  ],
+  [
+   848.0,
+   657.0,
+   848.0,
+   290.0,
+   3.0
+  ],
+  [
+   447.0,
+   189.0,
+   848.0,
+   189.0,
+   2.0
+  ],
+  [
+   447.0,
+   290.0,
+   447.0,
+   189.0,
+   2.0
+  ],
+  [
+   848.0,
+   290.0,
+   848.0,
+   189.0,
+   2.0
+  ],
+  [
+   14.5,
+   556.0,
+   250.0,
+   556.0,
+   3.0
+  ],
+  [
+   250.0,
+   473.0,
+   447.0,
+   473.0,
+   3.0
+  ],
+  [
+   250.0,
+   625.0,
+   447.0,
+   625.0,
+   3.0
+  ],
+  [
+   312.0,
+   742.0,
+   312.0,
+   625.0,
+   3.0
+  ],
+  [
+   215.0,
+   465.5,
+   248.0,
+   465.5,
+   20.0
+  ],
+  [
+   447.0,
+   533.0,
+   582.0,
+   533.0,
+   16.0
+  ],
+  [
+   573.0,
+   533.0,
+   573.0,
+   440.0,
+   17.0
+  ],
+  [
+   447.0,
+   633.0,
+   480.0,
+   633.0,
+   16.0
+  ],
+  [
+   582.0,
+   657.0,
+   582.0,
+   541.0,
+   2.0
+  ]
+ ],
+ "incertain": [
+  "Échelle inconnue (aucune cote, surface ni barre d'échelle) : 65 px/m posé à la main d'après des tailles plausibles (WC ~0,95 m, séjour/cuisine ~37 m²) ; la médiane des portes (~35 px) donnerait 43 px/m et un logement de 180 m², invraisemblable : le dessinateur dessine les portes trop étroites (même style que fr-034).",
+  "Balcon (447-848 × 189-290) : pas de pièce, ses traits fins sont tracés comme murs ; les deux baies du séjour (450-547 et 647-815) y donnent : porte_fenetre. Celle de la chambre n°3 (297-397) et celles des chambres 1 et 2 (mur gauche) : fenêtres.",
+  "Passage sans porte entre Dégagements et Entrée : mur x=447 entre 542 et 625 (encadré par deux blocs hachurés, un trait fin de seuil) tracé comme une ouverture « porte » de toute la largeur.",
+  "Entrée et Séjour/Cuisine ne sont séparés par aucun trait entre (582,541) et (582,657) : mur virtuel de 2 px dans le prolongement du retour hachuré et du mur en décroché, avec une « porte » de toute la largeur.",
+  "Cloison hachurée y=533 (447-582, épaisseur 16 px) avec un passage sans porte de 482 à 528 (un trait fin le traverse : seuil ou poutre) ; retour hachuré vertical (573, 440-533) dans le séjour/cuisine ; blocs hachurés (215-248 × 457-472 dans la chambre 2, 447-480 × 625-641 dans l'entrée) tracés comme murs épais (gaines ou piliers ?).",
+  "Portes du WC (252-280) et de la salle d'eau (347-382) : portes coulissantes (deux traits décalés) sur le mur y=625.",
+  "« Séjour/Cuisine » classé sejour (pièce de vie ouverte)."
+ ]
+}

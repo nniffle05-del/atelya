@@ -1,0 +1,50 @@
+{
+ "image": "fr-036.jpg",
+ "px_par_m": 132.0,
+ "echelle_source": "cotes intérieures 409 (face du mur gauche x≈99 → bande du mur droit x 635 = 536 px → 131,1) et 386 (face basse du mur SDB y≈360 → bande du mur bas y 872 = 512 px → 132,5) ; contrôle : terrasse 423 ↔ x 88→648 = 560 px (132,4) et 190 ↔ y 912→1165 = 253 px (133,2) ; 132 retenu",
+ "hsp": 2.5,
+ "affiner": false,
+ "murs": [
+  [73.5, 79, 677, 79, 30],
+  [84.5, 73.5, 84.5, 919, 29],
+  [73.5, 919, 73.5, 1190.5, 7],
+  [73.5, 1190.5, 674, 1190.5, 5],
+  [674, 919, 674, 1190.5, 7],
+  [656, 79, 656, 919, 42],
+  [84.5, 895.5, 656, 895.5, 47],
+  [262.5, 73.5, 262.5, 449, 7],
+  [262.5, 446.5, 299, 446.5, 5],
+  [262.5, 358.5, 645, 358.5, 7],
+  [618.5, 82, 618.5, 358.5, 33],
+  [84.5, 384.5, 262.5, 384.5, 2],
+  [323.5, 91, 323.5, 173, 5],
+  [262.5, 173, 323.5, 173, 5],
+  [88, 912, 88, 1165, 3],
+  [645, 912, 645, 1165, 3],
+  [88, 1165, 645, 1165, 3]
+ ],
+ "ouvertures": [
+  ["porte", 105, 79, 227, 79],
+  ["porte", 262.5, 212, 262.5, 310],
+  ["porte_fenetre", 122, 895.5, 420, 895.5],
+  ["porte", 100, 384.5, 259, 384.5]
+ ],
+ "pieces": [
+  ["ENTREE", "entree", 180, 330],
+  ["SDB / WC", "salle_d_eau", 400, 250],
+  ["pl", "placard", 292, 135],
+  ["SEJOUR / CUISINE / CHAMBRE", "sejour", 300, 600]
+ ],
+ "incertain": [
+  "Studio (séjour / cuisine / chambre en une pièce, classée sejour). L'entrée n'est séparée du séjour que par un trait pointillé (encre y 382-386, de x≈102 à 257) : mur virtuel de 2 px à y=384,5 + « porte » de toute la largeur (1,20 m, passage ouvert).",
+  "Murs haut et gauche : le trait épais (y 64-69, x 70-75) est la limite du lot (il fait aussi le tour de la terrasse : à droite x 672-677, en bas y 1188-1193) ; la face intérieure est un trait fin à x≈94-98 (gauche) et y≈89-93 (haut, présent sur toute la largeur, ligne de seuil fine sous la porte d'entrée) : murs tracés d'une face à l'autre, 70-99 (gauche, 29 px = 0,22 m) et 64-94 (haut, 30 px = 0,23 m). Relecture du 06/11 : le mur haut était tracé 65-82 (face intérieure manquée), corrigé.",
+  "Murs droit et bas tracés d'une face à l'autre comme le mur gauche : bande à motif en chaîne (doublage, x 632-652 selon la hauteur, y 872-891) + bande blanche + trait épais de limite (x 672-677) ou double trait de la terrasse (y 909-919) : mur droit 635-677 (42 px = 0,32 m), mur bas 872-919 (47 px = 0,36 m). Les faces intérieures (635, 872) sont sûres ; les faces extérieures le sont moins (la bande blanche pourrait n'être qu'un nez de dalle) : sans effet sur les pièces.",
+  "Échelle : les cotes 409 et 386 sont lues face à face (131-132,5 px/m) ; lues sur leurs repères (points à x≈90 et y≈362/878) elles donnent 133-134 ; les cotes de la terrasse 423 (132,4) et 190 (133,2) sont cohérentes : 132 retenu (±1 %).",
+  "Porte d'entrée dans le mur haut, de x 105 à 227 (battant ouvert dessiné le long de x≈100-110, 122 px = 0,92 m, arc dessiné vers l'entrée) ; le trait épais de limite de lot la traverse sans interruption. Le repère « 120x220 » près de la porte ne colle à aucune échelle et n'a pas servi.",
+  "Baie vitrée à deux vantaux (triangles) vers la terrasse : porte_fenetre x 122→420 (2,26 m).",
+  "Bande pointillée x 602-635, y 92-358 contre le mur droit de la SDB/WC (trois filets 601-607, 615-623, 628-630, contre la douche et le lavabo) : tracée comme un mur épais de 33 px (gaine technique ou coffrage probable) ; ce n'est peut-être qu'un habillage (faïence) de la paroi de douche. Le contrôle sur l'encre y voit un trou de y 94 à 129 (la bande ne commence nettement qu'à hauteur de la douche).",
+  "Boîte à zigzag à droite de l'entrée (x 260-299, y 362-449, 0,30 × 0,63 m, chauffe-eau ou gaine probable ; le « F » écrit plus à droite désigne le réfrigérateur sous le plan de travail) : son côté gauche prolonge la cloison SDB (x≈262, même trait épais) et son bas (y 444-449, x 260-299) a le même trait : tracés comme un retour de mur en L (0,65 m + 0,28 m) ; le côté droit (x 295-298, même trait de 3 px : la boîte est fermée) n'est pas tracé pour ne pas créer une zone close sans pièce. Le pointillé de l'entrée s'arrête sur ce côté gauche, ce qui plaide pour une construction (gaine) ; le relecteur y voit plutôt un contour d'appareil : 0,9 m de mur douteux, à trancher par NT (si gaine : ajouter le côté droit ; si appareil : retirer les deux et fermer l'entrée par un mur virtuel x 262,5 de y 358,5 à 384,5). Le reste de la kitchenette (plaques, évier, LL, pointillé du plan de travail) n'est pas tracé (mobilier).",
+  "Placard « pl » dans la SDB/WC (boîte croisée x 262-326, y 90-176, 0,45 × 0,65 m) : tracé comme zone placard avec ses deux cloisons fines (x 323,5 et y 173, 5 px), sans porte (aucune porte dessinée, placard intégré). Cercle Ø150 et rectangle 80x130 en pointillés (accessibilité, x 333-439 × y 92-264) : pas tracés.",
+  "Terrasse (x 88-645, y 919-1165, carrelage quadrillé) : pas de pièce ; son bord haut (double trait 909-919) est absorbé dans le mur bas ; ses bords gauche, droit et bas sont tracés comme murs fins de 3 px, et les traits de limite de lot autour d'elle (x 73,5, x 674, y 1190,5) comme murs fins."
+ ]
+}

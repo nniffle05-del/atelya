@@ -1,0 +1,191 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "fr-034.jpg",
+ "largeur": 1206,
+ "hauteur": 1058,
+ "px_par_m": 74.915,
+ "echelle_inconnue": false,
+ "echelle_source": "surfaces écrites des 9 pièces intérieures (plan schématique, pas à l'échelle : aucune cote, terrasses 46/40 m² dessinées bien trop petites, cellier 1,4 m² dessiné trop grand ; échelle = moyenne pondérée des pièces intérieures)",
+ "origine_px": [
+  295.0,
+  890.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "cuisine_1": "cuisine",
+  "chambre_1": "chambre",
+  "salle_d_eau_1": "salle_d_eau",
+  "salle_d_eau_2": "salle_d_eau",
+  "degagement_1": "degagement",
+  "wc_1": "wc",
+  "placard_1": "placard",
+  "chambre_2": "chambre"
+ },
+ "murs_px": [
+  [
+   71.0,
+   10.0,
+   291.0,
+   10.0,
+   5.0
+  ],
+  [
+   291.0,
+   10.5,
+   770.0,
+   47.5,
+   6.0
+  ],
+  [
+   770.3,
+   45.5,
+   1102.3,
+   117.5,
+   6.0
+  ],
+  [
+   70.5,
+   855.0,
+   70.5,
+   10.0,
+   6.0
+  ],
+  [
+   71.0,
+   856.5,
+   731.0,
+   856.5,
+   6.0
+  ],
+  [
+   733.0,
+   892.0,
+   733.0,
+   672.0,
+   5.0
+  ],
+  [
+   731.0,
+   893.0,
+   1102.0,
+   893.0,
+   5.0
+  ],
+  [
+   1101.0,
+   892.0,
+   1101.0,
+   119.0,
+   5.0
+  ],
+  [
+   291.0,
+   855.0,
+   291.0,
+   10.0,
+   6.0
+  ],
+  [
+   953.5,
+   892.0,
+   953.5,
+   87.0,
+   6.0
+  ],
+  [
+   770.0,
+   377.0,
+   770.0,
+   47.0,
+   5.0
+  ],
+  [
+   660.0,
+   378.0,
+   845.0,
+   378.0,
+   5.0
+  ],
+  [
+   659.5,
+   452.0,
+   659.5,
+   377.0,
+   6.0
+  ],
+  [
+   512.0,
+   451.5,
+   660.0,
+   451.5,
+   6.0
+  ],
+  [
+   512.0,
+   855.0,
+   512.0,
+   452.0,
+   5.0
+  ],
+  [
+   845.0,
+   341.5,
+   955.0,
+   341.5,
+   6.0
+  ],
+  [
+   843.5,
+   672.0,
+   843.5,
+   341.0,
+   6.0
+  ],
+  [
+   845.0,
+   525.5,
+   955.0,
+   525.5,
+   6.0
+  ],
+  [
+   512.0,
+   672.5,
+   955.0,
+   672.5,
+   6.0
+  ],
+  [
+   512.0,
+   746.0,
+   731.0,
+   746.0,
+   5.0
+  ],
+  [
+   585.5,
+   855.0,
+   585.5,
+   745.0,
+   6.0
+  ],
+  [
+   291.0,
+   452.0,
+   512.0,
+   452.0,
+   2.0
+  ]
+ ],
+ "incertain": [
+  "Plan schématique sans cotes et pas à l'échelle : les surfaces écrites des pièces intérieures donnent l'échelle (moyenne), mais chaque pièce s'en écarte (chambres ~70 px/m, salle d'eau 2,8 et WC ~81 px/m, cellier 1,4 m² dessiné à ~100 px/m) ; les terrasses (46 et 40 m²) sont dessinées à ~55-62 px/m.",
+  "Séjour et Cuisine (48 m² en tout) forment une seule zone ouverte sans cloison : mur virtuel de 2 px posé à y=452 (dans le prolongement du mur haut des parties communes) avec une « porte » de toute la largeur ; la vraie limite n'est pas dessinée.",
+  "Terrasse n°1 (46 m²), Terrasse n°2 (40 m²) et Parties communes : pas de pièce, leurs murs sont tracés.",
+  "Les 5 baies vitrées (cyan) donnent sur les terrasses : classées porte_fenetre ; certaines sont peut-être de simples fenêtres.",
+  "Aucune porte dessinée pour Chambre n°1 (seulement celle vers sa salle d'eau 2,8 m²) ni pour Chambre n°2 (seulement celle vers sa salle d'eau 2,7 m²) : aucune porte inventée. Les rectangles pointillés (732-845 × 340-377 à cheval sur le mur séjour/chambre 1, et 880-955 × 855-892 dans la chambre 2) ne sont pas des murs (placards ou gaines ?) ; ils restent dans les pièces.",
+  "Deux portes vers les parties communes : l'entrée (673-711, y=377) dans le séjour et une porte de service (660-700, y=672) dans les dégagements.",
+  "Cellier 1,4 m² classé placard (≤ 3 m²). Les portes dessinées font ~40 px, soit ~0,5 m à cette échelle : le dessinateur les a dessinées trop étroites.",
+  "Mur haut : deux segments en pente (291,10)→(770,47)→(1102,119) ; le trait est en réalité légèrement courbe."
+ ]
+}

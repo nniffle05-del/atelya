@@ -331,22 +331,23 @@
   "fr-036": {
    "plan": "fr-036",
    "reussi": true,
-   "murs": 15,
+   "murs": 17,
    "ouvertures": 4,
-   "pieces": 3,
+   "pieces": 4,
    "px_par_m": 132,
-   "echelle_source": "cotes 409 (face du mur gauche x≈99 → mur droit x 635 = 536 px → 131,1) et 386 (face basse du mur SDB y≈360 → mur bas y 872 = 512 px → 132,5) ; contrôle terrasse 423 ↔ 560 px (132,4) ; cote 190 de la terrasse incohérente (134-141)",
+   "echelle_source": "cotes intérieures 409 (x 99→635 = 536 px → 131,1) et 386 (y 360→872 = 512 px → 132,5) ; contrôle terrasse 423 (560 px → 132,4) et 190 (253 px → 133,2) ; 132 retenu (±1 %)",
    "niveaux": 1,
    "incertain": [
-    "Studio : séjour / cuisine / chambre en une pièce (sejour) ; entrée séparée par un pointillé y≈377 : mur virtuel 2 px + porte de toute la largeur",
-    "Le trait épais haut/gauche est la limite du lot (il entoure aussi la terrasse) ; faces intérieures lues à x≈99 (trait fin) et y≈82 : mur gauche tracé 70-99 (29 px), mur haut 65-82 (17 px)",
-    "Porte d'entrée dans le mur haut (x 105-227, battant 0,92 m) : le trait de limite de lot la traverse sans interruption",
-    "Bande pointillée x 602-635 dans la SDB/WC (deux bandes, trait fin au milieu) tracée comme mur épais de 33 px (gaine ou coffrage probable ; peut-être un simple habillage)",
-    "Échelle ±1 % selon qu'on lit les cotes face à face (131-132,5) ou sur leurs repères (133-134)",
-    "Kitchenette, placard « pl » dans la SDB, cercle Ø150 et rectangle 80x130 d'accessibilité, trait épais du bas de la niche frigo : non tracés ; terrasse : contour fin tracé (3 px), pas de pièce"
+    "Studio : entrée séparée du séjour par un pointillé (encre y 382-386) → mur virtuel 2 px à y 384,5 + « porte » de 1,20 m (passage ouvert).",
+    "Mur haut corrigé 64-94 (trait de limite 64-69 + face intérieure 89-93 sur toute la largeur) ; mur gauche 70-99 inchangé.",
+    "Murs droit et bas retracés d'une face à l'autre (bande en chaîne + bande blanche + trait de limite / double trait de la terrasse) : 635-677 (0,32 m) et 872-919 (0,36 m) ; faces intérieures sûres, faces extérieures moins (la bande blanche pourrait être un nez de dalle), sans effet sur les pièces.",
+    "Boîte à zigzag x 260-299 × y 362-449 (0,30 × 0,63 m, chauffe-eau ou gaine) : côté gauche (prolonge la cloison SDB, même trait) et pied du bas tracés en L (0,65 + 0,28 m) ; côté droit (même trait de 3 px, boîte fermée) non tracé. Le relecteur y voit un contour d'appareil : 0,9 m de mur douteux, à trancher par NT.",
+    "Placard « pl » (x 262-326 × y 90-176, 0,45 × 0,65 m) tracé comme zone placard avec ses deux cloisons de 5 px, sans porte (aucune dessinée).",
+    "Bande pointillée x 602-635 contre le mur droit de la SDB/WC gardée en mur de 33 px (gaine/coffrage probable, peut-être simple habillage) ; le contrôle y voit un trou de y 94 à 129.",
+    "Terrasse : pas de pièce ; bord haut absorbé dans le mur bas ; bords et traits de limite de lot tracés comme murs fins ; cercle Ø150, rectangle 80x130, « 120x220 », kitchenette : non tracés / non utilisés."
    ],
-   "confiance": 85,
-   "remarques": "Plan scanné bleuté avec cotes en cm. Affinage désactivé (traits de limite épais à côté des traits fins des faces). Murs droit et bas tracés sur leur motif en chaîne (20 et 18 px). Baie à deux vantaux vers la terrasse : porte_fenetre 122→420. Contrôle sur l'encre : signaux restants expliqués (bandes épaisses posées sur un trait fin + un trait de limite)."
+   "confiance": 82,
+   "remarques": "Vérifié sur le plan avec des agrandissements ×4 et ×6 (revue/x4-*.png, x6-*.png) et le contrôle sur l'encre. (1) Mur haut : le relecteur a raison, la face intérieure (y 89-93) est présente sur toute la largeur (x 100→640) → mur 0 = [73.5, 79, 677, 79, 30], porte d'entrée à y 79 ; les anciens « trous non déclarés » du mur 0 ont disparu du contrôle. (2) Pointillé : encre 382-386 → mur virtuel et porte à y 384,5 (le contrôle le voit encore décalé de 5 px : artefact d'un trait en tirets). (3) Murs droit et bas : option appliquée (cohérence avec le mur gauche, pas de lamelle de fond dans l'épaisseur pour le masque) : mur droit [656, 79, 656, 919, 42], mur bas [84.5, 895.5, 656, 895.5, 47], baie à y 895,5, mur 1 prolongé à 919, limites de lot (x 73,5 et 674) seulement le long de la terrasse, ancien trait 912 supprimé ; les faces intérieures (635, 872) ne bougent pas, les pièces non plus. (4) Boîte « F » : je ne suis pas d'accord avec le retrait pur et simple : le trait gauche x 260-263 est continu avec la cloison SDB (même trait, aucun trou réel à 426-440 : gris plus clair sur le ×6), le pied y 442-447 est le trait le plus épais de la boîte (5 px), et surtout le pointillé de l'entrée s'arrête dessus ; le retirer laisserait l'entrée ouverte entre y 358,5 et 384,5. Mais le côté droit (x 295-298) a le même trait de 3 px, la boîte est donc fermée (gaine ou appareil) : gardé en L (mur 7 arrêté à 449 au lieu de 456, pied ajouté), doute écrit avec les deux options pour NT. (5) Placard « pl » : tracé (côté droit 322-326 → axe 323,5 ; bas 170-176 → axe 173 ; le « trou » 140-159 du contrôle n'existe pas sur le ×6, trait juste plus clair), pièce [\"pl\", \"placard\", 292, 135], 0,23 m². Remarque sur l'échelle corrigée (la cote 190 colle : 253 px → 133). Contrôle restant : trous à y 892-906 (mur 1) et 896-910 (mur 5) = corps blanc du mur bas entre bande en chaîne et trait de terrasse, pas des ouvertures ; trou 1165-1185 du trait de limite gauche (trait plus clair au coin de la terrasse) ; traits longs = cotes 409/423/190, carrelage de la terrasse, douche, évier, LL. controle.png relu : 4 zones fermées (entrée 2,61 m², SDB/WC 4,67, placard 0,23, séjour 15,16), portes et baie au bon endroit."
   },
   "fr-037": {
    "plan": "fr-037",
@@ -596,6 +597,70 @@
    ],
    "resume": "Échelle inconnue (exclue de la note) : contrôle par un autre chemin = les trois portes doubles (62-64 px) font exactement 2 × les portes simples (31,5 px), mur extérieur 9-10 px = 0,25 m, fenêtres 0,9-1,8 m : la pose 38 px/m est cohérente (37 px/m si les portes font 0,83, 43 si 0,73). Murs relus sur zooms ×2 : 24 murs justes, battants épais (barres perpendiculaires ~30 px) bien exclus, fenêtres (5 haut, 3 gauche, 3 droite) retrouvées (z-i, z-j), aucune sur les murs bas, droit du Salon et gauche de la Chambre 3. Portes vérifiées au zoom : doubles Salle à manger/Entrée (z-d), entrée (z-e), Chambre 4 (z-h), Salon (z-c), renfoncement et absence de trait entre Placard 2 et renfoncement (z-b), petit placard (z-f), cellier (z-g), Wc et réduit (z-a-x4). Les 4 « porte sur mur plein » du contrôle d'encre sont les portes dessinées sans trou (confirmées), les 6 « 1,6-2,3 m » sont les doubles portes et les virtuels (attendus). 16 zones = 15 étiquettes + le réduit, cour laissée en extérieur. Aucune erreur grave ni moyenne. Zooms : ..\\atelya\\verites-lot2\\fr-033\\revue\\.",
    "tours": 0
+  },
+  "fr-034": {
+   "plan": "fr-034",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [],
+   "resume": "Relecture indépendante sur le plan, controle.png, « controler » (seuls les cadres cyan des 5 baies ressortent en « trait long » ; leurs bornes 46-235, 340-530, 634-787, 119-309, 708-824 confirment les 5 porte_fenetre à ±4 px) et 4 zooms (revue/zoom-a..d). Les 22 murs suivent l'encre (épaisseur ~6 px, affinage), les 13 ouvertures sont là où les arcs s'articulent (entrée 673-711 sur y=377 ; service 660-700 sur y=672 ; cuisine→dégagements 676-712 sur x=512 ; WC 547-587 et cellier 622-662 sur y=745 ; SdE 880-920 ×2), les 9 pièces sont bien nommées et typées (Cellier 1,4 m² → placard). Vérifié au zoom : le mur x=770 traverse sans trou le rectangle pointillé 732-845 × 340-377, et le mur x=731 est continu de 672 à 745 → les deux chambres ne sont accessibles que par leur salle d'eau : omission du dessinateur, à juste titre aucune porte inventée. Les deux rectangles pointillés (profondeur 37 px ≈ 0,5 m) sont des placards d'angle, pas des murs : laissés dans les pièces, acceptable. Échelle recalculée autrement : sans le séjour/cuisine, les 7 pièces fermées (30 m² écrits ↔ 29,14 m² mesurés) donnent 73,8 px/m ; le séjour+cuisine seuls (48 m²) 75,5 ; pièce par pièce de 69 (chambre 1) à 79 (WC) : plan pas à l'échelle, la moyenne 74,9 est plausible. Seule réserve (choix, pas erreur) : la limite virtuelle séjour/cuisine à y=452 donne cuisine 15,2 m² (11,8 écrit) et séjour 33,6 (36,2) ; une limite vers y≈515-520 collerait aux deux surfaces, mais rien n'est dessiné et l'étiquette « Cuisine » (y≈610) est centrée sur la zone actuelle.",
+   "tours": 1
+  },
+  "fr-035": {
+   "plan": "fr-035",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [],
+   "resume": "Relecture sur le plan, controle.png, « controler » (un seul signal : la flèche d'entrée) et 3 zooms (revue/zoom-a..c). Confirmé au zoom : blocs hachurés 447-480 et 530-582 à y 525-541 avec passage 480-530 sous un trait fin continu à y≈525, retour hachuré 565-582 × 440-541, trait x=447 interrompu de 541 à ~617 (passage dégagements→entrée), blocs 215-247 × 457-475 et 447-480 × 625-641 ; arcs de portes articulés comme tracés (chambre 3 : 262-300 sur y=473 ; chambre 2 : 505-540 et chambre 1 : 572-607 sur x=250 ; entrée : 690-727 sur x=580 ; WC et salle d'eau coulissantes sur y=625) ; 5 baies cyan et balcon (pas de pièce) justes ; 8 pièces bien nommées et typées (Séjour/Cuisine → sejour). Échelle : aucune cote, surface ni barre ; recalcul par d'autres chemins : largeur intérieure du WC 59 px ↔ 0,80-1,00 m → 59-74 px/m ; profondeur du balcon 101 px ↔ 1,2-1,6 m → 63-84 ; même outil de dessin que fr-034 où les portes font ~40 px pour 0,53 m → ici 35-38 px → 66-72. Le 65 px/m posé à la main est dans la fourchette plausible (60-70 ; logement ≈ 81 m² à 65, 70 m² à 70) et verite.json porte bien echelle_inconnue=true : rien à corriger.",
+   "tours": 1
+  },
+  "fr-036": {
+   "plan": "fr-036",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [
+    {
+     "gravite": "moyenne",
+     "quoi": "Mur haut tracé 65-82 (17 px, axe 73,5) : l'encre montre deux faces, le trait épais de limite de lot à y 64-69 ET une face intérieure à y 89-94 présente sur toute la largeur (profils à x=245, 330, 400, 560 ; revue/zoom-n). Le mur fait donc 64-94 (30 px = 0,23 m, comme le mur gauche 70-99) ; la SDB/WC et l'ENTREE commencent 11 px (8 cm) trop haut (+0,2 m² et +0,1 m²).",
+     "correction": "mur 0 → [73.5, 79, 674, 79, 30] ; porte d'entrée → [\"porte\", 105, 79, 227, 79] ; les murs verticaux qui partent de y=73.5 (x 84.5, 262.5, 618.5, 645, 674) peuvent garder leur départ (ils restent dans l'épaisseur)."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Le pointillé ENTREE/séjour est à y≈384-385 (encre 383-387 à x=110, 180, 240 ; revue/zoom-o), pas à 377 (à 377 on est sous le texte ENTREE).",
+     "correction": "mur virtuel → [84.5, 384.5, 262.5, 384.5, 2] ; ouverture → [\"porte\", 100, 384.5, 259, 384.5]."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Murs extérieurs droit et bas tracés en deux morceaux avec une lamelle de fond entre : à droite bande en chaîne 635-655 (doublage) + blanc + trait épais 670-677 (face extérieure) ; en bas bande 872-890 + blanc + double trait de la terrasse 909-919. Le mur gauche, lui, a été tracé d'une face à l'autre (70-99). Incohérent mais sans effet sur les pièces (faces intérieures 635 et 872 justes).",
+     "correction": "optionnel, pour la cohérence : mur droit [656, 79, 656, 881, 42] à la place de [645, 73.5, 645, 881, 20] et limite de lot [674, 881, 674, 1190.5, 7] seulement le long de la terrasse ; mur bas [84.5, 895.5, 655, 895.5, 47] à la place de [84.5, 881, 655, 881, 18] avec [\"porte_fenetre\", 122, 895.5, 420, 895.5], et supprimer [88, 912, 645, 912, 5] (absorbé)."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Le mur SDB x=262.5 est prolongé de 358.5 à 456 : ce tronçon (trait 259-263 de y 358 à 452, bas épais 448-452 sur x 257-310) encadre la boîte à zigzag « F » (chauffe-eau ou frigo) de la kitchenette : contour d'appareil plus probable qu'un retour de mur ; 0,7 m de mur douteux dans le séjour.",
+     "correction": "[262.5, 73.5, 262.5, 456, 7] → [262.5, 73.5, 262.5, 358.5, 7] (ou garder si NT sait que c'est une niche maçonnée)."
+    },
+    {
+     "gravite": "legere",
+     "quoi": "Le placard « pl » (boîte croisée 262-322 × 90-178 dans la SDB/WC, 0,45 × 0,65 m) n'est ni tracé ni déclaré alors que « placard » est un type de la convention (fr-037 trace ses PL.).",
+     "correction": "optionnel : murs [322, 94, 322, 178, 3] et [262.5, 178, 322, 178, 3], pièce [\"pl\", \"placard\", 292, 135], sans porte (placard intégré, aucune porte dessinée) ; à noter dans incertain."
+    }
+   ],
+   "resume": "corrigé, non relu. Relecture d'avant : Relecture sur le plan, controle.png, « controler » et 11 zooms (revue/zoom-e..o) + profils d'encre. Juste : mur gauche 70-99, mur droit (bande 635-655, légèrement biaisé 632-652 vers le bas), mur bas 872-890, cloisons SDB (x 260-270, y 355-365 à ±3 px), porte d'entrée 105-227 (battant ouvert dessiné le long de x≈109, 0,92 m), porte SDB 212-310, baie à deux vantaux 122-420, terrasse sans pièce, 3 pièces bien typées, cotes 409 (x 99→633-635 = 534-536 px → 130,6-131,1) et 386 (y 362→872 = 510 px → 132,1). Échelle recalculée par un autre chemin : cotes de la terrasse 423 (x 88→648 = 560 px → 132,4) et 190 (y 912→1165 = 253 px → 133,2) → 132-133 px/m : le 132 retenu est plausible ; la remarque « la cote 190 ne colle pas » est fausse mais sans effet. Le « 120x220 » près de la porte ne colle à aucune échelle (122 px ↔ 1,20 m donnerait 102) : ce n'est pas la largeur de la porte, ne pas s'en servir ; le cercle d'accessibilité n'est pas étiqueté Ø150 (seul « 80x130 » est écrit) : inutilisable. À corriger : le mur haut (moyenne) ; le reste est léger ou optionnel. La bande pointillée 602-635 de la SDB (trois filets 601-607, 615-623, 628-630, contre la douche et le lavabo) est laissée en mur : cloison technique plausible, doute déjà noté par le traceur. Erreurs vues : [{\"gravite\":\"moyenne\",\"quoi\":\"Mur haut tracé 65-82 (17 px, axe 73,5) : l'encre montre deux faces, le trait épais de limite de lot à y 64-69 ET une face intérieure à y 89-94 présente sur toute la largeur (profils à x=245, 330, 400, 560 ; revue/zoom-n). Le mur fait donc 64-94 (30 px = 0,23 m, comme le mur gauche 70-99) ; la SDB/WC et l'ENTREE commencent 11 px (8 cm) trop haut (+0,2 m² et +0,1 m²).\",\"correction\":\"mur 0 → [73.5, 79, 674, 79, 30] ; porte d'entrée → [\\\"porte\\\", 105, 79, 227, 79] ; les murs verticaux qui partent de y=73.5 (x 84.5, 262.5, 618.5, 645, 674) peuvent garder leur départ (ils restent dans l'épaisseur).\"},{\"gravite\":\"legere\",\"quoi\":\"Le pointillé ENTREE/séjour est à y≈384-385 (encre 383-387 à x=110, 180, 240 ; revue/zoom-o), pas à 377 (à 377 on est sous le texte ENTREE).\",\"correction\":\"mur virtuel → [84.5, 384.5, 262.5, 384.5, 2] ; ouverture → [\\\"porte\\\", 100, 384.5, 259, 384.5].\"},{\"gravite\":\"legere\",\"quoi\":\"Murs extérieurs droit et bas tracés en deux morceaux avec une lamelle de fond entre : à droite bande en chaîne 635-655 (doublage) + blanc + trait épais 670-677 (face extérieure) ; en bas bande 872-890 + blanc + double trait de la terrasse 909-919. Le mur gauche, lui, a été tracé d'une face à l'autre (70-99). Incohérent mais sans effet sur les pièces (faces intérieures 635 et 872 justes).\",\"correction\":\"optionnel, pour la cohérence : mur droit [656, 79, 656, 881, 42] à la place de [645, 73.5, 645, 881, 20] et limite de lot [674, 881, 674, 1190.5, 7] seulement le long de la terrasse ; mur bas [84.5, 895.5, 655, 895.5, 47] à la place de [84.5, 881, 655, 881, 18] avec [\\\"porte_fenetre\\\", 122, 895.5, 420, 895.5], et supprimer [88, 912, 645, 912, 5] (absorbé).\"},{\"gravite\":\"legere\",\"quoi\":\"Le mur SDB x=262.5 est prolongé de 358.5 à 456 : ce tronçon (trait 259-263 de y 358 à 452, bas épais 448-452 sur x 257-310) encadre la boîte à zigzag « F » (chauffe-eau ou frigo) de la kitchenette : contour d'appareil plus probable qu'un retour de mur ; 0,7 m de mur douteux dans le séjour.\",\"correction\":\"[262.5, 73.5, 262.5, 456, 7] → [262.5, 73.5, 262.5, 358.5, 7] (ou garder si NT sait que c'est une niche maçonnée).\"},{\"gravite\":\"legere\",\"quoi\":\"Le placard « pl » (boîte croisée 262-322 × 90-178 dans la SDB/WC, 0,45 × 0,65 m) n'est ni tracé ni déclaré alors que « placard » est un type de la convention (fr-037 trace ses PL.).\",\"correction\":\"optionnel : murs [322, 94, 322, 178, 3] et [262.5, 178, 322, 178, 3], pièce [\\\"pl\\\", \\\"placard\\\", 292, 135], sans porte (placard intégré, aucune porte dessinée) ; à noter dans incertain.\"}]",
+   "tours": 1
+  },
+  "fr-037": {
+   "plan": "fr-037",
+   "verdict": "ok",
+   "echelle_plausible": true,
+   "erreurs": [
+    {
+     "gravite": "legere",
+     "quoi": "Échelle : les surfaces saisies pour les chambres (11,69 et 10,56 = dimensions écrites) reposent sur l'idée que les 12,46 / 11,32 du tableau incluent les placards. Or « Rangt 2,28 » du tableau (dit non localisé) = PL. 1 + PL. 2 (2,05 m² dans les murs, 2,5 aux axes), donc les chambres du tableau n'incluent PAS les placards ; elles incluent la bande devant chaque placard, que les zones tracées incluent aussi (690.5-762 × 387-433 = 0,79 m² → 11,69 + 0,79 = 12,48 ≈ 12,46 ; 690.5-762 × 667-720 = 0,91 → 10,56 + 0,91 = 11,47 ≈ 11,32). Avec les valeurs du tableau l'échelle vaut 64,467 × √(62,11/63,61) = 63,7 px/m (−1,2 %), dans le bruit du plan (dimensions écrites : séjour 3,30 ↔ 210 px = 63,6 et 5,45 ↔ 353 = 64,8 ; cuisine 1,98 ↔ 128 = 64,6 et 4,45 ↔ 282 = 63,4 ; chambre 1 2,70 ↔ 174 = 64,4).",
+     "correction": "\"surfaces\": {\"Séjour\": 17.85, \"Chambre 1\": 12.46, \"Chambre 2\": 11.32, \"Cuisine\": 8.44, \"Entrée\": 4.73, \"Bains\": 3.84, \"W.C\": 1.38, \"Dégt\": 3.59} (→ ~63,7 px/m) et corriger la note d'incertain : Rangt 2,28 = les deux PL."
+    }
+   ],
+   "resume": "Relecture sur le plan, controle.png, « controler » (ses signaux sont tous expliqués : portes des PL. sur le trait continu des placards, porte d'entrée dessinée fermée, petit carré du vide-ordures, baignoire, marches, flèches du palier, soulignés du tableau) et 6 zooms (revue/zoom-a..f) + profils d'encre. Juste : mur gauche 563-584 (deux bandes + filet, tracé 573,5/23 px), mur central 758-767, mur haut 83-105, mur bas de la cuisine 394-404 avec le trou de porte 772-812 (tracé 770-818, 6 px dans le mur, négligeable), passage Entrée→Dégt = x=762 vide de 444 à 503, mur haut du séjour 577-590, mur droit 977-986, portes des chambres articulées en (748, 433) et (748, 667) avec le battant en barre à x≈748 (le « petit rectangle 747-760 × 665-705 » d'incertain est ce battant), porte d'entrée = arc centré sur l'angle (877, 398) de rayon 55 avec le battant fermé dans le plan du mur (encre 395-426 puis pâle) : la lecture 402-452 est la bonne. 10 pièces bien nommées et typées, Séch./Balcon/parties communes sans pièce, fenêtres et porte_fenetre aux bons endroits. Échelle recalculée par un autre chemin (surfaces du tableau et dimensions écrites) : 63,5-65 px/m, le 64,5 retenu est plausible ; une seule remarque légère sur le choix des surfaces (Rangt = placards).",
+   "tours": 1
   }
  }
 }
