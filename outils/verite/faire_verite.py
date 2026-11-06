@@ -443,8 +443,8 @@ def main() -> int:
     v = sp.add_parser("verite")
     v.add_argument("saisie", type=Path, nargs="+")
     a = ap.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8")  # les messages contiennent « ↔ » : le terminal Windows (cp1252) plantait
     if a.cmd == "controler":
-        sys.stdout.reconfigure(encoding="utf-8")
         print(controler(a.saisie))
     elif a.cmd == "apercu":
         print(apercu(a.saisie, a.sortie))

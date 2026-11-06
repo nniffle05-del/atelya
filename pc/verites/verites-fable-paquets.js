@@ -10,9 +10,10 @@ export const meta = {
 
 const PY = '"D:/Modélisation immobilière/atelya/.venv/Scripts/python.exe"'
 const OPTS = { model: 'fable', effort: 'max' }
-// Les deux premiers tracés, déjà finis à l'effort high, restent en cache : on ne les refait pas.
-const OPTS_TRACE = (g) => (g[0] === 'fr-021' || g[0] === 'fr-025') ? { model: 'fable', effort: 'high' } : OPTS
 const EXAMEN = new Set(args.examen)
+// Plans déjà tracés par une session précédente et dont le résumé est dans verites/journal-verites.json : un paquet entièrement
+// tracé saute le traceur et va droit au relecteur (re-tracer coûterait sans rien apporter de plus que la relecture).
+const DEJA = new Set(args.deja_traces || [])
 const ROLE = (g) => g.map(p => `${p} (${EXAMEN.has(p) ? 'EXAMEN' : 'entraînement'})`).join(', ')
 
 const COMMUN = `
@@ -54,14 +55,16 @@ const SCHEMA_REVUE = { type: 'object', properties: { plans: { type: 'array', ite
 
 const tracer = (g) => agent(`${COMMUN}
 TÂCHE : fabrique les vérités de ces plans, l'un après l'autre : ${ROLE(g)}. C'est le corrigé sur lequel Atelya sera noté et entraîné : une erreur ici devient une erreur apprise ; sois complet et fidèle au pixel.
-Pour chaque plan : (1) si le dossier contient déjà une verite-saisie.json (travail d'une session interrompue), repars-en : relis, complète, corrige, ne recommence pas de zéro ; sinon Read l'image, fais le brouillon et son aperçu, décide d'en partir ou de repartir de zéro ; (2) grille et zooms autant qu'il en faut pour lire les pixels ; (3) écris verite-saisie.json ; (4) lance verite puis controler, Read controle.png ; vérifie pièce par pièce (une couleur par pièce, bon nom, rien qui déborde, ouvertures posées) et l'échelle (une porte intérieure fait 0,7-0,95 m) ; corrige et relance jusqu'à ce que ce soit juste. Termine un plan avant de passer au suivant.`, { ...OPTS_TRACE(g), label: `tracer:${g[0]}…`, phase: 'Tracer', schema: SCHEMA_TRACE })
+Pour chaque plan : (1) si le dossier contient déjà une verite-saisie.json (travail d'une session interrompue), repars-en : relis, complète, corrige, ne recommence pas de zéro ; sinon Read l'image, fais le brouillon et son aperçu, décide d'en partir ou de repartir de zéro ; (2) grille et zooms autant qu'il en faut pour lire les pixels ; (3) écris verite-saisie.json ; (4) lance verite puis controler, Read controle.png ; vérifie pièce par pièce (une couleur par pièce, bon nom, rien qui déborde, ouvertures posées) et l'échelle (une porte intérieure fait 0,7-0,95 m) ; corrige et relance jusqu'à ce que ce soit juste. Termine un plan avant de passer au suivant.`, { ...OPTS, label: `tracer:${g[0]}…`, phase: 'Tracer', schema: SCHEMA_TRACE })
 
 // Plans d'examen : un 2e tracé indépendant, sans voir le premier ni le brouillon, pour comparer les deux corrigés.
 const tracerDouble = (g) => agent(`${COMMUN}
 TÂCHE : tu fais le DEUXIÈME tracé, indépendant, de ces plans d'examen : ${g.join(', ')}. Ton dossier de vérité est ../atelya/verites-lot2-double/fr-xxx/ (à la place de verites-lot2 ; crée-le et copie-y l'image). INTERDIT de lire quoi que ce soit dans ../atelya/verites-lot2/ et n'utilise pas le brouillon Atelya : ce tracé ne vaut que s'il est aveugle. Pour chaque plan, l'un après l'autre : Read l'image, grille et zooms autant qu'il en faut, écris verite-saisie.json, lance verite puis controler, Read controle.png, vérifie pièce par pièce et l'échelle, corrige jusqu'à ce que ce soit juste. Ne rends la main qu'une fois tous les plans finis.`, { ...OPTS, label: `double:${g[0]}…`, phase: 'Tracer', schema: SCHEMA_TRACE })
 
+const decrire = (t) => t.fichier ? `leurs résumés (dont leurs incertitudes) sont dans le fichier ${t.fichier}, rubrique "traces" (lis seulement ces plans)` : JSON.stringify(t)
+
 const relire = (g, resume, n) => agent(`${COMMUN}
-Un autre agent a tracé ces vérités : ${JSON.stringify(resume)}
+Un autre agent a tracé ces vérités : ${decrire(resume)}
 TÂCHE (relecture ADVERSE et indépendante, tu n'écris que tes zooms dans un sous-dossier revue\\ de chaque dossier) : pour chacun de ces plans (${g.join(', ')}), compare controle.png et l'image du plan (Read les deux, zooms si besoin), lance controler, et cherche les erreurs : mur manquant ou en trop (meuble, cote, hachure pris pour un mur), mur décalé ou d'épaisseur fausse, pièce oubliée, en trop, fondue avec une autre, nom ou type faux, zone qui déborde ou sort du logement, ouverture oubliée, en trop, de mauvais type ou de mauvaise largeur, extérieur compté comme pièce, niveau manquant. ÉCHELLE : recalcule-la par un AUTRE chemin que le traceur (une autre cote, une surface, une porte). Verdict « ok » seulement sans erreur grave ni moyenne. Erreurs concrètes (pixels ou nom de pièce) avec la correction exacte.${g.every(p => EXAMEN.has(p)) ? ` PLANS D'EXAMEN : un 2e tracé aveugle existe dans ..\\atelya\\verites-lot2-double\\. Lance ${PY} outils/verite/comparer_verites.py ..\\atelya\\verites-lot2 ..\\atelya\\verites-lot2-double ${g.join(' ')} --carte, puis Read chaque desaccord.png (rouge = les deux tracés diffèrent). Pour chaque zone rouge qui n'est pas un simple liseré de trait, et pour tout écart d'échelle de plus de 3 %, tranche sur le plan lequel a raison ; la vérité officielle est celle de verites-lot2 : si elle a tort, c'est une erreur à reporter avec sa correction.` : ''}`, { ...OPTS, label: `relire:${g[0]}…#${n}`, phase: 'Relire', schema: SCHEMA_REVUE })
 
 const corriger = (g, revue, n) => agent(`${COMMUN}
@@ -69,7 +72,8 @@ Un relecteur a trouvé des erreurs dans ces vérités (dossiers existants) : ${J
 TÂCHE : vérifie chaque erreur sur le plan (le relecteur peut se tromper : si tu es sûr qu'il a tort, dis-le dans remarques et ne change pas), corrige verite-saisie.json, relance verite et controler, Read controle.png. Rends l'état de TOUS ces plans : ${g.join(', ')}.`, { ...OPTS, label: `corriger:${g[0]}…#${n}`, phase: 'Corriger', schema: SCHEMA_TRACE })
 
 const traiter = async (g) => {
-  let trace = await tracer(g)
+  const dejaTrace = g.every(p => DEJA.has(p))
+  let trace = dejaTrace ? { fichier: 'verites/journal-verites.json' } : await tracer(g)
   if (!trace) return { groupe: g, perdu: 'tracer' }
   if (g.every(p => EXAMEN.has(p))) {
     const b = await tracerDouble(g)
@@ -79,6 +83,7 @@ const traiter = async (g) => {
   let revue = await relire(g, trace, 1)
   if (!revue) return { groupe: g, trace, perdu: 'relire' }
   const fautifs = (r) => r.plans.filter(p => p.verdict === 'corriger')
+  const majTrace = (t2) => { trace = trace.plans ? { plans: trace.plans.map(p => t2.plans.find(q => q.plan === p.plan) || p) } : { plans: t2.plans } }
   let tours = 0
   while (fautifs(revue).length && tours < 2) {
     tours++
@@ -86,9 +91,9 @@ const traiter = async (g) => {
     const noms = f.map(p => p.plan)
     const t2 = await corriger(noms, f, tours)
     if (!t2) return { groupe: g, trace, revue, perdu: 'corriger' }
-    trace = { plans: trace.plans.map(p => t2.plans.find(q => q.plan === p.plan) || p) }
+    majTrace(t2)
     // Nouvelle relecture seulement s'il restait une erreur grave : les erreurs moyennes corrigées passent par controler et controle.png.
-    if (!f.some(p => p.erreurs.some(e => e.gravite === 'grave'))) { revue = { plans: revue.plans.map(p => noms.includes(p.plan) ? { ...p, verdict: 'ok', resume: 'corrigé, non relu' } : p) }; break }
+    if (!f.some(p => p.erreurs.some(e => e.gravite === 'grave'))) { revue = { plans: revue.plans.map(p => noms.includes(p.plan) ? { ...p, verdict: 'ok', resume: `corrigé, non relu. Relecture d'avant : ${p.resume} Erreurs vues : ${JSON.stringify(p.erreurs)}` } : p) }; break }
     const r2 = await relire(noms, t2, tours + 1)
     if (!r2) return { groupe: g, trace, revue, perdu: 'relire' }
     revue = { plans: revue.plans.map(p => r2.plans.find(q => q.plan === p.plan) || p) }
