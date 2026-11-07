@@ -59,6 +59,16 @@ Chaque chantier laisse les tests verts et le témoin identique, et écrit une pl
 - **Part mesurée** sur 300 graines (270 logements, sans dessin) : 36 ensembles, soit 13,3 % (26 niveaux, 10 deux logements), 0 refusé ; 10,4 % de duplex, 5,6 % de pages à l'écran.
 - **Chargeur** : `..\atelya\entrainer.py` n'a besoin d'aucune modification (`lire_partitions` ne complète de zéros que les identifiants purement chiffrés, `dessins` lit `exemples/<id>/niveau_*`). Vérifié par un vrai appel sur `..\atelya\planches\lot2-revue`.
 
+## Revue adverse (07/11/2026) : ce qui a changé
+
+- **`--lot2 --sans-cotes`** : plus de dimensions de pièce ; titre et cartouche éteints quand les surfaces le sont. Reste permis par choix : surfaces si l'option les tire (avec le titre, le tableau et le cartouche), barre d'échelle tirée par l'option, HSP.
+- **Mitoyen + biais** : contact à 2 mm près (`TOLERANCE_CONTACT`), le cadre est arrondi par les murs en biais.
+- **Croquis penché** : quand le garde-fou retire le contour, le mur prend la couleur du trait, sauf style absurde et couleur tirée par la famille.
+- **Ensemble** : pas de cartouche ; dans `geometrie.json`, une épaisseur qui diffère entre les deux logements est retirée de `parametres` (`parametres_vrais`).
+- **Contour « gris » d'un extérieur** : 2 pixels au plus (écart assumé à fr-102 : un trait d'allure de cloison, masque = fond, s'apprendrait).
+- **`plan_pdf.fabriquer_jeu`** : alerte claire sur un jeu `--lot2`, comportement inchangé.
+- **Tests** : `test_image_contre_masque*` compare enfin l'image au masque (couleurs témoins) ; les cotes, dimensions et surfaces écrites sont comparées à leur vraie valeur. Preuve par mutants : `..\atelya\planches\lot2-revue-adverse\s6_mutants_apres.py`.
+
 ## Après le code
 
 Le lot 2 ne change aucune note tant qu'un modèle n'a pas appris dessus. Fabriquer le jeu (`tout --nombre 3300 --depart 70001 --lot2 ...`) et lancer l'essai 8 demandent l'accord de NT.

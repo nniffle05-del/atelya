@@ -221,6 +221,8 @@ Détail : `docs/projet/memoire/atelya-murs-en-trop.md`.
 jamais touchés) / ~80 à l'entraînement, vérités des 80 (Claude + validation NT à l'écran), catalogue de styles pour le lot 2, puis essai 8
 (e5 + DINOv2 + fabriqués + 80 vrais plans), jugé sur les 40 d'examen. Plan détaillé dans `atelya-murs-en-trop.md` (fin).
 
+**Lot 2 du générateur (07/11/2026, branche `etape-vrais-plans-105`)** : générateur 0.1.6, option `--lot2`, module `moteur/generateur/lot2.py`, 20 traits du catalogue, exemples composés `{ident}-ensemble/` (plusieurs niveaux, deux logements). Sans `--lot2` : témoin identique (137 fichiers). Relecture adverse : aucun masque faux. 627 tests. Aucun jeu fabriqué, aucun modèle entraîné : aucune note ne change. Détail : `docs/projet/etapes/lot2-conception.md`. **Défaut trouvé, lecteur non modifié, attend le « oui » de NT** : échelles silencieusement fausses (−10 à −41 %) sur 6 plans fabriqués cotés en cm sur 30 (fin de `atelya-echelle-vrais-plans.md`) ; les bancs existants ne contenaient pas ces styles.
+
 **CHANTIER EN COURS (06/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans. Lire d'abord `docs/projet/etapes/reprise-105-plans.md`.**
 
 **Prochaine étape** : les 105 vrais plans (ci-dessus). Restes d'A2 :

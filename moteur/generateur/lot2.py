@@ -623,6 +623,8 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
 
     `sans_cotes` : --sans-cotes gagne toujours. Le banc « sans cotes » suppose qu'aucune cote n'est écrite ;
     une famille ne doit donc pas rallumer ce que l'option a éteint."""
+    if sans_cotes:  # « 2,00 m × 1,60 m » est une cote : `noms` l'écrirait dès que les surfaces sont permises
+        l.dimensions = ""
     surfaces0 = style.surfaces
     v = style.variete
     if style.realisme is not None and (l.ecran or l.ecran_si_photo):
@@ -725,9 +727,17 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
         style.cartouche = False
     if style.rotation or style.perspective or style.focale:
         # Défaut connu de contour_des_murs : contour calculé sur le masque tourné, dessiné à plat (double contour décalé).
+        if style.murs_contour and l.couleur_murs is None and not absurde:
+            # Un croquis a un aplat presque blanc que seul ce trait rendait visible : sans lui, le masque affirmerait des murs
+            # qu'on ne voit plus. Le mur prend la couleur du trait. Un style absurde, lui, garde ses couleurs.
+            style.murs = style.murs_contour_couleur
         style.murs_contour = False
     if sans_cotes:
         style.cotes, style.surfaces = False, surfaces0
+        if not surfaces0:
+            # Hérités du style de base, ils écriraient encore « T1 de 33 m² » et « Murs extérieurs : 20 cm » sur un plan
+            # censé ne porter aucune mesure. Seulement ici : sans --lot2, les jeux « sans cotes » déjà fabriqués ne changent pas.
+            style.titre = style.cartouche = False
     if not style.cotes:
         style.cotes_partielles = False
 
@@ -1914,8 +1924,10 @@ def _contour_exterieur(d, boite, contour: str) -> None:
                 t0, t1 = k / max(n, 1), min(k + tiret, n) / max(n, 1)
                 d.d.line(((a + (e - a) * t0, b + (f - b) * t0), (a + (e - a) * t1, b + (f - b) * t1)), fill=st.textes, width=2)
         return
-    if contour == "gris":  # fr-102 : un large trait de la couleur des murs, en plus fin qu'un vrai mur
-        d.d.rectangle(boite, outline=st.murs, width=max(2, round(st.px_par_m * 0.05)))
+    if contour == "gris":
+        # fr-102 montre un large trait de la couleur des murs. Pas ici : 44 à 55 mm de cette couleur ont l'allure d'une cloison, et
+        # le masque dit fond. Le modèle apprendrait qu'une cloison n'est pas un mur. Décision prise : 2 pixels au plus.
+        d.d.rectangle(boite, outline=st.murs, width=2)
     elif contour == "moyen":  # fr-084
         d.d.rectangle(boite, outline=st.textes, width=2)
     else:
@@ -2100,6 +2112,11 @@ def _normaliser(niv: Niveau) -> None:
     _translater(niv, -c.x0, -c.y0)
 
 
+# Le cadre d'un niveau passe à l'entier supérieur à cause des murs en biais : un mur « au contact » du voisin peut en être à 1 mm
+# (graine 1039 : une fenêtre restait contre le mur d'à côté). 2 mm, c'est bien moins d'un pixel : à l'image, ils se touchent.
+TOLERANCE_CONTACT = 2
+
+
 def _orienter(niveau: Niveau, dehors: int, mitoyen: bool, rc: random.Random) -> tuple[Niveau, int]:
     """Une copie du niveau, tournée pour présenter sa bonne face à l'autre logement : vers `dehors` (+1 est, -1 ouest).
 
@@ -2115,7 +2132,7 @@ def _orienter(niveau: Niveau, dehors: int, mitoyen: bool, rc: random.Random) -> 
         bord = cadre_du_niveau(c).x1 if dehors > 0 else 0
         sur_la_face = [o for o in c.ouvertures if o.mur.vertical and o.mur.dehors == dehors]
         if mitoyen:
-            contact = [o for o in sur_la_face if (rect_du_mur(o.mur).x1 if dehors > 0 else rect_du_mur(o.mur).x0) == bord]
+            contact = [o for o in sur_la_face if abs((rect_du_mur(o.mur).x1 if dehors > 0 else rect_du_mur(o.mur).x0) - bord) <= TOLERANCE_CONTACT]
             score = (100 if any(o.sous_type == "porte_entree" for o in contact) else 0) + len(contact)
         else:
             score = 0 if any(o.sous_type == "porte_entree" for o in sur_la_face) else 1
@@ -2129,7 +2146,7 @@ def _sans_ouverture_au_contact(niv: Niveau, autre: Rect, contact: float, dehors:
     vérité reste exacte, puisque le mur est plein sur l'image et dans le masque."""
     def bouche(o) -> bool:
         m = o.mur
-        if not m.vertical or m.dehors != dehors or (rect_du_mur(m).x1 if dehors > 0 else rect_du_mur(m).x0) != contact:
+        if not m.vertical or m.dehors != dehors or abs((rect_du_mur(m).x1 if dehors > 0 else rect_du_mur(m).x0) - contact) > TOLERANCE_CONTACT:
             return False
         return o.u0 < autre.y1 and autre.y0 < o.u1
     niv.ouvertures = [o for o in niv.ouvertures if not bouche(o)]
@@ -2277,6 +2294,18 @@ def vers_ensemble(style, c: Composition) -> None:
                                      filet=c.filet, legende_niveau=False, numero_lot="", echelle_ecrite="", recadre=False,
                                      placards_fleches=False)  # la flèche traverserait tout l'autre bloc
     style.titre = False
+    style.cartouche = False  # il écrirait les épaisseurs du premier logement, fausses pour le second (graine 70193)
+
+
+def parametres_vrais(parametres: dict, log: LogementGenere, log_b: LogementGenere | None) -> dict:
+    """Les `parametres` de geometrie.json d'un ensemble : `dataclasses.replace` a gardé les épaisseurs du premier logement.
+    Une épaisseur qui diffère entre les deux logements n'a pas de valeur unique vraie : elle est retirée (chaque bloc a les siennes
+    dans ses murs). Un duplex (`log_b` None) n'a qu'un seul logement : tout reste vrai."""
+    if log_b is None:
+        return parametres
+    ecarts = {"epaisseur_murs_exterieurs": log.ep_ext != log_b.ep_ext, "epaisseur_cloisons": log.ep_cloison != log_b.ep_cloison,
+              "epaisseur_murs_porteurs": log.ep_porteur != log_b.ep_porteur}
+    return {cle: v for cle, v in parametres.items() if not ecarts.get(cle)}
 
 
 def vides_entre_blocs(blocs: list[dict]) -> list[Rect]:

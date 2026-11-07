@@ -5,7 +5,9 @@ l'ancien chemin de code. Si un trait touchait un masque, la comparaison le verra
 """
 import dataclasses
 import json
+import math
 import random
+import re
 
 import cv2
 import numpy as np
@@ -79,6 +81,141 @@ def _fabriquer(tmp_path, monkeypatch, l: L.Lot2, graine: int = 60002):
     dossier = tmp_path / "exemples" / f"{graine:06d}"
     assert valider_dossier(dossier, Regles.charger(None)).accepte
     return dossier
+
+
+def _espion_textes(monkeypatch) -> list[str]:
+    """Tout ce qui s'écrit vraiment sur l'image : _Dessin.texte (donc _ecrire), le stylo, le texte tourné."""
+    ecrits = []
+    vrai = R._Dessin.texte
+    monkeypatch.setattr(R._Dessin, "texte", lambda self, xy, texte, *a, **k: (ecrits.append(texte), vrai(self, xy, texte, *a, **k))[1])
+    for nom in ("texte_main", "_texte_tourne"):
+        monkeypatch.setattr(L, nom, (lambda f: lambda d, xy, texte, *a, **k: (ecrits.append(texte), f(d, xy, texte, *a, **k))[1])(getattr(L, nom)))
+    return ecrits
+
+
+def _espion_cotes(monkeypatch) -> list[tuple[str, float, bool]]:
+    """Chaque cote dessinée : (texte écrit, longueur du trait en mm, horizontale). La longueur vient des pixels du trait, pas du
+    calcul qui a produit le texte : une cote fausse se voit, même si le calcul faux donne un nombre bien formé."""
+    cotes = []
+    vrai = L._cote_fine
+
+    def espion(d, a, b, horizontale, texte, *r, **k):
+        cotes.append((texte, math.dist(a, b) / d.rep.s, horizontale))
+        return vrai(d, a, b, horizontale, texte, *r, **k)
+    monkeypatch.setattr(L, "_cote_fine", espion)
+    return cotes
+
+
+# ---------------------------------------------------------------- l'image contre le masque
+
+
+_MAGENTA, _VERT = (255, 0, 255), (0, 255, 0)
+# Même classe, même couleur : deux sortes de pièces de la même classe ne se contredisent pas.
+_PALETTE_TEMOIN = {s: (40 + 12 * CLASSES[s], 200 - 9 * CLASSES[s], 90 + 8 * (CLASSES[s] % 5)) for s in L._SORTES}
+
+
+def _en_couleurs_temoins(style) -> None:
+    """Murs magenta, fenêtres vertes, une couleur par sorte de pièce. Le reste du tirage est gardé, rotation et perspective comprises.
+
+    Retirés, car ils ont le droit d'avoir ces couleurs hors du masque : la flèche du nord, les repères en triangles et le contour
+    gris d'un extérieur sont dessinés à la couleur des murs."""
+    l = style.lot2
+    style.salissure, style.papier, style.contraste, style.realisme = "", 255, 1.0, None
+    style.murs_contour, style.murs, style.fond, style.traits = False, _MAGENTA, (255, 255, 255), (60, 60, 60)
+    style.variete, style.mobilier, style.pieces_colorees, style.fleche_nord = None, False, True, False
+    l.palette, l.sols, l.murs_dessin, l.triangles, l.portes_boites = "_temoin", {}, "", False, False
+    l.teinte, l.ecran, l.ecran_bordure = None, False, False
+    l.fenetres_pleines, l.couleur_fenetres, l.contour_fenetres = True, _VERT, _VERT
+    l.exterieurs = [{**e, "contour": "fin"} for e in l.exterieurs]
+
+
+def _proche(image: np.ndarray, couleur: tuple, tolerance: int = 30) -> np.ndarray:
+    return np.abs(image.astype(int) - np.array(couleur)).sum(axis=2) < tolerance
+
+
+def _image_contre_masque(rendu) -> None:
+    """Ce que le modèle voit et ce qu'on lui dit de voir sont-ils au même endroit ? Comparer des masques entre eux ne le dit pas.
+    Un rebord de 2 pixels est toléré : l'image est lissée, pas le masque."""
+    img, sem = rendu.images["plan"], rendu.images["masque_semantique"]
+    assert img.shape[:2] == sem.shape
+    k3, k5 = np.ones((3, 3), np.uint8), np.ones((5, 5), np.uint8)
+    bati = ((sem >= 1) & (sem <= 4)).astype(np.uint8)
+    fenetres = ((sem == CLASSES["fenetre"]) | (sem == CLASSES["porte_fenetre"])).astype(np.uint8)
+    magenta, vert = _proche(img, _MAGENTA), _proche(img, _VERT)
+    assert int((magenta & (cv2.dilate(bati, k5) == 0)).sum()) == 0  # aucun mur dessiné là où le masque dit autre chose
+    coeur = cv2.erode((sem == CLASSES["mur"]).astype(np.uint8), k5) > 0
+    assert coeur.any() and magenta[coeur].mean() > 0.9  # et le masque n'affirme aucun mur qui n'est pas dessiné
+    assert int((vert & (cv2.dilate(fenetres, k5) == 0)).sum()) == 0
+    coeur_f = cv2.erode(fenetres, k3) > 0
+    if coeur_f.sum() > 50:
+        assert vert[coeur_f].mean() > 0.5
+    for sorte, couleur in _PALETTE_TEMOIN.items():
+        zone = (sem == CLASSES[sorte]).astype(np.uint8)
+        pixels = _proche(img, couleur, 6)
+        # Une tache, pas un pixel seul : sur un plan penché, le lissage entre le séjour et le magenta retombe parfois sur la cuisine.
+        fuite = (pixels & (cv2.dilate(zone, k5) == 0)).astype(np.uint8)
+        assert not cv2.erode(fuite, k3).any(), sorte
+        coeur_p = cv2.erode(zone, k5) > 0
+        if coeur_p.sum() >= 200:
+            assert pixels[coeur_p].mean() > 0.4, sorte  # le reste : noms, cotes et traits écrits dans la pièce
+
+
+@pytest.mark.parametrize("graine,options", [
+    (60002, {}),  # à plat
+    (3021, {}),  # logiciel grand public penché, deux extérieurs
+    (3025, {}),  # murs noirs penchés
+    (3012, {"biais": True}),  # murs en biais
+    (40002, {"photo_realiste": True, "vraie_camera": True, "familles": ["photo"]}),  # une vraie caméra
+], ids=["a_plat", "logiciel_penche", "murs_noirs_penches", "biais", "camera"])
+def test_image_contre_masque(monkeypatch, graine, options):
+    monkeypatch.setitem(L.PALETTES_LOT2, "_temoin", _PALETTE_TEMOIN)
+    style = style_pour(graine, 0, Options(dossier=None, lot2=True, **options))
+    log = generer(graine, Reglages())
+    if options.get("biais"):
+        from moteur.generateur.biais import couper_angles
+        couper_angles(log, random.Random(f"biais-{graine}"))
+        assert log.niveaux[0].murs_libres
+    if graine in (3021, 3025):
+        assert style.rotation  # sinon ce cas ne prouve plus rien pour un plan penché
+    _en_couleurs_temoins(style)
+    _image_contre_masque(rendre(log, log.niveaux[0], style))
+
+
+@pytest.mark.parametrize("graine,compose,disposition,biais,rotation", [
+    (62, "niveaux", "empiles", False, 2.5),  # duplex, penché
+    (62, "niveaux", "cote_a_cote", False, 0.0),
+    (26, "deux_logements", "palier", True, 0.0),  # murs en biais
+    (26, "deux_logements", "mitoyen", False, -1.5),  # penché
+])
+def test_image_contre_masque_ensemble(monkeypatch, graine, compose, disposition, biais, rotation):
+    monkeypatch.setitem(L.PALETTES_LOT2, "_temoin", _PALETTE_TEMOIN)
+    opt = Options(dossier=None, lot2=True, biais=biais)
+    log = generer(graine, Reglages())
+    if biais:
+        from moteur.generateur.biais import couper_angles
+        couper_angles(log, random.Random(f"biais-{graine}"))
+    rc = random.Random(f"test-{graine}-{compose}-{disposition}")
+    log_b = None if log.duplex else E.second_logement(graine, opt, Reglages(), Regles.charger(None), rc)
+    style = style_pour(graine, 0, opt)
+    c = L.composer(log, log_b, compose, disposition, style, rc)
+    assert c.disposition == disposition and len(style.lot2.blocs) == 0
+    L.vers_ensemble(style, c)
+    _en_couleurs_temoins(style)
+    style.rotation = rotation or style.rotation
+    _image_contre_masque(rendre(c.log, c.log.niveaux[0], style, "ensemble"))
+
+
+def test_le_temoin_voit_une_image_decalee(monkeypatch):
+    # Le témoin du témoin : à quoi servirait-il s'il ne voyait pas le défaut qu'il doit attraper ?
+    monkeypatch.setitem(L.PALETTES_LOT2, "_temoin", _PALETTE_TEMOIN)
+    style = style_pour(60002, 0, Options(dossier=None, lot2=True))
+    log = generer(60002, Reglages())
+    _en_couleurs_temoins(style)
+    rendu = rendre(log, log.niveaux[0], style)
+    _image_contre_masque(rendu)
+    rendu.images["plan"] = np.roll(rendu.images["plan"], 60, axis=1)
+    with pytest.raises(AssertionError):
+        _image_contre_masque(rendu)
 
 
 # ---------------------------------------------------------------- le socle
@@ -159,6 +296,21 @@ def test_pdf_sans_lot2():
     assert style_a_plat(style_pour(60001, 0, Options(dossier=None, lot2=True))).lot2 is None
 
 
+def test_pdf_d_un_jeu_lot2_le_dit_clairement(tmp_path, capsys):
+    from moteur.generateur.plan_pdf import fabriquer_jeu
+    (tmp_path / "lot2").mkdir()
+    (tmp_path / "lot2" / "reglages.json").write_text(json.dumps({"options": {"lot2": True}}), encoding="utf-8")
+    bilan = fabriquer_jeu(tmp_path / "lot2", tmp_path / "pdf-lot2", ids=[])
+    assert "jeu fabriqué avec --lot2 : non pris en charge" in capsys.readouterr().out and "alerte" in bilan
+    # Les autres jeux n'en entendent pas parler : ni ligne, ni clé dans le bilan.
+    (tmp_path / "ancien").mkdir()
+    (tmp_path / "ancien" / "reglages.json").write_text(json.dumps({"options": {"diversite": 2}}), encoding="utf-8")
+    for jeu in ("ancien", "sans-reglages"):
+        (tmp_path / jeu).mkdir(exist_ok=True)
+        bilan = fabriquer_jeu(tmp_path / jeu, tmp_path / f"pdf-{jeu}", ids=[])
+        assert "lot2" not in capsys.readouterr().out and "alerte" not in bilan
+
+
 def test_version():
     assert VERSION_GENERATEUR == "0.1.6"
 
@@ -236,9 +388,18 @@ def test_format_dimensions():
 
 
 @pytest.mark.parametrize("mode", ["ajoute", "remplace"])
-def test_trait_2_dimensions(mode):
+def test_trait_2_dimensions(mode, monkeypatch):
     sans, _, _, _ = _rendus(60002, L.Lot2(famille="neutre"))
-    avec, reference, _, _ = _rendus(60002, L.Lot2(famille="neutre", dimensions=mode))
+    ecrits = _espion_textes(monkeypatch)
+    avec, reference, _, log = _rendus(60002, L.Lot2(famille="neutre", dimensions=mode))
+    # Le texte écrit est la vraie mesure de la pièce : une dimension fausse ne change pas les masques, seul ce contrôle la voit.
+    pieces = log.niveaux[0].pieces
+
+    def attendu(p):
+        return f"{p.rect.largeur / 1000:.2f} m × {p.rect.hauteur / 1000:.2f} m".replace(".", ",")
+    ecrites = {x for x in ecrits if "×" in x}
+    assert ecrites and ecrites <= {attendu(p) for p in pieces}
+    assert attendu(max(pieces, key=surface_piece)) in ecrites
     diff = _diff(avec, sans)
     assert diff.sum() > 100
     # La différence reste dans le logement : les dimensions s'écrivent dans les pièces, pas dans la marge.
@@ -535,6 +696,63 @@ def test_sans_cotes_gagne_sur_toutes_les_familles():
         avec = style_pour(graine, 0, Options(dossier=None, sans_cotes=True, lot2=True))
         assert avec.cotes is False and avec.cotes_partielles is False
         assert avec.surfaces == sans.surfaces  # ni rallumées, ni éteintes par une famille
+        assert not avec.lot2.dimensions
+        if not avec.surfaces:
+            assert not avec.titre and not avec.cartouche
+
+
+_DIMENSIONS = re.compile(r"\d[,.]\d{2}.*[x×].*\d[,.]\d{2}")
+_FORME_DE_COTE = re.compile(r"^\d{1,2}[,.]\d{2}( m)?$|^\d{2,3}$|^\d+(,\d+)? m$")
+
+
+def _mesures_ecrites(ecrits: list[str], style, log) -> list[str]:
+    """Ce qui a la forme d'une mesure, moins ce que --sans-cotes permet par choix : la barre d'échelle tirée par l'option
+    (exportateur.style_pour), les surfaces si elles sont permises, et ce qui n'est pas une longueur (numéro de lot, pastilles,
+    HSP : « HSP non » dans la conception)."""
+    l = style.lot2
+    permis = {"1 m", "2 m"} if style.echelle_graphique else set()
+    permis |= {l.numero_lot} | {str(k) for k in range(1, len(log.pieces) + 1)}
+    permis |= {f"{n.hsp / 1000:.2f}" for n in log.niveaux} if l.hsp == "HSP cercle" else set()
+    if style.surfaces and l.tableau:  # la colonne de valeurs d'un tableau de surfaces (« 4,01 ») : des surfaces, pas des cotes
+        permis |= {f"{surface_piece(p) / 1e6:.{l.tableau_decimales}f}".replace(".", ",") for p in log.pieces}
+    mesures = [x for x in ecrits if (_DIMENSIONS.search(x) or _FORME_DE_COTE.match(x)) and x not in permis]
+    if not style.surfaces:
+        mesures += [x for x in ecrits if "m²" in x or " cm" in x or "mètres" in x]
+    return mesures
+
+
+@pytest.mark.parametrize("graine", [43, 67, 65, 46, 80, 16, 21])
+def test_sans_cotes_aucune_mesure_sur_de_vrais_tirages(monkeypatch, graine):
+    # Par le vrai chemin, sans rien forcer : 43, 67 et 65 écrivaient « 2,00 m × 1,60 m » quand les surfaces sont permises ;
+    # 46 et 80 écrivaient « Murs extérieurs : 20 cm » et « T1 de 33 m² », 16 et 21 ce titre, quand elles ne le sont pas.
+    ecrits = _espion_textes(monkeypatch)
+    style = style_pour(graine, 0, Options(dossier=None, lot2=True, sans_cotes=True))
+    log = generer(graine, Reglages())
+    rendre(log, log.niveaux[0], style)
+    assert ecrits
+    assert not _mesures_ecrites(ecrits, style, log)
+
+
+def test_sans_cotes_dimensions_meme_si_les_surfaces_sont_permises(monkeypatch):
+    ecrits = _espion_textes(monkeypatch)
+    avec, _, style, log = _rendus(60002, L.Lot2(famille="neutre", dimensions="ajoute"), _base(cotes=False, surfaces=True), sans_cotes=True)
+    assert style.surfaces is True and any("m²" in x for x in ecrits)
+    assert not any(_DIMENSIONS.search(x) for x in ecrits)
+
+
+def test_sans_cotes_titre_et_cartouche_eteints_avec_les_surfaces():
+    eteint = _appliquee_sans_cotes(_base(surfaces=False, cotes=False, titre=True, cartouche=True))
+    assert eteint.titre is False and eteint.cartouche is False
+    permis = _appliquee_sans_cotes(_base(surfaces=True, cotes=False, titre=True, cartouche=True))
+    assert permis.titre is True and permis.cartouche is True  # le titre écrit alors une surface, permise
+    # Sans --lot2, rien ne change : les jeux « sans cotes » déjà fabriqués restent identiques.
+    ancien = style_pour(46, 0, Options(dossier=None, sans_cotes=True))
+    assert not ancien.surfaces and (ancien.titre or ancien.cartouche)
+
+
+def _appliquee_sans_cotes(style: Style) -> Style:
+    L.appliquer(style, L.Lot2(famille="neutre"), sans_cotes=True)
+    return style
 
 
 def test_style_absurde_garde_ses_couleurs():
@@ -551,6 +769,34 @@ def test_styles_monde_murs_pleins_pour_les_familles_foncees():
     style = _base(variete=Variete(murs="trait"))
     L.appliquer(style, L.lot2_au_hasard(random.Random(3), famille="murs_noirs", transversaux=False))
     assert style.variete.murs == "plein"
+
+
+def test_croquis_penche_les_murs_restent_visibles():
+    # Un croquis a un aplat presque blanc et un trait foncé autour. Sur un écran penché, le trait saute (contour décalé) :
+    # les murs disparaissaient de l'image alors que le masque les affirme (graine 16820).
+    assert style_pour(16820, 0, Options(dossier=None, lot2=True)).murs == (30, 30, 30)
+    clair = (230, 230, 230)
+    penche = _base(famille="croquis", murs=clair, murs_contour=True)
+    l = L.Lot2(famille="neutre", ecran=True, rotation=3.0, papier=240, contraste=0.9)
+    avec, _, style, _ = _rendus(60002, l, penche)
+    assert style.rotation == 3.0 and style.murs_contour is False and style.murs == style.murs_contour_couleur
+    gris = cv2.cvtColor(avec.images["plan"], cv2.COLOR_RGB2GRAY).astype(float)
+    mur = (avec.images["masque_semantique"] == CLASSES["mur"]).astype(np.uint8)
+    coeur = cv2.erode(mur, np.ones((5, 5), np.uint8)) > 0
+    autour = (cv2.dilate(mur, np.ones((15, 15), np.uint8)) > 0) & ~(cv2.dilate(mur, np.ones((5, 5), np.uint8)) > 0)
+    assert gris[autour].mean() - gris[coeur].mean() > 80
+    # À plat, le croquis garde son trait et son aplat.
+    droit = _base(famille="croquis", murs=clair, murs_contour=True)
+    L.appliquer(droit, L.Lot2(famille="neutre"))
+    assert droit.murs == clair and droit.murs_contour is True
+    # Une couleur tirée par la famille et un style absurde gardent leurs couleurs.
+    tiree = _base(famille="croquis", murs=clair, murs_contour=True, rotation=2.0, focale=1.1)
+    L.appliquer(tiree, L.Lot2(famille="neutre", couleur_murs=(24, 32, 56)))
+    assert tiree.murs == (24, 32, 56)
+    from moteur.generateur.variete import Variete
+    absurde = _base(murs=(90, 0, 90), murs_contour=True, rotation=2.0, focale=1.1, variete=Variete(absurde=True))
+    L.appliquer(absurde, L.Lot2(famille="neutre"))
+    assert absurde.murs == (90, 0, 90)
 
 
 def test_pas_de_contour_decale_sur_un_plan_penche():
@@ -621,7 +867,10 @@ def test_plan_de_travail_le_long_d_un_mur():
             for pid, lst in apres.items():
                 for m in lst:
                     if m.type == "plan_de_travail":
-                        assert L._longe_un_mur(m, pieces[pid].rect), (graine, pid)
+                        r, b = pieces[pid].rect, L._boite_meuble(m)
+                        assert L._longe_un_mur(m, r), (graine, pid)
+                        # _longe_un_mur ne regarde qu'un côté : un meuble sorti de sa pièce y passe, et il mordrait un mur.
+                        assert r.x0 <= b.x0 and b.x1 <= r.x1 and r.y0 <= b.y0 and b.y1 <= r.y1, (graine, pid)
             retournes += sum(a.contour != b.contour for pid in avant for a, b in zip(avant[pid], apres[pid]))
             for pid in avant:  # rien d'autre ne bouge
                 autres_avant = [m for m in avant[pid] if m.type != "plan_de_travail"]
@@ -701,8 +950,16 @@ def test_trait_3_famille_tiree():
     assert style.cartouche is False and style.titre is False
 
 
-def test_trait_3_cotes_en_cm_dans_les_pieces():
-    avec, reference, style, _ = _rendus(60002, _promoteur())
+def test_trait_3_cotes_en_cm_dans_les_pieces(monkeypatch):
+    cotes, ecrits = _espion_cotes(monkeypatch), _espion_textes(monkeypatch)
+    avec, reference, style, log = _rendus(60002, _promoteur())
+    assert cotes
+    pieces = log.niveaux[0].pieces
+    for texte, longueur_mm, _ in cotes:
+        assert texte in ecrits and abs(int(texte) * 10 - longueur_mm) <= 5.5, (texte, longueur_mm)  # arrondi au cm
+    # Et elles mesurent bien une pièce, de face à face.
+    assert {int(x) for x, _, h in cotes if h} <= {round(p.rect.largeur / 10) for p in pieces}
+    assert {int(x) for x, _, h in cotes if not h} <= {round(p.rect.hauteur / 10) for p in pieces}
     sans, _, _, _ = _rendus(60002, _promoteur(cotes_interieures=False))
     diff = _diff(avec, sans)
     assert diff[avec.images["masque_pieces"] > 0].sum() > 150  # dans les pièces
@@ -812,8 +1069,12 @@ def test_trait_6_page_blanche_pieces_creme():
     _verite_inchangee(avec, reference)
 
 
-def test_trait_6_cotes_par_mur_sans_chaines():
+def test_trait_6_cotes_par_mur_sans_chaines(monkeypatch):
+    cotes, ecrits = _espion_cotes(monkeypatch), _espion_textes(monkeypatch)
     avec, reference, style, _ = _rendus(60002, _logiciel())
+    assert cotes
+    for texte, longueur_mm, _ in cotes:  # « 4,86 m », « 4 m » : le trait mesure ce que dit le nombre, à l'arrondi du cm près
+        assert texte in ecrits and abs(float(texte.replace(" m", "").replace(",", ".")) * 1000 - longueur_mm) <= 5.5, (texte, longueur_mm)
     sans, _, _, _ = _rendus(60002, _logiciel(cotes_par_mur=False))
     diff = _diff(avec, sans)
     assert diff[avec.images["masque_pieces"] > 0].sum() > 400
@@ -1090,6 +1351,30 @@ def test_trait_18_jardin_vert():
     _verite_inchangee(avec, reference)
 
 
+def test_trait_18_contour_gris_jamais_plus_de_2_pixels():
+    # La couleur des murs, l'allure d'une cloison et un masque qui dit fond : le modèle apprendrait qu'une cloison n'est pas un mur.
+    mauve, vert = (90, 30, 90), (125, 235, 100)
+    for px_par_m in (100.0, 130.0):
+        l = L.Lot2(famille="neutre", couleur_murs=mauve, exterieurs=[_exterieur(sorte="terrasse", profondeur_m=2.0, motif="vert", contour="gris", couleur=vert)])
+        avec, _, _, _ = _rendus(26, l, _base(px_par_m=px_par_m))
+        trait = (np.all(avec.images["plan"] == np.array(mauve), axis=2) & (avec.images["masque_semantique"] == 0)).astype(np.uint8)
+        assert trait.sum() > 100  # il est bien dessiné
+        assert not cv2.erode(trait, np.ones((3, 3), np.uint8)).any()  # 3 pixels de large n'existent nulle part
+
+
+def test_trait_18_surface_ecrite_est_la_vraie(monkeypatch):
+    # Le lecteur d'échelle sait lire les surfaces écrites : une surface de balcon fausse serait une échelle fausse.
+    vus = []
+    vrai = L._ecrire_exterieur
+    monkeypatch.setattr(L, "_ecrire_exterieur", lambda d, xy, texte, *r: (vus.append(texte), vrai(d, xy, texte, *r))[1])
+    _, _, style, log = _rendus(26, L.Lot2(famille="neutre", exterieurs=[_exterieur(part=0.6, profondeur_m=2.4)]))
+    n = log.niveaux[0]
+    d = R._Dessin(log, n, style, Repere(_cadre_des_murs(n), style, random.Random(0), nb_pieces=len(n.pieces)), {}, True)
+    (_, r), = L.places_des_exterieurs(d)
+    attendu = f"{(r.x1 - r.x0) * (r.y1 - r.y0) / 1e6:.2f} m²".replace(".", ",")
+    assert attendu in vus and sum("m²" in x for x in vus) == 1
+
+
 def test_trait_18_exterieur_sans_mesure_sous_sans_cotes():
     e = [_exterieur(profondeur_m=2.0)]
     vus = []
@@ -1102,24 +1387,49 @@ def test_trait_18_exterieur_sans_mesure_sous_sans_cotes():
     assert vus == ["Balcon"]  # le nom seul, jamais « 7,20 m² »
 
 
+def _places(log, exterieurs: list[dict]) -> list:
+    n = log.niveaux[0]
+    style = _appliquee(L.Lot2(famille="neutre", exterieurs=exterieurs))
+    return [r for _, r in L.places_des_exterieurs(R._Dessin(log, n, style, Repere(_cadre_des_murs(n), style, random.Random(0), nb_pieces=len(n.pieces)), {}, True))]
+
+
+def _se_touchent(a, b) -> bool:
+    return not (a.x1 <= b.x0 + 1 or b.x1 <= a.x0 + 1 or a.y1 <= b.y0 + 1 or b.y1 <= a.y0 + 1)
+
+
 def test_trait_18_extérieur_ne_recouvre_rien():
+    # Graine 26, à droite : le premier mur candidat donne sur un renfoncement, le balcon y entrerait dans un mur du logement.
+    from moteur.generateur.annotations import rect_du_mur
+    vus = 0
     for graine in (26, 60, 60012, 2, 7):
         log = generer(graine, Reglages())
         for cote in ("bas", "droite"):
-            style = _appliquee(L.Lot2(famille="neutre", exterieurs=[_exterieur(cote=cote, part=0.9, profondeur_m=2.4)]))
-            rep = Repere(_cadre_des_murs(log.niveaux[0]), style, random.Random(0), nb_pieces=len(log.niveaux[0].pieces))
-            d = R._Dessin(log, log.niveaux[0], style, rep, {}, True)
-            for _, r in L.places_des_exterieurs(d):
-                for p in log.niveaux[0].pieces:
-                    z = p.rect
-                    assert r.x1 <= z.x0 + 1 or z.x1 <= r.x0 + 1 or r.y1 <= z.y0 + 1 or z.y1 <= r.y0 + 1
+            for r in _places(log, [_exterieur(cote=cote, part=0.9, profondeur_m=2.4)]):
+                vus += 1
+                for z in [p.rect for p in log.niveaux[0].pieces] + [rect_du_mur(m) for m in log.niveaux[0].murs]:
+                    assert not _se_touchent(r, z), (graine, cote)
+    assert vus >= 5  # sinon la boucle ne prouverait rien
+
+
+def _boite_du_pan(m):
+    xs, ys = [q[0] for q in m.polygone], [q[1] for q in m.polygone]
+    return L.Rect(min(xs), min(ys), max(xs), max(ys))
 
 
 def test_trait_18_sur_un_plan_en_biais():
     # Aucun extérieur sur un pan coupé, et la vérité reste celle du logement coupé.
-    avec, reference, _, log = _rendus(101, L.Lot2(famille="neutre", exterieurs=[_exterieur(cote="droite", part=0.9), _exterieur(cote="bas", part=0.9)]), biais=True)
-    assert log.niveaux[0].murs_libres
+    exterieurs = [_exterieur(cote="droite", part=0.9), _exterieur(cote="bas", part=0.9)]
+    avec, reference, _, log = _rendus(101, L.Lot2(famille="neutre", exterieurs=exterieurs), biais=True)
+    n = log.niveaux[0]
+    assert n.murs_libres
     _verite_inchangee(avec, reference)
+    places = _places(log, exterieurs)
+    assert places and not any(_se_touchent(r, _boite_du_pan(m)) for r in places for m in n.murs_libres)
+    # Sur 300 tirages, un mur droit raccourci par son pan coupé ne laisse jamais un balcon l'atteindre : l'obstacle ne s'est jamais
+    # montré utile. Il reste la seule garde si cela change : on pose donc le pan juste là où irait le balcon, il doit aller ailleurs.
+    avant = places[0]
+    n.murs_libres[0].polygone = [(avant.x0, avant.y0), (avant.x1, avant.y0), (avant.x1, avant.y1), (avant.x0, avant.y1)]
+    assert avant not in _places(log, exterieurs[:1])
 
 
 def test_trait_4_balcons_de_la_famille():
@@ -1425,6 +1735,53 @@ def test_trait_13_mitoyen(tmp_path, monkeypatch, graine):
     assert len(n0["pieces"]) == len(a["pieces"]) + len(b["pieces"])
 
 
+def test_trait_13_mitoyen_en_biais_aucune_fenetre_contre_le_voisin():
+    # Graine 1039 : le cadre arrondi par un mur en biais laissait 1 mm entre « == contact » et le mur : la fenêtre restait.
+    from moteur.generateur.annotations import rect_du_mur
+    from moteur.generateur.biais import couper_angles
+    reglages, regles = Reglages.charger(None), Regles()
+    opt = Options(dossier=None, lot2=True, biais=True)
+    log = generer(1039, reglages)
+    couper_angles(log, random.Random("biais-1039"))
+    rc = random.Random("revue-1039-True-deux_logements-mitoyen")
+    b = E.second_logement(1039, opt, reglages, regles, rc)
+    c = L.composer(log, b, "deux_logements", "mitoyen", style_pour(1039, 0, opt), rc)
+    assert c.disposition == "mitoyen"
+    n = c.log.niveaux[0]
+    murs = {s: [m for m in n.murs if m.id.endswith(s)] for s in ("_a", "_b")}
+    for o in n.ouvertures:
+        ro = rect_de_l_ouverture(o)
+        for m in murs["_b" if o.id.endswith("_a") else "_a"]:
+            rm = rect_du_mur(m)
+            ecart_x, ecart_y = max(rm.x0 - ro.x1, ro.x0 - rm.x1), max(rm.y0 - ro.y1, ro.y0 - rm.y1)
+            assert not (ecart_x <= 2 and ecart_y < 0), (o.id, m.id)
+
+
+def test_ensemble_sans_cartouche_ni_epaisseur_fausse(tmp_path, monkeypatch):
+    # Deux logements, deux épaisseurs : le cartouche écrivait celles du premier, geometrie.json aussi (`dataclasses.replace`).
+    style = _base(cartouche=True, titre=True)
+    log, log_b = generer(26, Reglages()), generer(60, Reglages())
+    L.appliquer(style, _lot_compose("deux_logements", "palier"))
+    style.cartouche = True
+    L.vers_ensemble(style, L.composer(log, log_b, "deux_logements", "palier", style, random.Random(1)))
+    assert style.cartouche is False and style.titre is False
+    # Chaque valeur de parametres, si elle est là, doit être vraie pour tous les murs.
+    faux_b = dataclasses.replace(log, ep_ext=log.ep_ext + 100, ep_cloison=log.ep_cloison, ep_porteur=log.ep_porteur)
+    parametres = {"graine": 26, "epaisseur_murs_exterieurs": 0.2, "epaisseur_cloisons": 0.07, "epaisseur_murs_porteurs": 0.2}
+    assert L.parametres_vrais(parametres, log, faux_b) == {"graine": 26, "epaisseur_cloisons": 0.07, "epaisseur_murs_porteurs": 0.2}
+    assert L.parametres_vrais(parametres, log, None) == parametres  # un duplex : un seul logement
+    # De bout en bout, sur la graine où l'écart a été vu.
+    _, dossier = _ensemble(tmp_path, monkeypatch, _lot_compose("deux_logements", "palier"), 70193)
+    geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
+    p = geo["parametres"]
+    epaisseurs = {m["epaisseur"] for m in geo["niveaux"][0]["murs"] if m["exterieur"]}
+    assert len(epaisseurs) >= 2 and "epaisseur_murs_exterieurs" not in p  # ces deux logements n'ont pas la même
+    # Duplex : tout est vrai, on garde.
+    _, dossier = _ensemble(tmp_path / "duplex", monkeypatch, _lot_compose("niveaux", "empiles"), 62)
+    geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
+    assert {m["epaisseur"] for m in geo["niveaux"][0]["murs"] if m["exterieur"]} == {geo["parametres"]["epaisseur_murs_exterieurs"]}
+
+
 def test_trait_13_sur_un_plan_en_biais(tmp_path, monkeypatch):
     # Les symétries doivent aussi retourner les murs en biais et les coins coupés, sinon le masque les trahirait.
     for disposition in ("palier", "mitoyen"):
@@ -1433,6 +1790,38 @@ def test_trait_13_sur_un_plan_en_biais(tmp_path, monkeypatch):
         assert valider_dossier(dossier, Regles.charger(None)).accepte
         geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
         assert any(m["orientation"] in ("oblique", "arrondi") for m in geo["niveaux"][0]["murs"])
+    # Un exemple valide ne prouve rien pour les pans coupés : le validateur relit le polygone du mur, retourné ou non. Ce contrôle
+    # regarde les contours des pièces, retournés à part : le pan coupé doit rester contre le coin qu'il ferme.
+    from moteur.generateur.biais import couper_angles
+    log = generer(101, Reglages())
+    couper_angles(log, random.Random("biais-101"))
+    n = log.niveaux[0]
+    assert n.murs_libres
+    for k in range(8):
+        c = L.copy.deepcopy(n)
+        L._symetrie(c, k)
+        L._normaliser(c)
+        _pans_contre_leur_piece(c)
+    log_b = generer(60, Reglages())
+    style = _base()
+    L.appliquer(style, _lot_compose("deux_logements", "palier"))
+    assemble = L.composer(log, log_b, "deux_logements", "palier", style, random.Random(1)).log
+    _pans_contre_leur_piece(assemble.niveaux[0])
+
+
+def _pans_contre_leur_piece(niv) -> None:
+    def distance(q, a, b) -> float:
+        ax, ay, bx, by = *a, *b
+        carre = (bx - ax) ** 2 + (by - ay) ** 2
+        t = max(0.0, min(1.0, ((q[0] - ax) * (bx - ax) + (q[1] - ay) * (by - ay)) / carre)) if carre else 0.0
+        return math.dist(q, (ax + t * (bx - ax), ay + t * (by - ay)))
+
+    bords = [(c[i], c[(i + 1) % len(c)]) for c in (p.contour for p in niv.pieces if p.contour) for i in range(len(c))]
+    assert bords
+    for m in niv.murs_libres:
+        centre = (sum(q[0] for q in m.polygone) / len(m.polygone), sum(q[1] for q in m.polygone) / len(m.polygone))
+        for q in (*m.axe, centre):  # l'axe et le polygone : l'un pourrait suivre sans l'autre
+            assert min(distance(q, a, b) for a, b in bords) <= m.epaisseur, (m.id, q)
 
 
 def test_symetrie_garde_les_surfaces():
@@ -1519,12 +1908,30 @@ def test_repartir_ensemble_dans_la_partition_du_parent(tmp_path, monkeypatch):
 
 
 def test_repartir_suit_le_parent_deplace(tmp_path, monkeypatch):
-    # Parent déplacé vers l'entraînement car trop semblable : son ensemble le suit, sinon il resterait seul au test.
-    _jeu_compose(tmp_path, monkeypatch)
-    r = E.repartir(tmp_path, (0.5, 0.25, 0.25), seuil=1e9)
+    # Parent déplacé vers l'entraînement car trop semblable : son ensemble le suit, sinon il resterait seul au test et le test
+    # noterait des pièces déjà apprises (une fuite d'entraînement). On impose la paire semblable : sinon, selon les graines, aucun
+    # parent ne bouge et le test ne prouve rien. Pas de dessin : seul `repartir` est en cause, sur un manifeste écrit à la main.
+    from moteur.generateur import doublons
+    exemples = []
+    for k in range(1, 13):
+        ident = f"{k:06d}"
+        (tmp_path / "exemples" / ident).mkdir(parents=True)
+        (tmp_path / "exemples" / ident / "manifeste.json").write_text(json.dumps({"empreinte": f"e{k}", "signature": {}}), encoding="utf-8")
+        exemples += [{"id": ident, "accepte": True, "famille": "f"}, {"id": f"{ident}-ensemble", "accepte": True, "famille": "f", "parent": ident}]
+    (tmp_path / "manifest.json").write_text(json.dumps({"exemples": exemples}), encoding="utf-8")
+    monkeypatch.setattr(doublons, "chercher", lambda entrees, seuil: {"doublons_exacts": [], "trop_semblables": []})
+    avant = E.repartir(tmp_path, (0.5, 0.25, 0.25))
+    parent = next(i for i in avant["partitions"]["test"] if not i.endswith("-ensemble"))
+    autre = next(i for i in avant["partitions"]["train"] if not i.endswith("-ensemble"))
+    assert f"{parent}-ensemble" in avant["partitions"]["test"]
+    monkeypatch.setattr(doublons, "chercher", lambda entrees, seuil: {"doublons_exacts": [], "trop_semblables": [{"ids": [parent, autre]}]})
+    r = E.repartir(tmp_path, (0.5, 0.25, 0.25))
+    assert r["deplaces_vers_train"] == [parent]
+    assert parent in r["partitions"]["train"] and f"{parent}-ensemble" in r["partitions"]["train"]
     partition = {i: p for p, ids in r["partitions"].items() for i in ids}
-    for i in [d.name for d in (tmp_path / "exemples").glob("*-ensemble")]:
-        assert partition[i] == partition[i.replace("-ensemble", "")]
+    for e in exemples:
+        if "parent" in e:
+            assert partition[e["id"]] == partition[e["parent"]], e["id"]
 
 
 def test_repartir_ensemble_d_un_parent_rejete_reste_dehors(tmp_path, monkeypatch):

@@ -255,6 +255,11 @@ def fabriquer_jeu(jeu: Path, sortie: Path, ids: list[str] | None = None, partie:
     from moteur.generateur.logements import en_logement
     from moteur.generateur.reglages import Reglages
 
+    # Refaire un plan se fait ici sans --lot2 : aucun plan d'un jeu --lot2 ne se reconnaît, et le bilan finirait à 0 niveau sans
+    # dire pourquoi. Le comportement ne change pas, on le dit seulement.
+    jeu_lot2 = _jeu_fabrique_avec_lot2(jeu)
+    if jeu_lot2:
+        print("ALERTE plan_pdf : jeu fabriqué avec --lot2 : non pris en charge (aucun PDF ne sera écrit)", flush=True)
     if ids is None:
         repartition = json.loads((jeu / "repartition.json").read_text(encoding="utf-8"))
         ids = sorted(repartition[partie]) if isinstance(repartition, dict) and partie in repartition else \
@@ -263,6 +268,8 @@ def fabriquer_jeu(jeu: Path, sortie: Path, ids: list[str] | None = None, partie:
     ids = [i for i in ids if not i.endswith("-ensemble")]  # un -ensemble n'a pas de graine à lui : int(ident) échouerait
     reglages, opt = Reglages.charger(None), Options()
     bilan = {"plans": 0, "niveaux": 0, "pdf": 0, "differents": [], "oublis": set(), "par_sorte": {}}
+    if jeu_lot2:
+        bilan["alerte"] = "jeu fabriqué avec --lot2 : non pris en charge"
     debut = time.perf_counter()
     for i, ident in enumerate(ids, 1):
         graine = int(ident)
@@ -295,6 +302,14 @@ def fabriquer_jeu(jeu: Path, sortie: Path, ids: list[str] | None = None, partie:
     sortie.mkdir(parents=True, exist_ok=True)
     (sortie / "bilan-pdf.json").write_text(json.dumps(bilan, ensure_ascii=False, indent=1), encoding="utf-8")
     return bilan
+
+
+def _jeu_fabrique_avec_lot2(jeu: Path) -> bool:
+    """reglages.json ne porte la clé `lot2` que si l'option a été donnée. Pas de fichier : un ancien jeu, rien à dire."""
+    try:
+        return bool(json.loads((jeu / "reglages.json").read_text(encoding="utf-8")).get("options", {}).get("lot2"))
+    except FileNotFoundError:
+        return False
 
 
 def _meme_plan(source: Path, log, niveau: Niveau, style: Style, en_logement) -> bool:

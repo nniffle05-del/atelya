@@ -10,7 +10,7 @@
 - **Limites** : la limite de 5 h tombe après ~1,9 M de tokens d'agents. Le 07/11 à ~00h45, une AUTRE limite est tombée : « You've reached your Fable limit », sans heure de reprise, proposant de changer de modèle. **Ne pas changer de modèle sans l'accord écrit de NT** : il veut Fable pour les vérités. À vérifier sur https://claude.ai/settings/usage.
 - Coût mesuré : ~1 M de tokens et ~1 h pour une passe de 2 paquets (8 plans tracés + relus, dont 1 seul paquet relu quand la limite coupe).
 
-- **Lot 2 du générateur (Fable non nécessaire)** : conception dans `lot2-conception.md`. Chantiers 1 et 2 faits et commités (15 traits sur 20 + socle, 551 tests, témoin identique). Chantier 3 (traits 10, 12, 13) : voir `git log`.
+- **Lot 2 du générateur : FINI** (chantiers 1 à 3 + corrections de la relecture adverse, 627 tests, témoin identique). Détail : `lot2-conception.md`. Reste : décision de NT sur le jeu à fabriquer ; à regarder avant l'essai 8 : aplat vert des extérieurs proche des murs gris en image grise (famille logiciel, graine 70106), fidèle à fr-102, laissé tel quel.
 - **Lecteur d'échelle** : défaut d'échelle silencieuse sur les cotes en cm, voir la fin de `atelya-echelle-vrais-plans.md`. Attend le « oui » de NT.
 
 ## Pourquoi une nouvelle conversation

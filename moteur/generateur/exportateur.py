@@ -47,7 +47,7 @@ from moteur.generateur import VERSION_GENERATEUR
 from moteur.generateur.annotations import NOMS_CLASSES, decrire
 from moteur.generateur.doublons import empreinte, signature
 from moteur.generateur.logements import LogementGenere, en_logement, generer
-from moteur.generateur.lot2 import PLAIN_PIED_EMPILE, appliquer as appliquer_lot2, composer, lot2_au_hasard, resume as resume_lot2, vers_ensemble
+from moteur.generateur.lot2 import PLAIN_PIED_EMPILE, appliquer as appliquer_lot2, composer, lot2_au_hasard, parametres_vrais, resume as resume_lot2, vers_ensemble
 from moteur.generateur.reglages import Reglages
 from moteur.generateur.rendu import Rendu, rendre
 from moteur.generateur.validateur import Regles, Verdict, valider_dossier, valider_geometrie
@@ -217,6 +217,7 @@ def fabriquer_ensemble(log: LogementGenere, graine: int, ident: str, compose: st
     dossier = opt.dossier / "exemples" / id_ensemble
     dossier.mkdir(parents=True, exist_ok=True)
     geometrie = decrire(c.log)
+    geometrie["parametres"] = parametres_vrais(geometrie["parametres"], log, log_b)
     n0 = geometrie["niveaux"][0]
     # L'emprise compte les blocs, pas le vide entre eux. Ces champs servent de contrôle, autant qu'ils restent vrais.
     emprise = sum(abs(sum(a[0] * b[1] - a[1] * b[0] for a, b in zip(q["coins"], q["coins"][1:] + q["coins"][:1]))) / 2 for q in c.blocs) / 1e6
