@@ -260,6 +260,7 @@ def fabriquer_jeu(jeu: Path, sortie: Path, ids: list[str] | None = None, partie:
         ids = sorted(repartition[partie]) if isinstance(repartition, dict) and partie in repartition else \
             sorted(p.name for p in (jeu / "exemples").iterdir())
         ids = [i for i in ids if (jeu / "exemples" / i).is_dir()]
+    ids = [i for i in ids if not i.endswith("-ensemble")]  # un -ensemble n'a pas de graine à lui : int(ident) échouerait
     reglages, opt = Reglages.charger(None), Options()
     bilan = {"plans": 0, "niveaux": 0, "pdf": 0, "differents": [], "oublis": set(), "par_sorte": {}}
     debut = time.perf_counter()

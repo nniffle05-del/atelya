@@ -26,10 +26,11 @@ import numpy as np  # noqa: E402
 
 from moteur.generateur import lot2 as L  # noqa: E402
 from moteur.generateur.controle_qualite import colorer_semantique  # noqa: E402
-from moteur.generateur.exportateur import Options, generer_lot, style_pour  # noqa: E402
+from moteur.generateur.exportateur import Options, generer_lot, second_logement, style_pour  # noqa: E402
 from moteur.generateur.logements import generer  # noqa: E402
 from moteur.generateur.reglages import Reglages  # noqa: E402
 from moteur.generateur.rendu import rendre  # noqa: E402
+from moteur.generateur.validateur import Regles  # noqa: E402
 from moteur.images import ecrire_image  # noqa: E402
 
 # Une ligne par option du générateur, pour couvrir tous les chemins de dessin qui existent déjà.
@@ -152,21 +153,70 @@ VIGNETTES_2 = [
     ("Trait 18 jardin herbe", ["fr-084", "fr-065"], 60012, "neutre", {"exterieurs": [_JARDIN_HERBE], "couleur_murs": (5, 5, 5)}),
     ("Trait 4 balcon pointille", ["fr-046", "fr-085"], 60, "murs_noirs", {"exterieurs": [_BALCON, {**_BALCON, "cote": "droite", "contour": "fin", "numero": 2}]}),
 ]
-VIGNETTES = {1: VIGNETTES_1, 2: VIGNETTES_2}
+_NIV = {"composition": "niveaux", "disposition": "empiles"}
+_COTE = {"composition": "niveaux", "disposition": "cote_a_cote"}
+_PALIER = {"composition": "deux_logements", "disposition": "palier"}
+_MITOYEN = {"composition": "deux_logements", "disposition": "mitoyen"}
+# Trait 13 : aucun plan cité. Les deux qui montrent le cas sont à l'examen (règle 15) : il est fabriqué de toutes pièces.
+VIGNETTES_3 = [
+    ("Trait 10 ecran bord noir", ["fr-024", "fr-040"], 60002, "neutre", {"ecran": True, "ecran_bordure": True, "couleur_murs": (70, 70, 70), "parentheses_grises": True, "couleur_surface": (120, 120, 120)}),
+    ("Trait 10 ecran sans bord", ["fr-040", "fr-024"], 2, "neutre", {"ecran": True, "ecran_bordure": False, "murs_dessin": "trait", "epaisseur_trait_mur": 0.25, "surface_point": True}),
+    ("Trait 10 ecran stylo", ["fr-086"], 60012, "neutre", {"ecran": True, "ecran_bordure": False, "manuscrit": "surfaces", "couleur_stylo": (20, 20, 30), "murs_dessin": "trait", "epaisseur_trait_mur": 0.25, "placards_fleches": True}),
+    ("Trait 10 photo sans table", ["fr-024"], 40002, "photo", {"_photo": True}),
+    ("Trait 12 RDC tirets", ["fr-025"], 62, "murs_noirs", {**_NIV, "titres_place": "haut", "titre_tirets": True, "couleur_murs": (120, 120, 120), "murs_dessin": "double", "epaisseur_trait_mur": 0.3, "arcs_pointilles": True}),
+    ("Trait 12 cotes par niveau", ["fr-072"], 62, "cotes_rouges", {**_NIV, "couleur_cotes": (30, 30, 30), "cotes_interieures_rouges": False, "murs_dessin": "", "couleur_murs": (10, 10, 10), "titres_place": "haut", "titre_tirets": True, "filet": True, "echelle_ecrite": ""}),
+    ("Trait 12 agence Niveau", ["fr-075"], 62, "agence_coloree", {**_NIV, "titres_place": "bas", "rose_des_vents": True}),
+    ("Trait 12 releve sans titre", ["fr-118", "fr-119"], 60022, "releve", {**_NIV, "titres_place": ""}),
+    ("Trait 12 sous plan surface", ["fr-120"], 62, "murs_noirs", {**_NIV, "titres_place": "bas", "titre_surface": True, "majuscules": True}),
+    ("Trait 12 cote a cote", ["fr-075"], 60022, "murs_noirs", {**_COTE, "titres_place": "haut"}),
+    ("Trait 12 plain-pied etages", ["fr-025"], 26, "neutre", {**_NIV, "titres_place": "haut"}),
+    ("Trait 13 palier", [], 26, "promoteur_gris", {**_PALIER, "couleur_murs": (10, 10, 10), "palette": "", "murs_dessin": "", "sans_chaines": True, "titres_place": "haut"}),
+    ("Trait 13 palier agence", [], 60, "agence_coloree", {**_PALIER, "titres_place": "bas"}),
+    ("Trait 13 mitoyen", [], 60, "murs_noirs", {**_MITOYEN, "titres_place": "haut"}),
+    ("Trait 13 mitoyen logiciel", [], 53, "logiciel_public", {**_MITOYEN, "exterieurs": []}),
+]
+VIGNETTES = {1: VIGNETTES_1, 2: VIGNETTES_2, 3: VIGNETTES_3}
+TOUS = 0  # la planche de tous les traits : ..\\atelya\\planches\\lot2-exemples.jpg
 # Les plans du chantier à comparer sur la planche ; une vignette sert aussi aux masques.
-MASQUES_A_REGARDER = {1: (0, 2), 2: (0, 10)}
+MASQUES_A_REGARDER = {1: (0, 2), 2: (0, 10), 3: (0, 4, 6, 11, 13), TOUS: ()}
 
 
 def _style_force(graine: int, famille: str, traits: dict):
     """Un style à plat et propre : on juge le trait, pas une salissure tirée par ailleurs."""
+    if traits.get("_photo"):  # sauf la vraie photo : sa page et sa lumière sont le sujet
+        style = style_pour(graine, 0, Options(dossier=None, lot2=True, photo_realiste=True, vraie_camera=True, familles=["photo"]))
+        style.lot2.ecran = style.realisme.ecran = True
+        return style
     style = style_pour(graine, 0, Options(dossier=None, familles=["architecte"], diversite=1))
     style.rotation, style.perspective, style.salissure, style.contraste, style.papier = 0.0, 0.0, "", 1.0, 255
     rng = random.Random(f"planche-{graine}-{famille}")
     l = _releve(rng) if famille == "releve" else L.lot2_au_hasard(rng, famille=famille, transversaux=False)
+    if traits.get("ecran"):
+        L._tirer_ecran_force(l, rng)
     for k, v in traits.items():
         setattr(l, k, v)
     L.appliquer(style, l)
     return style
+
+
+def _rendu_vignette(graine: int, famille: str, traits: dict):
+    """Le rendu d'une vignette ; traits 12 et 13 : celui de l'exemple -ensemble, par le même chemin que l'exportateur."""
+    style = _style_force(graine, famille, traits)
+    log = generer(graine, Reglages())
+    if not traits.get("composition"):
+        return rendre(log, log.niveaux[0], style)
+    rc = random.Random(f"lot2-compose-{graine}")
+    log_b = None if log.duplex else second_logement(graine, Options(dossier=None), Reglages(), Regles(), rc)
+    c = L.composer(log, log_b, traits["composition"], traits["disposition"], style, rc)
+    L.vers_ensemble(style, c)
+    for k in ("titres_place", "titre_tirets", "titre_surface", "filet"):  # la vignette montre ce trait-là, pas le tirage
+        if k in traits:
+            setattr(style.lot2, k, traits[k])
+    if style.lot2.titres_place and not style.lot2.blocs[0]["titre"]:  # le tirage n'avait pas prévu de titre : on les écrit ici
+        titres = L._titres_niveaux(style.lot2, rc) if c.compose == "niveaux" else L._titres_logements(log, log_b, rc)
+        for b, titre in zip(style.lot2.blocs, titres):
+            b["titre"] = titre
+    return rendre(c.log, c.log.niveaux[0], style, "ensemble")
 
 
 def _reduire(image: np.ndarray, cote: int) -> np.ndarray:
@@ -223,9 +273,9 @@ def planche(sortie: Path, cote: int = 520, chantier: int = 1) -> None:
     dossier = sortie.with_name(sortie.stem + "-vignettes")
     dossier.mkdir(exist_ok=True)
     cases = []
-    for k, (titre, plans, graine, famille, traits) in enumerate(VIGNETTES[chantier]):
-        log = generer(graine, Reglages())
-        rendu = rendre(log, log.niveaux[0], _style_force(graine, famille, traits))
+    vignettes = VIGNETTES_1 + VIGNETTES_2 + VIGNETTES_3 if chantier == TOUS else VIGNETTES[chantier]
+    for k, (titre, plans, graine, famille, traits) in enumerate(vignettes):
+        rendu = _rendu_vignette(graine, famille, traits)
         plan = _reduire(rendu.images["plan"], 768)
         gris = cv2.cvtColor(plan, cv2.COLOR_RGB2GRAY)
         _ecrire_rgb(dossier / f"{k:02d}.jpg", plan)
@@ -236,6 +286,9 @@ def planche(sortie: Path, cote: int = 520, chantier: int = 1) -> None:
             melange = (0.5 * rendu.images["plan"] + 0.5 * masque).astype(np.uint8)
             _ecrire_rgb(sortie.with_name(f"{sortie.stem}-masque{k}.jpg"), np.hstack([rendu.images["plan"], masque, melange]))
     _ecrire_rgb(sortie, _assembler(cases, 4))
+    if chantier == TOUS:
+        print("planche :", sortie)
+        return
     hasard = []
     for graine in (60001, 60002, 60005, 60013, 1, 2, 4, 62, 6, 101, 102, 40002):
         style = style_pour(graine, 0, Options(dossier=None, lot2=True))
@@ -254,13 +307,14 @@ def main() -> None:
     p.add_argument("avant", type=Path)
     p.add_argument("apres", type=Path)
     p = sous.add_parser("planche")
-    p.add_argument("--chantier", type=int, default=2, choices=sorted(VIGNETTES))
+    p.add_argument("--chantier", type=int, default=3, choices=[TOUS, *sorted(VIGNETTES)], help="0 : tous les traits (lot2-exemples.jpg)")
     p.add_argument("--sortie", type=Path, help="par défaut : ../atelya/planches/lot2-chantierN.jpg")
     args = parser.parse_args()
     if args.commande == "temoin":
         temoin(args.dossier)
     elif args.commande == "planche":
-        planche(args.sortie or Path(f"../atelya/planches/lot2-chantier{args.chantier}.jpg"), chantier=args.chantier)
+        defaut = "lot2-exemples.jpg" if args.chantier == TOUS else f"lot2-chantier{args.chantier}.jpg"
+        planche(args.sortie or Path("../atelya/planches") / defaut, cote=380 if args.chantier == TOUS else 520, chantier=args.chantier)
     elif args.commande == "comparer":
         sys.exit(1 if comparer(args.avant, args.apres) else 0)
 

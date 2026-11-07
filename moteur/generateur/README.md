@@ -49,7 +49,7 @@ uv run python -m moteur.generateur valider sorties/jeu-1000
 | `--familles` | impose des familles de style : `architecte,agence,minimaliste,scan,photo,colore,croquis` |
 | `--vraie-camera` | les photos de biais suivent l'optique d'un vrai téléphone (inclinaison, focale ~0,77 de la photo, photo non recadrée) au lieu de coins bougés au hasard |
 | `--sans-cotes` | aucune cote dessinée ; barre d'échelle (40 %) et surfaces écrites (60 %) tirées au hasard |
-| `--lot2` | styles vus sur 103 vrais plans (`lot2.py` ; agence colorée, promoteur gris avec cotes en cm, murs noirs, légende Carrez, logiciel grand public, scan ancien, cotes rouges ; dimensions de pièce, fenêtres en rectangles, texte tourné, écriture à la main, pastilles, placards fléchés, colimaçon, balcons et jardins, HSP et sol écrits, image recadrée). Sous `--lot2`, seule une photo ou un scan ancien garde une page penchée ou grise. Sans l'option, les jeux restent identiques. Un jeu fabriqué avec `--lot2` n'est pas réutilisable par `plan_pdf.fabriquer_jeu` sans l'option (`_meme_plan` comparerait un style lot 2 à un style refait sans) |
+| `--lot2` | styles vus sur 103 vrais plans (`lot2.py` ; agence colorée, promoteur gris avec cotes en cm, murs noirs, légende Carrez, logiciel grand public, scan ancien, cotes rouges ; dimensions de pièce, fenêtres en rectangles, texte tourné, écriture à la main, pastilles, placards fléchés, colimaçon, balcons et jardins, HSP et sol écrits, image recadrée, page vue à l'écran ; plusieurs niveaux ou deux logements sur une image : voir « Les exemples -ensemble » plus bas). Sous `--lot2`, seule une photo, une page vue à l'écran ou un scan ancien garde une page penchée ou grise. Sans l'option, les jeux restent identiques. Un jeu fabriqué avec `--lot2` n'est pas réutilisable par `plan_pdf.fabriquer_jeu` sans l'option (`_meme_plan` comparerait un style lot 2 à un style refait sans) |
 | `--variantes N` | N dessins supplémentaires du même logement (autres styles), dans `niveau_k/variante_n/` |
 | `--3d` | écrit aussi le modèle 3D (désactivé par défaut : les plans 2D sont la priorité) |
 | `--refaire` | refait les exemples déjà présents au lieu de les reprendre |
@@ -174,6 +174,16 @@ Au bord d'une pièce, le mur l'emporte : un pixel d'identifiant de pièce porte 
    qui change un exemple existant, et ne pas mélanger deux versions dans un même jeu
    (`manifest.json → version_generateur`). Le format d'annotations (`SCHEMA`) ne change que si les fichiers
    changent de forme.
+
+## Les exemples -ensemble (option `--lot2`, traits 12 et 13)
+
+Sur les vrais plans, 11 sur 103 montrent plusieurs niveaux sur une image et 2 montrent deux logements côte à côte. Dessiner cela dans un exemple existant aurait obligé à refaire le validateur et les masques. À la place, certains plans reçoivent un exemple sœur, en plus des leurs, `exemples/000012-ensemble/` : un logement assemblé à **un seul niveau**, avec les mêmes fichiers qu'un exemple ordinaire (`geometrie.json`, `logement_niveau0.json`, `niveau_0/`, `validation.json`, `manifeste.json`).
+
+- `compose: "niveaux"` (disposition `empiles` ou `cote_a_cote`) : les deux niveaux d'un duplex, ou une fois sur quatre pour un tirage de plain-pied, deux logements différents étiquetés comme des étages ; `compose: "deux_logements"` (disposition `palier` ou `mitoyen`) : un second logement tiré au-delà de toute graine de jeu (graine + 1 000 000 et plus), fabriqué de toutes pièces.
+- **La vérité** : le vide entre les blocs et le palier sont du fond (classe 0). Mitoyen : deux murs extérieurs accolés, deux éléments et une même classe ; les fenêtres au contact sont rebouchées, la porte d'entrée n'y est jamais. `geometrie.json` porte `parent`, `compose`, `disposition` et `blocs` (les pièces et le vrai contour de chaque bloc). `valider_geometrie` n'est pas rejoué sur l'ensemble (deux entrées, blocs non reliés) : chaque bloc l'a passé seul, et `valider_dossier` contrôle les fichiers et les masques.
+- **Composition impossible** (second logement refusé 5 fois, plus de 255 éléments pour un masque 8 bits) : pas d'exemple `-ensemble`, et le manifeste du parent le dit (`"compose": false`, `"compose_motif"`).
+- **Répartition** : `repartir` met un `-ensemble` dans la partition de son parent (aucune fuite entre train et test) et le liste dans `partitions`. **Statistiques** : un `-ensemble` n'est pas compté comme un logement, il a son bloc `ensembles`. **Doublons** : ils sont écartés de la recherche. Les chargeurs d'entraînement les lisent sans changement : l'identifiant vient de `repartition.json`, les dessins de `exemples/<id>/niveau_*`.
+- **Part mesurée** : environ 13 % de plans en plus. `--variantes` et `--3d` ne s'y appliquent pas (une seule image, sans modèle 3D). Un banc qui lit un jeu `--lot2` lira aussi les `-ensemble` comme un logement : ses chiffres n'y sont pas comparables à ceux d'un logement seul, ce jeu est d'abord un jeu d'entraînement.
 
 ## Limites connues (version 0.1.0)
 

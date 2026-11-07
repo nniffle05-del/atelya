@@ -101,6 +101,8 @@ class Style:
         d = asdict(self)
         if d["lot2"] is None:  # sans l'option, annotations.json reste identique à l'octet près
             del d["lot2"]
+        if d["realisme"] is not None and not d["realisme"]["ecran"]:  # pareil : le trait 10 n'existe que sous --lot2
+            del d["realisme"]["ecran"]
         return d
 
     @property

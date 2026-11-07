@@ -66,7 +66,7 @@ def _ajouter_options_generation(p: argparse.ArgumentParser) -> None:
     p.add_argument("--biais", action="store_true",
                    help="étape A3 : des angles du logement deviennent des pans coupés (30-60°) ou des angles arrondis")
     p.add_argument("--lot2", action="store_true",
-                   help="styles du lot 2, vus sur 103 vrais plans (agence colorée, murs noirs, dimensions, légende Carrez, fenêtres cyan, cotes rouges, HSP, recadrage…)")
+                   help="styles du lot 2, vus sur 103 vrais plans (agence colorée, murs noirs, dimensions, légende Carrez, fenêtres cyan, cotes rouges, HSP, recadrage, page vue à l'écran…) ; certains plans ont en plus un exemple sœur <id>-ensemble (plusieurs niveaux ou deux logements sur une image)")
     p.add_argument("--sans-cotes", action="store_true", help="aucune cote dessinée (barre d'échelle, surfaces au hasard)")
     p.add_argument("--variantes", type=int, default=0, help="variantes graphiques supplémentaires par logement")
     p.add_argument("--3d", dest="modele_3d", action="store_true", help="écrit aussi modele.glb, modele.obj, construction.json")
@@ -138,7 +138,8 @@ def main(argv: list[str] | None = None) -> None:
         entrees = []
         for m in sorted((dossier / "exemples").glob("*/manifeste.json")):
             e = json.loads(m.read_text(encoding="utf-8"))
-            if e["accepte"]:
+            # Un -ensemble n'est pas un logement de plus : deux ensembles ne se ressemblent pas au sens où deux plans se ressemblent.
+            if e["accepte"] and "parent" not in e:
                 entrees.append({"id": e["id"], "empreinte": e["empreinte"], "signature": e["signature"]})
         rapport = chercher(entrees, args.seuil if args.seuil is not None else SEUIL_RESSEMBLANCE)
         (dossier / "rapports").mkdir(exist_ok=True)

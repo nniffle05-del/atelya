@@ -4,7 +4,8 @@ Pourquoi : Atelya rate les styles jamais vus. Ce module apprend au générateur 
 l'essai 8 les apprenne sur des plans dont la vérité est exacte. Les traits sont ceux de
 docs/projet/etapes/catalogue-styles-lot2.md ; ce qui est dessiné ici imite des plans d'ENTRAÎNEMENT
 (ceux qu'ils citent : fr-075, fr-094, fr-096, fr-098, fr-108, fr-110, fr-106, fr-041, fr-062, fr-100, fr-102,
-fr-070, fr-036, fr-037, fr-111, fr-086, fr-112, fr-059, fr-080, fr-093, fr-120, fr-048, fr-084, fr-055…), jamais un plan d'examen.
+fr-070, fr-036, fr-037, fr-111, fr-086, fr-112, fr-059, fr-080, fr-093, fr-120, fr-048, fr-084, fr-055, fr-024, fr-040, fr-025,
+fr-072, fr-118, fr-119…), jamais un plan d'examen.
 
 Trois choses séparées, comme le lot 1 (variete.py) :
 
@@ -14,12 +15,15 @@ Trois choses séparées, comme le lot 1 (variete.py) :
 - le dessin : des fonctions qui reçoivent le `_Dessin` et ne touchent QUE son image. Jamais les masques :
   une étiquette, un tableau ou une cote reste du fond, une fenêtre bleue reste une fenêtre.
 
-Chantiers 1 et 2 : tous les traits, sauf 10, 12 et 13 (chantier 3 : les champs marqués « chantier 3 » existent déjà
-pour que le format ne change plus, mais rien ne les tire ni ne les dessine encore).
+Les traits 12 et 13 (plusieurs niveaux, deux logements sur une image) ne sont pas un simple dessin : `composer` fabrique un
+logement assemblé à UN seul niveau, que l'exportateur écrit comme un vrai exemple sœur `{ident}-ensemble/`. La vérité y reste
+tramée depuis les polygones, le vide entre les blocs et le palier sont du fond, comme tout ce qui est hors du logement.
 """
 
 from __future__ import annotations
 
+import copy
+import dataclasses
 import math
 import random
 from dataclasses import dataclass, field, fields
@@ -29,7 +33,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from moteur.dessin_plan import _police
 from moteur.generateur.annotations import rect_de_l_ouverture, rect_du_mur
-from moteur.generateur.logements import Rect, surface_piece
+from moteur.generateur.logements import LogementGenere, Niveau, Rect, _nommer, _transformer, surface_piece
 from moteur.generateur.mobilier import Meuble, _libre, _rect, _zones_de_battement
 from moteur.generateur.variete import Variete
 
@@ -178,10 +182,19 @@ class Lot2:
     placards_fleches: bool = False
     escalier: str = ""  # "", colimacon, fleche_acces
     pastilles: str = ""  # "", avec_noms (fr-059), legende (le nom est dans une légende à droite)
-    # ---- chantier 3 (pas encore tirés ni dessinés)
+    # ---- trait 10 : une page photographiée, vue à l'écran (fr-024, fr-040, fr-086)
     ecran: bool = False
-    composition: str = ""
-    disposition: str = ""
+    ecran_si_photo: bool = False  # sous --photo-realiste, l'écran prend la place de la table plus souvent : voir _tirer_ecran
+    ecran_bordure: bool = False  # le bord noir de l'écran dans les marges (sans --photo-realiste)
+    # ---- traits 12, 13 : tirés pour tout plan ; la composition elle-même remplit le reste (voir composer)
+    composition: str = ""  # "", niveaux, deux_logements
+    disposition: str = ""  # niveaux : empiles, cote_a_cote ; deux_logements : palier, mitoyen
+    blocs: list[dict] = field(default_factory=list)  # titre, cadre (mm), pieces, surface, coins
+    palier: dict | None = None  # cadre (mm) et texte du vide entre deux logements
+    titres_place: str = ""  # "", haut, bas
+    titre_tirets: bool = False  # fr-025, fr-072 : « ----- 1er étage ----- »
+    titre_surface: bool = False  # fr-120 : « ETAGE 62 m² »
+    filet: bool = False  # fr-072 : un trait qui sépare les deux niveaux
 
 
 def _gris(rng: random.Random, a: int, b: int) -> tuple[int, int, int]:
@@ -211,6 +224,9 @@ def lot2_au_hasard(rng: random.Random, famille: str | None = None, transversaux:
     if transversaux:
         _tirer_transversaux(l, rng)
         _tirer_exterieurs(l, rng)
+        # En dernier : ces tirages ne déplacent aucun de ceux d'au-dessus.
+        _tirer_composition(l, rng)
+        _tirer_ecran(l, rng)
     _accorder(l)
     return l
 
@@ -441,6 +457,48 @@ def _tirer_exterieurs(l: Lot2, rng: random.Random) -> None:
         })
 
 
+# Sur 103 plans, 11 ont plusieurs niveaux et 2 ont deux logements. Tiré ici pour tout plan, mais un plan de plain-pied ne
+# compose des niveaux qu'une fois sur quatre (10 % des logements sont des duplex, qui composent toujours) : 0,33 × (0,10 + 0,90 / 4)
+# donne les 11 % voulus. 3 % plutôt que 2 % pour les deux logements : le cas n'existe qu'à l'examen, il ne doit pas être oublié.
+PART_NIVEAUX, PART_DEUX_LOGEMENTS = 0.33, 0.03
+PLAIN_PIED_EMPILE = 0.25
+
+
+def _tirer_composition(l: Lot2, rng: random.Random) -> None:
+    u = rng.random()
+    if u < PART_NIVEAUX:
+        l.composition = "niveaux"
+        l.disposition = "empiles" if rng.random() < 0.75 else "cote_a_cote"  # fr-025, fr-072, fr-118, fr-119, fr-120, fr-075 sont empilés
+    elif u < PART_NIVEAUX + PART_DEUX_LOGEMENTS:
+        l.composition = "deux_logements"
+        l.disposition = "palier" if rng.random() < 0.6 else "mitoyen"
+
+
+def _tirer_ecran(l: Lot2, rng: random.Random) -> None:
+    """Trait 10, 6 plans sur 103. Ce que montrent fr-024, fr-040, fr-086 : papier grisé, un peu flou, très peu penché (1 à 3°, 2 à 8
+    au catalogue : les plus forts n'existent pas dans ces trois plans), verso qui transparaît, texte gros, jamais de table.
+    `ecran_si_photo` : parmi des plans qui sont tous des photos (--photo-realiste), le cas pèse bien plus que 6 %."""
+    l.ecran_si_photo = rng.random() < 0.3
+    if not l.recadre and rng.random() < 0.06:
+        _tirer_ecran_force(l, rng)
+
+
+def _tirer_ecran_force(l: Lot2, rng: random.Random) -> None:
+    l.ecran = True
+    l.ecran_bordure = rng.random() < 0.5  # fr-024, fr-040, fr-086 n'en montrent pas : le catalogue la demande, d'autres captures l'ont
+    l.part_texte = max(l.part_texte or 0.0, rng.uniform(0.19, 0.26))
+    l.sortie_jpeg = True
+    if rng.random() < 0.75:
+        l.rotation = rng.choice((-1, 1)) * rng.uniform(0.5, 4.0)
+    if l.famille == "scan_ancien":
+        return  # il a déjà son papier
+    l.papier = rng.randint(222, 245)
+    l.contraste = rng.uniform(0.8, 0.95)
+    l.salissure = rng.choice(("grain", "telephone", "telephone"))
+    if rng.random() < 0.5:  # fr-024, fr-040 : un gris légèrement bleuté
+        l.teinte = (rng.uniform(0.94, 0.98), rng.uniform(0.95, 0.98), 1.0)
+
+
 def _forme_exterieur(l: Lot2, rng: random.Random) -> tuple[str, str, str, tuple[int, int, int] | None]:
     """(sorte, motif, contour, couleur de fond) selon les habitudes de chaque famille."""
     if l.famille == "murs_noirs":  # catalogue, trait 4 : trait fin ou pointillé, rien dedans (fr-046, fr-085)
@@ -567,6 +625,8 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
     une famille ne doit donc pas rallumer ce que l'option a éteint."""
     surfaces0 = style.surfaces
     v = style.variete
+    if style.realisme is not None and (l.ecran or l.ecran_si_photo):
+        l.ecran = style.realisme.ecran = True  # la vraie photo garde tout, seule la table devient un écran
     absurde = v is not None and (v.absurde or v.inverse)
     style.lot2 = l
     if absurde:  # un style absurde apprend qu'un mur reste un mur : on ne lui rend pas des couleurs sages
@@ -687,7 +747,7 @@ def _page_sage(style, l: Lot2) -> None:
     style.contraste = max(style.contraste, 1.0)  # un contraste < 1 grise le blanc de la page
     if style.salissure in ("photocopie", "taches"):
         style.salissure = "jpeg"  # le blanc d'une photocopie vaut 205 à 235
-    if l.famille == "scan_ancien":
+    if l.famille == "scan_ancien" or l.ecran:
         if l.papier is not None:
             style.papier = l.papier
         if l.contraste is not None:
@@ -702,7 +762,8 @@ def resume(l: Lot2) -> dict:
     """Pour le manifeste : la famille et les traits allumés, sans les couleurs."""
     ignores = {"famille", "marges", "px_par_m", "part_texte", "epaisseur_trait", "epaisseur_trait_mur", "surface_decimales",
                "tableau_decimales", "format_dimensions", "couleur_etiquette", "couleur_fenetres", "contour_fenetres",
-               "surface_point", "cote_point", "sortie_jpeg", "noms_gras", "taille_cotes", "pas_sol", "papier", "contraste", "salissure"}
+               "surface_point", "cote_point", "sortie_jpeg", "noms_gras", "taille_cotes", "pas_sol", "papier", "contraste", "salissure",
+               "ecran_si_photo", "ecran_bordure", "blocs", "palier", "titres_place", "titre_tirets", "titre_surface", "filet"}
     traits = []
     for f in fields(l):
         valeur = getattr(l, f.name)
@@ -799,6 +860,10 @@ def marges_lot2(style, marges: tuple[int, int, int, int], nb_pieces: int) -> tup
             bas = max(bas, place)
         else:
             droite = max(droite, place)
+    if l.blocs and l.titres_place == "haut":
+        haut = max(haut, math.ceil(retrait_du_titre(style, "haut") + 1.2 * t))
+    if l.blocs and l.titres_place == "bas":
+        bas = max(bas, math.ceil(retrait_du_titre(style, "bas") + 1.2 * t))
     if l.numero_lot:
         lignes = 3.6 if "{type}" in l.numero_lot else 2.6
         depart = RECUL_COTE + 1.6 * t if style.cotes and not l.sans_chaines else 10
@@ -1276,6 +1341,12 @@ def apres_tout(d, rng: random.Random) -> None:
         surface_totale(d)
     if l.tableau and st.surfaces:
         tableau(d)
+    if l.blocs:
+        titres_des_blocs(d)
+    if l.filet:
+        filet_entre_blocs(d)
+    if l.palier and st.noms:
+        palier_ecrit(d)
 
 
 def triangles(d) -> None:
@@ -1730,6 +1801,8 @@ def places_des_exterieurs(d) -> list[tuple[dict, Rect]]:
     if deja is not None:
         return deja
     obstacles = [p.rect for p in d.niv.pieces] + [rect_du_mur(m) for m in d.niv.murs]
+    if d.style.lot2.blocs:  # le vide entre deux blocs porte leurs titres et le palier : pas un balcon
+        obstacles += vides_entre_blocs(d.style.lot2.blocs)
     for m in d.niv.murs_libres:  # A3 : pas de balcon sur un pan coupé
         xs, ys = [q[0] for q in m.polygone], [q[1] for q in m.polygone]
         obstacles.append(Rect(min(xs), min(ys), max(xs), max(ys)))
@@ -1880,3 +1953,428 @@ def _ecrire_exterieur(d, xy, texte: str, taille: int, sorte: str) -> None:
         texte_main(d, xy, texte, taille, l.couleur_stylo, d.hasard_lot2)
     else:
         d.texte(xy, texte, taille, st.textes)
+
+
+# ---------------------------------------------------------------- trait 10 : la page vue à l'écran
+
+
+def _verso(h: int, w: int, rng: random.Random) -> np.ndarray:
+    """Le texte du verso qui transparaît (fr-024) : des lignes de mots très floues, dont il ne reste qu'une ombre. 0 à 1."""
+    pas = rng.randint(max(14, h // 45), max(20, h // 25))
+    calque = Image.new("L", (w, h), 0)
+    dessin = ImageDraw.Draw(calque)
+    for y in range(rng.randint(0, pas), h, pas):
+        if rng.random() < 0.25:
+            continue
+        x, fin = rng.randint(0, w // 6), rng.randint(w // 2, w)
+        while x < fin:
+            mot = rng.randint(pas, 5 * pas)
+            dessin.rectangle((x, y, x + mot, y + max(2, pas // 3)), fill=255)
+            x += mot + rng.randint(pas // 3, pas)
+    return np.asarray(calque.filter(ImageFilter.GaussianBlur(pas / 3)), np.float32) / 255
+
+
+def ecran_pixels(image: np.ndarray, semantique: np.ndarray, l: Lot2, rng: random.Random) -> np.ndarray:
+    """La page vue à l'écran, sans --photo-realiste : verso, reflet doux, coins assombris, bord noir de l'écran.
+
+    Pixels seulement. Le bord reste dans les marges, comme V.capture : posé sur le logement, il cacherait des murs que le masque
+    affirme. `rng` a la même clé pour le plan et le plan sans mobilier : ils se regardent sur le même écran."""
+    h, w = image.shape[:2]
+    img = image.astype(np.float32)
+    img *= 1 - rng.uniform(0.03, 0.09) * _verso(h, w, rng)[:, :, None]
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    if rng.random() < 0.6:
+        cx, cy = rng.uniform(0, w), rng.uniform(0, h)
+        rx, ry = rng.uniform(0.15, 0.4) * w, rng.uniform(0.1, 0.3) * h
+        reflet = rng.uniform(0.12, 0.35) * np.exp(-(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2))
+        img = img * (1 - reflet[:, :, None]) + 250 * reflet[:, :, None]
+    rayon = np.hypot((xx - w / 2) / (w / 2), (yy - h / 2) / (h / 2))
+    img *= (1 - rng.uniform(0.04, 0.16) * np.clip(rayon - 0.5, 0, None) ** 2)[:, :, None]
+    sortie = np.clip(img, 0, 255).astype(np.uint8)
+    if not l.ecran_bordure:
+        return sortie
+    ys, xs = np.nonzero(semantique)
+    haut, bas, gauche, droite = (ys.min(), h - 1 - ys.max(), xs.min(), w - 1 - xs.max()) if len(ys) else (h // 10, h // 10, w // 10, w // 10)
+    noir = rng.randint(0, 14)
+    for cote in rng.sample(("haut", "bas", "gauche", "droite"), rng.randint(1, 4)):
+        e = rng.uniform(0.02, 0.06) * (h if cote in ("haut", "bas") else w)
+        e = int(min(e, {"haut": haut, "bas": bas, "gauche": gauche, "droite": droite}[cote] - 3))
+        if e <= 0:
+            continue
+        if cote == "haut":
+            sortie[:e] = noir
+        elif cote == "bas":
+            sortie[h - e:] = noir
+        elif cote == "gauche":
+            sortie[:, :e] = noir
+        else:
+            sortie[:, w - e:] = noir
+    return sortie
+
+
+# ---------------------------------------------------------------- traits 12 et 13 : plusieurs blocs sur une image
+
+
+TITRES_NIVEAUX = (("Rez-de-chaussée", "1er étage"), ("Rez de chaussée", "Étage"), ("RDC", "R+1"), ("Niveau 0", "Niveau 1"),
+                  ("Rez de jardin", "1er étage"), ("1er étage", "2ème étage"), ("Rez de chaussée", "1er étage"))
+TEXTES_PALIER = ("Palier", "Palier", "Palier d'étage", "Circulation", "Parties communes")
+
+
+@dataclass
+class Composition:
+    """Un logement assemblé à un seul niveau, et ce qu'il faut pour l'écrire."""
+
+    log: LogementGenere
+    compose: str
+    disposition: str
+    blocs: list[dict]
+    palier: dict | None = None
+    titres_place: str = ""
+    titre_tirets: bool = False
+    titre_surface: bool = False
+    filet: bool = False
+
+
+def cadre_du_niveau(niv: Niveau) -> Rect:
+    """Le cadre extérieur en mm, murs en biais compris (tous les nombres d'un Rect sont entiers)."""
+    rects = [rect_du_mur(m) for m in niv.murs]
+    xs = [r.x0 for r in rects] + [r.x1 for r in rects] + [q[0] for m in niv.murs_libres for q in m.polygone]
+    ys = [r.y0 for r in rects] + [r.y1 for r in rects] + [q[1] for m in niv.murs_libres for q in m.polygone]
+    return Rect(math.floor(min(xs)), math.floor(min(ys)), math.ceil(max(xs)), math.ceil(max(ys)))
+
+
+def _translater(niv: Niveau, dx: int, dy: int) -> None:
+    for p in niv.pieces:
+        r = p.rect
+        p.rect = Rect(r.x0 + dx, r.y0 + dy, r.x1 + dx, r.y1 + dy)
+        if p.contour:
+            p.contour = [(x + dx, y + dy) for x, y in p.contour]
+        p.interdits = [Rect(z.x0 + dx, z.y0 + dy, z.x1 + dx, z.y1 + dy) for z in p.interdits]
+    for m in niv.murs:
+        m.axe += dx if m.vertical else dy
+        d = dy if m.vertical else dx
+        m.debut, m.fin = m.debut + d, m.fin + d
+    for m in niv.murs_libres:
+        m.axe = [(x + dx, y + dy) for x, y in m.axe]
+        m.polygone = [(x + dx, y + dy) for x, y in m.polygone]
+    for o in niv.ouvertures:  # repérée le long de son mur, qui vient de glisser d'autant
+        d = dy if o.mur.vertical else dx
+        o.u0, o.u1 = o.u0 + d, o.u1 + d
+    niv.coins = [(x + dx, y + dy) for x, y in niv.coins]
+
+
+def _symetrie(niv: Niveau, n: int) -> None:
+    """Une des 8 symétries (mêmes bits que logements._transformer), murs en biais et coins coupés compris, ce que
+    _transformer ne sait pas faire : il tourne avant couper_angles, alors qu'ici le logement peut déjà être coupé."""
+    if not n:
+        return
+    echange, mx, my = bool(n & 1), bool(n & 2), bool(n & 4)
+    _transformer(niv, 0, 0, n)  # x → -x, y → -y selon les bits : le cadre est ramené ensuite, par _normaliser
+
+    def f(x: float, y: float) -> tuple[float, float]:
+        if echange:
+            x, y = y, x
+        return (-x if mx else x), (-y if my else y)
+
+    inverse = echange != (mx != my)  # le même test que _transformer : garde le contour dans le sens direct
+    for p in niv.pieces:
+        if p.contour:
+            p.contour = [f(x, y) for x, y in p.contour]
+            if inverse:
+                p.contour.reverse()
+        zones = []
+        for z in p.interdits:
+            (a, b), (c, e) = f(z.x0, z.y0), f(z.x1, z.y1)
+            zones.append(Rect(int(min(a, c)), int(min(b, e)), int(max(a, c)), int(max(b, e))))
+        p.interdits = zones
+    for m in niv.murs:
+        if (my if m.vertical else mx):  # le mur est parcouru à l'envers : ses bouts s'échangent
+            m.coupe_debut, m.coupe_fin = m.coupe_fin, m.coupe_debut
+    for m in niv.murs_libres:
+        m.axe = [f(x, y) for x, y in m.axe]
+        m.polygone = [f(x, y) for x, y in m.polygone]
+
+
+def _normaliser(niv: Niveau) -> None:
+    c = cadre_du_niveau(niv)
+    _translater(niv, -c.x0, -c.y0)
+
+
+def _orienter(niveau: Niveau, dehors: int, mitoyen: bool, rc: random.Random) -> tuple[Niveau, int]:
+    """Une copie du niveau, tournée pour présenter sa bonne face à l'autre logement : vers `dehors` (+1 est, -1 ouest).
+
+    Palier : la porte d'entrée donne sur le palier (les deux logements s'y font face). Mitoyen : c'est le contraire, un mur
+    mitoyen n'a ni porte ni fenêtre. Renvoie aussi le score : 100 ou plus dit que la porte reste du mauvais côté."""
+    ordre = list(range(8))
+    rc.shuffle(ordre)
+    meilleur, score_min = None, None
+    for n in ordre:
+        c = copy.deepcopy(niveau)
+        _symetrie(c, n)
+        _normaliser(c)
+        bord = cadre_du_niveau(c).x1 if dehors > 0 else 0
+        sur_la_face = [o for o in c.ouvertures if o.mur.vertical and o.mur.dehors == dehors]
+        if mitoyen:
+            contact = [o for o in sur_la_face if (rect_du_mur(o.mur).x1 if dehors > 0 else rect_du_mur(o.mur).x0) == bord]
+            score = (100 if any(o.sous_type == "porte_entree" for o in contact) else 0) + len(contact)
+        else:
+            score = 0 if any(o.sous_type == "porte_entree" for o in sur_la_face) else 1
+        if score_min is None or score < score_min:
+            meilleur, score_min = c, score
+    return meilleur, score_min
+
+
+def _sans_ouverture_au_contact(niv: Niveau, autre: Rect, contact: float, dehors: int) -> None:
+    """Une fenêtre qui donne sur le voisin n'existe pas : elle est rebouchée. La pièce peut y perdre sa fenêtre, mais la
+    vérité reste exacte, puisque le mur est plein sur l'image et dans le masque."""
+    def bouche(o) -> bool:
+        m = o.mur
+        if not m.vertical or m.dehors != dehors or (rect_du_mur(m).x1 if dehors > 0 else rect_du_mur(m).x0) != contact:
+            return False
+        return o.u0 < autre.y1 and autre.y0 < o.u1
+    niv.ouvertures = [o for o in niv.ouvertures if not bouche(o)]
+
+
+def _suffixer(niv: Niveau, suffixe: str) -> None:
+    """Identifiants distincts d'un bloc à l'autre. « chambre_n1 » (étage d'un duplex) le reste, sans redoubler le suffixe."""
+    for e in [*niv.pieces, *niv.murs, *niv.murs_libres, *niv.ouvertures]:
+        if not e.id.endswith(suffixe):
+            e.id += suffixe
+
+
+def assembler(log: LogementGenere, sources: list[tuple[Niveau, int, int, str]], titres: list[str] | None = None,
+              hsp: int | None = None) -> tuple[LogementGenere, list[dict]]:
+    """Un logement à UN seul niveau, fait des `sources` : (niveau, dx, dy, suffixe des identifiants).
+
+    Chaque source est copiée : les niveaux du logement d'origine, déjà écrits sur le disque, ne bougent pas. L'index 0 fait que
+    `rendre`, `valider_dossier` et le banc y voient un exemple ordinaire. `coins` n'est qu'une boîte (il sert à `signature`) : le
+    vrai contour de chaque bloc est dans `blocs`."""
+    pieces, murs, ouvertures, libres, blocs = [], [], [], [], []
+    for k, (niveau, dx, dy, suffixe) in enumerate(sources):
+        c = copy.deepcopy(niveau)  # une seule copie : chaque ouverture y garde son mur (même objet)
+        _translater(c, dx, dy)
+        _suffixer(c, suffixe)
+        cadre = cadre_du_niveau(c)
+        blocs.append({"titre": titres[k] if titres else "", "cadre": [cadre.x0, cadre.y0, cadre.x1, cadre.y1],
+                      "pieces": [p.id for p in c.pieces], "surface": round(sum(surface_piece(p) for p in c.pieces) / 1e6, 2),
+                      "coins": [list(q) for q in c.coins]})
+        pieces += c.pieces
+        murs += c.murs
+        ouvertures += c.ouvertures
+        libres += c.murs_libres
+    x0, y0 = min(p.rect.x0 for p in pieces), min(p.rect.y0 for p in pieces)
+    x1, y1 = max(p.rect.x1 for p in pieces), max(p.rect.y1 for p in pieces)
+    hauteur = hsp if hsp is not None else max(n[0].hsp for n in sources)  # le plus haut : aucune ouverture ne dépasse le plafond
+    niveau = Niveau(index=0, coins=[(x0, y0), (x1, y0), (x1, y1), (x0, y1)], pieces=pieces, murs=murs, ouvertures=ouvertures,
+                    z_sol=0, hsp=hauteur, murs_libres=libres)
+    return dataclasses.replace(log, niveaux=[niveau], hsp=hauteur), blocs
+
+
+def _titres_niveaux(l: Lot2, rc: random.Random) -> list[str]:
+    if l.famille == "agence_coloree":
+        return ["Niveau 0", "Niveau 1"]  # fr-075
+    return list(rc.choice(TITRES_NIVEAUX))
+
+
+def _titres_logements(log, log_b, rc: random.Random) -> list[str]:
+    if rc.random() < 0.5:
+        n = rc.randint(10, 80)
+        return [f"Lot {n}", f"Lot {n + 1}"]
+    return [f"{log.type} A", f"{log_b.type} B"]
+
+
+def _ecart_mm(style, rc: random.Random, a_titres: bool) -> int:
+    """Le vide entre deux blocs : 1,5 à 3 m comme sur fr-025, fr-118, fr-119, et assez pour le titre et les chaînes de cotes."""
+    t = style.taille_texte
+    besoin = 2.8 * t if a_titres else 0.0
+    if style.cotes and not style.lot2.sans_chaines:
+        besoin += RECUL_COTE + 2 * t  # la chaîne du bloc d'en bas
+        if style.cotes_partielles:
+            besoin += RECUL_COTE + 2 * t  # et celle du bloc d'en haut
+    return round(max(rc.uniform(1500, 3000), (besoin + 2 * t) / style.px_par_m * 1000))
+
+
+def _decalage(rc: random.Random, a: int, b: int) -> tuple[int, int]:
+    """Où poser deux longueurs a et b l'une par rapport à l'autre : même début, même milieu ou même fin."""
+    place = rc.choice(("debut", "milieu", "fin"))
+    grand = max(a, b)
+    return {"debut": (0, 0), "milieu": ((grand - a) // 2, (grand - b) // 2), "fin": (grand - a, grand - b)}[place]
+
+
+def composer(log: LogementGenere, log_b: LogementGenere | None, compose: str, disposition: str, style, rc: random.Random) -> Composition:
+    """Traits 12 et 13. `log_b` : le second logement (deux logements, ou plain-pied empilé) ; None pour un duplex.
+
+    Tout le hasard vient de `rc` (clé « lot2-compose-<graine> ») : le style, lui, doit rester celui du plan d'origine."""
+    l = style.lot2
+    place = "bas" if l.famille == "agence_coloree" else "haut"  # fr-075 ; fr-025, fr-072 écrivent au-dessus
+    if rc.random() < (0.7 if l.triangles else 0.15):
+        place = ""  # fr-118, fr-119 : les relevés d'appli n'écrivent rien entre les niveaux
+    if place == "bas" and style.echelle_graphique:
+        place = "haut"  # la barre d'échelle passe sous le plan
+    tirets = rc.random() < 0.25  # fr-025, fr-072
+    surface = rc.random() < 0.2 and bool(style.surfaces)  # fr-120
+    if compose == "deux_logements":
+        return _composer_logements(log, log_b, disposition, style, rc, place, surface)
+    a, b = (log.niveaux[0], log.niveaux[1]) if log.duplex else (log.niveaux[0], log_b.niveaux[0])
+    a, b = copy.deepcopy(a), copy.deepcopy(b)
+    _normaliser(a)
+    _normaliser(b)
+    ca, cb = cadre_du_niveau(a), cadre_du_niveau(b)
+    ecart = _ecart_mm(style, rc, bool(place))
+    filet = False
+    if disposition == "cote_a_cote":
+        da, db = _decalage(rc, ca.hauteur, cb.hauteur)
+        sources = [(a, 0, da, "_n0"), (b, ca.largeur + ecart, db, "_n1")]
+    else:
+        da, db = _decalage(rc, ca.largeur, cb.largeur)
+        filet = rc.random() < 0.2  # fr-072
+        if filet:
+            ecart += round(style.taille_texte * 1.5 / style.px_par_m * 1000)
+        if rc.random() < 0.75:  # le rez-de-chaussée en haut : fr-025, fr-072, fr-075, fr-120
+            sources = [(a, da, cb.hauteur + ecart, "_n0"), (b, db, 0, "_n1")]
+        else:
+            sources = [(a, da, 0, "_n0"), (b, db, ca.hauteur + ecart, "_n1")]
+    assemble, blocs = assembler(log, sources, _titres_niveaux(l, rc) if place else None)
+    return Composition(assemble, "niveaux", disposition, blocs, None, place, tirets and bool(place), surface and bool(place), filet)
+
+
+def _composer_logements(log, log_b, disposition, style, rc, place, surface) -> Composition:
+    """Trait 13. Fabriqué de toutes pièces, comme le demande le catalogue : aucun plan ne sert de modèle (les deux qui
+    montrent le cas sont à l'examen). Palier : un vide de fond, et les portes d'entrée s'y font face. Mitoyen : les deux murs
+    extérieurs accolés, deux éléments et une même classe, sans ouverture au contact."""
+    mitoyen = disposition == "mitoyen"
+    a, score_a = _orienter(log.niveaux[0], 1, mitoyen, rc)
+    b, score_b = _orienter(log_b.niveaux[0], -1, mitoyen, rc)
+    if mitoyen and (score_a >= 100 or score_b >= 100):  # la porte d'entrée ne peut pas donner sur le mur du voisin
+        mitoyen, disposition = False, "palier"
+        a, _ = _orienter(log.niveaux[0], 1, False, rc)
+        b, _ = _orienter(log_b.niveaux[0], -1, False, rc)
+    # Les étiquettes (M_est…) doivent dire ce qu'on voit après la symétrie.
+    _nommer(dataclasses.replace(log, niveaux=[a]))
+    _nommer(dataclasses.replace(log_b, niveaux=[b]))
+    ca, cb = cadre_du_niveau(a), cadre_du_niveau(b)
+    da, db = _decalage(rc, ca.hauteur, cb.hauteur)
+    ecart = 0 if mitoyen else round(max(rc.uniform(1200, 2500), 3.2 * style.taille_texte / style.px_par_m * 1000))
+    _translater(a, 0, da)
+    _translater(b, ca.largeur + ecart, db)
+    palier = None
+    if mitoyen:
+        contact = ca.largeur
+        _sans_ouverture_au_contact(a, cadre_du_niveau(b), contact, 1)
+        _sans_ouverture_au_contact(b, cadre_du_niveau(a), contact, -1)
+    else:
+        y0, y1 = max(da, db), min(da + ca.hauteur, db + cb.hauteur)
+        palier = {"cadre": [ca.largeur, y0, ca.largeur + ecart, y1], "texte": rc.choice(TEXTES_PALIER)}
+    assemble, blocs = assembler(log, [(a, 0, 0, "_a"), (b, 0, 0, "_b")], _titres_logements(log, log_b, rc) if place else None)
+    return Composition(assemble, "deux_logements", disposition, blocs, palier, place, False, surface and bool(place))
+
+
+def vers_ensemble(style, c: Composition) -> None:
+    """Le style du plan d'origine, adapté à l'ensemble. Ce qui parlait d'UN niveau ou prenait la marge que réclament les titres s'efface ;
+    le reste (couleurs, écriture, cotes) ne change pas, pour que l'ensemble ait le style de son plan."""
+    style.lot2 = dataclasses.replace(style.lot2, composition=c.compose, disposition=c.disposition, blocs=c.blocs, palier=c.palier,
+                                     titres_place=c.titres_place, titre_tirets=c.titre_tirets, titre_surface=c.titre_surface,
+                                     filet=c.filet, legende_niveau=False, numero_lot="", echelle_ecrite="", recadre=False,
+                                     placards_fleches=False)  # la flèche traverserait tout l'autre bloc
+    style.titre = False
+
+
+def vides_entre_blocs(blocs: list[dict]) -> list[Rect]:
+    """La bande vide entre deux blocs, en mm (mitoyen : aucune)."""
+    a, b = blocs[0]["cadre"], blocs[1]["cadre"]
+    x0, y0, x1, y1 = min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])
+    if a[2] < b[0] or b[2] < a[0]:
+        return [Rect(min(a[2], b[2]), y0, max(a[0], b[0]), y1)]
+    if a[3] < b[1] or b[3] < a[1]:
+        return [Rect(x0, min(a[3], b[3]), x1, max(a[1], b[1]))]
+    return []
+
+
+def retrait_du_titre(style, place: str) -> float:
+    """Du mur au milieu du titre, en pixels : au-delà de la chaîne de cotes s'il y en a une de ce côté."""
+    t = style.taille_texte
+    chaine = style.cotes and not style.lot2.sans_chaines and (place == "haut" or style.cotes_partielles)
+    return RECUL_COTE + 14 + 2 * t if chaine else 1.5 * t
+
+
+def titres_des_blocs(d) -> None:
+    """« Rez-de-chaussée », « Lot 12 » : au-dessus (fr-025, fr-072) ou en dessous (fr-075, fr-120) de chaque bloc. Du fond pour le masque."""
+    st, l = d.style, d.style.lot2
+    if not l.titres_place:
+        return
+    t = round(st.taille_texte * 1.05)
+    for b in l.blocs:
+        texte = b["titre"].upper() if l.majuscules else b["titre"]
+        if not texte:
+            continue
+        if l.titre_surface and st.surfaces:
+            texte += f" {b['surface']:.0f} m²"
+        if l.titre_tirets:
+            texte = f"----- {texte} -----"
+        x0, y0, x1, y1 = b["cadre"]
+        x = (d.px(x0, 0)[0] + d.px(x1, 0)[0]) / 2
+        if l.titres_place == "haut":
+            y = d.px(0, y1)[1] - retrait_du_titre(st, "haut")
+        else:
+            y = d.px(0, y0)[1] + retrait_du_titre(st, "bas")
+        _ecrire(d, (x, y), texte, t, st.textes, gras=l.noms_gras or l.titre_tirets)
+
+
+def filet_entre_blocs(d) -> None:
+    """fr-072 : un trait sur toute la largeur, entre les deux niveaux, à l'écart du titre."""
+    st, l = d.style, d.style.lot2
+    vides = vides_entre_blocs(l.blocs)
+    if not vides or vides[0].largeur < vides[0].hauteur:
+        return
+    haut_px, bas_px = d.px(0, vides[0].y1)[1], d.px(0, vides[0].y0)[1]
+    if l.titres_place == "haut":
+        bas_px -= retrait_du_titre(st, "haut") + st.taille_texte
+    elif l.titres_place == "bas":
+        haut_px += retrait_du_titre(st, "bas") + st.taille_texte
+    y = (haut_px + bas_px) / 2
+    d.d.line(((d.px(d.rep.xmin, 0)[0], y), (d.px(d.rep.xmax, 0)[0], y)), fill=st.traits, width=max(1, d.fin))
+
+
+def palier_ecrit(d) -> None:
+    """« Palier » dans le vide entre deux logements. Écrit seulement : ce vide est du fond, sur l'image comme dans le masque."""
+    st, l = d.style, d.style.lot2
+    x0, y0, x1, y1 = l.palier["cadre"]
+    cx, cy = d.px((x0 + x1) / 2, (y0 + y1) / 2)
+    texte = l.palier["texte"].upper() if l.majuscules else l.palier["texte"]
+    taille = max(9, round(st.taille_texte * 0.85))
+    longueur = _police(st.police, taille).getlength(texte)
+    largeur_px, hauteur_px = (x1 - x0) * d.rep.s, (y1 - y0) * d.rep.s
+    if longueur < largeur_px * 0.9:
+        d.texte((cx, cy), texte, taille, st.textes)
+    elif longueur < hauteur_px * 0.9:
+        d.texte((cx, cy), texte, taille, st.textes, vertical=True)
+
+
+def cotes_des_blocs(d) -> None:
+    """fr-072 : chaque niveau a ses chaînes de cotes, autour de lui. Une chaîne autour de l'image entière mesurerait du vide.
+
+    Un côté n'a pas de chaîne si l'autre bloc est trop près pour la loger : deux logements mitoyens, un palier étroit."""
+    st, l = d.style, d.style.lot2
+    place_mm = (RECUL_COTE + 2 * st.taille_texte) / d.rep.s
+    for k, b in enumerate(l.blocs):
+        pieces = [p.rect for p in d.niv.pieces if p.id in b["pieces"]]
+        x0, y0 = min(p.x0 for p in pieces), min(p.y0 for p in pieces)
+        x1, y1 = max(p.x1 for p in pieces), max(p.y1 for p in pieces)
+        gx0, gy0, gx1, gy1 = b["cadre"]
+        ox0, oy0, ox1, oy1 = l.blocs[1 - k]["cadre"]
+        recouvre_x, recouvre_y = gx0 < ox1 and ox0 < gx1, gy0 < oy1 and oy0 < gy1
+        haut = not (recouvre_x and 0 <= oy0 - gy1 < place_mm)
+        bas = not (recouvre_x and 0 <= gy0 - oy1 < place_mm)
+        gauche = not (recouvre_y and 0 <= gx0 - ox1 < place_mm)
+        droite = not (recouvre_y and 0 <= ox0 - gx1 < place_mm)
+        if haut:
+            d.chaine([(x0, x1)], d.px(0, gy1)[1] - RECUL_COTE, True, -1)
+        if gauche:
+            d.chaine([(y0, y1)], d.px(gx0, 0)[0] - RECUL_COTE, False, -1)
+        if st.cotes_partielles:
+            en_bas = sorted((p.x0, p.x1) for p in pieces if p.y0 == y0)
+            a_droite = sorted((p.y0, p.y1) for p in pieces if p.x1 == x1)
+            if bas and len(en_bas) > 1:
+                d.chaine(en_bas, d.px(0, gy0)[1] + RECUL_COTE, True, 1)
+            if droite and len(a_droite) > 1:
+                d.chaine(a_droite, d.px(gx1, 0)[0] + RECUL_COTE, False, 1)

@@ -1,4 +1,4 @@
-"""Lot 2 du générateur (--lot2), chantiers 1 et 2 : chaque trait est dessiné, et la vérité ne bouge pas.
+"""Lot 2 du générateur (--lot2), les trois chantiers : chaque trait est dessiné, et la vérité ne bouge pas.
 
 La référence d'un test est le même plan dessiné SANS le lot 2, à la même échelle et avec les mêmes marges : c'est
 l'ancien chemin de code. Si un trait touchait un masque, la comparaison le verrait.
@@ -126,12 +126,6 @@ def test_les_familles_ont_les_poids_de_la_conception():
     assert L.POIDS_FAMILLES == {"agence_coloree": 14, "promoteur_gris": 14, "murs_noirs": 13, "carrez_legende": 8,
                                 "logiciel_public": 5, "scan_ancien": 6, "cotes_rouges": 2, "neutre": 10}
     assert set(L.POIDS_FAMILLES) == set(L.FAMILLES_LOT2)
-
-
-def test_le_chantier_3_n_est_pas_encore_tire():
-    for k in range(300):
-        l = L.lot2_au_hasard(random.Random(k))
-        assert not (l.composition or l.ecran or l.disposition)
 
 
 def test_tout_est_json():
@@ -1213,3 +1207,575 @@ def test_le_lecteur_lit_des_cotes_en_cm(monkeypatch):
     _rendus(60002, _promoteur(noms_courts=True))
     nombres = [t for t in vus if t.isdigit()]
     assert nombres and all(FORME_COTE_CM.match(t) for t in nombres if len(t) <= 3)
+
+
+# ---------------------------------------------------------------- chantier 3 : traits 12 et 13, l'exemple -ensemble
+
+
+def _lot_compose(compose: str, disposition: str, famille: str = "neutre", **traits) -> L.Lot2:
+    l = L.lot2_au_hasard(random.Random(f"test-{compose}-{disposition}-{famille}"), famille=famille, transversaux=False)
+    l.composition, l.disposition = compose, disposition
+    for k, v in traits.items():
+        setattr(l, k, v)
+    return l
+
+
+def _ensemble(tmp_path, monkeypatch, l: L.Lot2, graine: int, **options):
+    """Le parent et son -ensemble, écrits sur le disque par le vrai chemin. Plain-pied : la composition n'est plus tirée au sort."""
+    monkeypatch.setattr(E, "lot2_au_hasard", lambda rng: l)
+    monkeypatch.setattr(E, "PLAIN_PIED_EMPILE", 1.0)
+    opt = Options(dossier=tmp_path, lot2=True, reprise=False, **options)
+    r = fabriquer_exemple(graine, opt, Reglages(), Regles.charger(None))
+    assert r.statut == "accepte", r.erreurs
+    return r, tmp_path / "exemples" / f"{graine:06d}-ensemble"
+
+
+def _lire(dossier):
+    from moteur.images import lire_image
+    dn = dossier / "niveau_0"
+    return {nom: lire_image(str(dn / f"{nom}.png"), cv2.IMREAD_UNCHANGED) for nom in ("masque_semantique", "masque_pieces", "masque_elements")}, \
+        json.loads((dn / "annotations.json").read_text(encoding="utf-8"))
+
+
+def _ids(log) -> list[str]:
+    n = log.niveaux[0]
+    return [e.id for e in (*n.pieces, *n.murs, *n.murs_libres, *n.ouvertures)]
+
+
+def test_assembler_duplex():
+    log = generer(62, Reglages())
+    assert log.duplex
+    avant = [dataclasses.asdict(p.rect) for p in log.pieces]
+    assemble, blocs = L.assembler(log, [(log.niveaux[0], 0, 0, "_n0"), (log.niveaux[1], 20000, 0, "_n1")], ["RDC", "R+1"])
+    n = assemble.niveaux[0]
+    assert len(assemble.niveaux) == 1 and n.index == 0 and not assemble.duplex
+    assert len(n.pieces) == len(log.pieces) and len(n.murs) == len(log.murs) and len(n.ouvertures) == len(log.ouvertures)
+    assert len(set(_ids(assemble))) == len(_ids(assemble))
+    murs = {id(m) for m in n.murs}
+    assert all(id(o.mur) in murs for o in n.ouvertures)  # chaque ouverture pointe vers un mur de l'ensemble, pas de l'original
+    assert [dataclasses.asdict(p.rect) for p in log.pieces] == avant  # les niveaux du parent, déjà écrits, ne bougent pas
+    assert blocs[0]["titre"] == "RDC" and blocs[1]["cadre"][0] >= 20000 - 1000
+
+
+def test_assembler_chaque_ouverture_reste_dans_son_mur():
+    log = generer(62, Reglages())
+    assemble, _ = L.assembler(log, [(log.niveaux[0], 300, -700, "_n0"), (log.niveaux[1], 25000, 9000, "_n1")])
+    for o in assemble.niveaux[0].ouvertures:
+        assert o.mur.debut - 1e-6 <= o.u0 < o.u1 <= o.mur.fin + 1e-6
+    r0, r1 = log.niveaux[0].ouvertures[0], assemble.niveaux[0].ouvertures[0]
+    a, b = rect_de_l_ouverture(r0), rect_de_l_ouverture(r1)
+    assert (b.x0 - a.x0, b.y0 - a.y0) == (300, -700)
+
+
+@pytest.mark.parametrize("disposition", ["empiles", "cote_a_cote"])
+def test_exemple_ensemble_valide(tmp_path, monkeypatch, disposition):
+    from moteur.logement import Logement
+    l = _lot_compose("niveaux", disposition, titres_place="", couleur_murs=(0, 0, 0))
+    r, dossier = _ensemble(tmp_path, monkeypatch, l, 62)
+    assert r.entree_manifeste["compose"] == "niveaux" and r.entree_manifeste["ensemble_accepte"] is True
+    assert valider_dossier(dossier, Regles.charger(None)).accepte
+    assert (dossier / "geometrie.json").exists() and (dossier / "logement_niveau0.json").exists()
+    m = json.loads((dossier / "manifeste.json").read_text(encoding="utf-8"))
+    assert m["parent"] == "000062" and m["compose"] == "niveaux" and m["nombre_niveaux"] == 1 and m["id"] == "000062-ensemble"
+    Logement.model_validate(json.loads((dossier / "logement_niveau0.json").read_text(encoding="utf-8")))
+    geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
+    assert geo["parent"] == "000062" and geo["compose"] == "niveaux" and len(geo["blocs"]) == 2 and len(geo["niveaux"]) == 1
+    masques, ann = _lire(dossier)
+    # Le masque des pièces a exactement n valeurs 1..n : ce que relit le validateur et ce que lit le banc.
+    n = len(ann["pieces"])
+    assert sorted(np.unique(masques["masque_pieces"]).tolist()) == list(range(n + 1))
+    # Le vide entre les blocs est du fond, d'un bout à l'autre.
+    from moteur.generateur.lot2 import vides_entre_blocs
+    style = ann["style"]["lot2"]
+    a = ann["image"]["matrice_m_vers_px"]
+    vide = vides_entre_blocs(style["blocs"])[0]
+    u0, v0 = a[0][0] * vide.x0 / 1000 + a[0][2], a[1][1] * vide.y0 / 1000 + a[1][2]
+    u1, v1 = a[0][0] * vide.x1 / 1000 + a[0][2], a[1][1] * vide.y1 / 1000 + a[1][2]
+    zone = masques["masque_semantique"][round(min(v0, v1)) + 1:round(max(v0, v1)) - 1, round(min(u0, u1)) + 1:round(max(u0, u1)) - 1]
+    assert zone.size and not zone.any()
+    # Chaque bloc a bien ses pièces : aucune des pièces d'un bloc n'est dans l'autre.
+    assert not set(style["blocs"][0]["pieces"]) & set(style["blocs"][1]["pieces"])
+    assert len(style["blocs"][0]["pieces"]) + len(style["blocs"][1]["pieces"]) == n
+
+
+def test_l_ensemble_ne_change_pas_le_parent(tmp_path, monkeypatch):
+    # Les dossiers du parent sont ceux qu'il aurait eus sans composition : l'ensemble s'ajoute, il ne remplace rien.
+    _ensemble(tmp_path / "a", monkeypatch, _lot_compose("niveaux", "empiles"), 62)
+    sans = _lot_compose("niveaux", "empiles")
+    sans.composition, sans.disposition = "", ""
+    monkeypatch.setattr(E, "lot2_au_hasard", lambda rng: sans)
+    fabriquer_exemple(62, Options(dossier=tmp_path / "b", lot2=True, reprise=False), Reglages(), Regles.charger(None))
+    for niveau in ("niveau_0", "niveau_1"):
+        for nom in ("masque_semantique.png", "masque_pieces.png", "masque_elements.png", "hauteur.png"):
+            a = (tmp_path / "a" / "exemples" / "000062" / niveau / nom).read_bytes()
+            b = (tmp_path / "b" / "exemples" / "000062" / niveau / nom).read_bytes()
+            assert a == b, (niveau, nom)
+
+
+def test_trait_12_titres_dans_l_image(monkeypatch):
+    ecrits = []
+    vrai = R._Dessin.texte
+    monkeypatch.setattr(R._Dessin, "texte", lambda self, xy, texte, *a, **k: (ecrits.append((texte, xy)), vrai(self, xy, texte, *a, **k))[1])
+    log = generer(62, Reglages())
+    style = _base()
+    L.appliquer(style, _lot_compose("niveaux", "empiles"))
+    c = L.composer(log, None, "niveaux", "empiles", style, random.Random(2))
+    L.vers_ensemble(style, c)
+    style.lot2.titres_place, style.lot2.titre_tirets, style.lot2.titre_surface = "haut", True, False
+    style.lot2.blocs[0]["titre"], style.lot2.blocs[1]["titre"] = "Rez-de-chaussée", "1er étage"
+    rendu = rendre(c.log, c.log.niveaux[0], style, "ensemble")
+    titres = {t: xy for t, xy in ecrits if "-----" in t}
+    assert set(titres) == {"----- Rez-de-chaussée -----", "----- 1er étage -----"}
+    sem = rendu.images["masque_semantique"]
+    for _, (x, y) in titres.items():
+        assert sem[int(y), int(x)] == 0  # écrit dans le vide ou la marge : jamais sur le logement
+
+
+@pytest.mark.parametrize("disposition", ["empiles", "cote_a_cote"])
+def test_trait_12_une_chaine_de_cotes_par_bloc(monkeypatch, disposition):
+    ecrits = []
+    vrai = R._Dessin.texte
+    monkeypatch.setattr(R._Dessin, "texte", lambda self, xy, texte, *a, **k: (ecrits.append(texte), vrai(self, xy, texte, *a, **k))[1])
+    log = generer(62, Reglages())
+    style = _base(cotes=True, cotes_partielles=False, noms=False, surfaces=False)
+    L.appliquer(style, _lot_compose("niveaux", disposition, couleur_cotes=None))
+    style.cotes, style.noms, style.surfaces = True, False, False
+    c = L.composer(log, None, "niveaux", disposition, style, random.Random(3))
+    L.vers_ensemble(style, c)
+    rendre(c.log, c.log.niveaux[0], style, "ensemble")
+    largeurs = set()
+    for b in style.lot2.blocs:
+        rects = [p.rect for p in c.log.niveaux[0].pieces if p.id in b["pieces"]]
+        largeurs.add(L.texte_cote(max(r.x1 for r in rects) - min(r.x0 for r in rects), style.lot2))
+    assert largeurs <= set(ecrits)
+    rects = [p.rect for p in c.log.niveaux[0].pieces]
+    total = L.texte_cote(max(r.x1 for r in rects) - min(r.x0 for r in rects), style.lot2)
+    if disposition == "cote_a_cote":
+        assert total not in ecrits  # une chaîne qui traverse le vide ne mesurerait rien
+
+
+def test_plain_pied_compose_une_fois_sur_quatre_seulement(tmp_path, monkeypatch):
+    l = _lot_compose("niveaux", "empiles")
+    monkeypatch.setattr(E, "lot2_au_hasard", lambda rng: l)
+    bilan = generer_lot(Options(dossier=tmp_path, nombre=24, depart=500, lot2=True, reprise=False, types=["T1", "T2", "studio"]), processus=1)
+    faits = sum(1 for d in (tmp_path / "exemples").glob("*-ensemble"))
+    acceptes = bilan["statuts"]["accepte"]
+    assert acceptes > 3 and faits < acceptes  # pas tous : un plain-pied ne se déguise pas toujours en maison à étages
+    assert bilan["ensembles"]["acceptes"] == faits
+
+
+@pytest.mark.parametrize("graine", [26, 60, 53])
+def test_trait_13_palier(tmp_path, monkeypatch, graine):
+    l = _lot_compose("deux_logements", "palier", titres_place="")
+    r, dossier = _ensemble(tmp_path, monkeypatch, l, graine)
+    assert r.entree_manifeste["compose"] == "deux_logements"
+    assert valider_dossier(dossier, Regles.charger(None)).accepte
+    masques, ann = _lire(dossier)
+    geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
+    assert geo["compose"] == "deux_logements" and geo["disposition"] == "palier"
+    # Le palier est du fond : deux blocs bâtis, séparés.
+    bati = ((masques["masque_semantique"] >= 1) & (masques["masque_semantique"] <= 15)).astype(np.uint8)
+    n, _ = cv2.connectedComponents(bati, connectivity=8)
+    assert n - 1 == 2
+    a, b = geo["blocs"]
+    assert a["pieces"] and b["pieces"] and len(a["pieces"]) + len(b["pieces"]) == len(ann["pieces"])
+    assert all(i.endswith("_a") for i in a["pieces"]) and all(i.endswith("_b") for i in b["pieces"])
+    # Deux entrées : les deux logements sont entiers.
+    entrees = [o for o in geo["niveaux"][0]["ouvertures"] if o["sous_type"] == "porte_entree"]
+    assert len(entrees) == 2
+    assert geo["connectivite"]["connexe"] is False  # c'est vrai : on ne passe pas d'un logement à l'autre
+
+
+def test_trait_13_les_portes_donnent_sur_le_palier():
+    # Une porte sur le bon côté dès que le logement peut en présenter une : toutes les symétries sont essayées.
+    bons = 0
+    for g in (26, 60, 53, 60012, 2, 7):
+        log = generer(g, Reglages())
+        for dehors in (1, -1):
+            c, score = L._orienter(log.niveaux[0], dehors, False, random.Random(g))
+            faces = [o for o in c.ouvertures if o.sous_type == "porte_entree" and o.mur.vertical and o.mur.dehors == dehors]
+            assert bool(faces) == (score == 0)
+            bons += score == 0
+    assert bons == 12
+
+
+@pytest.mark.parametrize("graine", [26, 60, 53])
+def test_trait_13_mitoyen(tmp_path, monkeypatch, graine):
+    l = _lot_compose("deux_logements", "mitoyen", titres_place="")
+    r, dossier = _ensemble(tmp_path, monkeypatch, l, graine)
+    assert valider_dossier(dossier, Regles.charger(None)).accepte
+    geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
+    n0 = geo["niveaux"][0]
+    a, b = geo["blocs"]
+    assert geo["disposition"] == "mitoyen"
+    assert a["cadre"][2] == pytest.approx(b["cadre"][0])  # les deux murs extérieurs se touchent
+    contact = a["cadre"][2]
+    for o in n0["ouvertures"]:
+        if o["orientation"] != "verticale":
+            continue
+        x0 = min(q[0] for q in o["polygone"])
+        x1 = max(q[0] for q in o["polygone"])
+        assert not (abs(x1 - contact) < 1e-6 or abs(x0 - contact) < 1e-6), o["id"]  # ni porte ni fenêtre au contact
+    # Deux éléments différents, une même classe.
+    masques, ann = _lire(dossier)
+    murs_a = [m for m in ann["murs"] if m["id"].endswith("_a")]
+    murs_b = [m for m in ann["murs"] if m["id"].endswith("_b")]
+    assert murs_a and murs_b and not {m["valeur_masque"] for m in murs_a} & {m["valeur_masque"] for m in murs_b}
+    assert {m["classe"] for m in murs_a + murs_b} == {CLASSES["mur"]}
+    assert len(n0["pieces"]) == len(a["pieces"]) + len(b["pieces"])
+
+
+def test_trait_13_sur_un_plan_en_biais(tmp_path, monkeypatch):
+    # Les symétries doivent aussi retourner les murs en biais et les coins coupés, sinon le masque les trahirait.
+    for disposition in ("palier", "mitoyen"):
+        l = _lot_compose("deux_logements", disposition, titres_place="")
+        _, dossier = _ensemble(tmp_path / disposition, monkeypatch, l, 101, biais=True)
+        assert valider_dossier(dossier, Regles.charger(None)).accepte
+        geo = json.loads((dossier / "geometrie.json").read_text(encoding="utf-8"))
+        assert any(m["orientation"] in ("oblique", "arrondi") for m in geo["niveaux"][0]["murs"])
+
+
+def test_symetrie_garde_les_surfaces():
+    import random as _r
+    from moteur.generateur.biais import couper_angles
+    log = generer(101, Reglages())
+    couper_angles(log, _r.Random("biais-101"))
+    n = log.niveaux[0]
+    s0 = sorted(round(surface_piece(p)) for p in n.pieces)
+    m0 = sorted(rect_du_mur_surface(m) for m in n.murs)
+    for k in range(8):
+        c = L.copy.deepcopy(n)
+        L._symetrie(c, k)
+        assert sorted(round(surface_piece(p)) for p in c.pieces) == s0, k
+        assert sorted(rect_du_mur_surface(m) for m in c.murs) == m0, k
+        for p in c.pieces:  # le contour reste dans le cadre de sa pièce
+            for x, y in (p.contour or []):
+                assert p.rect.x0 - 1 <= x <= p.rect.x1 + 1 and p.rect.y0 - 1 <= y <= p.rect.y1 + 1
+
+
+def rect_du_mur_surface(m) -> int:
+    from moteur.generateur.annotations import rect_du_mur
+    return rect_du_mur(m).surface
+
+
+def test_graine_b_deterministe():
+    a = E.second_logement(26, Options(dossier=None), Reglages(), Regles.charger(None), random.Random("lot2-compose-26"))
+    b = E.second_logement(26, Options(dossier=None), Reglages(), Regles.charger(None), random.Random("lot2-compose-26"))
+    assert a.graine == b.graine and a.graine >= 1_000_000 and not a.duplex
+    assert a.surface == b.surface
+
+
+def test_composition_impossible_le_manifeste_le_dit(tmp_path, monkeypatch):
+    # Point 7 de la conception : le second logement est refusé, pas d'exemple -ensemble, et le manifeste le dit.
+    vrai = E.generer
+
+    def faux(graine, reglages):
+        if graine >= 1_000_000:
+            raise RuntimeError("refusé")
+        return vrai(graine, reglages)
+    monkeypatch.setattr(E, "generer", faux)
+    l = _lot_compose("deux_logements", "palier")
+    r, dossier = _ensemble(tmp_path, monkeypatch, l, 26)
+    assert not dossier.exists()
+    m = json.loads((tmp_path / "exemples" / "000026" / "manifeste.json").read_text(encoding="utf-8"))
+    assert m["compose"] is False and m["compose_motif"]
+    assert r.statut == "accepte"  # le plan lui-même n'y perd rien
+
+
+def test_composition_trop_d_elements_refusee(tmp_path, monkeypatch):
+    # Un masque d'éléments est sur 8 bits : au-delà de 255, les identifiants se replieraient et la vérité serait fausse.
+    vrai = L.composer
+
+    def gonfle(*a, **k):
+        c = vrai(*a, **k)
+        n = c.log.niveaux[0]
+        n.ouvertures = n.ouvertures * 40
+        return c
+    monkeypatch.setattr(E, "composer", gonfle)
+    r, dossier = _ensemble(tmp_path, monkeypatch, _lot_compose("deux_logements", "palier"), 26)
+    assert not dossier.exists()
+    assert r.entree_manifeste["compose"] is False and "8 bits" in r.entree_manifeste["compose_motif"]
+
+
+def _jeu_compose(tmp_path, monkeypatch, nombre=8):
+    l = _lot_compose("deux_logements", "palier")
+    monkeypatch.setattr(E, "lot2_au_hasard", lambda rng: l)
+    bilan = generer_lot(Options(dossier=tmp_path, nombre=nombre, depart=300, lot2=True, reprise=False), processus=1)
+    assert bilan["statuts"]["rejete"] == 0 and bilan["statuts"]["accepte"] >= 4
+    assert list((tmp_path / "exemples").glob("*-ensemble"))
+    return bilan
+
+
+def test_repartir_ensemble_dans_la_partition_du_parent(tmp_path, monkeypatch):
+    _jeu_compose(tmp_path, monkeypatch)
+    r = E.repartir(tmp_path, (0.5, 0.25, 0.25))
+    partition = {i: p for p, ids in r["partitions"].items() for i in ids}
+    ensembles = [d.name for d in (tmp_path / "exemples").glob("*-ensemble")]
+    assert ensembles
+    for i in ensembles:
+        assert partition[i] == partition[i.replace("-ensemble", "")], i  # aucune fuite entre entraînement et test
+    assert sum(r["comptes"].values()) == len(partition)
+    assert sum(sum(c.values()) for c in r["familles"].values()) == len(partition) - len(ensembles)  # les familles ne comptent que les logements
+
+
+def test_repartir_suit_le_parent_deplace(tmp_path, monkeypatch):
+    # Parent déplacé vers l'entraînement car trop semblable : son ensemble le suit, sinon il resterait seul au test.
+    _jeu_compose(tmp_path, monkeypatch)
+    r = E.repartir(tmp_path, (0.5, 0.25, 0.25), seuil=1e9)
+    partition = {i: p for p, ids in r["partitions"].items() for i in ids}
+    for i in [d.name for d in (tmp_path / "exemples").glob("*-ensemble")]:
+        assert partition[i] == partition[i.replace("-ensemble", "")]
+
+
+def test_repartir_ensemble_d_un_parent_rejete_reste_dehors(tmp_path, monkeypatch):
+    _jeu_compose(tmp_path, monkeypatch)
+    ens = sorted((tmp_path / "exemples").glob("*-ensemble"))[0]
+    parent = ens.name.replace("-ensemble", "")
+    m = json.loads((tmp_path / "exemples" / parent / "manifeste.json").read_text(encoding="utf-8"))
+    m["accepte"] = False
+    (tmp_path / "exemples" / parent / "manifeste.json").write_text(json.dumps(m), encoding="utf-8")
+    E.ecrire_manifeste(tmp_path)
+    r = E.repartir(tmp_path, (0.5, 0.25, 0.25))
+    tous = {i for ids in r["partitions"].values() for i in ids}
+    assert parent not in tous and ens.name not in tous
+
+
+def test_les_ensembles_ne_faussent_ni_statistiques_ni_doublons(tmp_path, monkeypatch, capsys):
+    from moteur.generateur import statistiques
+    from moteur.generateur.__main__ import main
+    _jeu_compose(tmp_path, monkeypatch)
+    parents = [d for d in (tmp_path / "exemples").glob("*/") if not d.name.endswith("-ensemble")]
+    ensembles = list((tmp_path / "exemples").glob("*-ensemble"))
+    E.repartir(tmp_path)
+    stats = statistiques.ecrire(tmp_path)
+    assert stats["exemples"] == len(parents)  # un ensemble n'est pas un logement de plus
+    assert sum(stats["types"].values()) == len(parents)
+    assert stats["ensembles"]["nombre"] == len(ensembles) and stats["ensembles"]["acceptes"] == len(ensembles)
+    # Les mêmes chiffres qu'un jeu sans les ensembles : aucun type de pièce n'est compté deux fois.
+    total = sum(json.loads((d / "geometrie.json").read_text(encoding="utf-8"))["resume"]["nombre_pieces"] for d in parents)
+    assert sum(stats["pieces_par_type"].values()) == total
+    main(["doublons", str(tmp_path)])
+    rapport = json.loads((tmp_path / "rapports" / "doublons.json").read_text(encoding="utf-8"))
+    assert rapport["nombre"] == len(parents)
+    main(["valider", str(tmp_path)])
+    m = json.loads((ensembles[0] / "manifeste.json").read_text(encoding="utf-8"))
+    assert m["accepte"] is True and m["parent"]  # revérifié, sans perdre sa filiation
+    from moteur.generateur.controle_qualite import page
+    assert page(tmp_path, 40).exists()
+
+
+def test_le_chargeur_voit_les_ensembles(tmp_path, monkeypatch):
+    # Même lecture que entrainer.lire_partitions et entrainer.dessins, sans importer torch ici : la vraie vérification
+    # s'est faite une fois avec le vrai chargeur (voir docs/projet/etapes/lot2-conception.md).
+    _jeu_compose(tmp_path, monkeypatch)
+    r = E.repartir(tmp_path)
+    ids = [str(i).zfill(6) if str(i).isdigit() else str(i) for lst in r["partitions"].values() for i in lst]
+    ensembles = [i for i in ids if i.endswith("-ensemble")]
+    assert ensembles
+    for i in ensembles:
+        niveaux = sorted((tmp_path / "exemples" / i).glob("niveau_*"))
+        assert [n.name for n in niveaux] == ["niveau_0"]
+        assert any((niveaux[0] / f).exists() for f in ("plan.png", "plan.jpg"))
+        assert (niveaux[0] / "masque_semantique.png").exists()
+
+
+def test_anciens_jeux_sans_ensemble(tmp_path):
+    bilan = generer_lot(Options(dossier=tmp_path, nombre=4, depart=60, reprise=False), processus=1)
+    assert not list((tmp_path / "exemples").glob("*-ensemble"))
+    assert "ensembles" not in bilan
+    for m in (tmp_path / "exemples").glob("*/manifeste.json"):
+        e = json.loads(m.read_text(encoding="utf-8"))
+        assert "compose" not in e and "parent" not in e
+    assert "ensembles" not in json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+
+
+def test_la_part_des_ensembles_ressemble_aux_vrais_plans():
+    tirages = [L.lot2_au_hasard(random.Random(k)) for k in range(4000)]
+    niveaux = sum(l.composition == "niveaux" for l in tirages) / 4000
+    deux = sum(l.composition == "deux_logements" for l in tirages) / 4000
+    assert 0.28 < niveaux < 0.38 and 0.015 < deux < 0.05
+
+
+# ---------------------------------------------------------------- chantier 3 : trait 10, la page vue à l'écran
+
+
+def _photo_ecran(graine: int, ecran: bool):
+    style = style_pour(graine, 0, Options(dossier=None, photo_realiste=True, vraie_camera=True, familles=["photo"]))
+    r = style.realisme
+    assert r is not None
+    r.table, r.teinte_table, r.ecran = "bois", (150, 105, 65), ecran
+    r.plis, r.ombre_main, r.reflet, r.flou_bord, r.bouge, r.bruit = "", 0.0, 0.0, 0.0, 0, 1.0
+    style.salissure = ""
+    log = generer(graine, Reglages())
+    return rendre(log, log.niveaux[0], style)
+
+
+def test_trait_10_realiste_sans_table():
+    # Ce qui entoure la page : texturé sur une table, presque uni à l'écran. Les masques ne voient aucune différence.
+    avec, sans = _photo_ecran(40002, True), _photo_ecran(40002, False)
+    for nom in MASQUES:
+        assert np.array_equal(avec.images[nom], sans.images[nom]), nom
+
+    def coins(rendu):
+        i = cv2.cvtColor(rendu.images["plan"], cv2.COLOR_RGB2GRAY).astype(np.float32)
+        return [i[:10, :10].std(), i[:10, -10:].std(), i[-10:, :10].std(), i[-10:, -10:].std()]
+    assert np.median(coins(avec)) < 6
+    assert np.median(coins(avec)) < np.median(coins(sans))
+
+
+def test_trait_10_le_tirage_passe_par_appliquer():
+    style = style_pour(40002, 0, Options(dossier=None, photo_realiste=True, vraie_camera=True, familles=["photo"]))
+    l = L.Lot2(ecran=True)
+    L.appliquer(style, l)
+    assert style.realisme.ecran is True
+    style2 = style_pour(40002, 0, Options(dossier=None, photo_realiste=True, vraie_camera=True, familles=["photo"]))
+    l2 = L.Lot2(ecran_si_photo=True)
+    L.appliquer(style2, l2)
+    assert style2.realisme.ecran is True and l2.ecran is True
+    style3 = _base()
+    l3 = L.Lot2(ecran_si_photo=True)
+    L.appliquer(style3, l3)
+    assert l3.ecran is False  # sans vraie photo, ce tirage-là ne vaut rien
+
+
+def test_trait_10_absent_du_json_sans_lui():
+    from moteur.generateur.photo import Realisme
+    assert "ecran" not in Realisme().en_dict()
+    assert Realisme(ecran=True).en_dict()["ecran"] is True
+    s = Style(realisme=Realisme())
+    assert "ecran" not in s.en_dict()["realisme"]
+    assert Style(realisme=Realisme(ecran=True)).en_dict()["realisme"]["ecran"] is True
+    # Le chemin de la vraie table n'a pas bougé pour les anciens jeux.
+    from moteur.generateur.photo import realisme_au_hasard
+    assert realisme_au_hasard(random.Random(1)).ecran is False
+
+
+def test_trait_10_bord_dans_les_marges_seulement():
+    h, w = 400, 600
+    image = np.full((h, w, 3), 240, np.uint8)
+    sem = np.zeros((h, w), np.uint8)
+    sem[60:340, 80:520] = 1
+    noir_vu = False
+    for k in range(30):
+        l = L.Lot2(ecran=True, ecran_bordure=True)
+        sortie = L.ecran_pixels(image, sem, l, random.Random(k))
+        assert sortie.shape == image.shape
+        assert sortie[60:340, 80:520].min() > 40  # jamais sur le logement
+        noir_vu = noir_vu or sortie.min() < 20
+    assert noir_vu
+
+
+def test_trait_10_sans_bord_aucun_noir():
+    image = np.full((400, 600, 3), 240, np.uint8)
+    sortie = L.ecran_pixels(image, np.ones((400, 600), np.uint8), L.Lot2(ecran=True), random.Random(4))
+    assert sortie.min() > 60
+
+
+def test_trait_10_masques_inchanges_et_page_grise():
+    l = L.Lot2(famille="neutre")
+    L._tirer_ecran_force(l, random.Random(5))
+    l.rotation, l.ecran_bordure = None, True
+    avec, reference, style, _ = _rendus(60002, l)
+    _verite_inchangee(avec, reference, _masques_du(style))
+    assert style.papier < 255 and style.salissure in ("grain", "telephone")
+    assert avec.images["plan"][avec.images["masque_semantique"] == CLASSES["sejour"]].mean() < 250  # un papier gris, pas un blanc de page propre
+
+
+def test_trait_10_penche_sous_la_page_sage():
+    l = L.Lot2(famille="neutre")
+    L._tirer_ecran_force(l, random.Random(1))
+    l.rotation = 3.0
+    style = _base()
+    L.appliquer(style, l)
+    assert style.rotation == 3.0  # la page sage retire la pente du style de base, pas celle de ce trait
+
+
+def test_trait_10_plan_et_plan_sans_mobilier_meme_ecran():
+    l = L.Lot2(famille="neutre", ecran=True, ecran_bordure=True)
+    style = _base(mobilier=True)
+    L.appliquer(style, l)
+    style.mobilier = True
+    log = generer(60002, Reglages())
+    rendu = rendre(log, log.niveaux[0], style)
+    # Le bord noir de l'écran est le même dans les deux images.
+    assert np.array_equal(rendu.images["plan"] < 20, rendu.images["plan_sans_mobilier"] < 20)
+
+
+def test_palier_ecrit_dans_le_vide(monkeypatch):
+    ecrits = []
+    vrai = R._Dessin.texte
+    monkeypatch.setattr(R._Dessin, "texte", lambda self, xy, texte, *a, **k: (ecrits.append((texte, xy)), vrai(self, xy, texte, *a, **k))[1])
+    log, log_b = generer(26, Reglages()), generer(60, Reglages())
+    style = _base()
+    L.appliquer(style, _lot_compose("deux_logements", "palier"))
+    style.noms = True
+    c = L.composer(log, log_b, "deux_logements", "palier", style, random.Random(1))
+    L.vers_ensemble(style, c)
+    style.lot2.palier["texte"] = "Palier"
+    rendu = rendre(c.log, c.log.niveaux[0], style, "ensemble")
+    x, y = next(xy for t, xy in ecrits if t == "Palier")
+    assert rendu.images["masque_semantique"][int(y), int(x)] == 0
+    assert np.any(rendu.images["plan"][int(y) - 8:int(y) + 8, int(x) - 8:int(x) + 8] < 200)  # il est bien dessiné
+
+
+def test_trait_10_famille_tiree():
+    tirages = [L.lot2_au_hasard(random.Random(k)) for k in range(2000)]
+    part = sum(l.ecran for l in tirages) / 2000
+    assert 0.03 < part < 0.09
+    assert not any(l.ecran and l.recadre for l in tirages)  # le bord de l'écran a besoin de marges
+
+
+# ---------------------------------------------------------------- chantier 3 : de bout en bout
+
+
+@pytest.mark.parametrize("compose,disposition", [("niveaux", "empiles"), ("deux_logements", "palier"), ("deux_logements", "mitoyen")])
+@pytest.mark.parametrize("options", [
+    {"styles_monde": True}, {"biais": True}, {"photo_realiste": True, "vraie_camera": True, "familles": ["photo"]}, {"sans_cotes": True},
+], ids=["monde", "biais", "photo", "sans_cotes"])
+def test_combinaisons_avec_composition(tmp_path, monkeypatch, compose, disposition, options):
+    vrai = L.lot2_au_hasard
+
+    def tirer(rng):
+        l = vrai(rng)
+        l.composition, l.disposition = compose, disposition
+        return l
+    monkeypatch.setattr(E, "lot2_au_hasard", tirer)
+    monkeypatch.setattr(E, "PLAIN_PIED_EMPILE", 1.0)
+    r = fabriquer_exemple(26, Options(dossier=tmp_path, lot2=True, reprise=False, **options), Reglages(), Regles.charger(None))
+    assert r.statut == "accepte", r.erreurs
+    d = tmp_path / "exemples" / "000026-ensemble"
+    assert valider_dossier(d, Regles.charger(None)).accepte
+
+
+def test_sans_cotes_gagne_aussi_sur_l_ensemble(monkeypatch):
+    ecrits = []
+    vrai = R._Dessin.texte
+    monkeypatch.setattr(R._Dessin, "texte", lambda self, xy, texte, *a, **k: (ecrits.append(texte), vrai(self, xy, texte, *a, **k))[1])
+    log, log_b = generer(26, Reglages()), generer(60, Reglages())
+    style = _base(surfaces=False, cotes=False, cotes_partielles=False)
+    L.appliquer(style, _lot_compose("deux_logements", "palier", famille="promoteur_gris"), sans_cotes=True)
+    c = L.composer(log, log_b, "deux_logements", "palier", style, random.Random(1))
+    L.vers_ensemble(style, c)
+    style.lot2.titres_place, style.lot2.titre_surface = "haut", True
+    rendre(c.log, c.log.niveaux[0], style, "ensemble")
+    assert ecrits
+    for texte in ecrits:
+        assert "m²" not in texte and not texte.replace(",", "").isdigit() or len(texte) <= 2, texte
+
+
+def test_version():
+    assert VERSION_GENERATEUR == "0.1.6"
+
+
+def test_lot_lot2(tmp_path):
+    # La contrainte de bout en bout : 0 rejeté, et chaque exemple comme chaque -ensemble passe le validateur.
+    bilan = generer_lot(Options(dossier=tmp_path, nombre=12, depart=1, lot2=True, variantes=1, diversite=3, reprise=False), processus=1)
+    assert bilan["statuts"]["rejete"] == 0 and bilan["statuts"]["echec"] <= 2
+    assert bilan["ensembles"]["rejetes"] == 0
+    dossiers = list((tmp_path / "exemples").glob("*/"))
+    assert any(d.name.endswith("-ensemble") for d in dossiers), "aucun exemple -ensemble sur ces graines"
+    for d in dossiers:
+        assert valider_dossier(d, Regles.charger(None)).accepte, d.name
+    manifeste = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifeste["ensembles"] == sum(d.name.endswith("-ensemble") for d in dossiers)
+    assert manifeste["acceptes"] == manifeste["nombre"]

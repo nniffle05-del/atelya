@@ -555,7 +555,10 @@ class _Dessin:
             if st.variete.symboles_neuf:
                 V.symboles_neuf(self, st.variete, random.Random(f"neuf-{self.log.graine}-{self.niv.index}"))
         if st.cotes and (st.lot2 is None or not st.lot2.sans_chaines):
-            self.cotes()
+            if st.lot2 is not None and st.lot2.blocs:
+                L.cotes_des_blocs(self)  # une chaîne par bloc : autour de l'image entière, elle mesurerait aussi le vide
+            else:
+                self.cotes()
         if st.echelle_graphique:
             self.echelle_graphique()
         if st.cartouche:
@@ -602,6 +605,10 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
     if style.lot2 is not None and style.lot2.teinte:
         for nom in [n for n in images if n.startswith("plan")]:
             images[nom] = L.teinter(images[nom], style.lot2.teinte)
+    if style.lot2 is not None and style.lot2.ecran and style.realisme is None:
+        # En dernier : le bord de l'écran reste noir. Même clé pour les deux images : plan et plan sans mobilier, même écran.
+        for nom in [n for n in images if n.startswith("plan")]:
+            images[nom] = L.ecran_pixels(images[nom], d.semantique, style.lot2, random.Random(f"lot2-pixels-{log.graine}-{niveau.index}-{graine_style}"))
     d.pieces_m[d.elements > 0] = 0
     images["masque_semantique"] = d.semantique
     images["masque_pieces"] = d.pieces_m

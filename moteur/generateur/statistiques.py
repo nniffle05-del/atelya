@@ -28,7 +28,9 @@ def _quantiles(valeurs: list[float]) -> dict:
 
 def calculer(dossier: Path) -> dict:
     manifeste = json.loads((dossier / "manifest.json").read_text(encoding="utf-8"))
-    ex = manifeste["exemples"]
+    # Un -ensemble remontre des pièces déjà comptées chez son parent : à part, sinon types et surfaces seraient comptés deux fois.
+    ensembles = [e for e in manifeste["exemples"] if "parent" in e]
+    ex = [e for e in manifeste["exemples"] if "parent" not in e]
     acceptes = [e for e in ex if e["accepte"]]
     pieces_par_type: dict = {}
     ouvertures_par_type: dict = {}
@@ -84,6 +86,12 @@ def calculer(dossier: Path) -> dict:
         "avertissements": dict(sorted(avert.items(), key=lambda kv: -kv[1])),
         "rejetes_ids": [e["id"] for e in ex if not e["accepte"]],
     }
+    if ensembles:
+        stats["ensembles"] = {"nombre": len(ensembles), "acceptes": sum(e["accepte"] for e in ensembles),
+                              "compose": _compter(e["compose"] for e in ensembles),
+                              "disposition": _compter(e["disposition"] for e in ensembles),
+                              "part_pct": round(100 * len(ensembles) / max(1, len(ex)), 1),
+                              "rejetes_ids": [e["id"] for e in ensembles if not e["accepte"]]}
     rep = dossier / "repartition.json"
     if rep.exists():
         r = json.loads(rep.read_text(encoding="utf-8"))
@@ -110,6 +118,8 @@ def resume(stats: dict) -> str:
         f"Motifs de rejet : {stats['motifs_de_rejet']}",
         f"Avertissements : {stats['avertissements']}",
     ]
+    if "ensembles" in stats:
+        lignes.append(f"Exemples -ensemble (en plus) : {stats['ensembles']}")
     if "repartition" in stats:
         lignes.append(f"Répartition : {stats['repartition']}")
     return "\n".join(lignes)

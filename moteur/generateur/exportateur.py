@@ -23,6 +23,10 @@ Organisation d'un jeu (`dossier/`) :
 Les variantes graphiques d'un même logement (option --variantes N) sont des sous-dossiers
 `niveau_0/variante_1/`… avec les mêmes fichiers : même géométrie, autre style. Elles restent dans
 la même partition que leur logement.
+
+Sous --lot2, un plan peut avoir un exemple sœur `000012-ensemble/` (traits 12 et 13) : plusieurs niveaux, ou deux logements, sur
+une seule image. Il a les mêmes fichiers qu'un exemple à un niveau, et son manifeste.json porte « parent » et « compose ». Il
+suit toujours son parent dans la répartition, et ne compte pas comme un logement de plus dans les statistiques.
 """
 
 from __future__ import annotations
@@ -43,7 +47,7 @@ from moteur.generateur import VERSION_GENERATEUR
 from moteur.generateur.annotations import NOMS_CLASSES, decrire
 from moteur.generateur.doublons import empreinte, signature
 from moteur.generateur.logements import LogementGenere, en_logement, generer
-from moteur.generateur.lot2 import appliquer as appliquer_lot2, lot2_au_hasard, resume as resume_lot2
+from moteur.generateur.lot2 import PLAIN_PIED_EMPILE, appliquer as appliquer_lot2, composer, lot2_au_hasard, resume as resume_lot2, vers_ensemble
 from moteur.generateur.reglages import Reglages
 from moteur.generateur.rendu import Rendu, rendre
 from moteur.generateur.validateur import Regles, Verdict, valider_dossier, valider_geometrie
@@ -167,6 +171,82 @@ def style_pour(graine: int, variante: int, opt: Options) -> Style:
     return style
 
 
+def second_logement(graine: int, opt: Options, reglages: Reglages, regles: Regles, rc: random.Random) -> LogementGenere | None:
+    """Le logement d'à côté (trait 13) ou de l'étage différent (trait 12), tiré au-delà de toute graine de jeu : il n'écrit
+    aucun exemple à lui et ne peut donc pas passer de l'entraînement au test. Plain-pied et valide, sinon on en tire un autre."""
+    for _ in range(5):
+        g = graine + 1_000_000 + rc.randrange(10**6)
+        try:
+            b = generer(g, reglages)
+        except RuntimeError:
+            continue
+        if b.duplex:
+            continue
+        if opt.biais:
+            from moteur.generateur.biais import couper_angles
+            couper_angles(b, random.Random(f"biais-{g}"))
+        if valider_geometrie(b, decrire(b), regles).accepte:
+            return b
+    return None
+
+
+def fabriquer_ensemble(log: LogementGenere, graine: int, ident: str, compose: str, disposition: str, opt: Options, reglages: Reglages,
+                       regles: Regles) -> dict:
+    """L'exemple sœur `{ident}-ensemble/`, et ce que le manifeste du parent doit en dire (rien si ce plan ne compose pas).
+
+    valider_geometrie n'est pas rejoué : deux portes d'entrée et des blocs non reliés sont justes ici. Chaque bloc l'a passé
+    seul ; reste valider_dossier, la cohérence des fichiers et des masques."""
+    debut = time.perf_counter()
+    rc = random.Random(f"lot2-compose-{graine}")
+    log_b = None
+    if compose == "deux_logements" and log.duplex:
+        compose, disposition = "niveaux", "empiles"  # l'escalier du duplex ne mènerait nulle part
+    if not log.duplex:
+        if compose == "niveaux" and rc.random() >= PLAIN_PIED_EMPILE:
+            return {}
+        log_b = second_logement(graine, opt, reglages, regles, rc)
+        if log_b is None:
+            return {"compose": False, "compose_motif": "second logement refusé"}
+    style = style_pour(graine, 0, opt)  # refait : le Repere d'une vraie caméra a écrit dans celui du plan
+    c = composer(log, log_b, compose, disposition, style, rc)
+    if max(len(c.log.pieces), len(c.log.murs) + len(c.log.ouvertures) + len(c.log.niveaux[0].murs_libres)) > 255:
+        return {"compose": False, "compose_motif": "trop d'éléments pour un masque sur 8 bits"}
+    vers_ensemble(style, c)
+    niveau = c.log.niveaux[0]
+    id_ensemble = f"{ident}-ensemble"
+    dossier = opt.dossier / "exemples" / id_ensemble
+    dossier.mkdir(parents=True, exist_ok=True)
+    geometrie = decrire(c.log)
+    n0 = geometrie["niveaux"][0]
+    # L'emprise compte les blocs, pas le vide entre eux. Ces champs servent de contrôle, autant qu'ils restent vrais.
+    emprise = sum(abs(sum(a[0] * b[1] - a[1] * b[0] for a, b in zip(q["coins"], q["coins"][1:] + q["coins"][:1]))) / 2 for q in c.blocs) / 1e6
+    n0["surfaces"]["emprise_interieure"] = round(emprise, 2)
+    n0["surfaces"]["cloisons"] = round(emprise - n0["surfaces"]["habitable"], 2)
+    geometrie |= {"identifiant": f"SYNTHESE-{graine:06d}-ensemble", "parent": ident, "compose": c.compose, "disposition": c.disposition,
+                  "blocs": [{"titre": b["titre"], "cadre": [v / 1000 for v in b["cadre"]], "pieces": b["pieces"], "surface": b["surface"],
+                             "contour_interieur": [[v / 1000 for v in q] for q in b["coins"]]} for b in c.blocs]}
+    ecrire_json(dossier / "geometrie.json", geometrie)
+    ecrire_json(dossier / "logement_niveau0.json", en_logement(c.log, niveau) | {"projet_id": f"SYNTHESE-{graine:06d}-ensemble"})
+    rendu = rendre(c.log, niveau, style, graine_style="ensemble")
+    fichiers = ["geometrie.json", "logement_niveau0.json"] + ecrire_rendu(dossier / "niveau_0", rendu, opt.masques_par_classe)
+    verdict = valider_dossier(dossier, regles, Verdict())
+    ecrire_json(dossier / "validation.json", verdict.en_dict())
+    entree = {
+        "id": id_ensemble, "graine": graine, "parent": ident, "compose": c.compose, "disposition": c.disposition,
+        "type": c.log.type, "forme": c.log.forme, "duplex": False, "famille": c.log.famille, "surface": c.log.surface,
+        "nombre_pieces": len(c.log.pieces), "nombre_niveaux": 1, "nombre_murs": len(c.log.murs),
+        "nombre_ouvertures": len(c.log.ouvertures), "style": style.famille, "variantes": 0,
+        "empreinte": empreinte(c.log), "signature": signature(c.log, geometrie).en_dict(), "fichiers": fichiers,
+        "octets": sum(f.stat().st_size for f in dossier.rglob("*") if f.is_file()), "version_generateur": VERSION_GENERATEUR,
+        "accepte": verdict.accepte, "erreurs": verdict.erreurs, "avertissements": verdict.avertissements, "modele_3d": None,
+        "essais": c.log.essais, "lot2": resume_lot2(style.lot2), "duree_s": round(time.perf_counter() - debut, 3),
+    }
+    ecrire_json(dossier / "manifeste.json", entree)
+    if not verdict.accepte:
+        journal.warning("exemple %s rejeté après écriture : %s", id_ensemble, " ; ".join(verdict.erreurs[:3]))
+    return {"compose": c.compose, "ensemble": id_ensemble, "ensemble_accepte": verdict.accepte}
+
+
 def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Regles) -> Resultat:
     """Tout ce qu'il faut pour une graine : géométrie, validation, images, masques, 3D, fichiers."""
     debut = time.perf_counter()
@@ -230,6 +310,11 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
     verdict = valider_dossier(dossier, regles, verdict)
     ecrire_json(dossier / "validation.json", verdict.en_dict())
     taille = sum(f.stat().st_size for f in dossier.rglob("*") if f.is_file())
+    duree = time.perf_counter() - debut  # sans l'ensemble : il a sa propre durée, les statistiques ne doivent pas la compter deux fois
+    compose = {}
+    if style_lot2 is not None and style_lot2.composition and verdict.accepte:
+        # Avant manifeste.json : c'est lui qui marque un exemple comme fini, une reprise après coupure refera donc les deux.
+        compose = fabriquer_ensemble(log, graine, ident, style_lot2.composition, style_lot2.disposition, opt, reglages, regles)
     entree = {
         "id": ident, "graine": graine, "type": log.type, "forme": log.forme, "duplex": log.duplex,
         "famille": log.famille, "surface": log.surface, "nombre_pieces": len(log.pieces),
@@ -239,7 +324,7 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
         "fichiers": fichiers, "octets": taille, "version_generateur": VERSION_GENERATEUR,
         "accepte": verdict.accepte, "erreurs": verdict.erreurs, "avertissements": verdict.avertissements,
         "modele_3d": bilan_3d, "essais": log.essais, **({"biais": biais_faits} if opt.biais else {}),
-        **({"lot2": resume_lot2(style_lot2)} if style_lot2 is not None else {}), "duree_s": round(time.perf_counter() - debut, 3),
+        **({"lot2": resume_lot2(style_lot2)} if style_lot2 is not None else {}), **compose, "duree_s": round(duree, 3),
     }
     ecrire_json(dossier / "manifeste.json", entree)
     statut = "accepte" if verdict.accepte else "rejete"
@@ -295,6 +380,13 @@ def generer_lot(opt: Options, processus: int = 1) -> dict:
         "octets_par_exemple": manifeste["octets_par_exemple"],
         "secondes_par_graine": round(duree / max(1, len(graines)), 3),
     }
+    if opt.lot2:  # sinon le bilan des anciens jeux ne change pas
+        entrees = [r.entree_manifeste for r in resultats if r.entree_manifeste]
+        bilan["ensembles"] = {
+            "acceptes": sum(e.get("ensemble_accepte") is True for e in entrees),
+            "rejetes": sum(e.get("ensemble_accepte") is False for e in entrees),
+            "refuses": sum(e.get("compose") is False for e in entrees),
+        }
     journal.info("fin du lot : %s", json.dumps(bilan, ensure_ascii=False))
     return bilan
 
@@ -320,6 +412,8 @@ def ecrire_manifeste(dossier: Path) -> dict:
         "octets_total": octets, "octets_par_exemple": round(octets / len(entrees)) if entrees else 0,
         "exemples": [{k: v for k, v in e.items() if k != "signature"} for e in entrees],
     }
+    if any("parent" in e for e in entrees):
+        manifeste["ensembles"] = sum("parent" in e for e in entrees)
     ecrire_json(dossier / "manifest.json", manifeste)
     return manifeste
 
@@ -361,10 +455,14 @@ def repartir(dossier: Path, parts: tuple[float, float, float] = (0.8, 0.1, 0.1),
     par famille géométrique : chaque famille est présente dans chaque partition quand elle compte
     assez d'exemples. Les paires « trop semblables » entre train et test sont signalées dans le
     rapport, et le membre côté test est déplacé en train pour que le test mesure la généralisation.
+
+    Un exemple `-ensemble` montre les pièces de son parent : il le suit dans sa partition, à la fin, après les déplacements.
+    Il n'entre ni dans les groupes ni dans la recherche de ressemblances : ce n'est pas un logement de plus.
     """
     from moteur.generateur.doublons import SEUIL_RESSEMBLANCE, chercher
     manifeste = json.loads((dossier / "manifest.json").read_text(encoding="utf-8"))
-    exemples = [e for e in manifeste["exemples"] if e["accepte"]]
+    exemples = [e for e in manifeste["exemples"] if e["accepte"] and "parent" not in e]
+    ensembles = [e for e in manifeste["exemples"] if e["accepte"] and "parent" in e]
     entrees = []
     for e in exemples:
         m = json.loads((dossier / "exemples" / e["id"] / "manifeste.json").read_text(encoding="utf-8"))
@@ -399,6 +497,9 @@ def repartir(dossier: Path, parts: tuple[float, float, float] = (0.8, 0.1, 0.1),
             if affectation[cible] != "train":
                 affectation[cible] = "train"
                 deplaces.append(cible)
+    for e in ensembles:
+        if e["parent"] in affectation:  # sinon son parent a été rejeté : il reste hors du jeu avec lui
+            affectation[e["id"]] = affectation[e["parent"]]
     comptes = {p: sum(v == p for v in affectation.values()) for p in ("train", "validation", "test")}
     resultat = {
         "schema": "repartition/1.0", "graine": graine, "parts": list(parts), "comptes": comptes,

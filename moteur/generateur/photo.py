@@ -38,9 +38,13 @@ class Realisme:
     bouge: int = 0  # longueur du bougé en pixels (0 : aucun)
     bruit: float = 3.0  # bruit du capteur (écart-type)
     lumiere: tuple[float, float, float] = (1.0, 1.0, 1.0)  # multiplicateurs R, G, B (ampoule, jour, néon)
+    ecran: bool = False  # lot 2, trait 10 : la page vue à l'écran, sans table ; realisme_au_hasard n'y touche jamais
 
     def en_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if not d["ecran"]:  # sans le lot 2, annotations.json reste identique à l'octet près
+            del d["ecran"]
+        return d
 
 
 def realisme_au_hasard(rng: random.Random) -> Realisme:
@@ -104,6 +108,27 @@ def table(h: int, w: int, r: Realisme, rng: random.Random, nrng: np.random.Gener
     return img + nrng.normal(0, 2.5, img.shape).astype(np.float32)
 
 
+def fond_ecran(h: int, w: int, rng: random.Random, nrng: np.random.Generator) -> np.ndarray:
+    """Ce qui entoure la page vue à l'écran (lot 2, trait 10) : un aplat sombre ou clair, sa trame de pixels, et le bord noir de
+    l'écran sur 1 à 4 côtés. La page se pose dessus : le bord ne recouvre donc jamais le plan."""
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    g = rng.randint(235, 250) if rng.random() < 0.5 else rng.randint(18, 45)
+    pas = rng.uniform(2.5, 4.0)
+    trame = 1 + 0.012 * np.sin(xx * 2 * np.pi / pas) * np.sin(yy * 2 * np.pi / pas)
+    img = np.repeat((g * trame)[:, :, None], 3, axis=2)
+    for cote in rng.sample((0, 1, 2, 3), rng.randint(1, 4)):
+        e = int(rng.uniform(0.02, 0.06) * (h if cote < 2 else w))
+        if cote == 0:
+            img[:e] = 4
+        elif cote == 1:
+            img[h - e:] = 4
+        elif cote == 2:
+            img[:, :e] = 4
+        else:
+            img[:, w - e:] = 4
+    return img + nrng.normal(0, 1.0, img.shape).astype(np.float32)
+
+
 def plis_a_plat(h: int, w: int, r: Realisme, rng: random.Random, nrng: np.random.Generator) -> np.ndarray | None:
     """La lumière (autour de 1) des plis du papier, dessinée sur la page à plat. None : feuille lisse."""
     if not r.plis:
@@ -144,8 +169,10 @@ def composer(image: np.ndarray, page: np.ndarray, plis: np.ndarray | None, r: Re
     img = image.astype(np.float32)
     if plis is not None:
         img = img * plis[:, :, None]
-    fond = table(h, w, r, rng, nrng)
+    fond = fond_ecran(h, w, rng, nrng) if r.ecran else table(h, w, r, rng, nrng)
     dx, dy, force = r.ombre_feuille
+    if r.ecran:
+        force = 0.0  # une image à l'écran ne porte pas d'ombre
     decale = cv2.warpAffine(page, np.float32([[1, 0, dx * w], [0, 1, dy * h]]), (w, h))
     ombre = cv2.GaussianBlur(decale, (0, 0), max(2.0, 0.008 * max(h, w)))
     fond = fond * (1 - force * ombre)[:, :, None]
