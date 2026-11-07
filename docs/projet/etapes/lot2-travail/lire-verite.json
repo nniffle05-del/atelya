@@ -1,0 +1,229 @@
+{
+ "resume": "Carte du générateur (racine du dépôt : D:\\Modélisation immobilière\\atelya-code, branche etape-vrais-plans-105, VERSION_GENERATEUR = 0.1.5 ; rien n'a été écrit).\n\nCHAÎNE D'UN EXEMPLE : exportateur.fabriquer_exemple → logements.generer(graine) (géométrie en mm, une seule graine) → [biais.couper_angles si --biais, rng « biais-{graine} »] → annotations.decrire (geometrie.json, vérité en mètres) → validateur.valider_geometrie → pour chaque niveau et variante : exportateur.style_pour (Style tiré par rng « style-{graine+graine_styles}-{variante} », puis options à hasard séparé) → rendu.rendre(log, niveau, style) → exportateur.ecrire_rendu (plan.png, ou plan.jpg q92 si style.salissure ; masques toujours PNG ; annotations.json = polygones px + style.en_dict()) → validateur.valider_dossier (relit et compare masques ↔ polygones).\n\nRENDU (rendu.py) : un Repere unique mm → pixels (affinité A « à plat » avec les marges du style, puis homographie W rotation/perspective/vraie caméra ; H = W·A). L'image RGB est dessinée À PLAT par Pillow (_Dessin.d = ImageDraw) puis déformée (warpPerspective INTER_LINEAR) ; les 4 masques (semantique uint8 classes 0-15, pieces_m, elements, hauteur uint16) sont remplis DIRECTEMENT dans le repère FINAL par remplir_masque → rasteriser(rep.final(polygone)), la même fonction rasteriser que le validateur. Ordre de _Dessin.tout() : pieces() [aplats colorés, sols lot 1, masques pièces, meubles] → murs() [aplat ou V.mur, masques mur, murs libres A3, ouvertures remplies de fond + masques classes 2/3/4, contour_des_murs, symboles d'ouvertures] → noms() [nom + surface « 12,50 m² »] → lettres/symboles_neuf (lot 1) → cotes() [chaînes à RECUL_COTE = 60 px hors du cadre des murs] → echelle_graphique() → cartouche() [marge de droite, flèche du nord] → titre(). Puis rendre() : salir() (contraste, papier, photocopie/taches/grain/bruit/téléphone, JPEG) sur l'image déformée, photo réaliste (_feuille), V.capture (post-traitement pixels, dans les marges), puis pieces_m[elements > 0] = 0 et contours = gradient des classes 1-4.\n\nMASQUES : CLASSES (annotations.py 35-44) : 0 fond, 1 mur, 2 porte, 3 fenêtre, 4 porte-fenêtre, 5-15 pièces (sejour/principale 5, cuisine 6, chambre 7, sdb/sde 8, wc 9, entree 10, degagement 11, placard 12, buanderie 13, bureau 14, escalier 15). Tout ce qui est écrit/dessiné hors de remplir_masque est du fond ou reste sous la classe de la pièce : c'est exactement ce que fait le lot 1 (sols, lettres, cercle PMR, filigrane ne touchent que d.image / d.d). Le validateur (valider_dossier) exige : fichiers présents, mêmes dimensions que annotations.image, pixels de chaque pièce ≈ polygone retramé sans murs (6 %), classe sémantique au centre de gravité de chaque pièce, pixels d'ouverture ≈ polygone (±max(12 px, 15 %)), aire des murs ≈ union des polygones moins ouvertures (6 %). Donc : aucun trait de style ne doit changer la taille de l'image ni écrire dans un masque.\n\nCE QU'IL FAUT CRÉER POUR LE LOT 2 (même recette que variete.py) : un module moteur/generateur/lot2.py avec une dataclass Lot2 (tirages JSON-sérialisables) et lot2_au_hasard(rng, style) ; un champ Style.lot2: Lot2 | None = None ; Options.lot2 + --lot2 ; dans style_pour, après le bloc styles_monde et avant --resolution : r = random.Random(f\"lot2-{graine + opt.graine_styles}-{variante}\") ; des fonctions de dessin appelées depuis _Dessin seulement si st.lot2 is not None ; des post-traitements pixels dans rendre() à côté de V.capture ; plan_pdf.style_a_plat remis à lot2=None ; VERSION 0.1.6 ; tests/test_lot2.py sur le modèle de test_styles_monde + test_photo_realiste ; planche écrite avec ecrire_image dans ..\\atelya\\planches\\lot2-exemples.jpg (comparée aux 78 plans d'entraînement cités par le catalogue, jamais aux 40 d'examen).\n\nTRAITS DU CATALOGUE → POINT D'ENTRÉE (résumé ; détail dans points_de_branchement) : 1 agence colorée foncée → style_pour (couleurs murs/fond, pieces_colorees avec une palette LOT 2 à part, mobilier=False, surfaces) + rendu.pieces/murs ; 2 dimensions « 3,05 m × 2,85 m » et étiquette encadrée → rendu.noms ; 3 promoteur gris (cotes cm intérieures, cercles PMR [existe : V.symboles_neuf], sols hachurés [existe : V.sol], mobilier trait fin [existe], n° de lot, abréviations Rgt/Dgt/SdB à l'affichage) → noms/titre + nouvelle méthode cotes_interieures ; 4 murs noirs épais + « (12,2 m²) » gris [parentheses existe] + balcons hors logement → noms + Repere marges + nouvelle méthode exterieurs ; 5 légende/tableau de surfaces → nouvelle méthode dans la marge (modèle : cartouche) + élargissement des marges dans Repere ; 6 logiciel grand public (fond crème, murs gris moyen, cotes grises le long de chaque mur, étiquettes tournées, extérieurs verts) → style_pour + nouvelle méthode cotes_par_mur + texte(vertical=True) ; 7 texte à 90° → noms avec texte(vertical=True) (existe, PDF compris) ; 8 fenêtres en rectangles cyan → murs() ligne 308 (remplissage de l'ouverture) ou ouverture() ; 9 scan bleuté/pâle → teinte APRÈS salir dans rendre + salissure/papier ; 10 photo d'une page vue à l'écran → post-traitement pixels dans rendre (modèle : V.capture ; bordure d'écran dans les marges, pas de table) ; 11 manuscrit → police (téléchargement = accord NT) ou simulation lettre par lettre ; 12 plusieurs niveaux sur une image et 13 deux logements → hors du cadre « un niveau = un dossier » : rendu composite à concevoir (voir pièges), à faire en dernier ; 14 pastilles numérotées + légende → noms + marge ; 15 placards fléchés → noms (étiquette hors pièce + trait) ; 16 cotes rouges + « Échelle : 1/50e » → chaine() (couleur) + texte en marge ; 17 colimaçon / flèche « ACCES ETAGE » → rendu.meuble (forme marches : traits spiralés à la place de details, hauteur inchangée) ; 18 terrasse/jardin → marges (fond) ; 19 HSP/sol sous le nom → noms (3e ligne) ; 20 recadrage serré → style.marges réduites dans style_pour (jamais un découpage de l'image finale).",
+ "points_de_branchement": [
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/__init__.py",
+   "fonction": "VERSION_GENERATEUR",
+   "lignes": "24",
+   "role": "Passer « 0.1.5 » → « 0.1.6 » (recopiée dans geometrie.json, manifest.json, reglages.json ; test_description_versionnee et test_lot_ecrit_et_valide la relisent)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/exportateur.py",
+   "fonction": "Options (dataclass)",
+   "lignes": "56-82",
+   "role": "Ajouter `lot2: bool = False` après `biais` (82). Passe automatiquement dans reglages.json via _options_json (332-337)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/exportateur.py",
+   "fonction": "style_pour",
+   "lignes": "132-161",
+   "role": "LE point d'entrée du tirage : le Style vient de style_au_hasard(rng « style-{graine+graine_styles}-{variante} ») (133-135) ; chaque option ensuite tire son propre Random (« camera- » 136-149, « realisme- » 150-152, « monde- » 153-157). Insérer le bloc `if opt.lot2:` entre 157 et 158 (avant --resolution, 158-160, qui écrase px_par_m/taille_texte) : `r = random.Random(f\"lot2-{graine + opt.graine_styles}-{variante}\")`, `style.lot2 = lot2_au_hasard(r, style)`, puis les couleurs/réglages de page (modèle : appliquer_couleurs). C'est ici qu'on force pieces_colorees + palette lot 2, murs bleu nuit, mobilier False, fond crème, marges serrées (trait 20), salissure pour un scan ancien."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/exportateur.py",
+   "fonction": "fabriquer_exemple",
+   "lignes": "164-239",
+   "role": "Boucle niveaux × variantes (204-213) : un rendre() par niveau, écrit dans niveau_{index}/ (variante_{k}/ sinon). Entrée du manifeste (225-234) : ajouter `\"lot2\": …` comme `biais` (233). C'est après cette boucle qu'un éventuel rendu composite « plusieurs niveaux sur une image » (traits 12/13) devrait écrire son dossier à part."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/exportateur.py",
+   "fonction": "ecrire_rendu",
+   "lignes": "105-129",
+   "role": "plan.jpg (qualité 92) seulement si `style.salissure` est non vide (110-114), sinon plan.png ; masques toujours PNG ; annotations.json. Un « scan ancien » du lot 2 doit donc poser une salissure pour sortir en JPEG comme un vrai scan."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/__main__.py",
+   "fonction": "_options / _ajouter_options_generation",
+   "lignes": "34-44 et 47-74",
+   "role": "Ajouter `lot2=args.lot2` (43) et `p.add_argument(\"--lot2\", action=\"store_true\", help=…)` à côté de --styles-monde / --biais (63-66) ; exemple dans la docstring (13-21)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/variantes.py",
+   "fonction": "Style (dataclass)",
+   "lignes": "53-99",
+   "role": "Ajouter `lot2: Lot2 | None = None` après `realisme` (96). en_dict() = asdict → recopié dans annotations.json[\"style\"] et comparé par plan_pdf._meme_plan : la dataclass Lot2 doit rester JSON-sérialisable (tuples, str, float, bool ; pas de numpy, pas de set). Champs existants réutilisables : fond, murs, murs_contour, traits, textes, pieces_colorees, palette, mobilier, cotes, surfaces, marges, salissure, papier, contraste."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/variantes.py",
+   "fonction": "FAMILLES, POLICES, PALETTES, style_au_hasard",
+   "lignes": "30-50 et 106-205",
+   "role": "À NE PAS MODIFIER : style_au_hasard tire dans ces listes avec le rng partagé (rng.choice(POLICES) 117, rng.choice(list(PALETTES)) 134/147/194, rng.choices(poids) 115) ; une entrée de plus change les tirages de toutes les anciennes graines. Nouvelles palettes/polices du lot 2 dans des tables à part (ex. PALETTES_LOT2 dans lot2.py), consultées seulement si style.lot2."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/variantes.py",
+   "fonction": "salir",
+   "lignes": "211-243",
+   "role": "Pixels seulement, après déformation : papier (218-219), contraste (220-221), photo réaliste (223-225), photocopie/taches passent par le GRIS (227-232 : détruisent toute couleur), grain/bruit (233-236), téléphone (237-240), JPEG final (241-242). Un scan bleuté (trait 9) ou des cotes rouges + photocopie se contredisent : teinter APRÈS salir (dans rendre) ou ajouter une branche gardée par style.lot2."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/variete.py",
+   "fonction": "Variete, variete_au_hasard, appliquer_couleurs",
+   "lignes": "39-59, 67-93, 96-115",
+   "role": "Le MODÈLE à copier pour lot2.py : dataclass de tirages enregistrée dans le style, tirage sur un Random à part, couleurs de page appliquées au Style. Ne pas changer la consommation du rng « monde- » (test_tirages_varies fige les ensembles tirés ; les jeux monde-6-19 dépendent de l'ordre des tirages)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/variete.py",
+   "fonction": "sol, mur, lettres, symboles_neuf, arc_pointille, capture",
+   "lignes": "121-159, 162-187, 190-201, 204-221, 229-235, 238-272",
+   "role": "Briques réutilisables telles quelles ou à copier : sol = motif collé par d.image.paste avec un calque limité au polygone de la pièce (pour sols hachurés de promoteur, terrasses à lattes) ; lettres = texte posé en recul dans chaque pièce (modèle pour pastilles, HSP, étiquettes) ; symboles_neuf = étiquette encadrée (rectangle outline + texte, 212-216) et CERCLE PMR en pointillé (217-221 : déjà le trait 3) ; capture = post-traitement pixels qui lit `semantique` pour rester dans les marges (modèle du trait 10 « page vue à l'écran » et des bandeaux)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "Repere.__init__",
+   "lignes": "95-150",
+   "role": "Marges du style (97) élargies pour le cartouche (98-99) et la barre d'échelle (100-101) : même mécanisme pour un tableau de surfaces (trait 5), des balcons/terrasses/jardin hors logement (4, 18), des titres de niveaux (12) : élargir bas/droite seulement si style.lot2. Taille à plat (103-104), A (106-108), rotation (111-116), vraie caméra (117-140), perspective au hasard via `rng.uniform` (142-144 : ce rng « rendu-… » ne doit rien tirer d'autre), identite (149), H (150). Trait 20 (recadrage serré) = marges réduites dans le Style, pas un découpage."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.__init__ / px / poly_px / remplir_masque / ligne / texte",
+   "lignes": "177-226",
+   "role": "Outils du dessin : image Pillow à plat (182-183), masques dans le repère final (186-189), épaisseurs fin/moyen en px (190-191), ids des masques (192-197). remplir_masque (210-211) = la SEULE porte vers les masques : un trait de lot 2 ne l'appelle jamais. texte(..., vertical=True) (216-226) écrit un texte tourné de 90° par vignette collée : sert aux cotes verticales et au trait 7 ; plan_pdf._DessinPdf.texte le gère aussi."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.pieces",
+   "lignes": "230-245",
+   "role": "Aplat de la pièce (234-235, palette PALETTES[style.palette] : brancher ici une palette lot 2 si style.lot2), sol lot 1 (236-238), masques (239-240), puis meubles (243-245). Les sols se dessinent AVANT les murs, qui les recouvrent. Le `continue` 241-242 est sans effet (après les masques) : ne pas y toucher."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.meuble / _marches",
+   "lignes": "247-288",
+   "role": "Meubles en contour couleur style.traits, épaisseur self.fin (déjà « trait fin ») ; hauteur dans la carte de hauteur. Trait 1 (mobilier couleur + ombre légère) et trait 17 (escalier en colimaçon, flèche « ACCES ETAGE ») se branchent ici : garder la hauteur (_marches) et ne changer que les traits dessinés (m.details) quand m.forme == \"marches\"."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.murs / mur_libre / contour_des_murs",
+   "lignes": "291-343",
+   "role": "Aplat des murs (296-299 : V.mur si variete, sinon polygon fill=st.murs → un mur bleu nuit = couleur du Style, l'épaisseur vient de la GÉOMÉTRIE, 15-40 cm × px/m, à ne pas changer), masques mur (300-302), murs libres A3 (303-304, 317-334), ouvertures remplies de st.fond (305-311 : trait 8 « fenêtre cyan » = remplir ici en cyan quand o.type != porte, ou dans ouverture()), contour_des_murs (312-313, 336-343 : défaut connu, contour calculé sur le masque FINAL et dessiné À PLAT → double contour sur plans penchés ; ne pas le corriger hors option, cela changerait les anciens jeux), symboles d'ouvertures (314-315)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.ouverture / arc",
+   "lignes": "345-402",
+   "role": "Fenêtre = 3 traits + 2 bouts (355-363), porte-fenêtre/baie (364-369), portes avec battant et arc (374-386, arc pointillé lot 1 399-401). Trait 8 : rectangle cyan plein à la place des traits de la fenêtre (le masque reste classe 3/4, posé dans murs())."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.noms",
+   "lignes": "406-429",
+   "role": "Nom + surface « 12,50 m² » au centre de la pièce, couleur/majuscules/parenthèses du lot 1 (408-418), réduction de la taille pour tenir (419-421), surface en gris plus clair (424-425). Point d'entrée des traits 2 (dimensions « 3,05 m × 2,85 m », étiquette blanche encadrée — dans la pièce seulement), 3 (abréviations Rgt/Dgt/SdB appliquées à l'affichage, jamais dans logements.NOMS), 4 (parenthèses gris), 7 (texte vertical si la pièce est étroite : r.largeur*rep.s petit), 14 (pastilles ①②③ + légende en marge), 15 (étiquette hors pièce reliée par un trait), 19 (3e ligne « hsp : 2,50 » / « sol carrelage »)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.cotes / chaine",
+   "lignes": "431-470",
+   "role": "Chaînes de cotes hors du logement à RECUL_COTE = 60 px (haut + gauche toujours, bas + droite si cotes_partielles), texte _fr(m) (virgule), vertical pour les chaînes verticales. Trait 16 (cotes rouges) = couleur des traits/textes de chaine() tirée du lot 2 ; traits 3 et 6 (cotes en cm entiers à l'intérieur des pièces, petites cotes grises le long de CHAQUE mur) = nouvelles méthodes voisines (cotes_interieures / cotes_par_mur) appelées depuis tout(). Un plan ne doit pas mélanger cotes en cm et en m (le lecteur n'admet les entiers que sans cote « d,dd »)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.cartouche / titre / echelle_graphique",
+   "lignes": "472-507",
+   "role": "Modèles de texte en marge : cartouche à droite (x = px(xmax) + RECUL_COTE + 60, lignes espacées de 1,5 taille, flèche du nord 487-490 → rose des vents du trait 1), titre en haut à gauche (492-496 → n° de lot « T3 G206 60.44 m² » du trait 3), barre d'échelle (498-507). Le tableau/légende de surfaces (trait 5) et « Échelle : 1/50e » (trait 16) s'écrivent de la même façon, avec les marges élargies dans Repere."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_Dessin.tout",
+   "lignes": "509-527",
+   "role": "L'ORDRE de dessin : pieces → murs → noms → lettres/symboles lot 1 (hasard « neuf-{graine}-{niveau} » recréé ici, 519) → cotes → échelle → cartouche → titre. Insérer les appels lot 2 au bon rang (sols dans pieces ; étiquettes/dimensions/pastilles après noms ; balcons, tableau, titres de niveau après cotes) avec un `random.Random(f\"lot2-dessin-{graine}-{niveau}-…\")` recréé dans tout() : le même _Dessin est rejoué pour plan_sans_mobilier (548-549) et doit redonner les mêmes traits."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "rendre",
+   "lignes": "530-567",
+   "role": "Repere (534), meubles (535-540), dessin (541-542), déformation + salir (545-546, rng « salissure-… »), plan_sans_mobilier (547-552), post-traitement pixels V.capture (555-558, rng « capture-… », appliqué à toutes les images « plan* ») : c'est l'endroit des post-traitements du lot 2 (teinte bleutée du trait 9, bordure d'écran du trait 10), toujours sur l'image finale, sans changer sa taille, hors du logement (semantique > 0). Masques assemblés 559-566 : ne pas y toucher."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/rendu.py",
+   "fonction": "_annotations_pixels",
+   "lignes": "589-644",
+   "role": "Polygones en px via rep.final (arrondis au centième, comme rasteriser), matrice m → px, `\"style\": style.en_dict()` (640 : le nouveau champ lot2 y apparaîtra, `null` sans option). Rien à changer sauf pour un rendu composite (ids, niveaux)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/annotations.py",
+   "fonction": "CLASSES / NOMS_CLASSES ; rasteriser / _retrait ; decrire_niveau",
+   "lignes": "35-44 ; 296-344 ; 185-246",
+   "role": "Classes des masques : ne pas en ajouter (balcon/terrasse/jardin/tableau/cotes/cercles = fond 0 ; colimaçon = pièce escalier 15). rasteriser = tramage commun rendu/validateur (centre du pixel dans le polygone, rentré d'un demi-pixel) : intouchable. decrire_niveau = vérité en mètres, indépendante du style."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/validateur.py",
+   "fonction": "valider_dossier (et Regles)",
+   "lignes": "225-303 (33-47)",
+   "role": "Ce que « valider » exige par niveau_{index} : annotations.json + 5 masques + plan (241-251), mêmes dimensions que annotations.image (262-265), hauteur en uint16 (266-267), pixels de chaque pièce ≈ polygone sans murs à 6 % (273-277), classe au centre de gravité (279-286, escalier d'étage toléré), ouvertures ±max(12 px, 15 %) (287-292), murs ≈ union des polygones à 6 % (293-303). Un trait de lot 2 ne peut donc ni changer la taille de l'image, ni recouvrir le masque, ni déplacer un pixel du bâti. Un dossier hors niveau_{index} est ignoré."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/logements.py",
+   "fonction": "NOMS ; Piece ; MurLibre ; Niveau ; contour_piece ; en_logement",
+   "lignes": "214-229 ; 60-70 ; 94-108 ; 127-148 ; 151-156 ; 1054-1093",
+   "role": "NOMS est tiré par Fabricant.nom avec le rng de la géométrie : y ajouter « Rgt », « SdB »… changerait les logements de toutes les graines → abréviations à l'affichage seulement. Piece.contour (A3) ≠ None pour un angle coupé : toujours passer par contour_piece(p) et p.rect pour les étiquettes ; Piece.interdits = coin coupé (rien à poser). Niveau.murs_libres = murs en biais/arrondis (polygone exact). en_logement = logement.json de chaque niveau (vérité pour la 3D), hors style."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/mobilier.py",
+   "fonction": "meubler_niveau / _escalier",
+   "lignes": "211-214 / 187-208",
+   "role": "Meubles tirés sur rng « mobilier-{graine}-{niveau} » (ne pas y toucher) ; l'escalier est toujours dessiné (forme « marches », traits tous les ~25 cm, hauteur progressive). Trait 17 : dessiner autrement dans rendu.meuble (spirale, flèche), sans changer le Meuble ni la hauteur."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/plan_pdf.py",
+   "fonction": "style_a_plat ; _Enregistreur ; _DessinPdf.texte ; _meme_plan",
+   "lignes": "129-132 ; 51-107 ; 118-126 ; 299-310",
+   "role": "style_a_plat remet le style « propre » par replace(...) champ par champ (variete=None, realisme=None) : AJOUTER lot2=None, sinon le jeu PDF changerait avec --lot2 et les traits collés par image.paste n'entreraient pas dans le PDF sans être comptés comme « oubli ». _Enregistreur ne recopie que line/polygon/rectangle/ellipse/arc/text ; tout autre appel à d.d.* est noté dans « ordres_non_recopies » (test_chaque_sorte_est_bien_triee exige []). _meme_plan ne compare que les clés du style enregistré : une clé « lot2 » en plus dans le style refait ne casse pas les anciens jeux."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/moteur/generateur/controle_qualite.py",
+   "fonction": "planche / _superposer / planches",
+   "lignes": "74-93 / 49-60 / 96-110",
+   "role": "Planche existante (plan, annotations superposées, masque coloré, pièces, hauteur) et écriture JPEG par ecrire_image : à réutiliser pour ..\\atelya\\planches\\lot2-exemples.jpg (un rendu par trait, titre du trait, à comparer à l'œil aux plans d'entraînement cités ; regarder aussi la version en gris)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/tests/test_styles_monde.py",
+   "fonction": "_rendus, test_sans_option_rien_ne_change, test_la_verite_ne_bouge_pas, test_le_dessin_change, test_tirages_varies",
+   "lignes": "13-17, 20-21, 24-30, 33-35, 38-44",
+   "role": "Le gabarit de tests/test_lot2.py : même logement rendu avec et sans l'option → style sans option a le champ à None ; 4 masques np.array_equal et même forme d'image ; le dessin change ; les tirages couvrent toutes les valeurs. Ajouter, par trait, un test qui le voit sur l'image (pixels d'une couleur, texte présent via comparaison avant/après) et un masque inchangé."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/tests/test_photo_realiste.py",
+   "fonction": "test_les_anciens_styles_ne_changent_pas, test_les_masques_restent_exacts",
+   "lignes": "22-26, 28-37",
+   "role": "Preuve plus forte à copier : `dataclasses.replace(avec, lot2=None) == sans` (aucun autre champ du Style n'a bougé) et annotations identiques hors clé « style », masques identiques, même forme."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/tests/test_generateur.py",
+   "fonction": "test_masques_fideles_aux_annotations, test_rotation_annotations_toujours_alignees, test_meme_style_meme_image, fixture lot + test_lot_ecrit_et_valide",
+   "lignes": "147-174, 177-192, 214-219, 264-299",
+   "role": "Les garde-fous existants qui doivent rester verts : masques ≈ polygones, pièce sous le masque de sa classe, hauteur (plafond sur les murs, 0 sur le fond), polygones alignés après rotation/perspective, déterminisme, lot de 8 graines diversité 3 relu par valider_dossier. Lancer aussi test_biais.py (test_sans_option_rien_ne_change, 50-53) et test_plan_pdf.py (87-101 : l'image du générateur ne change pas avec l'enregistreur)."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/pc/entrainer.py",
+   "fonction": "dessins / charger",
+   "lignes": "72-81 / 84-96",
+   "role": "Ce que l'entraîneur lit : pour chaque dossier `niveau_*` (glob, pas les variante_k), plan.png ou plan.jpg (+ plan_sans_mobilier) et masque_semantique.png, image convertie en GRIS (`convert(\"L\")`), réduite (grand côté 768). Même chose pour l'œil DINOv2 (pc/a3/oeil.py 165-168 : gris répété sur 3 canaux). Conséquence : un trait purement coloré n'existe pour le modèle que par sa luminance ; un rendu composite (traits 12/13) doit vivre dans un dossier `niveau_*` à part pour être vu à l'entraînement."
+  },
+  {
+   "fichier": "D:/Modélisation immobilière/atelya-code/docs/projet/etapes/catalogue-styles-lot2.md",
+   "fonction": "Règles pour le lot 2 (section finale)",
+   "lignes": "44-52",
+   "role": "Contraintes à respecter : nouvelle VERSION, Random à part « lot2-{graine}-{variante} », identité au pixel sur 8 graines sans l'option, masques inchangés, tests/test_lot2.py (un test par trait), planche ..\\atelya\\planches\\lot2-exemples.jpg. Exemples cités = plans d'entraînement seulement ; liste d'examen dans verites/repartition-vrais-plans.json (examen_anciens 15 + examen_nouveaux 25 : fr-020, 028, 043, 045, 049, 051, 052, 053, 054, 056, 057, 060, 064, 068, 077, 079, 083, 087, 089, 091, 095, 097, 101, 114, 121)."
+  }
+ ],
+ "comment_le_lot1_reste_sans_effet": "Le lot 1 (--styles-monde, commit 11c5423, 6-19) a touché 5 fichiers du générateur et n'a changé aucun ancien plan grâce à quatre verrous :\n\n1. UN DRAPEAU ET UN HASARD À PART. Options.styles_monde vaut False par défaut (exportateur.py 80) ; --styles-monde le pose (__main__.py 43, 63-64). Dans style_pour (153-157), le bloc n'est exécuté que si l'option est vraie, et il tire sur `r3 = random.Random(f\"monde-{graine + opt.graine_styles}-{variante}\")`, un générateur distinct du `rng = random.Random(f\"style-…\")` que consomme style_au_hasard. Le Style de base sort donc exactement comme avant (mêmes couleurs, marges, famille, salissure…) ; puis seulement `style.variete = variete_au_hasard(r3)` et `appliquer_couleurs(style, variete, r3)` modifient quelques champs. Même recette pour --vraie-camera/--sans-cotes (« camera-… », 136-149), --photo-realiste (« realisme-… », 150-152) et --biais (« biais-{graine} », fabriquer_exemple 182-186, qui touche la géométrie après generer()).\n\n2. UN CHAMP OPTIONNEL À None ET DES BRANCHES CONDITIONNELLES. Style.variete: Variete | None = None (variantes.py 95). Dans rendu.py, chaque usage est gardé : pieces() 236-238 (sols), murs() 296-299 (V.mur sinon l'ancien polygon fill), mur_libre() 321, arc() 399-401, noms() 408-418 (couleur, majuscules, parenthèses), tout() 515-519 (lettres, symboles), rendre() 555-558 (capture). Avec variete None, c'est l'ancien code, instruction pour instruction.\n\n3. AUCUN TIRAGE SUPPLÉMENTAIRE DANS LES HASARDS EXISTANTS. Le hasard de dessin du lot 1 est recréé localement : `random.Random(f\"neuf-{graine}-{niveau}\")` dans tout() (519) et `random.Random(f\"capture-…\")` dans rendre() (558). Les rng « rendu-… » (perspective du Repere), « salissure-… », « mobilier-… » et « photo-… » sont consommés exactement comme avant. Les listes SOLS/MURS/FILIGRANES sont dans variete.py et ne sont lues que par le hasard « monde ». Rien n'a été ajouté à PALETTES/POLICES/FAMILLES/NOMS (qui sont tirées par le rng partagé).\n\n4. LES MASQUES NE PASSENT JAMAIS PAR LE LOT 1. Les fonctions de variete.py n'écrivent que sur d.image / d.d (Pillow) ; remplir_masque n'est appelé que par le code d'origine. D'où test_la_verite_ne_bouge_pas : masques identiques AVEC et SANS l'option, même forme d'image ; test_le_dessin_change : seuls les pixels du plan diffèrent ; test_sans_option_rien_ne_change : style_pour sans option → variete None. La preuve « identique au pixel » des anciens jeux a été faite à la main (8 graines, md5 avec et sans option) ; c'est ce que le catalogue redemande pour le lot 2. Seuls effets de bord acceptés : VERSION_GENERATEUR 0.1.3 → 0.1.4 (clé version dans geometrie/manifest) et une clé `\"variete\": null` de plus dans annotations.json[\"style\"] (asdict) : pas de pixel changé, et plan_pdf._meme_plan n'en tient pas compte.\n\nLe lot 2 doit reproduire exactement ce schéma : Options.lot2 → style_pour (après le bloc monde, avant --resolution) → Random « lot2-{graine + opt.graine_styles}-{variante} » (la convention du dépôt ajoute graine_styles ; la consigne dit « lot2-{graine}-{variante}» : à trancher, en suivant de préférence la convention) → Style.lot2 None par défaut → branches `if st.lot2 is not None` dans rendu → hasard de dessin recréé par clé → aucun appel à remplir_masque → plan_pdf.style_a_plat remis à lot2=None.",
+ "pieges": [
+  "LISTES TIRÉES PAR LE HASARD PARTAGÉ : ne rien ajouter à variantes.PALETTES, POLICES, FAMILLES (rng.choice / rng.choices dans style_au_hasard), à logements.NOMS (Fabricant.nom tire dans ces listes avec le rng de la géométrie : « Rgt »/« SdB » y changeraient les logements), ni à variete.SOLS/MURS/FILIGRANES ou photo.TABLES. Nouvelles palettes, polices et abréviations = tables à part dans lot2.py, lues seulement si style.lot2 ; abréviations appliquées à l'affichage dans rendu.noms.",
+  "HASARD : un seul Random « lot2-… » dans style_pour (convention du dépôt : f\"lot2-{graine + opt.graine_styles}-{variante}\" ; la consigne dit sans graine_styles : à trancher), et pour le hasard au moment du dessin un Random recréé dans _Dessin.tout() à partir d'une clé (graine, niveau, graine_style), jamais le rng du Repere (« rendu-… », consommé par la perspective), ni « salissure-… », « mobilier-… », « photo-… ». plan_sans_mobilier rejoue un second _Dessin : il doit redonner les mêmes traits (test_meme_style_meme_image).",
+  "MASQUES : aucun trait de lot 2 n'appelle remplir_masque ni n'ajoute de classe (balcon, terrasse, jardin, tableau, cotes, cercles PMR, étiquettes, pastilles = fond 0 ou pixels sous la classe de la pièce) ; ne jamais changer la taille de l'image après rendu (valider_dossier compare aux dimensions d'annotations.image) : le recadrage serré (trait 20) = marges du Style réduites dans style_pour, pas un découpage ; les deux niveaux sur une image (12/13) ne tiennent pas dans niveau_{index}/.",
+  "ÉTIQUETTES OPAQUES : une étiquette blanche encadrée (trait 2) ou un tableau posé SUR un mur ou une ouverture cache le bâti alors que le masque dit « mur » → le modèle apprendrait des murs invisibles. Les poser dans la pièce (recul depuis p.rect, en respectant Piece.interdits et contour_piece pour les angles coupés A3) ou dans les marges ; en marge, vérifier avec d.semantique > 0 (repère final) comme V.capture.",
+  "ORDRE DE DESSIN ET MARGES : sols avant murs (le mur recouvre) ; les ouvertures sont remplies de st.fond dans murs() (308) après les murs : une fenêtre cyan (trait 8) se peint là ou dans ouverture() ; textes après murs ; les chaînes de cotes sont à RECUL_COTE = 60 px du cadre des murs (haut/gauche toujours, bas/droite si cotes_partielles) : un balcon, une terrasse ou un tableau dans la même marge entre en collision → élargir bas/droite dans Repere.__init__ sous l'option (modèle : cartouche 98-99, échelle 100-101) ou choisir un côté sans chaîne.",
+  "REPERE / PERSPECTIVE : l'image est dessinée À PLAT puis déformée (INTER_LINEAR) ; les masques sont tramés dans le repère FINAL par rep.final. Tout ce qui est collé après déformation (capture, teinte, bordure d'écran) s'applique à l'image finale et doit rester hors du logement. contour_des_murs a un défaut connu (contour calculé sur le masque final, dessiné à plat → double contour sur plans « agence » penchés) : ne pas le corriger dans ce lot hors option, cela changerait les anciens jeux.",
+  "LE MODÈLE VOIT EN GRIS : pc/entrainer.py (charger, convert(\"L\")) et l'œil DINOv2 (pc/a3/oeil.py 165-168) travaillent sur une image grise. Bleu nuit, cyan, rouge, pastel, vert n'agissent que par leur luminance : choisir les couleurs pour que le gris ressemble aux vrais plans (bleu nuit → très sombre OK ; cyan et rouge → gris moyen ; pastels → 220-240) et regarder la planche aussi en gris.",
+  "JPEG ET SALISSURES : plan.jpg (q92) seulement si style.salissure est non vide (ecrire_rendu 110) ; dans salir, photocopie et taches convertissent en GRIS (détruisent une teinte bleutée ou des cotes rouges), puis JPEG (241-242). Un scan ancien bleuté (trait 9) = teinte appliquée APRÈS salir dans rendre() (comme V.capture) ou branche gardée par lot2 ; ne pas le combiner avec « photocopie ». Les tests comparent des tableaux numpy, pas des fichiers : le JPEG n'intervient que sur disque.",
+  "POLICES : _police(nom, taille) (moteur/dessin_plan.py 102-104, lru_cache) charge moteur/polices/<nom> ; Style.police ∈ POLICES (liste à ne pas étendre). Une police « manuscrite » (trait 11) = fichier à TÉLÉCHARGER → accord écrit de NT (règle 3) + licence lue (OFL/Apache/Bitstream OK) + entrée dans moteur/polices/LICENCES.txt ; sans téléchargement : imiter la main lettre par lettre (vignette tournée/décalée, comme texte(vertical=True)). Le texte à 90° existe déjà (_Dessin.texte vertical=True, aussi dans _DessinPdf.texte).",
+  "PDF (plan_pdf.py) : style_a_plat (129-132) remet les champs un par un → ajouter lot2=None, sinon --lot2 changerait le jeu PDF et les traits collés par d.image.paste n'entreraient pas dans le PDF sans être comptés « oubliés » ; _Enregistreur ne connaît que line/polygon/rectangle/ellipse/arc/text (tout autre d.d.* devient un « ordre non recopié », test_chaque_sorte_est_bien_triee exige []) ; _meme_plan tolère une clé de style en plus.",
+  "annotations.json : asdict(style) ajoutera « \"lot2\": null » à tous les nouveaux jeux (comme « variete » en 6-19) : identique au pixel mais pas au JSON, à dire dans le bilan. La dataclass Lot2 doit rester JSON-sérialisable (tuples, str, float, bool, dict de str ; pas de numpy, pas de set). --resolution est appliqué APRÈS les tirages dans style_pour (158-160) : toute taille en pixels se calcule au dessin (d.rep.s, d.style.taille_texte), jamais au tirage.",
+  "CHEMINS ET ACCENTS : toujours moteur.images.lire_image / ecrire_image (jamais cv2.imread/imwrite : muets dans « D:\\Modélisation immobilière ») et chemins relatifs ..\\atelya\\vrais-plans\\lot-2026-11-05\\ et ..\\atelya\\planches\\ ; read_text/write_text avec encoding=\"utf-8\" ; pas de chemin accentué en dur dans un .ps1 (PowerShell 5.1 sans BOM).",
+  "LECTEUR EN FACE : les cotes en cm entiers ne sont admises par lecture_cotes.valeur_de_cote que sans cote « d,dd » sur le plan et à deux d'accord → ne pas mélanger cm et m sur un même plan ; FORME_DIMENSIONS reconnaît « 3,05 m × 2,85 m » / « 3.87 x 4.65 m » (produit = surface), FORME_SURFACE « (12,2 m²) » à 1 ou 2 décimales ; un numéro de lot en gros (« 45 ») ressemble à une cote cm : voulu (à apprendre), à noter. Les seuils du lecteur ne se règlent pas sur les plans d'examen.",
+  "PREUVE « IDENTIQUES AU PIXEL » : fabriquer AVANT toute modification un jeu témoin de 8 graines dans le scratchpad (sans option, et avec --styles-monde, --biais, --photo-realiste --familles photo) puis comparer après (md5 des PNG, np.array_equal des masques) ; ne pas comparer au jeu-10000 du PC (fabriqué sur le Mac : ~0,3 niveau de gris d'écart). Garder verts : test_styles_monde, test_photo_realiste, test_biais, test_generateur (fixture lot 8 graines + valider_dossier), test_plan_pdf (87-101), test_tirages_varies (fige les ensembles de variete_au_hasard : ne pas changer sa consommation du rng « monde »).",
+  "EXAMEN : ne jamais ouvrir ni utiliser les 40 plans d'examen (verites/repartition-vrais-plans.json : examen_anciens fr-003…fr-019 et examen_nouveaux fr-020, 028, 043, 045, 049, 051, 052, 053, 054, 056, 057, 060, 064, 068, 077, 079, 083, 087, 089, 091, 095, 097, 101, 114, 121) ; la planche lot2-exemples.jpg se compare aux plans d'entraînement cités dans le catalogue (fr-075, 082, 094, 096, 116, 021, 098, 117, 041, 108…).",
+  "TRAITS 12/13 (plusieurs niveaux / deux logements sur une image) : hors du cadre actuel « un niveau = un rendre() = un dossier niveau_{index} » (ids de masques 1..n par niveau, validateur par dossier, entraîneur par glob(\"niveau_*\") + plan + masque_semantique). Il faut un rendu composite (Repere commun avec décalage par niveau, ids décalés, ou composite à plat seulement), écrit dans un dossier à part lu par l'entraîneur et ignoré du validateur, avec ses propres tests ; pour deux logements, deux graines à coller par un mur mitoyen/palier. C'est le trait le plus lourd : le faire en dernier ou le reporter avec l'accord de NT.",
+  "MULTIPROCESSUS : generer_lot(processus > 1) passe par un Pool ; tout état de module modifié (setattr, dict global rempli à la volée) persiste dans les processus enfants (piège vu le 05/11 dans ab_traducteur) : les tirages du lot 2 doivent être portés par le Style (pur, sans état global). Le `continue` « trémie » de pieces() (241-242) est un no-op : ne pas le « réparer », les masques d'étage changeraient."
+ ]
+}
