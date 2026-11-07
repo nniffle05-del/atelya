@@ -43,6 +43,13 @@ Pourquoi A plutôt que B :
 
 Chaque chantier laisse les tests verts et le témoin identique, et écrit une planche `..\atelya\planches\lot2-chantierN.jpg` comparée aux plans d'entraînement du catalogue. Les fichiers `.jpg` de planches restent hors dépôt.
 
+## Chantier 2 fait (07/11/2026) : ce qui s'écarte de A, et ce qui reste à trancher
+
+- **Page de base** (demande après la planche du chantier 1) : sous `--lot2`, rotation, perspective, papier gris, contraste < 1 et photocopie du style de base sont retirés, sauf vraie photo (famille « photo », vraie caméra). Le scan ancien pose sa propre page. Mesuré sur 200 tirages : 9,5 % de plans penchés, 8,5 % de pages grises (les 59 plans d'entraînement du catalogue : 5 à 10 % penchés selon qu'on compte les pentes < 0,5°, 7 % de pages grises).
+- **Plan de travail** : `plans_de_travail_au_mur` (dans `rendre`, sous `--lot2`) retourne le meuble posé en travers. `mobilier.py` n'est pas touché. La carte de hauteur dépend donc du mobilier, comme prévu.
+- **Écarts à A** : cotes par mur → par pièce, de face à face (fr-100) ; page blanche et pièces crème, pas fond crème (fr-100, fr-102, fr-103) ; numéro de lot dans la marge du haut ; jardin = rectangle accolé (fr-084, fr-102), pas une bande tout autour ; pastilles en disque foncé, avec le nom (fr-059) ou avec légende ; champs `textes_verticaux` et `pastilles` en texte au lieu de booléens.
+- **Risque à trancher avec NT, vu à la mesure du lecteur** : sur les plans à cotes intérieures en cm (promoteur, scan), un trait de cote qui en croise un autre est pris pour une marque de fin de cote par `lecture_cotes._marques`. Les erreurs se ressemblent : plusieurs cotes s'accordent à tort et l'échelle est « sûre » et fausse sans alerte. Mesuré sur 30 tirages au hasard à plat, cotés en cm : **6 erreurs silencieuses de −10 à −41 %** (source « cotes », sûre), 14 justes à moins de 0,4 %, 10 envoyés à la vérification. Sans les traits verticaux, 5 de ces 6 erreurs disparaissent ; il reste 1 erreur de +3,6 %. Sur 5 des 6, les surfaces écrites donnaient la bonne échelle, mais `decider` ne les confronte aux cotes que si les cotes ne sont pas sûres. De vrais plans croisent aussi leurs cotes (fr-108, fr-062) : le dessin est juste, c'est le lecteur qui devra être revu avant de compter sur ces plans. Le lecteur n'a pas été modifié. Sans effet sur l'entraînement (le modèle ne lit pas l'échelle), mais un banc passé sur des plans lot 2 compterait ces erreurs.
+
 ## Après le code
 
 Le lot 2 ne change aucune note tant qu'un modèle n'a pas appris dessus. Fabriquer le jeu (`tout --nombre 3300 --depart 70001 --lot2 ...`) et lancer l'essai 8 demandent l'accord de NT.

@@ -245,6 +245,8 @@ class _Dessin:
             v = self.style.variete
             if v is not None and v.sols.get(p.sorte):
                 V.sol(self, p, v.sols[p.sorte], v)
+            if l2 is not None and l2.sols.get(p.sorte):  # V.sol est pure : une variété locale lui suffit
+                V.sol(self, p, l2.sols[p.sorte], V.Variete(couleur_sol=l2.couleur_sol, pas_sol=l2.pas_sol))
             self.remplir_masque(self.semantique, contour, CLASSES[p.sorte])
             self.remplir_masque(self.pieces_m, contour, self.ids_pieces[p.id])
             if self.niv.index > 0 and p.sorte == "escalier":
@@ -272,7 +274,10 @@ class _Dessin:
         else:
             self.d.polygon(pts, outline=couleur, width=self.fin)
             self.remplir_masque(self.hauteur, m.contour, min(m.hauteur, 65535))
-        for trait in m.details or []:
+        details = m.details or []
+        if m.forme == "marches" and self.style.lot2 is not None and self.style.lot2.escalier == "colimacon":
+            details = []  # L.colimacon a déjà dessiné les marches : la flèche droite traverserait le cercle
+        for trait in details:
             if len(trait) == 2:
                 self.ligne(trait[0], trait[1], couleur, self.fin)
             else:
@@ -281,8 +286,14 @@ class _Dessin:
     def _marches(self, x0: float, y0: float, x1: float, y1: float, m: Meuble) -> None:
         """Les marches montent du bas de l'escalier jusqu'au plancher de l'étage : hauteur progressive."""
         couleur = self.style.traits
-        for trait in m.details or []:
-            self.ligne(trait[0], trait[1], couleur, self.fin)
+        l2 = self.style.lot2
+        if l2 is not None and l2.escalier == "colimacon":
+            L.colimacon(self, x0, y0, x1, y1)
+        else:
+            for trait in m.details or []:
+                self.ligne(trait[0], trait[1], couleur, self.fin)
+            if l2 is not None and l2.escalier == "fleche_acces":
+                L.fleche_acces(self, x0, y0, x1, y1)
         le_long_de_x = (x1 - x0) >= (y1 - y0)
         n = 12
         haut = self.niv.hsp + self.log.plancher
@@ -484,13 +495,12 @@ class _Dessin:
                 self.d.line(((x - 7, y + 7), (x + 7, y - 7)), fill=coul_t, width=2)
             milieu = ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
             ecart = (taille * 0.75 + 8) * cote_texte
-            valeur = _fr((b - a) / 1000)
-            if l2 is not None and l2.cote_point:
-                valeur = valeur.replace(",", ".")
+            valeur = _fr((b - a) / 1000) if l2 is None else L.texte_cote(b - a, l2)
+            ecrire = self.texte if l2 is None else L.ecrivain_cotes(self)
             if horizontale:
-                self.texte((milieu[0], milieu[1] + ecart), valeur, taille, coul_x)
+                ecrire((milieu[0], milieu[1] + ecart), valeur, taille, coul_x)
             else:
-                self.texte((milieu[0] + ecart, milieu[1]), valeur, taille, coul_x, vertical=True)
+                ecrire((milieu[0] + ecart, milieu[1]), valeur, taille, coul_x, vertical=True)
 
     def cartouche(self) -> None:
         rep, st = self.rep, self.style
@@ -534,6 +544,7 @@ class _Dessin:
         if st.lot2 is not None:
             # Hasard à part, même clé pour le plan et le plan sans mobilier : ils écrivent et cotent pareil.
             self.hasard_lot2 = random.Random(f"lot2-dessin-{self.log.graine}-{self.niv.index}-{graine_style}")
+            L.avant_tout(self, self.hasard_lot2)
         self.pieces()
         self.murs()
         if st.noms or st.surfaces:
@@ -543,7 +554,7 @@ class _Dessin:
                 V.lettres(self, st.variete)
             if st.variete.symboles_neuf:
                 V.symboles_neuf(self, st.variete, random.Random(f"neuf-{self.log.graine}-{self.niv.index}"))
-        if st.cotes:
+        if st.cotes and (st.lot2 is None or not st.lot2.sans_chaines):
             self.cotes()
         if st.echelle_graphique:
             self.echelle_graphique()
@@ -566,8 +577,10 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
     escaliers = {pid: [m for m in lst if m.forme == "marches"] for pid, lst in tous.items()}
     escaliers = {pid: lst for pid, lst in escaliers.items() if lst}
     meubles = tous if style.mobilier else escaliers
-    if style.lot2 is not None and style.lot2.mobilier_fixes:
-        meubles = L.garder_fixes(meubles)
+    if style.lot2 is not None:
+        meubles = L.plans_de_travail_au_mur(meubles, niveau)
+        if style.lot2.mobilier_fixes:
+            meubles = L.garder_fixes(meubles)
     d = _Dessin(log, niveau, style, rep, meubles, avec_mobilier=True)
     d.tout(graine_style)
     images: dict[str, np.ndarray] = {}
@@ -586,6 +599,9 @@ def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str 
     if v is not None and (v.capture or v.filigrane or v.agrandi > 1.0):
         for nom in [n for n in images if n.startswith("plan")]:
             images[nom] = V.capture(images[nom], d.semantique, v, random.Random(f"capture-{log.graine}-{niveau.index}-{graine_style}"))
+    if style.lot2 is not None and style.lot2.teinte:
+        for nom in [n for n in images if n.startswith("plan")]:
+            images[nom] = L.teinter(images[nom], style.lot2.teinte)
     d.pieces_m[d.elements > 0] = 0
     images["masque_semantique"] = d.semantique
     images["masque_pieces"] = d.pieces_m

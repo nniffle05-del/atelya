@@ -3,8 +3,8 @@
 Pourquoi : Atelya rate les styles jamais vus. Ce module apprend au générateur à les dessiner, pour que
 l'essai 8 les apprenne sur des plans dont la vérité est exacte. Les traits sont ceux de
 docs/projet/etapes/catalogue-styles-lot2.md ; ce qui est dessiné ici imite des plans d'ENTRAÎNEMENT
-(fr-075, fr-094, fr-096, fr-098, fr-076, fr-117, fr-046, fr-063, fr-093, fr-074, fr-023, fr-035, fr-031,
-fr-105, fr-067, fr-120, fr-027), jamais un plan d'examen.
+(ceux qu'ils citent : fr-075, fr-094, fr-096, fr-098, fr-108, fr-110, fr-106, fr-041, fr-062, fr-100, fr-102,
+fr-070, fr-036, fr-037, fr-111, fr-086, fr-112, fr-059, fr-080, fr-093, fr-120, fr-048, fr-084, fr-055…), jamais un plan d'examen.
 
 Trois choses séparées, comme le lot 1 (variete.py) :
 
@@ -14,8 +14,8 @@ Trois choses séparées, comme le lot 1 (variete.py) :
 - le dessin : des fonctions qui reçoivent le `_Dessin` et ne touchent QUE son image. Jamais les masques :
   une étiquette, un tableau ou une cote reste du fond, une fenêtre bleue reste une fenêtre.
 
-Chantier 1 : traits 1, 2, 4 (sans les balcons), 5, 8, 16, 19, 20. Les champs marqués « chantier 2 / 3 »
-existent déjà pour que le format ne change plus, mais rien ne les tire ni ne les dessine encore.
+Chantiers 1 et 2 : tous les traits, sauf 10, 12 et 13 (chantier 3 : les champs marqués « chantier 3 » existent déjà
+pour que le format ne change plus, mais rien ne les tire ni ne les dessine encore).
 """
 
 from __future__ import annotations
@@ -24,17 +24,22 @@ import math
 import random
 from dataclasses import dataclass, field, fields
 
+import numpy as np
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
+
 from moteur.dessin_plan import _police
-from moteur.generateur.annotations import rect_de_l_ouverture
-from moteur.generateur.logements import surface_piece
+from moteur.generateur.annotations import rect_de_l_ouverture, rect_du_mur
+from moteur.generateur.logements import Rect, surface_piece
+from moteur.generateur.mobilier import Meuble, _libre, _rect, _zones_de_battement
 from moteur.generateur.variete import Variete
 
 RECUL_COTE = 60  # le même que rendu.RECUL_COTE (rendu importe ce module, pas l'inverse ; un test vérifie l'égalité)
 
-# Toutes les familles du catalogue, et celles qui sont tirées aujourd'hui. Poids = fréquences sur 103 plans.
+# Les familles du catalogue et leurs poids (leurs fréquences sur 103 plans).
 FAMILLES_LOT2 = ("agence_coloree", "promoteur_gris", "murs_noirs", "carrez_legende", "logiciel_public", "scan_ancien",
                  "cotes_rouges", "neutre")
-POIDS_FAMILLES = {"agence_coloree": 14, "murs_noirs": 13, "carrez_legende": 8, "cotes_rouges": 2, "neutre": 10}
+POIDS_FAMILLES = {"agence_coloree": 14, "promoteur_gris": 14, "murs_noirs": 13, "carrez_legende": 8, "logiciel_public": 5,
+                  "scan_ancien": 6, "cotes_rouges": 2, "neutre": 10}
 
 # Couleurs relevées sur fr-075, fr-094, fr-096, fr-116 : des pastels ternes, pas des couleurs vives.
 _BEIGE, _PECHE, _BLEU, _ROSE, _GRIS = (238, 232, 214), (251, 238, 222), (222, 226, 239), (231, 213, 201), (211, 211, 211)
@@ -50,6 +55,15 @@ PALETTES_LOT2 = {
                      "escalier": _GRIS},
     "blanc": {s: (255, 255, 255) for s in _SORTES},  # fr-098, fr-076 : pièces blanches sur une page gris clair
     "bleu_uni": {s: (203, 225, 245) for s in _SORTES},  # fr-067 : toutes les pièces du même bleu
+    # Trait 6 : les logiciels grand public colorient les pièces, pas la page (fr-100, fr-102, fr-103 ; fr-070 en lilas).
+    "creme": {**{s: (253, 248, 228) for s in _SORTES}, "placard": (196, 196, 196)},
+    "lilas": {**{s: (244, 244, 252) for s in _SORTES}, "sdb": (232, 240, 250), "sde": (232, 240, 250), "wc": (232, 240, 250)},
+    "gris_clair": {s: (234, 236, 236) for s in _SORTES},  # fr-041 : pièces gris clair, murs ardoise
+    # fr-062 : le seul promoteur en couleurs franches, cuisine comprise.
+    "promoteur_vif": {"sejour": (190, 220, 245), "principale": (190, 220, 245), "cuisine": (86, 145, 205), "chambre": (250, 205, 150),
+                      "bureau": (250, 205, 150), "sdb": (90, 175, 230), "sde": (90, 175, 230), "wc": (90, 175, 230),
+                      "entree": (190, 230, 190), "degagement": (190, 230, 190), "placard": (250, 250, 250),
+                      "buanderie": (190, 230, 190), "escalier": (220, 220, 220)},
 }
 
 # Ce qui reste dessiné d'un plan d'agence sans « mobilier » (fr-075) : les équipements fixes, jamais lits ni canapés.
@@ -57,6 +71,8 @@ MEUBLES_FIXES = {"baignoire", "douche", "lavabo", "wc", "plan_de_travail", "lave
 
 ABREVIATIONS = {"Dégagement": "Dgt", "Rangement": "Rgt", "Salle de bains": "SdB", "Salle de bain": "SdB", "Salle d'eau": "SdE",
                 "Chambre": "Ch.", "Placard": "Pl.", "Cuisine": "Cuis.", "Toilettes": "WC", "Pièce principale": "Pièce"}
+# Ce qui s'écrit à côté d'une fenêtre sur les plans de promoteur (fr-041, fr-108, fr-110) : volet roulant, porte-fenêtre.
+MENTIONS = {"fenetre": "VR", "porte_fenetre": "PF"}
 SOLS_ECRITS = {"sdb": ("carrelage",), "sde": ("carrelage",), "wc": ("carrelage",), "cuisine": ("carrelage", "lino"),
                "entree": ("carrelage",), "degagement": ("carrelage", "lino"), "buanderie": ("lino", "carrelage"),
                "chambre": ("parquet", "moquette", "carrelage"), "bureau": ("parquet", "moquette"),
@@ -102,7 +118,7 @@ class Lot2:
     parentheses_grises: bool = False  # trait 4 : « (12,2 m²) »
     # ---- trait 2 : dimensions de pièce
     dimensions: str = ""  # "", remplace, ajoute
-    format_dimensions: str = "3,05 m × 2,85 m"  # ou « 3.87 x 4.65 m »
+    format_dimensions: str = "3,05 m × 2,85 m"  # ou « 3.87 x 4.65 m », « 2.70×4.33 » (fr-037)
     etiquettes: str = ""  # "", bloc (tout le texte dans un cadre), surface (seule la surface, fr-063)
     couleur_etiquette: tuple[int, int, int] = (255, 255, 255)
     triangles: bool = False  # petits repères au milieu de chaque côté (fr-098, fr-117)
@@ -129,21 +145,39 @@ class Lot2:
     recadre: bool = False
     # ---- socle
     sortie_jpeg: bool = False
-    # ---- chantier 2 (pas encore tirés ni dessinés)
-    unite_cotes: str = "m"
-    cotes_par_mur: bool = False
-    sans_chaines: bool = False
+    barre_echelle: bool = False  # fr-070, fr-112 : la seule échelle du plan est une barre
+    # ---- traits 3, 6, 9 : les cotes (une seule unité par plan, le lecteur n'admet les entiers que sans cote « d,dd »)
+    unite_cotes: str = "m"  # m ou cm
+    cotes_interieures: bool = False  # trait 3 : un trait de cote de mur à mur dans chaque pièce
+    cotes_par_mur: bool = False  # trait 6 : une cote le long de chaque mur de chaque pièce
+    sans_chaines: bool = False  # pas de chaîne autour du plan : les cotes sont dans les pièces (fr-108, fr-100)
+    taille_cotes: float = 0.7  # part de la taille du texte
+    # ---- trait 3 : promoteur
     cercles_pmr: bool = False
-    numero_lot: str = ""
+    sols: dict[str, str] = field(default_factory=dict)  # sorte de pièce → motif (V.sol)
+    couleur_sol: tuple[int, int, int] = (205, 205, 205)
+    pas_sol: float = 0.2
+    numero_lot: str = ""  # « 45 », « A1 14 », « Lot 206 », « {type} G206 » (écrit avec la surface totale)
     abreviations: bool = False
     mentions_menuiseries: bool = False
+    # ---- trait 18 (et balcons du 4) : extérieurs. Chaque dict : sorte, cote, part, position, profondeur_m, motif, contour, couleur
     exterieurs: list[dict] = field(default_factory=list)
-    textes_verticaux: bool = False
+    # ---- trait 7
+    textes_verticaux: str = ""  # "", etroites (pièces où le nom ne tient pas à plat), toutes (fr-055)
+    # ---- trait 9 : scan ancien. Seule cette famille pose sa page : voir _page_sage
+    papier: int | None = None
+    contraste: float | None = None
+    salissure: str | None = None
+    rotation: float | None = None
     teinte: tuple[float, float, float] | None = None
-    manuscrit: str = ""
+    # ---- trait 11
+    manuscrit: str = ""  # "", surfaces (mesures au stylo), tout (les noms aussi)
+    couleur_stylo: tuple[int, int, int] = (20, 20, 20)
+    souligne: bool = False  # fr-112 : les noms à la main sont soulignés
+    # ---- trait 15, 17, 14
     placards_fleches: bool = False
-    escalier: str = ""
-    pastilles: bool = False
+    escalier: str = ""  # "", colimacon, fleche_acces
+    pastilles: str = ""  # "", avec_noms (fr-059), legende (le nom est dans une légende à droite)
     # ---- chantier 3 (pas encore tirés ni dessinés)
     ecran: bool = False
     composition: str = ""
@@ -168,8 +202,16 @@ def lot2_au_hasard(rng: random.Random, famille: str | None = None, transversaux:
         _tirer_carrez(l, rng)
     elif famille == "cotes_rouges":
         _tirer_cotes_rouges(l, rng)
+    elif famille == "promoteur_gris":
+        _tirer_promoteur(l, rng)
+    elif famille == "logiciel_public":
+        _tirer_logiciel(l, rng)
+    elif famille == "scan_ancien":
+        _tirer_scan(l, rng)
     if transversaux:
         _tirer_transversaux(l, rng)
+        _tirer_exterieurs(l, rng)
+    _accorder(l)
     return l
 
 
@@ -247,6 +289,192 @@ def _tirer_cotes_rouges(l: Lot2, rng: random.Random) -> None:
     l.noms_courts = True  # fr-031 : des cotes partout, pas de surface écrite
 
 
+def _tirer_promoteur(l: Lot2, rng: random.Random) -> None:
+    """Trait 3, plans de vente du neuf. Il n'y a pas « un » promoteur gris, d'où cinq manières de dessiner les murs."""
+    forme = rng.choices(("noir", "gris", "double", "ardoise", "vif"), weights=(3, 3, 3, 2, 1))[0]
+    trait = _gris(rng, 110, 150)
+    if forme == "noir":  # fr-108
+        l.couleur_murs = _gris(rng, 0, 20)
+    elif forme == "gris":  # le catalogue, fr-109 : tout en gris moyen
+        l.couleur_murs = _gris(rng, 105, 150)
+    elif forme == "double":  # fr-106, fr-110 : les murs ne sont que leurs deux bords
+        l.couleur_murs = _gris(rng, 40, 90)
+        l.murs_dessin, l.epaisseur_trait_mur = "double", rng.uniform(0.08, 0.18)
+    elif forme == "ardoise":  # fr-041
+        g = rng.randint(55, 80)
+        l.couleur_murs, l.palette = (g, g + 8, g + 12), "gris_clair"
+        trait = _gris(rng, 50, 80)
+    else:  # fr-062
+        l.couleur_murs, l.palette = _gris(rng, 0, 20), "promoteur_vif"
+        trait = _gris(rng, 40, 70)
+    l.couleur_traits = trait
+    l.couleur_textes = _gris(rng, 15, 60)
+    l.couleur_fond = (255, 255, 255)
+    l.px_par_m = rng.randint(85, 125)
+    l.part_texte = rng.uniform(0.13, 0.17)
+    l.epaisseur_trait = rng.uniform(0.008, 0.012)
+    l.marges = (rng.randint(100, 170), rng.randint(100, 170), rng.randint(100, 170), rng.randint(100, 170))
+    l.unite_cotes = "cm" if rng.random() < 0.8 else "m"  # fr-041 cote en mètres, avec un point
+    l.cote_point = l.unite_cotes == "m"
+    l.cotes_interieures = True
+    l.sans_chaines = rng.random() < 0.7  # fr-108, fr-110 : aucune chaîne autour du plan
+    l.cercles_pmr = rng.random() < 0.8
+    l.sans_mobilier = rng.random() < 0.15
+    if rng.random() < 0.35:
+        for sorte in rng.sample(("sejour", "principale", "chambre", "bureau", "cuisine"), rng.randint(1, 3)):
+            l.sols[sorte] = rng.choice(("parquet", "hachures"))
+        l.couleur_sol = _gris(rng, 185, 220)  # assez clair pour ne pas devenir un mur sur l'image grise réduite
+        l.pas_sol = rng.uniform(0.12, 0.3)
+    if rng.random() < 0.6:
+        l.numero_lot = rng.choice((str(rng.randint(11, 98)), f"A{rng.randint(1, 4)} {rng.randint(10, 60)}",
+                                   f"Lot {rng.randint(100, 299)}", "{type} G" + str(rng.randint(100, 299))))
+    l.abreviations = rng.random() < 0.6
+    l.majuscules = rng.random() < 0.3
+    l.mentions_menuiseries = rng.random() < 0.6
+    l.noms_gras = rng.random() < 0.5
+    l.noms_courts = rng.random() < 0.35
+    l.vantail_fin = True
+    l.arcs_pointilles = rng.random() < 0.2
+    l.taille_cotes = rng.uniform(0.62, 0.8)
+
+
+def _tirer_logiciel(l: Lot2, rng: random.Random) -> None:
+    """Trait 6 : Kozikaza, HomeByMe, magicplan. Page blanche et pièces crème (fr-100, fr-102, fr-103) ou lilas (fr-070)."""
+    if rng.random() < 0.75:
+        l.palette = "creme"
+        l.couleur_murs = _gris(rng, 140, 175)  # à 60 niveaux au moins du crème : le mur reste visible en gris
+        l.couleur_cotes = _gris(rng, 95, 125)
+    else:
+        g = rng.randint(66, 84)
+        l.palette, l.couleur_murs = "lilas", (g, g + 2, g + 30)
+        l.couleur_cotes = (rng.randint(140, 165), rng.randint(140, 165), rng.randint(205, 225))
+    l.couleur_fond = (255, 255, 255)
+    l.couleur_traits = _gris(rng, 120, 165)
+    l.couleur_textes = _gris(rng, 15, 40)
+    l.couleur_surface = l.couleur_textes
+    l.px_par_m = rng.randint(90, 125)
+    l.part_texte = rng.uniform(0.14, 0.19)
+    l.marges = (rng.randint(30, 110), rng.randint(30, 110), rng.randint(30, 110), rng.randint(30, 110))
+    l.cotes_par_mur = l.sans_chaines = True
+    l.taille_cotes = rng.uniform(0.6, 0.95)  # fr-100 écrit petit, fr-102 presque aussi gros que les noms
+    l.textes_verticaux = "etroites" if rng.random() < 0.5 else ""
+    l.sans_mobilier = rng.random() < 0.4  # fr-100, fr-102 : rien ; fr-103, fr-070 : meubles dessinés
+    l.mobilier_couleur = not l.sans_mobilier
+    l.fenetres_pleines = True  # fenêtres blanches cernées de gris, jamais de traits dans le mur
+    l.couleur_fenetres, l.contour_fenetres = (255, 255, 255), _gris(rng, 120, 165)
+    l.vantail_fin = True
+    l.barre_echelle = rng.random() < 0.2  # fr-070
+
+
+def _tirer_scan(l: Lot2, rng: random.Random) -> None:
+    """Trait 9 : promoteur des années 80-2000. fr-036 (bleuté, cotes en cm, terrasse carrelée), fr-037, fr-111 (photocopie,
+    surfaces en légende, dimensions dans les pièces). Une page sur deux reste blanche : fr-037, fr-111 le sont."""
+    if rng.random() < 0.5:
+        l.papier = rng.randint(215, 240)
+        l.contraste = rng.uniform(0.8, 0.95)
+        if rng.random() < 0.65:
+            l.teinte = (rng.uniform(0.86, 0.94), rng.uniform(0.9, 0.97), 1.0)
+        else:
+            l.teinte = (1.0, rng.uniform(0.95, 0.98), rng.uniform(0.86, 0.92))
+        l.salissure = rng.choices(("grain", "jpeg", "photocopie", "taches"), weights=(3, 1, 3, 1))[0]
+    else:
+        l.papier = rng.randint(245, 255)
+        l.contraste = rng.uniform(0.95, 1.0)
+        l.salissure = rng.choices(("grain", "jpeg"), weights=(5, 3))[0]  # le blanc d'une photocopie vaut 205 à 235 : pas ici
+    l.sortie_jpeg = True
+    if rng.random() < 0.3:  # la plupart des scans vus sont droits : fr-036, fr-037, fr-111
+        l.rotation = rng.choice((-1, 1)) * rng.uniform(0.3, 1.5)
+    l.couleur_murs = _gris(rng, 15, 60)
+    l.couleur_traits = _gris(rng, 25, 70)
+    l.couleur_textes = _gris(rng, 15, 50)
+    l.couleur_fond = (255, 255, 255)
+    l.px_par_m = rng.randint(80, 120)
+    l.part_texte = rng.uniform(0.15, 0.2)
+    l.epaisseur_trait = rng.uniform(0.01, 0.016)
+    l.marges = (rng.randint(70, 150), rng.randint(70, 150), rng.randint(70, 150), rng.randint(70, 150))
+    l.murs_dessin = rng.choices(("double", "hachure", ""), weights=(4, 3, 3))[0]
+    l.epaisseur_trait_mur = rng.uniform(0.08, 0.2)
+    l.majuscules = rng.random() < 0.6
+    if rng.random() < 0.65:  # fr-036 : 409, 386, 423
+        l.unite_cotes = "cm"
+        l.cotes_interieures = True
+        l.sans_chaines = rng.random() < 0.6
+        l.noms_courts = True
+    else:  # fr-037 : « 2.70×4.33 » dans la pièce, surfaces en légende
+        l.dimensions = "remplace"
+        l.format_dimensions = "2.70×4.33"
+        l.sans_chaines = True
+        if rng.random() < 0.7:
+            l.tableau, l.tableau_decimales = rng.choice(("gauche", "droite")), 2
+        l.barre_echelle = rng.random() < 0.25  # fr-112
+    l.mobilier_fixes = rng.random() < 0.6
+    l.cercles_pmr = rng.random() < 0.25  # fr-036
+    if rng.random() < 1 / 3:  # fr-078 : « sol : parquet » à la main ; fr-112 : les noms aussi
+        l.manuscrit = "surfaces" if rng.random() < 0.7 else "tout"
+        _tirer_stylo(l, rng)
+
+
+def _tirer_stylo(l: Lot2, rng: random.Random) -> None:
+    l.couleur_stylo = (rng.randint(25, 60), rng.randint(40, 85), rng.randint(120, 175)) if rng.random() < 0.4 else _gris(rng, 10, 40)
+    l.souligne = l.manuscrit == "tout" and rng.random() < 0.5
+
+
+def _tirer_exterieurs(l: Lot2, rng: random.Random) -> None:
+    """Trait 18 et balcons du trait 4. Un extérieur reste du fond (le générateur n'a pas de classe extérieur) : il ne se pose
+    que dans une marge libre, en bas ou à droite, jamais là où passent déjà un tableau, une rose ou une colonne."""
+    proba = {"murs_noirs": 0.35, "promoteur_gris": 0.35, "logiciel_public": 0.5, "scan_ancien": 0.4}.get(l.famille, 0.1)
+    if l.recadre or l.triangles or rng.random() >= proba:
+        return
+    cotes = []
+    if not (l.tableau == "bas" or l.legende_niveau or l.rose_des_vents):
+        cotes.append("bas")
+    if not (l.tableau == "droite" or l.surface_totale or l.pastilles == "legende"):
+        cotes.append("droite")
+    if not cotes:
+        return
+    for k in range(1 if rng.random() < 0.7 else 2):
+        sorte, motif, contour, couleur = _forme_exterieur(l, rng)
+        l.exterieurs.append({
+            "sorte": sorte, "cote": rng.choice(cotes), "part": 1.0 if sorte == "jardin" else rng.uniform(0.35, 0.85),
+            "position": rng.random(), "profondeur_m": rng.uniform(2.5, 4.5) if sorte == "jardin" else rng.uniform(1.0, 2.4),
+            "motif": motif, "contour": contour, "couleur": couleur, "numero": k + 1,
+        })
+
+
+def _forme_exterieur(l: Lot2, rng: random.Random) -> tuple[str, str, str, tuple[int, int, int] | None]:
+    """(sorte, motif, contour, couleur de fond) selon les habitudes de chaque famille."""
+    if l.famille == "murs_noirs":  # catalogue, trait 4 : trait fin ou pointillé, rien dedans (fr-046, fr-085)
+        return "balcon", "vide", rng.choice(("fin", "pointille")), None
+    if l.famille == "scan_ancien":  # fr-036 : terrasse carrelée ; fr-037 : balcon en croisillons
+        return rng.choice((("terrasse", "carrelage", "fin", None), ("balcon", "croisillons", "fin", None), ("balcon", "vide", "fin", None)))
+    if l.famille == "logiciel_public":  # fr-102 : terrasse d'un vert franc
+        vert = (rng.randint(115, 195), rng.randint(225, 240), rng.randint(95, 170))
+        return rng.choice(("terrasse", "jardin")), "vert", "gris", vert
+    if l.famille == "promoteur_gris":  # fr-108 : balcon vide ; fr-062 : terrasse carrelée ; fr-110 : lattes
+        return rng.choice((("balcon", "vide", "moyen", None), ("terrasse", "carrelage", "fin", (222, 222, 200)), ("balcon", "lattes", "fin", None)))
+    return rng.choice((("balcon", "vide", "fin", None), ("balcon", "hachures", "fin", None), ("balcon", "vide", "pointille", None),  # fr-080
+                       ("terrasse", "lattes", "moyen", None), ("jardin", "herbe", "moyen", None),  # fr-084
+                       ("jardin", "vert", "fin", (190, 222, 170))))
+
+
+def _accorder(l: Lot2) -> None:
+    """Ce qui ne doit jamais se trouver ensemble sur un plan, quel que soit l'ordre des tirages."""
+    if l.unite_cotes == "cm":
+        # Jamais de cm et de mètres sur le même plan : le lecteur n'admet les entiers que sans aucune cote « d,dd ».
+        l.dimensions, l.cote_point = "", False
+        if l.hsp == "HSP cercle":  # « 2.50 » seul dans son cercle a la forme d'une cote en mètres
+            l.hsp = "hsp:"
+    if l.tableau or l.surface_totale:  # les étiquettes de placard et la légende vont dans les mêmes marges
+        l.placards_fleches = False
+        if l.pastilles == "legende":
+            l.pastilles = "avec_noms"
+    if l.recadre:  # le logement touche les bords : plus de place pour ce qui s'écrit dehors
+        l.placards_fleches, l.numero_lot, l.barre_echelle = False, "", False
+        l.exterieurs = []
+        if l.pastilles == "legende":
+            l.pastilles = "avec_noms"
+
+
 def _tirer_transversaux(l: Lot2, rng: random.Random) -> None:
     """Les traits indépendants de la famille."""
     if rng.random() < 0.2:
@@ -280,7 +508,18 @@ def _tirer_transversaux(l: Lot2, rng: random.Random) -> None:
     if rng.random() < 0.08 and l.famille in ("neutre", "murs_noirs"):
         l.recadre = True
         _tirer_marges_serrees(l, rng)
-    l.sortie_jpeg = rng.random() < 0.3
+    l.sortie_jpeg = l.sortie_jpeg or rng.random() < 0.3
+    if rng.random() < 0.15 and not l.textes_verticaux:  # trait 7 : fr-067 dans les pièces étroites, fr-055 partout
+        l.textes_verticaux = "etroites" if rng.random() < 0.8 else "toutes"
+    if rng.random() < 0.05 and not l.manuscrit and l.famille not in ("agence_coloree", "logiciel_public"):  # trait 11 : fr-086, fr-112
+        l.manuscrit = "surfaces" if rng.random() < 0.7 else "tout"
+        _tirer_stylo(l, rng)
+    if rng.random() < 0.03:  # trait 14 : fr-059
+        l.pastilles = "avec_noms" if rng.random() < 0.6 else "legende"
+    if rng.random() < 0.05:  # trait 15 : fr-080, fr-086
+        l.placards_fleches = True
+    if rng.random() < 0.3:  # trait 17 : n'agit que sur un niveau qui a un escalier
+        l.escalier = "colimacon" if rng.random() < 0.6 else "fleche_acces"
 
 
 def _tirer_releve(l: Lot2, rng: random.Random) -> None:
@@ -333,7 +572,8 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
     if absurde:  # un style absurde apprend qu'un mur reste un mur : on ne lui rend pas des couleurs sages
         l.couleur_murs = l.couleur_fond = l.couleur_traits = l.couleur_textes = l.couleur_cotes = None
         l.palette, l.fenetres_pleines, l.portes_boites, l.couleur_surface, l.mobilier_couleur = "", False, False, None, False
-        l.tableau_couleur = None
+        l.tableau_couleur = l.teinte = None
+    _page_sage(style, l)
     for champ, attribut in (("couleur_murs", "murs"), ("couleur_fond", "fond"), ("couleur_traits", "traits"),
                             ("couleur_textes", "textes"), ("epaisseur_trait", "epaisseur_trait"), ("px_par_m", "px_par_m"),
                             ("marges", "marges")):
@@ -370,15 +610,33 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
     elif l.famille == "cotes_rouges":
         style.cotes = style.noms = style.symboles = True
         style.mobilier = style.cartouche = style.titre = False
+    elif l.famille == "promoteur_gris":
+        style.cotes = style.noms = style.surfaces = style.symboles = style.arcs = style.mobilier = True
+        style.cartouche = style.titre = style.fleche_nord = style.echelle_graphique = False
+    elif l.famille == "logiciel_public":
+        style.cotes = style.noms = style.surfaces = style.symboles = style.arcs = style.mobilier = True
+        style.cartouche = style.titre = style.fleche_nord = False
+    elif l.famille == "scan_ancien":
+        style.cotes = style.noms = style.surfaces = style.symboles = style.arcs = True
+        style.mobilier = l.mobilier_fixes
+        style.cartouche = style.titre = style.fleche_nord = style.echelle_graphique = False
+    if l.famille in ("promoteur_gris", "scan_ancien"):
+        style.pieces_colorees = bool(l.palette)  # pièces blanches, sauf fr-041 et fr-062 : pas le pastel tiré par le style de base
+    if l.famille in ("logiciel_public", "scan_ancien"):
+        style.echelle_graphique = l.barre_echelle
+    if l.unite_cotes == "cm":  # le cartouche écrit « Cotes intérieures, en mètres » et des hauteurs en mètres
+        style.cartouche = False
     if l.sans_noms:
         style.noms = False
     if l.sans_mobilier:
         style.mobilier = False
     if l.dimensions:
         style.surfaces = True  # écrire une dimension demande la permission des surfaces (--sans-cotes l'éteint plus bas)
+    if l.pastilles:
+        style.noms = True  # noms() dessine aussi les pastilles : sans lui, une légende renverrait à des numéros absents
     if l.couleur_murs is not None or l.palette or l.couleur_cotes is not None:
-        # La photocopie et les taches passent l'image en gris : le trait disparaîtrait.
-        if style.salissure in ("photocopie", "taches"):
+        # La photocopie et les taches passent l'image en gris : le trait disparaîtrait. Le scan ancien, lui, en vit.
+        if style.salissure in ("photocopie", "taches") and l.famille != "scan_ancien":
             style.salissure = "jpeg"
     if l.triangles:  # le relevé d'appli n'a ni cotes, ni cartouche
         style.cotes = style.cotes_partielles = style.cartouche = style.titre = style.fleche_nord = False
@@ -396,6 +654,15 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
             v.murs = "plein"
         elif l.murs_dessin:
             v.murs, v.epaisseur_trait_mur = l.murs_dessin, l.epaisseur_trait_mur
+    if l.exterieurs:
+        # Un extérieur occupe la marge du bas ou de droite : les chaînes, la barre et le cartouche y passeraient par-dessus.
+        style.cotes_partielles = False
+        if any(e["cote"] == "bas" for e in l.exterieurs):
+            style.echelle_graphique = False
+        if any(e["cote"] == "droite" for e in l.exterieurs):
+            style.cartouche = False
+    if l.placards_fleches:  # le cartouche prend la marge de droite, où vont les étiquettes de placard
+        style.cartouche = False
     if style.rotation or style.perspective or style.focale:
         # Défaut connu de contour_des_murs : contour calculé sur le masque tourné, dessiné à plat (double contour décalé).
         style.murs_contour = False
@@ -405,11 +672,37 @@ def appliquer(style, l: Lot2, sans_cotes: bool = False) -> None:
         style.cotes_partielles = False
 
 
+def _page_sage(style, l: Lot2) -> None:
+    """La page de base : droite et blanche, sauf si la page est le sujet.
+
+    Pourquoi : la rotation, le papier gris, le contraste et la photocopie viennent du style de base (`style_au_hasard`), qui
+    les tire pour des jeux où ils sont une épreuve. Mesuré au chantier 1 : 5 plans penchés sur 12, des pages grises. Sur les 59
+    plans d'entraînement du catalogue, 3 sont nettement penchés (fr-024, fr-040, fr-086) et 3 de moins de 0,5°, soit 5 à 10 % ;
+    4 ont une page franchement grise (7 %), tous des photos ou des scans. On garde donc la page d'une photo (famille « photo », vraie caméra) ; le scan ancien pose la sienne."""
+    if style.focale or style.realisme is not None or style.famille == "photo":
+        l.teinte = None  # la teinte du scan colorerait aussi la table de la photo
+        return  # une photo reste une photo : son papier, sa perspective, sa lumière sont le sujet
+    style.rotation, style.perspective = 0.0, 0.0
+    style.papier = 255
+    style.contraste = max(style.contraste, 1.0)  # un contraste < 1 grise le blanc de la page
+    if style.salissure in ("photocopie", "taches"):
+        style.salissure = "jpeg"  # le blanc d'une photocopie vaut 205 à 235
+    if l.famille == "scan_ancien":
+        if l.papier is not None:
+            style.papier = l.papier
+        if l.contraste is not None:
+            style.contraste = l.contraste
+        if l.salissure:
+            style.salissure = l.salissure
+        if l.rotation is not None:
+            style.rotation = l.rotation
+
+
 def resume(l: Lot2) -> dict:
     """Pour le manifeste : la famille et les traits allumés, sans les couleurs."""
     ignores = {"famille", "marges", "px_par_m", "part_texte", "epaisseur_trait", "epaisseur_trait_mur", "surface_decimales",
-               "tableau_decimales", "format_dimensions", "unite_cotes", "couleur_etiquette", "couleur_fenetres", "contour_fenetres",
-               "surface_point", "cote_point", "sortie_jpeg", "noms_gras"}
+               "tableau_decimales", "format_dimensions", "couleur_etiquette", "couleur_fenetres", "contour_fenetres",
+               "surface_point", "cote_point", "sortie_jpeg", "noms_gras", "taille_cotes", "pas_sol", "papier", "contraste", "salissure"}
     traits = []
     for f in fields(l):
         valeur = getattr(l, f.name)
@@ -417,7 +710,64 @@ def resume(l: Lot2) -> dict:
             continue
         if valeur:
             traits.append(f.name)
+    if l.unite_cotes == "m" and "unite_cotes" in traits:
+        traits.remove("unite_cotes")  # le mètre est le cas ordinaire : seule l'unité cm est un trait
     return {"famille": l.famille, "traits": traits, "composition": l.composition}
+
+
+def plans_de_travail_au_mur(meubles: dict[str, list[Meuble]], niveau) -> dict[str, list[Meuble]]:
+    """Un plan de travail court le long d'un mur, il ne part pas de lui vers le milieu de la pièce.
+
+    La cause : mobilier.pose choisit le sens du meuble d'après la forme de la pièce, puis _contre_un_mur tire le mur au hasard ;
+    2,40 m × 0,60 m sur un mur « ouest » se retrouve en travers. On ne touche pas à mobilier.py (le hasard « mobilier- » fait les
+    anciens jeux) : sous --lot2, le meuble posé de travers est retourné contre un mur. Sans hasard : plan et plan_sans_mobilier
+    voient le même. S'il ne tient nulle part sans gêner une porte ou un autre meuble, il disparaît."""
+    pieces = {p.id: p for p in niveau.pieces}
+    sortie = {}
+    for pid, lst in meubles.items():
+        p = pieces[pid]
+        sortie[pid] = list(lst)
+        for i, m in enumerate(lst):
+            if m.type != "plan_de_travail" or _longe_un_mur(m, p.rect):
+                continue
+            autres = [_boite_meuble(x) for j, x in enumerate(sortie[pid]) if j != i and x is not None]
+            neuf = _le_long_d_un_mur(m, p, _zones_de_battement(p, niveau.ouvertures) + list(p.interdits), autres)
+            sortie[pid][i] = Meuble(m.type, _rect(neuf.x0, neuf.y0, neuf.x1, neuf.y1), m.hauteur, m.forme) if neuf else None
+        sortie[pid] = [m for m in sortie[pid] if m is not None]
+    return sortie
+
+
+def _boite_meuble(m: Meuble) -> Rect:
+    xs, ys = [q[0] for q in m.contour], [q[1] for q in m.contour]
+    return Rect(min(xs), min(ys), max(xs), max(ys))
+
+
+def _longe_un_mur(m: Meuble, r: Rect, jeu: int = 100) -> bool:
+    b = _boite_meuble(m)
+    if b.largeur >= b.hauteur:
+        return b.y0 - r.y0 <= jeu or r.y1 - b.y1 <= jeu
+    return b.x0 - r.x0 <= jeu or r.x1 - b.x1 <= jeu
+
+
+def _le_long_d_un_mur(m: Meuble, p, interdits: list[Rect], autres: list[Rect], marge: int = 50) -> Rect | None:
+    """Le rectangle retourné, le plus près possible de sa place d'origine."""
+    b, r = _boite_meuble(m), p.rect
+    long_, prof = max(b.largeur, b.hauteur), min(b.largeur, b.hauteur)
+    centre_x, centre_y = (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2
+    candidats = []
+    if r.largeur >= long_ + 2 * marge:
+        pas_x = range(int(r.x0 + marge), int(r.x1 - marge - long_) + 1, 100)
+        for y in (r.y0 + marge, r.y1 - marge - prof):
+            candidats += [Rect(x, y, x + long_, y + prof) for x in pas_x]
+    if r.hauteur >= long_ + 2 * marge:
+        pas_y = range(int(r.y0 + marge), int(r.y1 - marge - long_) + 1, 100)
+        for x in (r.x0 + marge, r.x1 - marge - prof):
+            candidats += [Rect(x, y, x + prof, y + long_) for y in pas_y]
+    candidats.sort(key=lambda c: abs((c.x0 + c.x1) / 2 - centre_x) + abs((c.y0 + c.y1) / 2 - centre_y))
+    for c in candidats:
+        if _libre(c, interdits, autres):
+            return c
+    return None
 
 
 def garder_fixes(meubles: dict) -> dict:
@@ -443,6 +793,21 @@ def marges_lot2(style, marges: tuple[int, int, int, int], nb_pieces: int) -> tup
         bas = max(bas, math.ceil(3.5 * t))
     if l.surface_totale and style.surfaces:
         droite = max(droite, math.ceil(_largeur_colonne_surface(style) + 3 * t))
+    for e in l.exterieurs:  # la profondeur de l'extérieur, sans quoi il sortirait de l'image
+        place = math.ceil(e["profondeur_m"] * style.px_par_m + 40)
+        if e["cote"] == "bas":
+            bas = max(bas, place)
+        else:
+            droite = max(droite, place)
+    if l.numero_lot:
+        lignes = 3.6 if "{type}" in l.numero_lot else 2.6
+        depart = RECUL_COTE + 1.6 * t if style.cotes and not l.sans_chaines else 10
+        haut = max(haut, math.ceil(depart + lignes * t + 8))
+    if l.placards_fleches:
+        place = math.ceil(_debut_tableau(style) + _police(style.police, _taille_placard(style)).getlength("Placard 10") + 14)
+        gauche, droite = max(gauche, place), max(droite, place)
+    if l.pastilles == "legende":
+        droite = max(droite, math.ceil(_debut_tableau(style) + _largeur_colonne(style) + 2.2 * t + 20))
     if l.echelle_ecrite and style.cotes:
         haut = max(haut, RECUL_COTE + math.ceil(4.6 * t) + 10)
     if l.tableau and style.surfaces:
@@ -455,6 +820,10 @@ def marges_lot2(style, marges: tuple[int, int, int, int], nb_pieces: int) -> tup
             else:
                 gauche = max(gauche, place)
     return haut, bas, gauche, droite
+
+
+def _taille_placard(style) -> int:
+    return max(9, round(style.taille_texte * 0.8))
 
 
 def _largeur_colonne_surface(style) -> float:
@@ -489,6 +858,8 @@ def _nombre(valeur: float, decimales: int, point: bool = False) -> str:
 
 def format_dimensions(largeur_mm: float, hauteur_mm: float, forme: str) -> str:
     a, b = largeur_mm / 1000, hauteur_mm / 1000
+    if forme.startswith("2.70"):
+        return f"{a:.2f}×{b:.2f}"
     if forme.startswith("3.87"):
         return f"{a:.2f} x {b:.2f} m"
     return f"{_nombre(a, 2)} m × {_nombre(b, 2)} m"
@@ -497,6 +868,29 @@ def format_dimensions(largeur_mm: float, hauteur_mm: float, forme: str) -> str:
 def format_surface(metres_carres: float, l: Lot2, parentheses: bool = False) -> str:
     texte = f"{_nombre(metres_carres, l.surface_decimales, l.surface_point)} m²"
     return f"({texte})" if parentheses else texte
+
+
+def abreger(nom: str) -> str:
+    """fr-108, fr-041 : « Dgt », « Ch. 1 », « Pl. 2 ». Seul le dessin change : le nom et l'identifiant de la pièce restent."""
+    if nom in ABREVIATIONS:
+        return ABREVIATIONS[nom]
+    mot, _, reste = nom.rpartition(" ")
+    if mot in ABREVIATIONS and reste.isdigit():
+        return f"{ABREVIATIONS[mot]} {reste}"
+    return nom
+
+
+def texte_cote(mm: float, l: Lot2) -> str:
+    """Une seule unité sur tout le plan : le lecteur n'admet les centimètres entiers que sans aucune cote « d,dd »."""
+    if l.unite_cotes == "cm":
+        return str(round(mm / 10))
+    return _nombre(mm / 1000, 2, l.cote_point)
+
+
+def texte_metres(mm: float) -> str:
+    """Les logiciels grand public écrivent « 4 m », « 1,8 m », « 4,86 m » (fr-100, fr-102)."""
+    texte = f"{round(mm / 10) / 100:.2f}".rstrip("0").rstrip(".")
+    return f"{texte.replace('.', ',')} m"
 
 
 def tronquer(police, nom: str, place: float) -> str:
@@ -523,29 +917,39 @@ def noms(d) -> None:
     gris = l.couleur_surface if l.couleur_surface is not None else tuple(min(c + 60, 150) for c in couleur)
     if l.etiquettes == "surface":  # fr-063 : dans son cadre, la surface est écrite foncée
         gris = couleur
-    petit = max(8, t0 - 2)
-    plus_petit = max(8, round(t0 * 0.75))
+    # Le stylo écrit plus gros que la machine (fr-086).
+    petit = t0 if l.manuscrit else max(8, t0 - 2)
+    plus_petit = t0 - 1 if l.manuscrit else max(8, round(t0 * 0.75))
     entre_parentheses = l.parentheses_grises or (v is not None and v.parentheses)
-    for p in d.niv.pieces:
+    for k, p in enumerate(d.niv.pieces, 1):
+        if l.placards_fleches and p.sorte == "placard":
+            continue  # fr-080 : son nom est écrit dehors, relié par une flèche
         r = p.rect
         cx, cy = d.px((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2)
-        place = r.largeur * s * 0.9
         lignes = []  # (priorité, texte, taille, couleur, gras, sorte)
-        nom = p.nom.upper() if l.majuscules or (v is not None and v.majuscules) else p.nom
+        nom = abreger(p.nom) if l.abreviations else p.nom
+        nom = nom.upper() if l.majuscules or (v is not None and v.majuscules) else nom
+        sens = _sens_du_texte(d, p, nom)
+        cote_utile = r.hauteur if sens else r.largeur
+        place = cote_utile * s * 0.9
         t = t0
-        if st.noms:
+        ecrit_dedans = l.pastilles != "legende"  # sinon le nom et la surface sont dans la légende
+        if l.pastilles and min(r.largeur, r.hauteur) * s > 2.4 * t0:
+            lignes.append((-1, str(k), max(9, round(t0 * 0.85)), couleur, False, "pastille"))
+        if st.noms and ecrit_dedans:
             if l.noms_tronques:
                 nom = tronquer(_police(st.police, t0), nom, place)
             else:
                 if l.noms_courts and _police(st.police, t0).getlength(nom) > place:
-                    nom = ABREVIATIONS.get(p.nom, nom)
+                    nom = abreger(p.nom)
+                    nom = nom.upper() if l.majuscules or (v is not None and v.majuscules) else nom
                 while t > 9 and _police(st.police, t).getlength(nom) > place:
                     t -= 1
             lignes.append((0, nom, t, couleur, l.noms_gras, "nom"))
-        if st.surfaces and not l.noms_courts:
+        if st.surfaces and not l.noms_courts and ecrit_dedans:
             surface = format_surface(surface_piece(p) / 1e6, l, entre_parentheses)
             dims = format_dimensions(r.largeur, r.hauteur, l.format_dimensions) if l.dimensions else ""
-            if dims and _police(st.police, plus_petit).getlength(dims) > r.largeur * s * 0.95:
+            if dims and _police(st.police, plus_petit).getlength(dims) > cote_utile * s * 0.95:
                 dims = ""  # trop large pour la pièce : il déborderait sur le mur
             if dims:
                 lignes.append((1, dims, plus_petit, gris, False, "mesure"))
@@ -558,7 +962,23 @@ def noms(d) -> None:
         if sol:
             mention = f"sol {sol}"
             lignes.append((4, f"({mention})" if l.mention_sol == "(sol)" else mention, plus_petit, gris, False, "sol"))
-        _poser_lignes(d, p, lignes, cx, cy)
+        _poser_lignes(d, p, lignes, cx, cy, sens)
+
+
+def _sens_du_texte(d, p, nom: str) -> int:
+    """0 : à plat ; +1 : se lit de bas en haut (fr-067, fr-102) ; -1 : de haut en bas (fr-055).
+
+    Une pièce coupée en biais reste à plat : sa boîte déborde de son contour, le texte tourné y toucherait le mur."""
+    st, l = d.style, d.style.lot2
+    if not l.textes_verticaux or p.contour:
+        return 0
+    s = d.rep.s
+    longueur = _police(st.police, st.taille_texte).getlength(nom)
+    if longueur > p.rect.hauteur * s * 0.9:
+        return 0  # il ne tiendrait pas non plus debout
+    if l.textes_verticaux == "toutes":
+        return -1
+    return 1 if longueur > p.rect.largeur * s * 0.9 else 0
 
 
 def _texte_hsp(d, l: Lot2) -> str:
@@ -571,15 +991,10 @@ def _texte_hsp(d, l: Lot2) -> str:
 
 
 def _hauteur_ligne(ligne: tuple) -> float:
-    return ligne[2] * (3.4 if ligne[5] == "cercle" else 1.25)
+    return ligne[2] * {"cercle": 3.4, "pastille": 2.3}.get(ligne[5], 1.25)
 
 
-def _poser_lignes(d, p, lignes: list[tuple], cx: float, cy: float) -> None:
-    """Écrit ce qui tient dans la hauteur de la pièce, par priorité, centré sur la pièce."""
-    st, l = d.style, d.style.lot2
-    s = d.rep.s
-    r = p.rect
-    dispo = r.hauteur * s * 0.95
+def _garder_lignes(lignes: list[tuple], dispo: float) -> tuple[list[tuple], float]:
     gardees, total = [], 0.0
     for ligne in sorted(lignes, key=lambda x: x[0]):
         h = _hauteur_ligne(ligne)
@@ -587,24 +1002,169 @@ def _poser_lignes(d, p, lignes: list[tuple], cx: float, cy: float) -> None:
             continue
         gardees.append(ligne)
         total += h
+    return gardees, total
+
+
+def _poser_lignes(d, p, lignes: list[tuple], cx: float, cy: float, sens: int = 0) -> None:
+    """Écrit ce qui tient dans la hauteur de la pièce, par priorité, centré sur la pièce. `sens` : texte tourné, les
+    lignes se rangent alors de gauche à droite (ou de droite à gauche), dans la largeur de la pièce."""
+    st, l = d.style, d.style.lot2
+    s = d.rep.s
+    r = p.rect
+    dispo = (r.largeur if sens else r.hauteur) * s * 0.95
+    gardees, total = _garder_lignes(lignes, dispo)
+    # Le cercle HSP dessine une forme de 3 lignes : il ne se pose que s'il ne touche ni une ouverture ni le battant d'une
+    # porte (petites pièces). Sans lui, les autres lignes se recentrent.
+    for ligne in gardees:
+        if ligne[5] == "cercle":
+            y = cy - total / 2 + sum(_hauteur_ligne(x) for x in gardees[:gardees.index(ligne)]) + _hauteur_ligne(ligne) / 2
+            if sens or not cercle_tient(d, p, cx, y, _rayon_cercle_hsp(ligne[2])):
+                gardees, total = _garder_lignes([x for x in lignes if x[5] != "cercle"], dispo)
+            break
     if not gardees:
         return
-    gardees.sort(key=lambda x: x[0])
-    if l.etiquettes:
+    if l.etiquettes and not sens:
         _etiquette(d, p, gardees, cx, cy, total)
-    y = cy - total / 2
+    position = -total / 2
     for _, texte, taille, couleur, gras, sorte in gardees:
         h = _hauteur_ligne((0, texte, taille, couleur, gras, sorte))
-        if sorte == "cercle":
-            _cercle_hsp(d, cx, y + h / 2, texte, taille, couleur)
+        milieu = position + h / 2
+        position += h
+        if sens:
+            xy = (cx + sens * milieu, cy)
         else:
-            _ecrire(d, (cx, y + h / 2), texte, taille, couleur, gras)
-        y += h
+            xy = (cx, cy + milieu)
+        if sorte == "cercle":
+            _cercle_hsp(d, xy[0], xy[1], texte, taille, couleur)
+        elif sorte == "pastille":
+            _pastille(d, xy, texte, taille, couleur)
+        elif _a_la_main(l, sorte):
+            texte_main(d, xy, texte, taille, l.couleur_stylo, d.hasard_lot2, sens=sens, souligne=l.souligne and sorte == "nom")
+        elif sens:
+            _texte_tourne(d, xy, texte, taille, couleur, sens, gras)
+        else:
+            _ecrire(d, xy, texte, taille, couleur, gras)
+
+
+def _a_la_main(l: Lot2, sorte: str) -> bool:
+    return l.manuscrit == "tout" or (l.manuscrit == "surfaces" and sorte in ("mesure", "hsp", "sol"))
+
+
+def _texte_tourne(d, xy, texte: str, taille: int, couleur, sens: int, gras: bool = False) -> None:
+    """Comme _Dessin.texte(vertical=True), dans les deux sens : fr-055 se lit de haut en bas, fr-102 de bas en haut."""
+    police = _police(d.style.police, taille)
+    g, h, dr, b = police.getbbox(texte)
+    vignette = Image.new("L", (dr - g + 4, b - h + 4), 0)
+    dessin = ImageDraw.Draw(vignette)
+    dessin.text((2 - g, 2 - h), texte, fill=255, font=police)
+    if gras and taille >= 11:
+        dessin.text((3 - g, 2 - h), texte, fill=255, font=police)
+    _coller(d, xy, vignette.rotate(90 * sens, expand=True), couleur)
+
+
+def _coller(d, xy, vignette: Image.Image, couleur) -> None:
+    x, y = round(xy[0] - vignette.width / 2), round(xy[1] - vignette.height / 2)
+    d.image.paste(Image.new("RGB", vignette.size, couleur), (x, y), vignette)
+
+
+def _boite_px(d, r) -> tuple[float, float, float, float]:
+    x0, y1 = d.px(r.x0, r.y0)
+    x1, y0 = d.px(r.x1, r.y1)
+    return min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)
+
+
+def _rayon_cercle_hsp(taille: int) -> float:
+    return taille * 1.55
+
+
+def cercle_tient(d, p, cx: float, cy: float, rayon: float) -> bool:
+    """Le cercle reste dans la pièce sans toucher une ouverture ni le battant d'une porte. Boîtes comparées au cercle :
+    2 pixels de marge, le trait du cercle a son épaisseur."""
+    rayon += 2
+    x0, y0, x1, y1 = _boite_px(d, p.rect)
+    if cx - rayon < x0 or cx + rayon > x1 or cy - rayon < y0 or cy + rayon > y1:
+        return False
+    obstacles = [rect_de_l_ouverture(o) for o in d.niv.ouvertures] + _zones_de_battement(p, d.niv.ouvertures) + list(p.interdits)
+    for r in obstacles:
+        bx0, by0, bx1, by1 = _boite_px(d, r)
+        ecart_x = max(bx0 - cx, 0.0, cx - bx1)
+        ecart_y = max(by0 - cy, 0.0, cy - by1)
+        if ecart_x * ecart_x + ecart_y * ecart_y < rayon * rayon:
+            return False
+    return True
+
+
+def _pastille(d, xy, texte: str, taille: int, couleur) -> None:
+    """fr-059 : un disque foncé, le numéro en blanc. Pas de glyphe ①② : Inter et Liberation ne l'ont pas."""
+    rayon = taille * 1.05
+    cx, cy = xy
+    d.d.ellipse((cx - rayon, cy - rayon, cx + rayon, cy + rayon), fill=couleur)
+    d.texte(xy, texte, taille, (255, 255, 255))
+
+
+# ---------------------------------------------------------------- l'écriture à la main
+
+
+def _vignette_main(texte: str, taille: int, rng: random.Random) -> Image.Image:
+    """Le mot, lettre par lettre : chaque glyphe de DejaVuSans (la seule police à avoir « ² » et « × ») tourné, décalé, un peu
+    plus ou moins grand, sur une pente propre au mot. Aucune police téléchargée : c'est une écriture régulière, pas une vraie
+    main (fr-086, fr-112 sont plus libres)."""
+    cote = int(taille * 2.2) + 6
+    toile = Image.new("L", (int(taille * 0.95 * (len(texte) + 2)) + 2 * cote, cote + 8), 0)
+    pente = rng.uniform(0.08, 0.32)
+    epais = taille >= 22 and rng.random() < 0.5  # DejaVu est déjà épaisse : en dessous, le filtre bouche les chiffres
+    x, ondule = float(cote / 2), rng.uniform(0, 6.3)
+    for i, lettre in enumerate(texte):
+        if lettre == " ":
+            x += taille * rng.uniform(0.3, 0.45)
+            continue
+        t = max(7, round(taille * rng.uniform(0.9, 1.1)))
+        police = _police("DejaVuSans.ttf", t)
+        g = Image.new("L", (cote, cote), 0)
+        ImageDraw.Draw(g).text((cote / 2, cote * 0.62), lettre, fill=255, font=police, anchor="ms")
+        g = g.rotate(rng.uniform(-7, 7), resample=Image.BILINEAR)
+        g = g.transform(g.size, Image.AFFINE, (1, pente, -pente * cote * 0.62, 0, 1, 0), resample=Image.BILINEAR)
+        if epais:
+            g = g.filter(ImageFilter.MaxFilter(3))
+        avance = police.getlength(lettre)
+        gx = round(x + avance / 2 - cote / 2 + rng.uniform(-1, 1))
+        gy = round(4 + taille * 0.1 * math.sin(ondule + i * 0.8) + rng.uniform(-1, 1))
+        boite = (gx, gy, gx + cote, gy + cote)
+        toile.paste(ImageChops.lighter(toile.crop(boite), g), boite)
+        x += avance * rng.uniform(0.88, 1.02)
+    zone = toile.getbbox()
+    return toile.crop(zone) if zone else toile
+
+
+def texte_main(d, xy, texte: str, taille: int, couleur, rng: random.Random, sens: int = 0, souligne: bool = False) -> None:
+    """Écrit au stylo. `rng` vient de la clé « lot2-dessin- » : plan et plan_sans_mobilier ont le même tremblé."""
+    vignette = _vignette_main(texte, taille, rng)
+    if souligne:  # fr-112 : les noms soulignés d'un trait à la main
+        large = Image.new("L", (vignette.width, vignette.height + 6), 0)
+        large.paste(vignette, (0, 0))
+        y = vignette.height + 2
+        ImageDraw.Draw(large).line([(0, y + rng.randint(-1, 1)), (vignette.width // 2, y + rng.randint(-1, 1)),
+                                    (vignette.width - 1, y + rng.randint(-1, 1))], fill=255, width=max(1, taille // 12))
+        vignette = large
+    if sens:
+        vignette = vignette.rotate(90 * sens, expand=True)
+    _coller(d, xy, vignette, couleur)
+
+
+def ecrivain_cotes(d):
+    """La fonction qui écrit les cotes : d.texte, ou le stylo. Même signature, pour que rendu.chaine n'ait qu'une ligne de plus."""
+    l = d.style.lot2
+    if not l.manuscrit:
+        return d.texte
+
+    def ecrire(xy, texte, taille, couleur, ancre="mm", vertical=False):
+        texte_main(d, xy, texte, taille, l.couleur_stylo, d.hasard_lot2, sens=1 if vertical else 0)
+    return ecrire
 
 
 def _cercle_hsp(d, cx: float, cy: float, valeur: str, taille: int, couleur) -> None:
     """fr-105 : « HSP 2.50 » dans un cercle."""
-    rayon = taille * 1.55
+    rayon = _rayon_cercle_hsp(taille)
     d.d.ellipse((cx - rayon, cy - rayon, cx + rayon, cy + rayon), outline=couleur, width=1)
     d.texte((cx, cy - taille * 0.55), "HSP", taille, couleur)
     d.texte((cx, cy + taille * 0.55), valeur, taille, couleur)
@@ -679,11 +1239,31 @@ def remplir_meuble(d, m, pts) -> None:
 # ---------------------------------------------------------------- ce qui se dessine à la fin
 
 
+def avant_tout(d, rng: random.Random) -> None:
+    """Appelé au début de _Dessin.tout : ce qui se trouve sous les murs et les pièces."""
+    if d.style.lot2.exterieurs:
+        exterieurs(d, rng)
+
+
 def apres_tout(d, rng: random.Random) -> None:
     """Appelé à la fin de _Dessin.tout : par-dessus le plan et dans les marges réservées."""
     st, l = d.style, d.style.lot2
     if l.triangles:
         triangles(d)
+    if st.cotes and l.cotes_interieures:
+        cotes_interieures(d, rng)
+    if st.cotes and l.cotes_par_mur:
+        cotes_par_mur(d, rng)
+    if l.cercles_pmr:
+        cercles_pmr(d, rng)
+    if l.mentions_menuiseries:
+        mentions_menuiseries(d)
+    if l.placards_fleches:
+        placards_fleches(d)
+    if l.numero_lot:
+        numero_lot(d)
+    if l.pastilles == "legende":
+        legende_pastilles(d)
     if st.cotes and l.cotes_interieures_rouges and l.couleur_cotes is not None:
         cotes_interieures_rouges(d, rng)
     if st.cotes and l.echelle_ecrite:
@@ -877,3 +1457,426 @@ def _tableau_bas(d, lignes: list[tuple[str, str]], total: str) -> None:
         d.d.line(((xc, y_haut), (xc, y)), fill=couleur, width=1)
     ligne = f"Surface loi Carrez totale : {total} m²" if l.tableau_bordures else f"TOTAL {total} m²"
     _ecrire(d, (x0 + largeur / 2, y + pas * 0.9), ligne, taille, couleur, gras=True)
+
+
+# ---------------------------------------------------------------- trait 3 : les plans de vente du neuf
+
+
+def _cote_fine(d, a, b, horizontale: bool, texte: str, taille: int, couleur, ligne, sur_le_trait: bool = False) -> None:
+    """Un trait de cote fin, de mur à mur, avec ses marques. `sur_le_trait` : le trait s'interrompt pour le nombre (fr-100) ;
+    sinon le nombre est posé à côté (fr-108, fr-110)."""
+    ecrire = ecrivain_cotes(d)
+    longueur = _police(d.style.police, taille).getlength(texte)
+    marque = max(3, round(taille * 0.3))
+    mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+    if horizontale:
+        if sur_le_trait:
+            d.d.line((a, (mx - longueur / 2 - 3, my)), fill=ligne, width=1)
+            d.d.line(((mx + longueur / 2 + 3, my), b), fill=ligne, width=1)
+        else:
+            d.d.line((a, b), fill=ligne, width=1)
+        for x, y in (a, b):
+            d.d.line(((x, y - marque), (x, y + marque)), fill=ligne, width=1)
+        ecrire((mx, my if sur_le_trait else my - taille * 0.75), texte, taille, couleur)
+    else:
+        if sur_le_trait:
+            d.d.line((a, (mx, my + longueur / 2 + 3)), fill=ligne, width=1)
+            d.d.line(((mx, my - longueur / 2 - 3), b), fill=ligne, width=1)
+        else:
+            d.d.line((a, b), fill=ligne, width=1)
+        for x, y in (a, b):
+            d.d.line(((x - marque, y), (x + marque, y)), fill=ligne, width=1)
+        ecrire((mx if sur_le_trait else mx - taille * 0.75, my), texte, taille, couleur, vertical=True)
+
+
+def _couleurs_cotes(d) -> tuple:
+    l = d.style.lot2
+    return (l.couleur_cotes or d.style.textes), (l.couleur_cotes or d.style.traits)
+
+
+def cotes_interieures(d, rng: random.Random) -> None:
+    """fr-108, fr-110 : dans chaque pièce, un trait de mur à mur dans chaque sens, près d'un bord (le centre est pour le nom).
+    La longueur écrite est la vraie, dans l'unité du plan."""
+    st, l = d.style, d.style.lot2
+    taille = max(9, round(st.taille_texte * l.taille_cotes))
+    couleur, ligne = _couleurs_cotes(d)
+    police = _police(st.police, taille)
+    for p in d.niv.pieces:
+        if p.contour:
+            continue  # le bout d'un trait tomberait dans le coin coupé : une cote fausse apprise
+        r = p.rect
+        if r.largeur > 1000 and r.largeur * d.rep.s > 2 * police.getlength(texte_cote(r.largeur, l)):
+            recul = min(rng.uniform(220, 520), r.hauteur * 0.22)
+            y = r.y1 - recul if rng.random() < 0.5 else r.y0 + recul
+            _cote_fine(d, d.px(r.x0, y), d.px(r.x1, y), True, texte_cote(r.largeur, l), taille, couleur, ligne)
+        if r.hauteur > 1000 and r.hauteur * d.rep.s > 2 * police.getlength(texte_cote(r.hauteur, l)):
+            recul = min(rng.uniform(220, 520), r.largeur * 0.22)
+            x = r.x1 - recul if rng.random() < 0.5 else r.x0 + recul
+            _cote_fine(d, d.px(x, r.y0), d.px(x, r.y1), False, texte_cote(r.hauteur, l), taille, couleur, ligne)
+
+
+def cercles_pmr(d, rng: random.Random) -> None:
+    """Le cercle de giration de 1,50 m (fr-041, fr-108), en pointillé avec sa croix, décalé du nom. Du fond pour le masque."""
+    r_mm = 750
+    candidates = [p for p in d.niv.pieces if p.sorte in ("sdb", "sde", "wc", "chambre", "sejour", "principale", "cuisine")
+                  and not p.contour and min(p.rect.largeur, p.rect.hauteur) >= 1600]
+    rng.shuffle(candidates)
+    couleur = d.style.traits
+    for p in candidates[:rng.randint(1, 3)]:
+        r = p.rect
+        x = rng.uniform(r.x0 + r_mm + 40, r.x1 - r_mm - 40)
+        y = rng.uniform(r.y0 + r_mm + 40, r.y1 - r_mm - 40)
+        cx, cy = d.px(x, y)
+        rr = r_mm * d.rep.s
+        for a in range(0, 360, 20):
+            d.d.arc((cx - rr, cy - rr, cx + rr, cy + rr), a, a + 10, fill=couleur, width=1)
+        croix = max(3, rr * 0.08)
+        d.d.line(((cx - croix, cy), (cx + croix, cy)), fill=couleur, width=1)
+        d.d.line(((cx, cy - croix), (cx, cy + croix)), fill=couleur, width=1)
+
+
+def mentions_menuiseries(d) -> None:
+    """« VR », « PF » juste dehors, le long de chaque fenêtre d'un mur extérieur (fr-041, fr-110)."""
+    st = d.style
+    taille = max(8, round(st.taille_texte * 0.6))
+    for o in d.niv.ouvertures:
+        m = o.mur
+        if o.type not in MENTIONS or not m.dehors:
+            continue
+        milieu = (o.u0 + o.u1) / 2
+        ecart = m.epaisseur / 2 + taille * 0.9 / d.rep.s
+        x, y = (m.axe + m.dehors * ecart, milieu) if m.vertical else (milieu, m.axe + m.dehors * ecart)
+        d.texte(d.px(x, y), MENTIONS[o.type], taille, st.textes)
+
+
+def numero_lot(d) -> None:
+    """Le numéro de lot, gros, en haut de page (fr-106 : « 45 »). « T3 G206 60.44 m² » (fr-108) porte la vraie surface, et
+    celle-ci demande la permission des surfaces : --sans-cotes n'écrit aucune mesure."""
+    st, l = d.style, d.style.lot2
+    t = st.taille_texte
+    x, y = d.rep.largeur0 / 2, 4 + 1.3 * t
+    if "{type}" not in l.numero_lot:
+        _ecrire(d, (x, y), l.numero_lot, round(t * 2.2), st.textes, gras=True)
+        return
+    _ecrire(d, (x, y - 0.2 * t), l.numero_lot.replace("{type}", d.log.type), round(t * 1.4), st.textes, gras=True)
+    if st.surfaces:
+        total = sum(surface_piece(p) for p in d.log.pieces) / 1e6
+        _ecrire(d, (x, y + 1.3 * t), f"{total:.2f} m²", round(t * 1.4), st.textes, gras=True)
+
+
+# ---------------------------------------------------------------- trait 6 : les logiciels grand public
+
+
+def cotes_par_mur(d, rng: random.Random) -> None:
+    """fr-100, fr-102 : une cote le long de chaque mur de chaque pièce, le trait interrompu par le nombre. Par pièce plutôt que
+    par mur (écart à la conception) : ces logiciels cotent l'intérieur de la pièce, de face à face, pas l'axe du mur."""
+    st, l = d.style, d.style.lot2
+    taille = max(9, round(st.taille_texte * l.taille_cotes))
+    couleur, ligne = _couleurs_cotes(d)
+    for p in d.niv.pieces:
+        if p.contour:
+            continue
+        r = p.rect
+        for y, garde in ((r.y1 - min(rng.uniform(120, 300), r.hauteur * 0.2), rng.random()),
+                         (r.y0 + min(rng.uniform(120, 300), r.hauteur * 0.2), rng.random())):
+            if r.largeur >= 800 and garde < 0.75:
+                _cote_fine(d, d.px(r.x0, y), d.px(r.x1, y), True, texte_metres(r.largeur), taille, couleur, ligne, sur_le_trait=True)
+        for x, garde in ((r.x0 + min(rng.uniform(120, 300), r.largeur * 0.2), rng.random()),
+                         (r.x1 - min(rng.uniform(120, 300), r.largeur * 0.2), rng.random())):
+            if r.hauteur >= 800 and garde < 0.75:
+                _cote_fine(d, d.px(x, r.y0), d.px(x, r.y1), False, texte_metres(r.hauteur), taille, couleur, ligne, sur_le_trait=True)
+
+
+# ---------------------------------------------------------------- trait 9 : la teinte du scan
+
+
+def teinter(image: np.ndarray, teinte: tuple[float, float, float]) -> np.ndarray:
+    """Après salir : la photocopie passe l'image en gris et effacerait la couleur du papier. Les masques ne passent pas par ici."""
+    return np.clip(image.astype(np.float32) * np.array(teinte, np.float32), 0, 255).astype(np.uint8)
+
+
+# ---------------------------------------------------------------- trait 14 : la légende des pastilles
+
+
+def legende_pastilles(d) -> None:
+    """« ① Séjour 17,85 m² » à droite du plan. La surface demande la permission des surfaces."""
+    st, l = d.style, d.style.lot2
+    taille = _taille_tableau(st)
+    pas = taille * 2.3
+    x = d.px(d.rep.xmax, 0)[0] + _debut_tableau(st) + taille * 1.2
+    y = max(taille * 1.5, d.px(0, d.rep.ymax)[1])
+    for k, p in enumerate(d.niv.pieces, 1):
+        if y + pas > d.rep.hauteur0:
+            break  # tronquée à la page : elle ne déborde jamais
+        _pastille(d, (x, y + pas / 2), str(k), taille, st.textes)
+        d.texte((x + taille * 1.6, y + pas / 2), p.nom, taille, st.textes, ancre="lm")
+        if st.surfaces:
+            d.texte((x + _largeur_colonne(st) + taille, y + pas / 2), format_surface(surface_piece(p) / 1e6, l), taille, st.textes, ancre="rm")
+        y += pas
+
+
+# ---------------------------------------------------------------- trait 15 : les placards fléchés
+
+
+def placards_fleches(d) -> None:
+    """fr-080, fr-086 : « Placard 2 » dans la marge, une flèche qui traverse les murs jusqu'au placard. Vrai sur les plans, et le
+    masque reste le mur : seule l'image reçoit le trait."""
+    st = d.style
+    taille = _taille_placard(st)
+    milieu = (d.px(d.rep.xmin, 0)[0] + d.px(d.rep.xmax, 0)[0]) / 2
+    droite_prise = d.style.lot2.pastilles == "legende" or any(e["cote"] == "droite" for e, _ in places_des_exterieurs(d))
+    pris: dict[str, list[float]] = {"gauche": [], "droite": []}
+    for p in d.niv.pieces:
+        if p.sorte != "placard":
+            continue
+        r = p.rect
+        cible = d.px((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2)
+        cote = "gauche" if cible[0] < milieu or droite_prise else "droite"
+        y = cible[1]
+        while any(abs(y - q) < taille * 1.6 for q in pris[cote]):  # deux étiquettes ne se recouvrent pas
+            y += taille * 1.6
+        pris[cote].append(y)
+        if cote == "gauche":
+            x = d.px(d.rep.xmin, 0)[0] - _debut_tableau(st)
+            d.texte((x, y), p.nom, taille, st.textes, ancre="rm")
+        else:
+            x = d.px(d.rep.xmax, 0)[0] + _debut_tableau(st)
+            d.texte((x, y), p.nom, taille, st.textes, ancre="lm")
+        _fleche(d, (x, y), cible, st.textes)
+
+
+def _fleche(d, depart, pointe, couleur) -> None:
+    d.d.line((depart, pointe), fill=couleur, width=max(1, d.fin))
+    a = math.atan2(pointe[1] - depart[1], pointe[0] - depart[0])
+    t = max(6, round(d.style.taille_texte * 0.45))
+    d.d.polygon([pointe, (pointe[0] - t * math.cos(a - 0.4), pointe[1] - t * math.sin(a - 0.4)),
+                 (pointe[0] - t * math.cos(a + 0.4), pointe[1] - t * math.sin(a + 0.4))], fill=couleur)
+
+
+# ---------------------------------------------------------------- trait 17 : les escaliers
+
+
+def colimacon(d, x0: float, y0: float, x1: float, y1: float) -> None:
+    """fr-093 : un cercle de marches au bout de la cage, le reste en marches droites. Seul le dessin change : le meuble, ses
+    annotations et la carte de hauteur (12 bandes droites, une approximation assumée) restent ceux de l'escalier droit."""
+    couleur = d.style.traits
+    gx, hy = d.px(x0, y1)
+    dx, by = d.px(x1, y0)
+    largeur, hauteur = dx - gx, by - hy
+    rayon = min(largeur, hauteur) / 2 * 0.96
+    au_debut = d.log.graine % 2 == 0  # sans hasard : un seul bout par logement, aux deux niveaux
+    if largeur >= hauteur:
+        cx, cy = (gx + rayon + 2, (hy + by) / 2) if au_debut else (dx - rayon - 2, (hy + by) / 2)
+    else:
+        cx, cy = ((gx + dx) / 2, hy + rayon + 2) if au_debut else ((gx + dx) / 2, by - rayon - 2)
+    noyau = max(3.0, 75 * d.rep.s)
+    d.d.ellipse((cx - rayon, cy - rayon, cx + rayon, cy + rayon), outline=couleur, width=d.fin)
+    d.d.ellipse((cx - noyau, cy - noyau, cx + noyau, cy + noyau), outline=couleur, width=d.fin)
+    n = 13
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        d.d.line(((cx + noyau * math.cos(a), cy + noyau * math.sin(a)), (cx + rayon * math.cos(a), cy + rayon * math.sin(a))),
+                 fill=couleur, width=d.fin)
+    # La flèche du sens de montée, courbe, à mi-marche.
+    moyen = (rayon + noyau) / 2
+    d.d.arc((cx - moyen, cy - moyen, cx + moyen, cy + moyen), 30, 250, fill=couleur, width=d.fin)
+    bout = math.radians(250)
+    px_, py_ = cx + moyen * math.cos(bout), cy + moyen * math.sin(bout)
+    t = max(5, round(rayon * 0.14))
+    d.d.polygon([(px_ + t * 0.9, py_ + t * 0.2), (px_ - t * 0.4, py_ - t * 0.6), (px_ - t * 0.4, py_ + t * 0.8)], fill=couleur)
+    # 2 ou 3 marches droites de départ dans ce qui reste de la cage.
+    pas = 260 * d.rep.s
+    for k in range(1, 4):
+        if largeur >= hauteur:
+            x = (cx + rayon + k * pas) if au_debut else (cx - rayon - k * pas)
+            if gx < x < dx:
+                d.d.line(((x, hy), (x, by)), fill=couleur, width=d.fin)
+        else:
+            y = (cy + rayon + k * pas) if au_debut else (cy - rayon - k * pas)
+            if hy < y < by:
+                d.d.line(((gx, y), (dx, y)), fill=couleur, width=d.fin)
+
+
+def fleche_acces(d, x0: float, y0: float, x1: float, y1: float) -> None:
+    """fr-120 : les marches droites habituelles, une pointe au bout de la flèche et « ACCES ETAGE » écrit dans la cage, le long
+    de la flèche, côté pointe (le nom de la pièce est au milieu)."""
+    st = d.style
+    couleur = st.traits
+    gx, hy = d.px(x0, y1)
+    dx, by = d.px(x1, y0)
+    t = max(5, round(st.taille_texte * 0.4))
+    taille = max(8, round(st.taille_texte * 0.7))
+    texte = "ACCES ETAGE" if d.niv.index == 0 else "ACCES RDC"
+    longueur = _police(st.police, taille).getlength(texte)
+    if dx - gx >= by - hy:  # la flèche de mobilier._escalier suit le grand côté, au milieu de la cage
+        pointe = (dx - 150 * d.rep.s, (hy + by) / 2)
+        d.d.polygon([pointe, (pointe[0] - t, pointe[1] - t / 2), (pointe[0] - t, pointe[1] + t / 2)], fill=couleur)
+        if longueur < (dx - gx) * 0.45:
+            d.texte((dx - longueur / 2 - 4, (hy + by) / 2 - taille * 0.9), texte, taille, st.textes)
+    else:
+        pointe = ((gx + dx) / 2, hy + 150 * d.rep.s)
+        d.d.polygon([pointe, (pointe[0] - t / 2, pointe[1] + t), (pointe[0] + t / 2, pointe[1] + t)], fill=couleur)
+        if longueur < (by - hy) * 0.45:
+            d.texte(((gx + dx) / 2 - taille * 0.9, hy + longueur / 2 + 4), texte, taille, st.textes, vertical=True)
+
+
+# ---------------------------------------------------------------- trait 18 et balcons du trait 4 : les extérieurs
+
+
+def places_des_exterieurs(d) -> list[tuple[dict, Rect]]:
+    """Où tombe chaque extérieur, en mm : contre la face d'un mur extérieur droit, sans mordre sur rien. Sans hasard ; un
+    extérieur qui ne trouve pas de place n'est pas dessiné (la marge réservée reste, ce n'est que du blanc)."""
+    deja = getattr(d, "_places_exterieurs", None)
+    if deja is not None:
+        return deja
+    obstacles = [p.rect for p in d.niv.pieces] + [rect_du_mur(m) for m in d.niv.murs]
+    for m in d.niv.murs_libres:  # A3 : pas de balcon sur un pan coupé
+        xs, ys = [q[0] for q in m.polygone], [q[1] for q in m.polygone]
+        obstacles.append(Rect(min(xs), min(ys), max(xs), max(ys)))
+    places = []
+    for e in d.style.lot2.exterieurs:
+        r = _place_exterieur(d.niv, e, obstacles)
+        if r is not None:
+            places.append((e, r))
+            obstacles.append(r)
+    d._places_exterieurs = places
+    return places
+
+
+def _place_exterieur(niv, e: dict, obstacles: list[Rect]) -> Rect | None:
+    droite = e["cote"] == "droite"
+    dehors = 1 if droite else -1
+    murs = [m for m in niv.murs if m.dehors == dehors and m.vertical == droite and m.fin - m.debut >= 1500]
+
+    def fenetres(m):
+        return [o for o in niv.ouvertures if o.mur is m and o.type != "porte"]
+
+    def rang(m):  # un balcon se trouve devant une porte-fenêtre, à défaut une fenêtre
+        f = fenetres(m)
+        return (any(o.type == "porte_fenetre" for o in f), bool(f), m.fin - m.debut)
+
+    prof = e["profondeur_m"] * 1000
+    for m in sorted(murs, key=rang, reverse=True):
+        longueur_mur = m.fin - m.debut
+        long_ = e["part"] * longueur_mur
+        f = sorted(fenetres(m), key=lambda o: o.type != "porte_fenetre")
+        if f:
+            long_ = max(long_, f[0].u1 - f[0].u0 + 400)
+            centre = (f[0].u0 + f[0].u1) / 2
+        else:
+            centre = m.debut + e["position"] * longueur_mur
+        long_ = min(long_, longueur_mur)
+        u0 = min(max(centre - long_ / 2, m.debut), m.fin - long_)
+        face = m.axe + dehors * m.epaisseur / 2
+        r = Rect(face, u0, face + prof, u0 + long_) if droite else Rect(u0, face - prof, u0 + long_, face)
+        if all(r.x1 <= z.x0 + 1 or z.x1 <= r.x0 + 1 or r.y1 <= z.y0 + 1 or z.y1 <= r.y0 + 1 for z in obstacles):
+            return r
+    return None
+
+
+def exterieurs(d, rng: random.Random) -> None:
+    """Dessiné en premier : rien du logement n'est recouvert, et aucun masque n'est touché, l'extérieur reste du fond."""
+    for e, r in places_des_exterieurs(d):
+        boite = _boite_px(d, r)
+        if e["couleur"]:
+            d.d.rectangle(boite, fill=tuple(e["couleur"]))
+        _motif_exterieur(d, boite, e, r, rng)
+        _contour_exterieur(d, boite, e["contour"])
+        _legende_exterieur(d, e, r, boite)
+
+
+def _motif_exterieur(d, boite, e: dict, r: Rect, rng: random.Random) -> None:
+    motif = e["motif"]
+    x0, y0, x1, y1 = (round(v) for v in boite)
+    w, h = max(1, x1 - x0), max(1, y1 - y0)
+    couche = Image.new("L", (w, h), 0)
+    c = ImageDraw.Draw(couche)
+    s = d.rep.s
+    if motif == "lattes":  # fr-084, perpendiculaires au mur
+        pas = max(4, round(150 * s))
+        if e["cote"] == "bas":
+            for k in range(0, w, pas):
+                c.line([(k, 0), (k, h)], fill=255)
+        else:
+            for k in range(0, h, pas):
+                c.line([(0, k), (w, k)], fill=255)
+    elif motif == "carrelage":  # fr-036, fr-062
+        pas = max(8, round(600 * s))
+        for k in range(0, w, pas):
+            c.line([(k, 0), (k, h)], fill=255)
+        for k in range(0, h, pas):
+            c.line([(0, k), (w, k)], fill=255)
+    elif motif in ("hachures", "croisillons"):  # fr-037
+        pas = max(5, round(250 * s))
+        for k in range(-h, w, pas):
+            c.line([(k, 0), (k + h, h)], fill=255)
+            if motif == "croisillons":
+                c.line([(k, h), (k + h, 0)], fill=255)
+    elif motif == "herbe":  # fr-084 : des touffes semées
+        for _ in range(max(6, round((r.x1 - r.x0) * (r.y1 - r.y0) / 1e6 * 2.5))):
+            x, y = rng.uniform(8, max(9, w - 8)), rng.uniform(8, max(9, h - 8))
+            for dx in (-4, 0, 4):
+                c.line([(x, y), (x + dx, y - 7)], fill=255)
+    couleur = tuple(min(v + 30, 150) for v in d.style.traits)
+    d.image.paste(Image.new("RGB", (w, h), couleur), (x0, y0), couche)
+    if e["sorte"] == "jardin":  # des arbres : cercles concentriques
+        for _ in range(rng.randint(3, 8)):
+            rayon = rng.uniform(300, 700) * s
+            if w <= 2 * rayon + 4 or h <= 2 * rayon + 4:
+                continue
+            cx, cy = rng.uniform(x0 + rayon + 2, x1 - rayon - 2), rng.uniform(y0 + rayon + 2, y1 - rayon - 2)
+            for k in (1.0, 0.6, 0.2):
+                d.d.ellipse((cx - rayon * k, cy - rayon * k, cx + rayon * k, cy + rayon * k), outline=(90, 130, 80), width=1)
+
+
+def _contour_exterieur(d, boite, contour: str) -> None:
+    st = d.style
+    x0, y0, x1, y1 = boite
+    if contour == "pointille":  # fr-080 : gros pointillés noirs
+        cotes = [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]
+        tiret = max(6, round(st.taille_texte * 0.5))
+        for (a, b), (e, f) in cotes:
+            n = math.hypot(e - a, f - b)
+            for k in range(0, int(n), 2 * tiret):
+                t0, t1 = k / max(n, 1), min(k + tiret, n) / max(n, 1)
+                d.d.line(((a + (e - a) * t0, b + (f - b) * t0), (a + (e - a) * t1, b + (f - b) * t1)), fill=st.textes, width=2)
+        return
+    if contour == "gris":  # fr-102 : un large trait de la couleur des murs, en plus fin qu'un vrai mur
+        d.d.rectangle(boite, outline=st.murs, width=max(2, round(st.px_par_m * 0.05)))
+    elif contour == "moyen":  # fr-084
+        d.d.rectangle(boite, outline=st.textes, width=2)
+    else:
+        d.d.rectangle(boite, outline=st.traits, width=1)
+
+
+def _legende_exterieur(d, e: dict, r: Rect, boite) -> None:
+    """« Balcon », et sa surface si le plan a le droit d'écrire des surfaces (fr-112, fr-065 : « Jardin (48 m²) »)."""
+    st, l = d.style, d.style.lot2
+    nom = {"balcon": "Balcon", "terrasse": "Terrasse", "jardin": "Jardin"}[e["sorte"]]
+    if e.get("numero", 1) > 1:
+        nom += f" {e['numero']}"
+    nom = nom.upper() if l.majuscules else nom
+    x0, y0, x1, y1 = boite
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    taille = max(9, round(st.taille_texte * 0.85))
+    police = _police(st.police, taille)
+    surface = format_surface((r.x1 - r.x0) * (r.y1 - r.y0) / 1e6, l) if st.surfaces and not l.noms_courts else ""
+    if surface and police.getlength(surface) < (x1 - x0) * 0.9 and y1 - y0 > taille * 3:
+        cy -= taille * 0.65
+        _ecrire_exterieur(d, (cx, cy + taille * 1.3), surface, taille, "mesure")
+    if police.getlength(nom) < (x1 - x0) * 0.9 and y1 - y0 > taille * 1.4:
+        _ecrire_exterieur(d, (cx, cy), nom, taille, "nom")
+    if st.cotes and l.cotes_interieures and x1 - x0 > 120 and y1 - y0 > 90:
+        # fr-036 : la terrasse a aussi ses cotes, dans l'unité du plan.
+        t = max(9, round(st.taille_texte * l.taille_cotes))
+        couleur, ligne = _couleurs_cotes(d)
+        _cote_fine(d, (x0 + 1, y1 - t), (x1 - 1, y1 - t), True, texte_cote(r.x1 - r.x0, l), t, couleur, ligne)
+        _cote_fine(d, (x1 - t, y0 + 1), (x1 - t, y1 - 1), False, texte_cote(r.y1 - r.y0, l), t, couleur, ligne)
+
+
+def _ecrire_exterieur(d, xy, texte: str, taille: int, sorte: str) -> None:
+    st, l = d.style, d.style.lot2
+    if _a_la_main(l, sorte):
+        texte_main(d, xy, texte, taille, l.couleur_stylo, d.hasard_lot2)
+    else:
+        d.texte(xy, texte, taille, st.textes)

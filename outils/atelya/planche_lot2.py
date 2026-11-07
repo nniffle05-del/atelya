@@ -105,7 +105,7 @@ def _releve(rng) -> L.Lot2:
 
 
 # Une vignette par trait du chantier : (titre, plans d'entraînement à comparer, graine, famille, traits forcés).
-VIGNETTES = [
+VIGNETTES_1 = [
     ("Trait 1 agence coloree", ["fr-075", "fr-094", "fr-096"], 60002, "agence_coloree", {}),
     ("Trait 1 agence grise", ["fr-116"], 60005, "agence_coloree", {"palette": "agence_grise", "mobilier_fixes": True, "mobilier_couleur": True}),
     ("Trait 2 releve dimensions", ["fr-098", "fr-117", "fr-076"], 60013, "releve", {}),
@@ -120,6 +120,41 @@ VIGNETTES = [
     ("Trait 19 HsP sol bleu", ["fr-067", "fr-120"], 60013, "neutre", {"hsp": "HsP :", "mention_sol": "(sol)", "palette": "bleu_uni", "couleur_murs": (198, 198, 198), "couleur_textes": (25, 25, 25), "sans_mobilier": True}),
     ("Trait 20 recadre", ["fr-027", "fr-076"], 60013, "murs_noirs", {"recadre": True, "marges": (3, 2, 5, 4)}),
 ]
+
+_BALCON = {"sorte": "balcon", "cote": "bas", "part": 0.6, "position": 0.5, "profondeur_m": 1.5, "motif": "vide", "contour": "pointille", "couleur": None, "numero": 1}
+_TERRASSE_CM = {**_BALCON, "sorte": "terrasse", "profondeur_m": 2.2, "motif": "carrelage", "contour": "fin"}
+_LATTES = {**_BALCON, "sorte": "terrasse", "cote": "droite", "profondeur_m": 2.2, "motif": "lattes", "contour": "moyen"}
+_JARDIN = {**_BALCON, "sorte": "jardin", "part": 1.0, "profondeur_m": 3.5, "motif": "vert", "contour": "gris", "couleur": (125, 235, 100)}
+_JARDIN_HERBE = {**_JARDIN, "cote": "droite", "motif": "herbe", "contour": "moyen", "couleur": None}
+_CM = {"unite_cotes": "cm", "cote_point": False, "cotes_interieures": True, "cercles_pmr": True, "sans_mobilier": False}
+
+VIGNETTES_2 = [
+    ("Trait 3 cm murs noirs", ["fr-108"], 26, "promoteur_gris", {**_CM, "couleur_murs": (10, 10, 10), "palette": "", "murs_dessin": "", "sans_chaines": True, "numero_lot": "{type} G206", "mentions_menuiseries": True, "abreviations": True, "noms_courts": False, "exterieurs": [{**_BALCON, "contour": "moyen"}]}),
+    ("Trait 3 gris double lot", ["fr-106", "fr-110"], 60012, "promoteur_gris", {**_CM, "couleur_murs": (70, 70, 70), "palette": "", "murs_dessin": "double", "epaisseur_trait_mur": 0.12, "sans_chaines": True, "numero_lot": "45", "abreviations": True, "noms_courts": False, "sols": {"sejour": "parquet"}, "couleur_sol": (205, 205, 205), "pas_sol": 0.2}),
+    ("Trait 3 gris moyen", ["fr-109"], 53, "promoteur_gris", {**_CM, "couleur_murs": (125, 125, 125), "palette": "", "murs_dessin": "", "sans_chaines": False, "numero_lot": "A1 14", "mentions_menuiseries": True, "noms_courts": True, "sols": {"chambre": "hachures"}, "couleur_sol": (200, 200, 200), "pas_sol": 0.18}),
+    ("Trait 3 ardoise metres", ["fr-041"], 70, "promoteur_gris", {"unite_cotes": "m", "cote_point": True, "cotes_interieures": True, "cercles_pmr": True, "sans_mobilier": False, "couleur_murs": (66, 74, 78), "palette": "gris_clair", "murs_dessin": "", "sans_chaines": True, "numero_lot": "", "mentions_menuiseries": True, "abreviations": True, "noms_courts": True, "sols": {}}),
+    ("Trait 3 promoteur vif", ["fr-062"], 60012, "promoteur_gris", {**_CM, "couleur_murs": (10, 10, 10), "palette": "promoteur_vif", "murs_dessin": "", "sans_chaines": True, "numero_lot": "", "noms_courts": True, "noms_gras": True, "sols": {}, "exterieurs": [{**_TERRASSE_CM, "couleur": (222, 222, 200)}]}),
+    ("Trait 6 creme", ["fr-100", "fr-102"], 26, "logiciel_public", {"palette": "creme", "couleur_murs": (160, 160, 160), "couleur_cotes": (110, 110, 110), "sans_mobilier": True, "mobilier_couleur": False, "taille_cotes": 0.7, "exterieurs": []}),
+    ("Trait 6 lilas meuble", ["fr-070", "fr-103"], 53, "logiciel_public", {"palette": "lilas", "couleur_murs": (74, 76, 104), "couleur_cotes": (150, 150, 215), "sans_mobilier": False, "mobilier_couleur": True, "taille_cotes": 0.85, "barre_echelle": True, "exterieurs": []}),
+    ("Trait 6 terrasse verte", ["fr-102"], 60, "logiciel_public", {"palette": "creme", "couleur_murs": (165, 165, 165), "couleur_cotes": (100, 100, 100), "sans_mobilier": True, "mobilier_couleur": False, "taille_cotes": 0.9, "exterieurs": [{**_JARDIN, "sorte": "terrasse"}]}),
+    ("Trait 7 etroites", ["fr-067"], 2, "neutre", {"textes_verticaux": "etroites", "couleur_murs": (20, 20, 20)}),
+    ("Trait 7 toutes", ["fr-055"], 60012, "neutre", {"textes_verticaux": "toutes", "couleur_murs": (20, 20, 20), "fenetres_pleines": True, "couleur_fenetres": (120, 190, 240), "murs_dessin": "trait", "epaisseur_trait_mur": 0.25}),
+    ("Trait 9 bleute cm", ["fr-036"], 7, "scan_ancien", {"papier": 228, "contraste": 0.9, "salissure": "grain", "teinte": (0.89, 0.93, 1.0), "unite_cotes": "cm", "cotes_interieures": True, "sans_chaines": True, "noms_courts": True, "dimensions": "", "tableau": "", "murs_dessin": "double", "epaisseur_trait_mur": 0.12, "majuscules": True, "mobilier_fixes": True, "cercles_pmr": True, "manuscrit": "", "rotation": None, "exterieurs": [_TERRASSE_CM]}),
+    ("Trait 9 photocopie legende", ["fr-037", "fr-111"], 26, "scan_ancien", {"papier": 252, "contraste": 0.98, "salissure": "grain", "teinte": None, "unite_cotes": "m", "cotes_interieures": False, "sans_chaines": True, "noms_courts": False, "dimensions": "remplace", "format_dimensions": "2.70×4.33", "tableau": "gauche", "tableau_bordures": False, "murs_dessin": "hachure", "majuscules": False, "mobilier_fixes": True, "cercles_pmr": False, "manuscrit": "", "rotation": None, "exterieurs": [{**_BALCON, "motif": "croisillons", "contour": "fin"}]}),
+    ("Trait 11 surfaces au stylo", ["fr-086"], 2, "neutre", {"manuscrit": "surfaces", "couleur_stylo": (25, 25, 30), "couleur_murs": (20, 20, 20), "murs_dessin": "trait", "epaisseur_trait_mur": 0.25, "surface_decimales": 1}),
+    ("Trait 11 tout au stylo", ["fr-112"], 60012, "neutre", {"manuscrit": "tout", "couleur_stylo": (40, 60, 150), "couleur_murs": (35, 35, 35)}),
+    ("Trait 14 pastilles", ["fr-059"], 60012, "agence_coloree", {"pastilles": "avec_noms", "mobilier_fixes": False, "mobilier_couleur": False, "surface_decimales": 2}),
+    ("Trait 14 legende", ["fr-059"], 26, "murs_noirs", {"pastilles": "legende", "parentheses_grises": False}),
+    ("Trait 15 placards fleches", ["fr-080", "fr-086"], 26, "murs_noirs", {"placards_fleches": True, "parentheses_grises": False, "exterieurs": [_BALCON]}),
+    ("Trait 17 colimacon", ["fr-093"], 62, "murs_noirs", {"escalier": "colimacon"}),
+    ("Trait 17 fleche ACCES", ["fr-120"], 60022, "neutre", {"escalier": "fleche_acces", "couleur_murs": (10, 10, 10), "majuscules": True}),
+    ("Trait 18 terrasse lattes", ["fr-084"], 60, "neutre", {"exterieurs": [_LATTES], "couleur_murs": (5, 5, 5)}),
+    ("Trait 18 jardin herbe", ["fr-084", "fr-065"], 60012, "neutre", {"exterieurs": [_JARDIN_HERBE], "couleur_murs": (5, 5, 5)}),
+    ("Trait 4 balcon pointille", ["fr-046", "fr-085"], 60, "murs_noirs", {"exterieurs": [_BALCON, {**_BALCON, "cote": "droite", "contour": "fin", "numero": 2}]}),
+]
+VIGNETTES = {1: VIGNETTES_1, 2: VIGNETTES_2}
+# Les plans du chantier à comparer sur la planche ; une vignette sert aussi aux masques.
+MASQUES_A_REGARDER = {1: (0, 2), 2: (0, 10)}
 
 
 def _style_force(graine: int, famille: str, traits: dict):
@@ -175,19 +210,20 @@ def _verifier_references(repartition: Path = Path("verites/repartition-vrais-pla
     """Règle 15 : aucun plan d'examen ne sert de référence."""
     r = json.loads(repartition.read_text(encoding="utf-8"))
     examen, entrainement = set(r["examen_nouveaux"]) | set(r["examen_anciens"]), set(r["entrainement"])
-    for _, plans, *_ in VIGNETTES:
-        for p in plans:
-            assert p in entrainement and p not in examen, p
+    for vignettes in VIGNETTES.values():
+        for _, plans, *_ in vignettes:
+            for p in plans:
+                assert p in entrainement and p not in examen, p
 
 
-def planche(sortie: Path, cote: int = 520) -> None:
+def planche(sortie: Path, cote: int = 520, chantier: int = 1) -> None:
     """Écrit la planche, une image par vignette à 768 px (pour regarder de près), et les masques de deux exemples."""
     _verifier_references()
     sortie.parent.mkdir(parents=True, exist_ok=True)
     dossier = sortie.with_name(sortie.stem + "-vignettes")
     dossier.mkdir(exist_ok=True)
     cases = []
-    for k, (titre, plans, graine, famille, traits) in enumerate(VIGNETTES):
+    for k, (titre, plans, graine, famille, traits) in enumerate(VIGNETTES[chantier]):
         log = generer(graine, Reglages())
         rendu = rendre(log, log.niveaux[0], _style_force(graine, famille, traits))
         plan = _reduire(rendu.images["plan"], 768)
@@ -195,7 +231,7 @@ def planche(sortie: Path, cote: int = 520) -> None:
         _ecrire_rgb(dossier / f"{k:02d}.jpg", plan)
         cases.append(_case(rendu.images["plan"], f"{titre} ({', '.join(plans)})", cote))
         cases.append(_case(gris, "gris 768 px", cote))
-        if k in (0, 2):
+        if k in MASQUES_A_REGARDER[chantier]:
             masque = colorer_semantique(rendu.images["masque_semantique"])
             melange = (0.5 * rendu.images["plan"] + 0.5 * masque).astype(np.uint8)
             _ecrire_rgb(sortie.with_name(f"{sortie.stem}-masque{k}.jpg"), np.hstack([rendu.images["plan"], masque, melange]))
@@ -218,12 +254,13 @@ def main() -> None:
     p.add_argument("avant", type=Path)
     p.add_argument("apres", type=Path)
     p = sous.add_parser("planche")
-    p.add_argument("--sortie", type=Path, default=Path("../atelya/planches/lot2-chantier1.jpg"))
+    p.add_argument("--chantier", type=int, default=2, choices=sorted(VIGNETTES))
+    p.add_argument("--sortie", type=Path, help="par défaut : ../atelya/planches/lot2-chantierN.jpg")
     args = parser.parse_args()
     if args.commande == "temoin":
         temoin(args.dossier)
     elif args.commande == "planche":
-        planche(args.sortie)
+        planche(args.sortie or Path(f"../atelya/planches/lot2-chantier{args.chantier}.jpg"), chantier=args.chantier)
     elif args.commande == "comparer":
         sys.exit(1 if comparer(args.avant, args.apres) else 0)
 
