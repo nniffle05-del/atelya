@@ -43,6 +43,7 @@ from moteur.generateur import VERSION_GENERATEUR
 from moteur.generateur.annotations import NOMS_CLASSES, decrire
 from moteur.generateur.doublons import empreinte, signature
 from moteur.generateur.logements import LogementGenere, en_logement, generer
+from moteur.generateur.lot2 import appliquer as appliquer_lot2, lot2_au_hasard, resume as resume_lot2
 from moteur.generateur.reglages import Reglages
 from moteur.generateur.rendu import Rendu, rendre
 from moteur.generateur.validateur import Regles, Verdict, valider_dossier, valider_geometrie
@@ -80,6 +81,7 @@ class Options:
     styles_monde: bool = False  # styles des vrais plans français (sols, traits fins, lettres A-D, capture…) et styles absurdes
     photo_realiste: bool = False  # les photos « vraie caméra » posées sur une vraie table (plis, ombres, reflets, flou)
     biais: bool = False  # A3 : pans coupés et angles arrondis (murs qui ne sont ni horizontaux ni verticaux)
+    lot2: bool = False  # styles vus sur les 103 vrais plans (agence colorée, murs noirs, légende Carrez, cotes rouges…)
 
 
 @dataclass
@@ -107,7 +109,7 @@ def ecrire_rendu(dn: Path, rendu: Rendu, masques_par_classe: bool) -> list[str]:
     fichiers = []
     # Un plan abîmé (grain, JPEG, photo) est enregistré en JPEG : c'est ce qu'envoie un client, et le PNG
     # d'une image bruitée pèse dix fois plus. Les masques restent toujours en PNG (sans perte).
-    jpeg = bool(rendu.style.salissure)
+    jpeg = bool(rendu.style.salissure) or (rendu.style.lot2 is not None and rendu.style.lot2.sortie_jpeg)
     for nom, image in rendu.images.items():
         if nom.startswith("plan") and jpeg:
             ecrire_image(str(dn / f"{nom}.jpg"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
@@ -155,6 +157,10 @@ def style_pour(graine: int, variante: int, opt: Options) -> Style:
         r3 = random.Random(f"monde-{graine + opt.graine_styles}-{variante}")
         style.variete = variete_au_hasard(r3)
         appliquer_couleurs(style, style.variete, r3)
+    if opt.lot2:
+        # Encore un tirage à part : sans --lot2, le style reste bit à bit celui de la version précédente.
+        r4 = random.Random(f"lot2-{graine + opt.graine_styles}-{variante}")
+        appliquer_lot2(style, lot2_au_hasard(r4), sans_cotes=opt.sans_cotes)
     if opt.resolution:
         style.px_par_m = opt.resolution
         style.taille_texte = round(opt.resolution * 0.2)
@@ -202,6 +208,7 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
         ecrire_json(dossier / f"logement_niveau{niveau.index}.json", en_logement(log, niveau))
         fichiers.append(f"logement_niveau{niveau.index}.json")
     styles = []
+    style_lot2 = None
     for niveau in log.niveaux:
         for variante in range(opt.variantes + 1):
             style = style_pour(graine, variante, opt)
@@ -211,6 +218,7 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
             fichiers += [(f"niveau_{niveau.index}/" + f) if variante else f for f in ecrire_rendu(dn, rendu, opt.masques_par_classe)]
             if variante == 0 and niveau.index == 0:
                 styles.append(style.famille)
+                style_lot2 = style.lot2
     bilan_3d = None
     if opt.modele_3d:
         from moteur.generateur.modele3d import briques_du_logement, ecrire_glb, ecrire_obj, plan_de_construction
@@ -230,7 +238,8 @@ def fabriquer_exemple(graine: int, opt: Options, reglages: Reglages, regles: Reg
         "empreinte": empreinte(log), "signature": signature(log, geometrie).en_dict(),
         "fichiers": fichiers, "octets": taille, "version_generateur": VERSION_GENERATEUR,
         "accepte": verdict.accepte, "erreurs": verdict.erreurs, "avertissements": verdict.avertissements,
-        "modele_3d": bilan_3d, "essais": log.essais, **({"biais": biais_faits} if opt.biais else {}), "duree_s": round(time.perf_counter() - debut, 3),
+        "modele_3d": bilan_3d, "essais": log.essais, **({"biais": biais_faits} if opt.biais else {}),
+        **({"lot2": resume_lot2(style_lot2)} if style_lot2 is not None else {}), "duree_s": round(time.perf_counter() - debut, 3),
     }
     ecrire_json(dossier / "manifeste.json", entree)
     statut = "accepte" if verdict.accepte else "rejete"
@@ -331,6 +340,8 @@ def _journal(chemin: Path) -> None:
 
 def _options_json(opt: Options) -> dict:
     d = asdict(opt)
+    if not d["lot2"]:  # sans l'option, reglages.json ne change pas non plus
+        del d["lot2"]
     for k, v in d.items():
         if isinstance(v, Path):
             d[k] = str(v)

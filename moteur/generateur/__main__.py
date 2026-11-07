@@ -18,6 +18,7 @@ Exemples :
   uv run python -m moteur.generateur generer --nombre 20 --3d --variantes 2 --masques-par-classe --resolution 80
   uv run python -m moteur.generateur tout --nombre 100 --dossier sorties/jeu-100 --processus 4
   uv run python -m moteur.generateur generer --nombre 50 --familles photo --photo-realiste --dossier sorties/photos
+  uv run python -m moteur.generateur generer --nombre 50 --lot2 --dossier sorties/lot2
   uv run python -m moteur.generateur repartir sorties/jeu-100 --parts 0.8,0.1,0.1
 """
 
@@ -40,7 +41,7 @@ def _options(args: argparse.Namespace) -> Options:
         masques_par_classe=args.masques_par_classe, reprise=not args.refaire, reglages=Path(args.reglages) if args.reglages else None,
         regles=Path(args.regles) if args.regles else None, familles=args.familles.split(",") if args.familles else None,
         vraie_camera=args.vraie_camera or args.photo_realiste, sans_cotes=args.sans_cotes,
-        photo_realiste=args.photo_realiste, styles_monde=args.styles_monde, biais=args.biais,
+        photo_realiste=args.photo_realiste, styles_monde=args.styles_monde, biais=args.biais, lot2=args.lot2,
     )
 
 
@@ -64,6 +65,8 @@ def _ajouter_options_generation(p: argparse.ArgumentParser) -> None:
                    help="styles des vrais plans (sols dessinés, traits fins, gris clair, lettres A-D, capture, symboles du neuf) + styles absurdes")
     p.add_argument("--biais", action="store_true",
                    help="étape A3 : des angles du logement deviennent des pans coupés (30-60°) ou des angles arrondis")
+    p.add_argument("--lot2", action="store_true",
+                   help="styles du lot 2, vus sur 103 vrais plans (agence colorée, murs noirs, dimensions, légende Carrez, fenêtres cyan, cotes rouges, HSP, recadrage…)")
     p.add_argument("--sans-cotes", action="store_true", help="aucune cote dessinée (barre d'échelle, surfaces au hasard)")
     p.add_argument("--variantes", type=int, default=0, help="variantes graphiques supplémentaires par logement")
     p.add_argument("--3d", dest="modele_3d", action="store_true", help="écrit aussi modele.glb, modele.obj, construction.json")

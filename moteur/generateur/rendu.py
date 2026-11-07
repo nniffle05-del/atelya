@@ -37,6 +37,7 @@ from moteur.generateur.annotations import CLASSES, rect_de_l_ouverture, rect_du_
 from moteur.generateur.logements import LogementGenere, MurLibre, Niveau, Ouverture, Piece, Rect, contour_piece, surface_piece
 from moteur.generateur.mobilier import Meuble, meubler_niveau
 from moteur.generateur.photo import plis_a_plat
+from moteur.generateur import lot2 as L
 from moteur.generateur import variete as V
 from moteur.generateur.variantes import PALETTES, Style, salir
 
@@ -92,9 +93,11 @@ class Repere:
     (rotation + perspective) vers l'image finale. `H` est la matrice 3×3 totale (mm → pixels).
     """
 
-    def __init__(self, cadre: Rect, style: Style, rng: random.Random):
+    def __init__(self, cadre: Rect, style: Style, rng: random.Random, nb_pieces: int = 12):
         self.s = style.px_par_m / 1000  # pixels par millimètre
         haut, bas, gauche, droite = style.marges
+        if style.lot2 is not None:  # avant le reste : tableaux et légendes prennent leur place, l'image garde la taille des masques
+            haut, bas, gauche, droite = L.marges_lot2(style, (haut, bas, gauche, droite), nb_pieces)
         if style.cartouche:  # la marge de droite s'élargit si le cartouche est écrit gros
             droite = max(droite, RECUL_COTE + 100 + round(style.taille_texte * 0.85 * 17))
         if style.echelle_graphique:  # la marge du bas s'élargit pour garder la barre d'échelle entière
@@ -189,6 +192,11 @@ class _Dessin:
         self.hauteur = np.zeros((repere.hauteur, repere.largeur), np.uint16)
         self.fin = max(1, round(repere.s * 1000 * style.epaisseur_trait))
         self.moyen = max(2, round(repere.s * 1000 * 0.03))
+        # Qui dessine les murs : la variété du style, ou celle que demande le lot 2.
+        self.variete_murs = style.variete if style.lot2 is None else L.variete_des_murs(style)
+        if style.lot2 is not None and style.lot2.vantail_fin:
+            self.moyen = self.fin
+        self.hasard_lot2: random.Random | None = None
         self.ids_pieces = {p.id: i + 1 for i, p in enumerate(niveau.pieces)}
         self.ids_elements = {m.id: i + 1 for i, m in enumerate(niveau.murs)}
         n = len(niveau.murs)
@@ -228,7 +236,8 @@ class _Dessin:
     # ---- pièces ----
 
     def pieces(self) -> None:
-        palette = PALETTES[self.style.palette]
+        l2 = self.style.lot2
+        palette = L.PALETTES_LOT2[l2.palette] if l2 is not None and l2.palette else PALETTES[self.style.palette]
         for p in self.niv.pieces:
             contour = contour_piece(p)
             if self.style.pieces_colorees:
@@ -247,6 +256,8 @@ class _Dessin:
     def meuble(self, m: Meuble) -> None:
         couleur = self.style.traits
         pts = self.poly_px(m.contour)
+        if self.style.lot2 is not None and self.style.lot2.mobilier_couleur:
+            L.remplir_meuble(self, m, pts)
         if m.forme == "ellipse":
             xs, ys = [p[0] for p in pts], [p[1] for p in pts]
             self.d.ellipse((min(xs), min(ys), max(xs), max(ys)), outline=couleur, width=self.fin)
@@ -293,8 +304,8 @@ class _Dessin:
         for m in self.niv.murs:
             r = rect_du_mur(m)
             contour = [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
-            if st.variete is not None:
-                V.mur(self, m, contour, st.variete)
+            if self.variete_murs is not None:
+                V.mur(self, m, contour, self.variete_murs)
             else:
                 self.d.polygon(self.poly_px(contour), fill=st.murs)
             self.remplir_masque(self.semantique, contour, CLASSES["mur"])
@@ -305,7 +316,7 @@ class _Dessin:
         for o in self.niv.ouvertures:
             r = rect_de_l_ouverture(o)
             contour = [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
-            self.d.polygon(self.poly_px(contour), fill=st.fond)
+            self.d.polygon(self.poly_px(contour), fill=st.fond if st.lot2 is None else L.couleur_ouverture(st, o))
             self.remplir_masque(self.semantique, contour, CLASSES[o.type])
             self.remplir_masque(self.elements, contour, self.ids_elements[o.id])
             self.remplir_masque(self.hauteur, contour, o.allege if o.type == "fenetre" else 0)
@@ -316,7 +327,7 @@ class _Dessin:
 
     def mur_libre(self, m: MurLibre) -> None:
         """A3 : un mur en biais ou arrondi, dessiné comme les autres murs du style (plein, trait, double, hachure)."""
-        st, v = self.style, self.style.variete
+        st, v = self.style, self.variete_murs
         pts = self.poly_px(m.polygone)
         genre = v.murs if v is not None else "plein"
         if genre == "trait":
@@ -344,6 +355,8 @@ class _Dessin:
 
     def ouverture(self, o: Ouverture) -> None:
         st = self.style
+        if st.lot2 is not None and L.ouverture_en_boite(self, o):
+            return
         m = o.mur
         e = m.epaisseur / 2
         t0, t1 = o.u0, o.u1
@@ -396,7 +409,7 @@ class _Dessin:
         if (fin - debut) % 360 > 180:
             debut, fin = fin, debut
         clair = tuple(min(c + 60, 170) for c in couleur)
-        if self.style.variete is not None and self.style.variete.arcs_pointilles:
+        if (self.style.variete is not None and self.style.variete.arcs_pointilles) or (self.style.lot2 is not None and self.style.lot2.arcs_pointilles):
             V.arc_pointille(self, (cx - r, cy - r, cx + r, cy + r), debut, fin, clair, max(1, self.fin // 2))
             return
         self.d.arc((cx - r, cy - r, cx + r, cy + r), debut, fin, fill=clair, width=max(1, self.fin // 2))
@@ -405,6 +418,9 @@ class _Dessin:
 
     def noms(self) -> None:
         st = self.style
+        if st.lot2 is not None:
+            L.noms(self)
+            return
         v = st.variete
         taille = st.taille_texte
         couleur = v.couleur_noms if v is not None and v.couleur_noms else st.textes
@@ -450,24 +466,31 @@ class _Dessin:
     def chaine(self, intervalles: list[tuple[float, float]], position: float, horizontale: bool, cote_texte: int) -> None:
         st = self.style
         taille = round(st.taille_texte * 0.9)
+        l2 = st.lot2
+        coul_t, coul_x = st.traits, st.textes
+        if l2 is not None and l2.couleur_cotes is not None:  # trait 16 : la chaîne entière est rouge (fr-031)
+            coul_t = coul_x = l2.couleur_cotes
         for a, b in intervalles:
             if horizontale:
                 p, q = (self.px(a, 0)[0], position), (self.px(b, 0)[0], position)
             else:
                 p, q = (position, self.px(0, a)[1]), (position, self.px(0, b)[1])
-            self.d.line((p, q), fill=st.traits, width=1)
+            self.d.line((p, q), fill=coul_t, width=1)
             for x, y in (p, q):
                 if horizontale:
-                    self.d.line(((x, y - 9), (x, y + 9)), fill=st.traits, width=1)
+                    self.d.line(((x, y - 9), (x, y + 9)), fill=coul_t, width=1)
                 else:
-                    self.d.line(((x - 9, y), (x + 9, y)), fill=st.traits, width=1)
-                self.d.line(((x - 7, y + 7), (x + 7, y - 7)), fill=st.traits, width=2)
+                    self.d.line(((x - 9, y), (x + 9, y)), fill=coul_t, width=1)
+                self.d.line(((x - 7, y + 7), (x + 7, y - 7)), fill=coul_t, width=2)
             milieu = ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
             ecart = (taille * 0.75 + 8) * cote_texte
+            valeur = _fr((b - a) / 1000)
+            if l2 is not None and l2.cote_point:
+                valeur = valeur.replace(",", ".")
             if horizontale:
-                self.texte((milieu[0], milieu[1] + ecart), _fr((b - a) / 1000), taille, st.textes)
+                self.texte((milieu[0], milieu[1] + ecart), valeur, taille, coul_x)
             else:
-                self.texte((milieu[0] + ecart, milieu[1]), _fr((b - a) / 1000), taille, st.textes, vertical=True)
+                self.texte((milieu[0] + ecart, milieu[1]), valeur, taille, coul_x, vertical=True)
 
     def cartouche(self) -> None:
         rep, st = self.rep, self.style
@@ -506,8 +529,11 @@ class _Dessin:
         self.texte((x, y + 22), "0", round(st.taille_texte * 0.8), st.textes)
         self.texte((x + metres * rep.s * 1000, y + 22), f"{metres} m", round(st.taille_texte * 0.8), st.textes)
 
-    def tout(self) -> None:
+    def tout(self, graine_style: str = "") -> None:
         st = self.style
+        if st.lot2 is not None:
+            # Hasard à part, même clé pour le plan et le plan sans mobilier : ils écrivent et cotent pareil.
+            self.hasard_lot2 = random.Random(f"lot2-dessin-{self.log.graine}-{self.niv.index}-{graine_style}")
         self.pieces()
         self.murs()
         if st.noms or st.surfaces:
@@ -525,28 +551,32 @@ class _Dessin:
             self.cartouche()
         if st.titre:
             self.titre()
+        if st.lot2 is not None:
+            L.apres_tout(self, self.hasard_lot2)
 
 
 def rendre(log: LogementGenere, niveau: Niveau, style: Style, graine_style: str = "") -> Rendu:
     """Dessine le niveau selon le style : images, masques et annotations pixels, tous alignés."""
     rng = random.Random(f"rendu-{log.graine}-{niveau.index}-{graine_style}")
     cadre = _cadre_des_murs(niveau)
-    rep = Repere(cadre, style, rng)
+    rep = Repere(cadre, style, rng, nb_pieces=len(niveau.pieces))
     tous = meubler_niveau(niveau, log.graine)
     # Les marches d'un escalier ne sont pas du mobilier : un plan les montre toujours, et la carte de
     # hauteur doit toujours les porter. Un style « sans mobilier » garde donc l'escalier.
     escaliers = {pid: [m for m in lst if m.forme == "marches"] for pid, lst in tous.items()}
     escaliers = {pid: lst for pid, lst in escaliers.items() if lst}
     meubles = tous if style.mobilier else escaliers
+    if style.lot2 is not None and style.lot2.mobilier_fixes:
+        meubles = L.garder_fixes(meubles)
     d = _Dessin(log, niveau, style, rep, meubles, avec_mobilier=True)
-    d.tout()
+    d.tout(graine_style)
     images: dict[str, np.ndarray] = {}
     page, plis = _feuille(rep, style, f"photo-{log.graine}-{niveau.index}-{graine_style}")
     plan = rep.deformer(np.asarray(d.image), True, style.fond)
     images["plan"] = salir(plan, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"), page, plis)
     if style.mobilier:
         d2 = _Dessin(log, niveau, style, rep, escaliers, avec_mobilier=True)
-        d2.tout()
+        d2.tout(graine_style)
         nu = rep.deformer(np.asarray(d2.image), True, style.fond)
         images["plan_sans_mobilier"] = salir(nu, style, random.Random(f"salissure-{log.graine}-{niveau.index}-{graine_style}"),
                                              page, plis)

@@ -23,6 +23,7 @@ from dataclasses import asdict, dataclass, field
 import cv2
 import numpy as np
 
+from moteur.generateur.lot2 import Lot2
 from moteur.generateur.photo import Realisme, capteur, composer, lumiere
 from moteur.generateur.variete import Variete
 from moteur.salissure import _photocopie, _taches
@@ -94,9 +95,13 @@ class Style:
     papier: int = 255  # le blanc du papier (230 : scanner un peu gris)
     variete: Variete | None = None  # styles du monde (option --styles-monde) : sols, murs autrement, lettres, capture…
     realisme: Realisme | None = None  # photo réaliste (option --photo-realiste) : table, plis, ombres, reflets
+    lot2: Lot2 | None = None  # styles des 103 vrais plans (option --lot2) : voir moteur/generateur/lot2.py
 
     def en_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if d["lot2"] is None:  # sans l'option, annotations.json reste identique à l'octet près
+            del d["lot2"]
+        return d
 
     @property
     def niveaux_gris(self) -> bool:

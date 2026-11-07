@@ -15,10 +15,11 @@ Chaque module fait une chose :
 - `statistiques.py`  : les statistiques d'un jeu généré ;
 - `controle_qualite.py` : planches d'aperçu et page de contrôle visuel ;
 - `photo.py`         : la photo réaliste (table, plis, ombres, reflets, flou) de l'option --photo-realiste ;
+- `lot2.py`          : les styles vus sur les 103 vrais plans (option --lot2) ;
 - `__main__.py`      : la ligne de commande (`python -m moteur.generateur`).
 
 La fabrique existante (moteur/fabrique.py) n'est pas modifiée : elle sert au banc
 de lecture, qui doit redonner exactement les mêmes plans qu'avant.
 """
 
-VERSION_GENERATEUR = "0.1.5"
+VERSION_GENERATEUR = "0.1.6"

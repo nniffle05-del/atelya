@@ -5,7 +5,7 @@ d'agence, d'architecte, de scan ou de photo, et écrit pour chacun la **vérité
 au pixel, polygones, graphe des pièces, et en option le modèle 3D. Le but : des données d'entraînement en
 quantité illimitée, variées, sans aucune donnée tierce (voir `DATA_LICENSE.md` à la racine).
 
-Version du générateur : `0.1.1` (`moteur/generateur/__init__.py`). Format d'annotations : `plan-synthetique/1.0`.
+Version du générateur : `0.1.6` (`moteur/generateur/__init__.py`). Format d'annotations : `plan-synthetique/1.0`.
 
 ## Installation
 
@@ -49,6 +49,7 @@ uv run python -m moteur.generateur valider sorties/jeu-1000
 | `--familles` | impose des familles de style : `architecte,agence,minimaliste,scan,photo,colore,croquis` |
 | `--vraie-camera` | les photos de biais suivent l'optique d'un vrai téléphone (inclinaison, focale ~0,77 de la photo, photo non recadrée) au lieu de coins bougés au hasard |
 | `--sans-cotes` | aucune cote dessinée ; barre d'échelle (40 %) et surfaces écrites (60 %) tirées au hasard |
+| `--lot2` | styles vus sur 103 vrais plans (`lot2.py` ; chantier 1 : agence colorée, dimensions de pièce, murs noirs, légende Carrez, fenêtres en rectangles, cotes rouges, HSP et sol écrits, image recadrée). Sans l'option, les jeux restent identiques. Un jeu fabriqué avec `--lot2` n'est pas réutilisable par `plan_pdf.fabriquer_jeu` sans l'option (`_meme_plan` comparerait un style lot 2 à un style refait sans) |
 | `--variantes N` | N dessins supplémentaires du même logement (autres styles), dans `niveau_k/variante_n/` |
 | `--3d` | écrit aussi le modèle 3D (désactivé par défaut : les plans 2D sont la priorité) |
 | `--refaire` | refait les exemples déjà présents au lieu de les reprendre |

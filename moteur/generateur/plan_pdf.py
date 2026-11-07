@@ -129,7 +129,7 @@ class _DessinPdf(_Dessin):
 def style_a_plat(style: Style) -> Style:
     """Le style d'un PDF exporté d'un logiciel : ni penché, ni photographié, ni sali (couleurs, textes, cotes gardés)."""
     return replace(style, rotation=0.0, perspective=0.0, focale=0.0, focale_photo=0.0, inclinaison=(0.0, 0.0),
-                   centre_optique=(0.0, 0.0), salissure="", contraste=1.0, papier=255, variete=None, realisme=None)
+                   centre_optique=(0.0, 0.0), salissure="", contraste=1.0, papier=255, variete=None, realisme=None, lot2=None)
 
 
 def mise_en_page(largeur_px: float, hauteur_px: float, px_par_m: float) -> tuple[int, str, tuple[float, float], float]:
