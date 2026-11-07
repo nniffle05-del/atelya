@@ -52,6 +52,12 @@ D'où la règle (decider, `ecrite`) : les mesures prises sur le dessin passent t
 surfaces, c'est elle qui sert (plus précise) ; seule, le plan part à la vérification. (Au départ, la largeur des portes
 la confirmait à 15 % près ; banc A2-6 : 10 justes mais 1 fausse de 41 % sur une page réduite, les portes coloriées
 étant elles-mêmes fausses de 28 % : supprimé.)
+
+Version 0.12 (07/11/2026, défaut trouvé par le lot 2 du générateur : échelles fausses de −10 à −41 %, jugées sûres, sur les plans à cotes
+dans les pièces) : la mesure des cotes est corrigée dans moteur.lecture_cotes (version 0.2). Ici : les dimensions d'une pièce qui
+redisent la surface écrite dans la même pièce ne comptent plus deux fois (_sans_les_dimensions_en_double : −29,3 % sur 14 plans sur 439) ;
+des cotes contradictoires ne passent plus par le secours « cote d'ensemble » (+86 %) ; le garde-fou DESACCORD_COTES_SURES dans decider ;
+et une cote seule, sans logement colorié pour la contrôler, part à la vérification (vrai plan fr-066 : −74 %).
 """
 
 from __future__ import annotations
@@ -66,12 +72,16 @@ from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du
 from moteur.lecture_cotes import (CONTRADICTION, COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle,
                                   lire_textes, plan_en_cm, valeur_de_cote)
 from moteur.redressement import Redressement
-from moteur.surfaces_ecrites import FORME_LEGENDE, SurfaceLue, echelle_par_surfaces, surfaces_dans_textes, surfaces_de_legende
+from moteur.surfaces_ecrites import FORME_DIMENSIONS, FORME_LEGENDE, SurfaceLue, echelle_par_surfaces, surfaces_dans_textes, surfaces_de_legende
 
-VERSION_ECHELLE = "0.11.0"
+VERSION_ECHELLE = "0.12.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
+# Des cotes SÛRES contredites par des surfaces SÛRES (version 0.12). Mesuré, plans à plat : cotes justes ≤ 1,7 % d'écart aux surfaces
+# (298 plans fabriqués, dont 156 avec les vrais coloriages d'Atelya) ; cotes fausses ≥ 5,7 % (15 plans) ; le seul vrai plan
+# d'entraînement à porter les deux, fr-110, est à 3,4 %. Réglé sans aucun plan d'examen.
+DESACCORD_COTES_SURES = 0.05
 PAPIER_GRIS = 235  # en dessous (niveau de gris du papier), le plan est une photocopie ou une photo : on étire ses gris
 ACCORD_PORTES = 0.25  # photo : barre ou surfaces à plus de 25 % de l'échelle approchée par les portes → à vérifier
 LARGEUR_PORTE = 0.83  # m : la porte intérieure courante en France (vantail de 83 cm)
@@ -90,6 +100,7 @@ PORTES_CV_MAX = 0.20  # écart-type des largeurs gardées / médiane
 PORTES_REMPLISSAGE_MIN = 0.60  # aire de la tache / (longueur × largeur de sa boîte)
 PORTES_SUR_EPAISSEUR_MIN = 1.8  # largeur médiane des portes / épaisseur médiane des murs
 PORTES_MAX = 30  # au-delà, ce ne sont pas des portes
+DIMENSIONS_REDITES = 0.15  # « 3,05 m × 2,85 m » à moins de 15 % de la surface écrite dans la même pièce : c'est la même chose, dite deux fois
 EPAISSEUR_MUR_COURANTE = 0.20  # m : l'épaisseur de mur courante ; en secours seulement (±20 % en médiane sur les vrais plans)
 
 
@@ -205,6 +216,12 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     un PDF) ; en désaccord, elle est ignorée (page réduite à l'impression : la barre et les surfaces, dessinées, restent
     justes) ; seule, vérification (les portes ne suffisent pas à la confirmer : banc A2-6, 1 erreur de 41 %).
 
+    Version 0.12 : des cotes sûres que des surfaces sûres (plusieurs pièces d'accord) contredisent de plus de 5 % partent aussi à la
+    vérification (plan à plat). Avant, les surfaces n'étaient comparées qu'aux cotes peu sûres : des cotes mal mesurées mais d'accord
+    entre elles passaient sans alerte. Les surfaces ne remplacent jamais les cotes ici : un plan schématique peut écrire des surfaces
+    fausses (fr-024, fr-029), seul un humain peut trancher. Et des cotes peu sûres (une seule) sans logement colorié pour les
+    contrôler (interieur_px inconnu) ne suffisent plus.
+
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « échelle écrite », « cote d'ensemble »
     ou « à vérifier »
     (échelles à None)."""
@@ -231,8 +248,14 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
         else:
             m = largeur or hauteur
             bon = _plausible(m, il, cote_max_largeur, sure) and _plausible(m, ih, cote_max_hauteur, sure)
+        if not sure and not (il or ih):
+            # Version 0.12 : une cote seule, sans logement colorié pour la contrôler, n'est contrôlée par rien. Vrai plan fr-066 : la cote
+            # « 12,26 » mesurée sur 245 pixels au lieu de ~900 (son trait traverse un sol carrelé), échelle fausse de −74 %, annoncée lue.
+            bon = False
         if bon and not sure and surfaces and not de_biais and abs(surfaces / (largeur or hauteur) - 1) > ACCORD_SURFACES:
             return None, None, "à vérifier"  # deux avis sérieux en désaccord : un humain tranche
+        if bon and sure and surfaces and not de_biais and round(abs(surfaces / (largeur or hauteur) - 1), 6) > DESACCORD_COTES_SURES:
+            return None, None, "à vérifier"  # jamais une des deux choisie sans alerte (voir la version 0.12)
         if bon:
             return largeur, hauteur, "cotes"
     # Sans aucune cote mesurée, les « nombres en forme de cote » lus sont souvent des surfaces
@@ -617,6 +640,11 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
     hauteur = hauteur * facteur if hauteur else None
     horiz = [v for v, vert in nombres if not vert and v >= COTE_MIN]
     verti = [v for v, vert in nombres if vert and v >= COTE_MIN]
+    if contredite:
+        # Cotes contradictoires : la plus grande cote lue ne peut plus servir de cote d'ensemble (decider, dernier secours). Sur les
+        # plans à cotes dans les pièces, elle n'en est d'ailleurs pas une : deux pièces de 6,40 et 4,70 m rapportées à un logement
+        # de 12 × 8,6 m tombaient d'accord par hasard (plan fabriqué 80362 : +86 %, source « cote d'ensemble »).
+        horiz, verti = [], []
     interieur = interieur_du_logement(col, largeur or hauteur or max(col.shape) / 15)
     surf = _echelle_des_surfaces(col, textes, vers_col, largeur or hauteur or max(col.shape) / 15)
     return EchelleLue(largeur, hauteur, echelle.sure, cotes, echelle.hauteur_sous_plafond,
@@ -628,18 +656,46 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       portes_fiables=portes_fiables(col), epaisseur=echelle_par_epaisseur(col))
 
 
+def _sans_les_dimensions_en_double(dimensions: list[SurfaceLue], surfaces: list[SurfaceLue], dedans: np.ndarray) -> list[SurfaceLue]:
+    """Les dimensions d'une pièce qui ne redisent pas la surface déjà écrite dans la même pièce.
+
+    Une pièce peut porter les deux : « 3,05 m × 2,85 m » et « 8,69 m² ». moteur.surfaces_ecrites additionne les surfaces d'une
+    même zone (séjour et cuisine ouverte) : la pièce comptait alors pour le double de sa surface, sur toutes les pièces à la fois,
+    donc avec un bel accord, et l'échelle tombait à 1/√2 de la vraie : −29,3 %, jugée sûre (14 plans du lot 2 sur 439)."""
+    _, etiq = cv2.connectedComponents(dedans.astype(np.uint8), connectivity=4)
+    h, w = dedans.shape
+
+    def zone(s: SurfaceLue) -> int:
+        x, y = int(round(s.x)), int(round(s.y))
+        return int(etiq[y, x]) if 0 <= y < h and 0 <= x < w else 0
+
+    par_zone: dict[int, list[float]] = {}
+    for s in surfaces:
+        if zone(s):
+            par_zone.setdefault(zone(s), []).append(s.valeur)
+    return [d for d in dimensions if not any(abs(d.valeur / v - 1) <= DIMENSIONS_REDITES for v in par_zone.get(zone(d), ()))]
+
+
 def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
     """L'échelle des surfaces écrites (voir moteur.surfaces_ecrites), placées sur le coloriage remis droit."""
-    lues = surfaces_dans_textes(textes)
-    if not lues and not any(FORME_LEGENDE.match(t.texte.strip()) for t in textes):
+    # Les dimensions d'une pièce (« 3,05 m × 2,85 m ») sont lues à part : voir _sans_les_dimensions_en_double.
+    dimensions = [t for t in textes if FORME_DIMENSIONS.match(t.texte.strip())]
+    ecrites = [t for t in textes if not FORME_DIMENSIONS.match(t.texte.strip())]
+    lues, lues_dim = surfaces_dans_textes(ecrites), surfaces_dans_textes(dimensions)
+    if not lues and not lues_dim and not any(FORME_LEGENDE.match(t.texte.strip()) for t in textes):
         return None
-    pts = np.array([[x, y, 1.0] for _, x, y in lues]).reshape(-1, 3) @ vers_col.T
-    surfaces = [SurfaceLue(v, float(p[0] / p[2]), float(p[1] / p[2])) for (v, _, _), p in zip(lues, pts)]
+
+    def placees(liste: list) -> list[SurfaceLue]:
+        pts = np.array([[x, y, 1.0] for _, x, y in liste]).reshape(-1, 3) @ vers_col.T
+        return [SurfaceLue(v, float(p[0] / p[2]), float(p[1] / p[2])) for (v, _, _), p in zip(liste, pts)]
+
     bati = bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
     dehors = dehors_du_logement(bati)
     dedans = ~bati & ~dehors_pour_les_pieces(bati, dehors, col, px_par_m)
+    surfaces = placees(lues)
+    surfaces += _sans_les_dimensions_en_double(placees(lues_dim), surfaces, dedans)
 
     def projeter_col(x: float, y: float) -> tuple[float, float]:
         p = vers_col @ (x, y, 1.0)
