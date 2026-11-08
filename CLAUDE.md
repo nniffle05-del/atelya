@@ -264,7 +264,8 @@ B2-3 vraies matières CC0 (bibliothèque `..\atelya\bibliotheque\matieres`, 29 m
 photos rangées dans le .blend ; fin des lignes au sol) ; teinte d'un sol d'après une photo du client (`moteur/teinte_photo.py`, mur
 blanc = étalon) ; B2-4 lumière du jour (ciel physique, portails, plafonniers éteints, exposition et balance des blancs « de
 photographe », 512 passes). Habillage 0.7. Note ~71/100 client. Meubles ABO officiels en téléchargement (`..\atelya\bibliotheque\
-meubles-abo`, outil `outils/bibliotheque/telecharger_meubles.py`, REPRENABLE : relancer la même commande, il saute ce qui est fait).
+meubles-abo`, outil `outils/bibliotheque/telecharger_meubles.py`, REPRENABLE ; depuis le 09/11 il tourne dans SA PROPRE FENÊTRE Windows, indépendante des conversations, lancée par
+`outils/bibliotheque/lancer_telechargement_meubles.ps1` (double-clic pour le relancer ; journal `meubles-abo\journal.txt`)).
 **ÉTAPE SUIVANTE (accord NT 09/11) : B2 TEMPS 2 = app-001** (`..\atelya\photos-clients\app-001\`, plan sans cotes + 12 photos) :
 lire le plan à la main comme une vérité (échelle : 124 m² au total, portes ~80 cm, HSP 3 m ; ne PAS construire palier, escalier,
 ascenseur), 3D par Atelya, puis chaque pièce prend le sol (motif + teinte) de SA photo, comparaison côte à côte avec l'annonce.
