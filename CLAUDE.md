@@ -358,4 +358,5 @@ permet au projet claude.ai et au futur Claude du Mac de rester au courant à leu
 @docs/projet/memoire/sujets-produit-non-traites.md
 @docs/projet/memoire/surveiller-entrainements.md
 @docs/projet/memoire/vrais-plans-francais.md
+@docs/projet/memoire/lecture-par-api-claude.md
 @docs/projet/etapes/memoire-a3-detail-2026-11-02.md
