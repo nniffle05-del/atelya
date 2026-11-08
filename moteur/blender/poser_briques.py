@@ -44,7 +44,14 @@ def main() -> None:
         scene.collection.children.link(collections[categorie])
 
     materiaux = creer_materiaux()
+    # B1 (08/11/2026) : deux murs qui se croisent (en X, murs épais) ont leurs dessus exactement à la même hauteur ; au rendu,
+    # chacun fait de l'ombre à l'autre et la croisée sort NOIRE. Chaque mur monte donc d'un dixième de millimètre de plus que
+    # le précédent (cycle de 10, au plus 0,9 mm) : invisible (caché dans le plafond, ou de quelques millimètres vu de dessus).
+    rang_des_murs: dict[str, int] = {}
     for brique in plan["briques"]:
+        if brique["categorie"] == "mur" and brique["z_haut"] > brique["z_bas"]:
+            rang = rang_des_murs.setdefault(brique["element"], len(rang_des_murs))
+            brique = {**brique, "z_haut": brique["z_haut"] + 0.0001 * (rang % 10)}
         maillage = creer_maillage(brique)
         if brique.get("materiau"):
             maillage.materials.append(materiaux[brique["materiau"]])

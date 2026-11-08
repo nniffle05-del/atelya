@@ -121,3 +121,35 @@ chaîne « lecture de Claude → vérification → 3D » ; ne jamais faire calcu
 accord écrit de NT. Voir [[objectif-global-nt]], [[atelya-verification-reelle]], [[ecran-verification]],
 [[atelya-echelle-vrais-plans]], [[vrais-plans-francais]].
 Meubles (B4) : NT veut du RÉALISTE avant tout (08/11/2026) → ABO retenu, Sand3D écarté (voir audit-technologique-2026-10-31.md).
+
+**B1 « maquette sans défaut » (08/11/2026, accord NT « Oui »)** — image donnée à NT : maquette en carton, murs = planches, sol =
+moquette. Défauts vus sur fr-031 et leurs causes : filet de ciel au pied des murs et de lumière au plafond (sols/plafonds = contour lu,
+quelques mm en retrait des murs), carrés noirs aux jonctions (deux murs l'un dans l'autre : dessus à la même hauteur qui se font de
+l'ombre au rendu ; aussi bouts lus qui se croisent ou s'arrêtent à 3,5 cm), cuisine NOIRE (deux sols superposés : la 1re pièce d'une
+zone partagée gardait toute la zone), faux murs fins des vérités. Corrections :
+- `moteur/geometrie.py` : bouts à moins de max(3 cm, ½ épaisseur du plus mince) réunis ; nœud de 3 murs dont 2 alignés = T accepté (avant
+  refusé), le mur qui arrive s'arrête sur la FACE ; bout libre qui s'arrête avant / entre dans / traverse un autre mur coupé sur la bonne
+  face (angle L croisé : l'un va à la face extérieure, l'autre à la face intérieure ; dépassement ≤ 50 cm) ; sols et plafonds CALÉS sur
+  les faces des murs (côté parallèle à 2°, à ≤ 10 cm, longeant la face sur ≥ 90 %) ; bouche-trous en fin de calculer_briques.
+- `moteur/controle_maquette.py` 0.1.0 (nouveau) : grille de 4 mm vue de dessus ; trous du sol et du plafond, sols superposés, murs
+  superposés ; `jours_a_boucher` : fente (épaisseur = plus grand cercle inscrit ≤ 6 cm) bouchée par le sol de la pièce voisine ;
+  morceau de pièce ≤ 1 m² complété ; vide enclos sans pièce ≤ 2 m² rempli comme un mur (gaine) ; plus grand = JAMAIS bouché.
+- `moteur/preparer_verification.py` : doutes `zone_sans_piece` (fort, ≥ 0,25 m² : pièce oubliée, terrasse, partie commune ?) et
+  `vide_rempli` (faible, ≥ 0,5 m² : WC ou placard oublié ?).
+- `moteur/traduire_claude.py` : zone partagée par plusieurs pièces à contours DÉCOUPÉE entre elles (chaque point à la pièce dont le
+  contour le contient, sinon la plus proche) ; jamais deux pièces au même endroit ; contour à angles droits gardé seulement s'il épouse
+  la zone (≤ 3 % ET ≤ 1,5 px en moyenne le long du bord ; avant : comparaison des seules surfaces).
+- `outils/lecture_claude/fiche_depuis_verite.py` : faux murs des vérités (< 5 cm, couverts à ≥ 85 % par des ouvertures) retirés, chaque
+  pièce reçoit son contour.
+- `moteur/blender/poser_briques.py` : chaque mur monte de 0,1 mm de plus que le précédent (cycle de 10, ≤ 0,9 mm) : deux murs qui se
+  croisent en X (fr-021, murs de 80 cm) n'ont plus leurs dessus au même niveau (plus de noir) ; invisible.
+Mesures sur les 20 vérités Fable (`pc/b1/mesurer_jours.py`, résultats `..\atelya\b1\jours.json`) : avant 3 à 163 trous par plan et 2
+plans refusés par la 3D (fr-023, fr-034) ; après : 20/20 construits, 15/20 SANS AUCUN TROU, les 5 autres (fr-022, 023, 034, 035, 036,
+037 : grandes zones sans pièce de 1,7 à 67 m²) signalées ; sols superposés ≤ 0,04 m² (bruit de mesure : ~0,004 m² par mètre de frontière
+commune) ; murs superposés de 7,5 → 2,2 m² (fr-021, croix de murs épais, rendue propre par le décalage de hauteur) et ≤ 0,3 m² ailleurs.
+Rendus Blender vérifiés à l'œil : fr-031 (avant/après : `..\atelya\b1\fr-031-*-avant-apres.png`), fr-030, fr-021, fr-024, fr-026,
+fr-038 : plus de filet bleu, plus de filet de lumière, plus de carrés noirs, cuisine ouverte visible. Limites : quelques fins traits
+sombres le long de murs extérieurs de fr-021 (marches entre morceaux de mur d'épaisseurs différentes ? non vérifié) ; placards devenus
+des niches ouvertes (portes de placard à ajouter en B2/B4). Tests : `tests/test_controle_maquette.py` (6), 6 de plus dans
+`test_geometrie.py`, 1 de plus dans `test_traduire_claude.py`.
+

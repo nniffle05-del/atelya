@@ -50,7 +50,8 @@ MODELE = "claude"
 ACCORD_DEUX_CLES = 0.03  # 3 % : écart maximal entre l'échelle retrouvée par Atelya et celle proposée par Claude
 PORTEE_OUVERTURE_PX = 12.0  # une ouverture appartient à un mur dont l'axe passe à moins de ça (ou de son épaisseur)
 DEBORD_OUVERTURE_M = 0.05  # une ouverture qui dépasse le bout de son mur de plus de 5 cm donne un doute
-ECART_CONTOUR = 0.05  # le contour à angles droits est gardé s'il couvre la zone à 5 % près, sinon le contour libre
+ECART_CONTOUR_PX = 1.5  # px : … et pas plus de 1,5 pixel d'écart en moyenne le long du bord de la zone
+ECART_CONTOUR = 0.03  # le contour à angles droits est gardé s'il épouse la zone à 3 % près (pixels en trop + en moins), sinon le contour libre
 HAUTEUR_SOUS_PLAFOND = 2.50
 HAUTEUR_PORTE, HAUTEUR_PORTE_FENETRE, HAUT_FENETRE = 2.04, 2.15, 2.20  # comme moteur.coloriage
 CLASSE_OUVERTURE = {"porte": PORTE, "fenetre": FENETRE, "porte_fenetre": PORTE_FENETRE}
@@ -128,12 +129,22 @@ def _mur_porteur(bords: list[float], murs: list[list[float]], indice_claude: int
 
 
 def _contour(zone: np.ndarray) -> list[tuple[float, float]] | None:
-    """Le contour d'une zone : à angles droits s'il la couvre bien (murs droits), sinon le contour libre (murs en biais)."""
+    """Le contour d'une zone : à angles droits s'il ÉPOUSE la zone (murs droits), sinon le contour libre (murs en biais, plan
+    un peu penché). Épouser = pixels de l'un et pas de l'autre ≤ ECART_CONTOUR de la zone (B1, 08/11/2026 : comparer les seules
+    surfaces laissait passer un rectangle droit sur une pièce penchée de 2°, fr-024, avec des pointes vides le long des murs)."""
     ortho = _contour_orthogonal(zone)
     aire = float(zone.sum())
     if ortho is not None and aire > 0:
-        a = abs(cv2.contourArea(np.array(ortho, np.float32)))
-        if abs(a / aire - 1) <= ECART_CONTOUR:
+        dessin = np.zeros(zone.shape, np.uint8)
+        k = 1 << 4
+        pts = np.round((np.asarray(ortho, np.float64) - 0.5) * k).astype(np.int32)  # bords des pixels → centres (fillPoly)
+        cv2.fillPoly(dessin, [pts], 1, shift=4)
+        bords, _ = cv2.findContours(zone.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        perimetre = sum(cv2.arcLength(c, True) for c in bords)
+        ecart = float(np.logical_xor(dessin > 0, zone).sum())
+        # Les deux : une petite pièce tolère 3 % (un rang de pixels), une grande pas plus de 1,5 px en moyenne le long du bord
+        # (fr-038 : 3 % d'un séjour de 85 m² laissaient le rectangle droit déborder de 0,7 m² sur la cuisine).
+        if ecart / aire <= ECART_CONTOUR and ecart <= ECART_CONTOUR_PX * max(perimetre, 1.0):
             return ortho
     contours, _ = cv2.findContours(zone.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
@@ -141,6 +152,34 @@ def _contour(zone: np.ndarray) -> list[tuple[float, float]] | None:
     c = max(contours, key=cv2.contourArea)
     pts = cv2.approxPolyDP(c, 1.5, True)[:, 0, :].astype(float)
     return [(float(x), float(y)) for x, y in pts] if len(pts) >= 3 else ortho
+
+
+def _partager(zones: list, membres: list[int], zone: np.ndarray, contours: dict[int, list]) -> None:
+    """Découpe `zone` entre les pièces `membres` (indices dans `zones`) : chaque pixel va à la pièce dont le contour lu le
+    contient (la première lue en cas de recouvrement), sinon à la plus proche ; une pièce sans contour prend le reste."""
+    ys, xs = np.nonzero(zone)
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    z = zone[y0:y1, x0:x1]
+    graines = []
+    for i in membres:
+        if i in contours:
+            g = _polygone([(u - x0, v - y0) for u, v in contours[i]], z.shape) & z
+        else:
+            g = None
+        graines.append(g)
+    reste = z.copy()
+    for g in graines:
+        if g is not None:
+            reste &= ~g
+    graines = [g if g is not None else reste for g in graines]
+    distances = np.stack([cv2.distanceTransform((~g).astype(np.uint8), cv2.DIST_L2, 3) if g.any()
+                          else np.full(z.shape, np.inf, np.float32) for g in graines])
+    proprietaire = np.argmin(distances, axis=0)
+    for rang, i in enumerate(membres):
+        pid, ptype, _, c = zones[i]
+        masque = np.zeros(zone.shape, bool)
+        masque[y0:y1, x0:x1] = z & (proprietaire == rang)
+        zones[i] = (pid, ptype, masque, c)
 
 
 def _polygone(points, forme: tuple[int, int]) -> np.ndarray:
@@ -198,6 +237,8 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
     au_bord = set(np.unique(np.concatenate([etiq[0], etiq[-1], etiq[:, 0], etiq[:, -1]])).tolist())
     zones: list[tuple[str, str, np.ndarray, bool]] = []  # (id Claude, type, masque, contour donné par Claude)
     prises: dict[int, int] = {}
+    partages: dict[int, list[int]] = {}  # zone → pièces (indices dans zones) qui se la partagent
+    contours_lus: dict[int, list] = {}  # indice dans zones → contour donné par la lecture (pixels du plan)
     for p in fiche.pieces:
         x, y = p.point[0] / f, p.point[1] / f
         u, v = min(max(int(round(x)), 0), W - 1), min(max(int(round(y)), 0), H - 1)
@@ -216,8 +257,10 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
             continue
         if z in prises:
             k = prises[z]
-            if contour_claude and zones[k][3]:
-                zones.append((p.id, p.type, _polygone(contour_claude, (H, W)) & (etiq == z), True))
+            if contour_claude:  # même zone, mais la lecture sépare les pièces : la zone sera partagée entre elles (plus bas)
+                zones.append((p.id, p.type, etiq == z, True))
+                contours_lus[len(zones) - 1] = contour_claude
+                partages.setdefault(z, [k]).append(len(zones) - 1)
             else:  # même zone, sans cloison entre elles (cuisine ouverte…) : une seule pièce
                 premiere = next(q for q in fiche.pieces if q.id == zones[k][0])
                 autres.append(_doute("pieces_reunies", f"{p.nom or NOM_PIECE[p.type]} et {premiere.nom or NOM_PIECE[premiere.type]} "
@@ -225,6 +268,21 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
             continue
         prises[z] = len(zones)
         zones.append((p.id, p.type, etiq == z, bool(contour_claude)))
+        if contour_claude:
+            contours_lus[len(zones) - 1] = contour_claude
+
+    # Une zone fermée que la lecture partage entre plusieurs pièces (cuisine ouverte sur le séjour…) est découpée entre elles,
+    # sans trou ni recouvrement : chaque point va à la pièce dont le contour lu le contient, sinon à la plus proche (B1 ; avant,
+    # la première pièce gardait toute la zone : fr-031, le séjour recouvrait la cuisine, deux sols au même endroit, rendus noirs).
+    for z, membres in partages.items():
+        _partager(zones, membres, etiq == z, contours_lus)
+
+    # Jamais deux pièces au même endroit (deux sols superposés : la 3D les rend noirs) : une pièce perd ce qu'une pièce lue
+    # avant elle occupe déjà (un contour donné par la lecture peut déborder sur la pièce voisine).
+    deja = np.zeros((H, W), bool)
+    for i, (pid, ptype, masque_i, c_i) in enumerate(zones):
+        zones[i] = (pid, ptype, masque_i & ~deja, c_i)
+        deja |= zones[i][2]
 
     # 3. Le « coloriage de Claude » (classes du U-Net), réduit comme l'image que colorie Atelya.
     masque = bati.copy() * MUR

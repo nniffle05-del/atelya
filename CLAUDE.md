@@ -251,6 +251,11 @@ recalage `moteur/recalage_murs.py`, outil `outils/lecture_claude/traduire_fiche.
 sous-étape 3 (doutes propres à la lecture de Claude, `moteur/doutes_claude.py` 0.1.0 : textes introuvables, cotes contre le dessin,
 surfaces contre les pièces ; traducteur 0.2.0). Suite : sous-étape 4 (essai sans clé API sur les vérités + copies abîmées).
 Détail : `plan-lancement-lecture-claude.md`.
+**NT 08/11 : API testée À LA FIN ; priorité = Atelya performant partout, en commençant par Blender** (entrée : vérités Fable
+fr-021…041 prises comme lecture de Claude, `outils/lecture_claude/fiche_depuis_verite.py`). Étapes Blender proposées : B1 maquette
+sans défaut (FAITE le 08/11 : 20/20 vrais plans construits, 15/20 sans aucun trou, plus de fuites ni de carrés noirs ;
+`moteur/controle_maquette.py`) → B2 rendu photo d'annonce → B3 soleil réel → B4 meubles (ABO retenu, réalisme d'abord) → B5
+caméra / cinématique + comparatif.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

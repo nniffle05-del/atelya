@@ -289,3 +289,25 @@ def test_doutes_designent_les_elements_du_logement(plan):
     for doute in lu.gardee.examen["doutes"]:
         assert doute["element"] is None or doute["element"] in ids, doute
     assert _doute(lu, "piece_ouverte")["element"] == "chambre_1"
+
+
+def test_cuisine_ouverte_deux_pieces_cote_a_cote_sans_superposition(plan):
+    """B1 (fr-031) : deux pièces dans la même zone, chacune avec son contour lu → deux sols côte à côte, sans se recouvrir
+    (avant, la première gardait toute la zone : deux sols au même endroit, rendus noirs par Blender)."""
+    from moteur.controle_maquette import controler
+    from moteur.geometrie import calculer_briques
+    from moteur.logement import Logement
+
+    d = _fiche()
+    d["murs"] = [m for m in d["murs"] if m["id"] != "M5"]
+    d["ouvertures"] = [o for o in d["ouvertures"] if o["id"] != "O1"]
+    d["pieces"][0]["contour"] = [[X(0), Y(4)], [X(3.5), Y(4)], [X(3.5), Y(0)], [X(0), Y(0)]]
+    d["pieces"][1]["contour"] = [[X(3.5), Y(4)], [X(6), Y(4)], [X(6), Y(0)], [X(3.5), Y(0)]]
+    lu = _lire(plan, d)
+    surfaces = sorted(_surface(p["contour"]) for p in lu.gardee.logement["pieces"])
+    assert surfaces == pytest.approx([10.0, 14.0], rel=0.03)
+    log = Logement.model_validate(lu.gardee.logement)
+    r = controler(calculer_briques(log), log.hauteur_sous_plafond)
+    # 4 m de frontière commune comptés dans les deux pièces sur un rang de cases de 4 mm = 0,016 m² (bruit de la mesure) ;
+    # avant B1, c'était toute la cuisine (~7 m² sur fr-031).
+    assert r["sols_superposes_m2"] <= 0.02 and r["sol"]["trous"] == 0
