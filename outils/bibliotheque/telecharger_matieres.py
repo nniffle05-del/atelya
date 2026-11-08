@@ -49,12 +49,31 @@ POLY_HAVEN = [
     ("granito", "terrazzo_tiles", "granito (terrazzo)"),
     ("enduit_peint_blanc", "white_plaster_02", "enduit au léger grain (gris taché : servira pour le grain, couleur choisie par Atelya)"),
     ("mosaique_rayee", "square_tiled_wall", "petite mosaïque à rayures brunes et grises"),
+    # Parquets en plus (accord écrit de NT le 08/11/2026 : « Oui »), vraies photos
+    ("chene_clair_photo", "laminate_floor_03", "parquet chêne clair (photo)"),
+    ("chene_naturel_photo", "oak_wood_planks", "parquet chêne naturel (photo)"),
+    ("vieux_parquet", "old_wooden_floor_03", "vieux parquet (photo)"),
 ]
 # carte Poly Haven → nom de fichier Atelya
 CARTES_PH = {"Diffuse": "couleur.jpg", "nor_gl": "relief.jpg", "Rough": "brillance.jpg"}
 
+# nom Atelya, identifiant ambientCG, description, taille réelle couverte par une image (m) : celle donnée par ambientCG, sinon
+# estimée d'après la largeur des lames (marquée « estimée » dans matieres.json)
 AMBIENTCG = [
-    ("faience_blanche", "Tiles036", "faïence blanche à carreaux carrés"),
+    ("faience_blanche", "Tiles036", "faïence blanche à carreaux carrés", None),
+    # Parquets en plus (accord écrit de NT le 08/11/2026 : « Oui »)
+    ("chene_clair_moderne", "WoodFloor051", "parquet chêne clair moderne", 1.8),
+    ("chene_beige", "WoodFloor062", "parquet chêne beige", (1.5, "estimée")),
+    ("chene_grise", "WoodFloor056", "parquet chêne grisé", 3.2),
+    ("chene_noeuds", "WoodFloor040", "parquet chêne à nœuds, larges lames", 1.9),
+    ("lames_foncees", "WoodFloor064", "parquet à lames foncées", (1.5, "estimée")),
+    ("hongrie_naturel", "WoodFloor052", "parquet point de Hongrie naturel", 1.8),
+    ("hongrie_grise", "WoodFloor057", "parquet point de Hongrie grisé", 3.2),
+    ("batons_rompus_clair", "WoodFloor053", "parquet bâtons rompus clair", 1.8),
+    ("batons_rompus_tres_clair", "WoodFloor058", "parquet bâtons rompus très clair", 2.4),
+    ("versailles_clair", "WoodFloor055", "parquet Versailles clair", 1.2),
+    ("versailles_chaud", "WoodFloor060", "parquet Versailles chaud", 1.0),
+    ("mosaique_parquet", "WoodFloor069", "parquet mosaïque (années 60-70)", (1.0, "estimée")),
 ]
 # fin du nom de fichier dans le zip ambientCG → nom Atelya
 CARTES_ACG = {"_Color.jpg": "couleur.jpg", "_NormalGL.jpg": "relief.jpg", "_Roughness.jpg": "brillance.jpg"}
@@ -102,10 +121,14 @@ def poly_haven(dossier: Path, nom: str, ident: str) -> dict:
     }
 
 
-def ambientcg(dossier: Path, nom: str, ident: str) -> dict:
+def ambientcg(dossier: Path, nom: str, ident: str, taille=None) -> dict:
     cible = dossier / nom
+    estimee = isinstance(taille, tuple)
+    taille_m = [taille[0], taille[0]] if estimee else ([taille, taille] if taille else None)
     if all((cible / s).exists() for s in CARTES_ACG.values()):
-        return json.loads((cible / "source.json").read_text(encoding="utf-8"))
+        source = json.loads((cible / "source.json").read_text(encoding="utf-8"))
+        source["taille_image_m"] = source.get("taille_image_m") or taille_m
+        return source
     archive = lire_url(f"https://ambientcg.com/get?file={ident}_2K-JPG.zip")
     cible.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(archive)) as zip_:
@@ -119,7 +142,7 @@ def ambientcg(dossier: Path, nom: str, ident: str) -> dict:
         raise SystemExit(f"PLANTÉ : {ident} : images absentes de l'archive : {manquantes}")
     source = {"source": "ambientCG", "identifiant": ident, "licence": "CC0 1.0",
               "page": f"https://ambientcg.com/a/{ident}", "auteurs": ["ambientCG (Lennart Demes)"],
-              "taille_image_m": None}
+              "taille_image_m": taille_m, **({"taille_estimee": True} if estimee else {})}
     (cible / "source.json").write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
     return source
 
@@ -133,9 +156,9 @@ def main() -> None:
     for nom, ident, description in POLY_HAVEN:
         print(f"{nom} <- Poly Haven {ident}")
         catalogue[nom] = {"description": description, **poly_haven(dossier, nom, ident)}
-    for nom, ident, description in AMBIENTCG:
+    for nom, ident, description, taille in AMBIENTCG:
         print(f"{nom} <- ambientCG {ident}")
-        catalogue[nom] = {"description": description, **ambientcg(dossier, nom, ident)}
+        catalogue[nom] = {"description": description, **ambientcg(dossier, nom, ident, taille)}
     for nom, entree in catalogue.items():
         entree["octets"] = sum(f.stat().st_size for f in (dossier / nom).glob("*.jpg"))
     (dossier / "matieres.json").write_text(json.dumps(catalogue, ensure_ascii=False, indent=2), encoding="utf-8")

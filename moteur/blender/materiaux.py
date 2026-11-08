@@ -74,15 +74,38 @@ def _peinture(couleur, rugosite):
 
 
 def _sol(materiau, m):
-    """Une matière de sol : photo de la bibliothèque, ou dessin par calcul (point de Hongrie, carreaux de ciment)."""
-    nom = materiau.name
+    """Une matière de sol : photo de la bibliothèque, ou dessin par calcul (point de Hongrie, carreaux de ciment).
+
+    Un nom « matiere~r,g,b » porte une teinte : la couleur est multipliée par ces trois nombres (rouge, vert, bleu), pour
+    rapprocher la matière de ce que montrent les photos du client."""
+    nom, _, gains = materiau.name.partition("~")
     if nom == "carreaux_ciment":
-        return _carreaux_ciment(materiau, m)
-    if nom == "point_de_hongrie" and m.photo("chene_clair"):
-        return _point_de_hongrie(materiau, m)
-    if m.photo(nom):
-        return _photo(materiau, m, nom)
-    return (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
+        _carreaux_ciment(materiau, m)
+    elif nom == "point_de_hongrie" and m.photo("chene_clair"):
+        _point_de_hongrie(materiau, m)
+    elif m.photo(nom):
+        _photo(materiau, m, nom)
+    else:
+        (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
+    if gains:
+        _teinter(materiau, [float(g) for g in gains.split(",")])
+
+
+def _teinter(materiau, gains):
+    """Multiplie la couleur de base du matériau par (rouge, vert, bleu)."""
+    arbre = materiau.node_tree
+    bsdf = next(n for n in arbre.nodes if n.type == "BSDF_PRINCIPLED")
+    entree = bsdf.inputs["Base Color"]
+    melange = _melange_multiplier(arbre.nodes)
+    couleur = arbre.nodes.new("ShaderNodeRGB")
+    couleur.outputs[0].default_value = (*gains, 1.0)
+    if entree.is_linked:
+        arbre.links.new(entree.links[0].from_socket, _entree(melange, "A"))
+    else:
+        _entree(melange, "A").default_value = entree.default_value
+    arbre.links.new(couleur.outputs[0], _entree(melange, "B"))
+    arbre.links.new(_sortie(melange, "Result"), entree)
+    materiau.diffuse_color = tuple(min(1.0, c * g) for c, g in zip(materiau.diffuse_color[:3], gains)) + (1.0,)
 
 
 def _fabriques_simples():

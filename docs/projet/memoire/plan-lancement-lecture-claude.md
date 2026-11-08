@@ -246,3 +246,22 @@ un test Python vérifie que l'écran et le moteur ont la même liste. Rendus : `
 `..\atelya\b2\fr-031-sejour-avant-apres-b2.png`. Reste vu : fin trait sombre dans le tableau d'une porte-fenêtre de fr-031 (existait
 avant, ombre de l'embrasure : à revoir avec la lumière B2-4) ; faïence murale des salles d'eau pas encore posée (les murs sont partagés
 entre deux pièces : il faudra peindre chaque face) ; portes de placard toujours blanches.
+
+**Parquets en plus (08/11/2026, demande de NT : « trouver d'autres parquets très réalistes », l'actuel lui semble un peu foncé)** :
+86 parquets comparés en vignettes (64 ambientCG, 22 Poly Haven, tous CC0, rien téléchargé à part les vignettes). 15 PROPOSÉS, en
+attente du « oui » de NT pour le téléchargement (~245 Mo, 2K) : ambientCG WoodFloor051 (chêne clair moderne), 062 (chêne beige), 056
+(chêne grisé), 040 (chêne à nœuds, larges lames), 064 (lames foncées), 052 et 057 (VRAIS points de Hongrie), 053 et 058 (bâtons rompus
+clairs), 055 et 060 (parquet VERSAILLES), 069 (mosaïque des années 60-70) ; Poly Haven laminate_floor_03, oak_wood_planks,
+old_wooden_floor_03 (photos). Les ambientCG sont « PBRProcedural » (fabriqués à partir de photos de bois, pas photographiés d'un bloc) :
+on garde seulement ceux qui passent l'essai de rendu à l'œil, comme pour le granito. Planche : `..\atelya\b2\parquets-proposes.png`.
+**Suite (08/11/2026 soir, « Oui » de NT + « adapte un parquet aux photos »)** : les 15 parquets sont téléchargés
+(`telecharger_matieres.py` étendu ; bibliothèque : 29 matières, 242 Mo). Essai dans le séjour entier de fr-031
+(`..\atelya\b2\parquets-essai.png`) : GARDÉS 10 (chêne clair moderne, chêne grisé, chêne à nœuds, chêne clair larges lames, chêne
+naturel, vieux parquet, 2 points de Hongrie, 2 bâtons rompus) → catalogue de 19 sols ; ÉCARTÉS du choix (gardés dans la bibliothèque) :
+chêne beige et lames foncées (unis, plastique), Versailles clair et chaud (motif trop petit, rosé), mosaïque (terne). Mesure sur les
+photos d'app-001 (`moteur/teinte_photo.py`, mur blanc = étalon) : le parquet d'app-001 renvoie ~(0,52 ; 0,24 ; 0,10) de la lumière,
+notre parquet par défaut ~(0,22 ; 0,12 ; 0,06) → 2,4 fois plus sombre : NT avait raison. Nouveau : `teinte` du sol de la pièce
+(3 multiplicateurs, nom de matériau « matiere~r,g,b »). Essai fr-031 façon app-001 (`..\atelya\b2\app001-parquet.png`) : le dessin et
+la clarté suivent la photo, mais la couleur sort ROSÉE au rendu : l'éclairage actuel (plafonniers blanc chaud + ciel uni) teinte
+tout ; à régler avec B2-4 (lumière du jour) avant de juger la couleur. Chevrons d'app-001 plus grands que ceux d'ambientCG (colonnes
+~40 cm contre ~30). NT : « ça ressemble plus au 15 » (n° 15 de la planche proposée = mosaïque ?) → question posée.

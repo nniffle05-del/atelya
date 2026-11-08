@@ -130,6 +130,9 @@ class Sol(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     matiere: Literal[*NOMS_SOLS]
+    teinte: tuple[Annotated[float, Field(ge=0.2, le=4.0)], Annotated[float, Field(ge=0.2, le=4.0)],
+                  Annotated[float, Field(ge=0.2, le=4.0)]] | None = Field(
+        default=None, description="Correction de couleur (rouge, vert, bleu) qui rapproche la matière de la photo du client")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)

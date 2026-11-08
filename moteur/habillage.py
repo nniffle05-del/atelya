@@ -55,7 +55,7 @@ from dataclasses import asdict, replace
 
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
-from moteur.matieres import SOL_PAR_SORTE, sorte
+from moteur.matieres import SOL_PAR_SORTE, matiere_et_teinte, nom_materiau, sorte
 
 VERSION_PLAN = "construction/0.2"
 
@@ -254,7 +254,8 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
         return "plafond_blanc"
     pieces = {p.id: p for p in logement.pieces}
     if brique.element in pieces:
-        return matiere_du_sol(pieces[brique.element])
+        piece = pieces[brique.element]
+        return nom_materiau(matiere_du_sol(piece), piece.sol.teinte if piece.sol is not None else None)
     return "seuil"  # le sol sous une porte
 
 
@@ -636,7 +637,8 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
             epaisseur, hauteur = EPAISSEUR_PLINTHE_CARRELAGE, HAUTEUR_PLINTHE_CARRELAGE
             sol = sols[piece.id].materiau
             # le carrelage du sol ; sous des carreaux de ciment (motif), une plinthe unie ; sous un parquet, du carrelage beige
-            materiau = ("carrelage" if sol == "carreaux_ciment" else sol) if sorte(sol) == "carrelage" else SOL_PAR_SORTE["carrelage"]
+            materiau = (("carrelage" if matiere_et_teinte(sol)[0] == "carreaux_ciment" else sol) if sorte(sol) == "carrelage"
+                        else SOL_PAR_SORTE["carrelage"])
         else:
             epaisseur, hauteur, materiau = EPAISSEUR_PLINTHE, HAUTEUR_PLINTHE, "menuiserie_blanche"
         contour = sols[piece.id].contour  # sens direct : l'intérieur de la pièce est à gauche de chaque côté

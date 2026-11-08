@@ -19,6 +19,17 @@ SOLS: dict[str, tuple[str, str]] = {
     "parquet_batons_rompus": ("Parquet bâtons rompus", "bois"),
     "point_de_hongrie": ("Parquet point de Hongrie", "bois"),
     "stratifie": ("Stratifié", "bois"),
+    "chene_clair_moderne": ("Chêne clair moderne", "bois"),
+    "chene_grise": ("Chêne grisé", "bois"),
+    "chene_noeuds": ("Chêne à nœuds, larges lames", "bois"),
+    "chene_clair_photo": ("Chêne clair, larges lames", "bois"),
+    "chene_naturel_photo": ("Chêne naturel", "bois"),
+    "vieux_parquet": ("Vieux parquet", "bois"),
+    "hongrie_naturel": ("Point de Hongrie naturel", "bois"),
+    "hongrie_grise": ("Point de Hongrie grisé", "bois"),
+    "batons_rompus_clair": ("Bâtons rompus clair", "bois"),
+    "batons_rompus_tres_clair": ("Bâtons rompus très clair", "bois"),
+
     "carrelage_interieur": ("Carrelage beige", "carrelage"),
     "carreaux_ciment": ("Carreaux de ciment", "carrelage"),
     "tomettes": ("Tomettes", "carrelage"),
@@ -35,12 +46,32 @@ CALCULEES = {"point_de_hongrie": "chene_clair", "carreaux_ciment": None}
 # Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (degrés).
 ROTATION_PHOTO = {"carrelage_interieur": 45.0}
 
+# Essayées le 08/11/2026 dans le séjour de fr-031 et ÉCARTÉES du choix (téléchargées, gardées dans la bibliothèque) : chêne
+# beige (WoodFloor062) et lames foncées (WoodFloor064) trop unis, effet plastique ; Versailles clair et chaud (WoodFloor055,
+# 060) pas convaincants à la distance d'une photo de pièce (motif trop petit et rosé) ; mosaïque (WoodFloor069) terne et boueuse.
+
 # Le sol supposé quand rien ne l'a vu, selon la sorte de la pièce (moteur.habillage.sol_de_la_piece).
 SOL_PAR_SORTE = {"bois": "parquet_chene_lames", "carrelage": "carrelage_interieur"}
 
 
+def nom_materiau(matiere: str, teinte=None) -> str:
+    """Le nom du matériau d'une brique : la matière, suivie de sa teinte s'il y en a une (« chene_beige~1.20,1.00,0.80 »)."""
+    if not teinte:
+        return matiere
+    return matiere + "~" + ",".join(f"{g:.2f}" for g in teinte)
+
+
+def matiere_et_teinte(nom: str) -> tuple[str, tuple[float, float, float] | None]:
+    """L'inverse de nom_materiau."""
+    if "~" not in nom:
+        return nom, None
+    matiere, gains = nom.split("~", 1)
+    return matiere, tuple(float(g) for g in gains.split(","))
+
+
 def sorte(matiere: str) -> str:
     """« bois » ou « carrelage » (un nom inconnu, ancien « parquet » compris, compte comme du bois)."""
+    matiere = matiere_et_teinte(matiere)[0]
     if matiere in SOLS:
         return SOLS[matiere][1]
     return "carrelage" if "carrel" in matiere else "bois"
