@@ -256,6 +256,19 @@ fr-021…041 prises comme lecture de Claude, `outils/lecture_claude/fiche_depuis
 sans défaut (FAITE le 08/11 : 20/20 vrais plans construits, 15/20 sans aucun trou, plus de fuites ni de carrés noirs ;
 `moteur/controle_maquette.py`) → B2 rendu photo d'annonce → B3 soleil réel → B4 meubles (ABO retenu, réalisme d'abord) → B5
 caméra / cinématique + comparatif.
+**B2 « maquette 3D réaliste », TEMPS 1 FAIT (08-09/11/2026, branche `etape-ecran-lecture-claude`, 726aaac, 741 tests)** : B2-1 plinthes
++ encadrements + appuis ; plinthes, portes de placard et SOL décidés PIÈCE PAR PIÈCE (décision NT : jamais une règle fixe partout ;
+champs `plinthes`, `placard`, `sol` (+ `teinte`) de chaque pièce, statut ajoute = supposé / estime = vu sur photo / mesure = choisi à
+l'écran ; listes dans la fiche de chaque pièce à l'écran de vérification ; `habillage.completer_finitions`) ; B2-2 portes de placard ;
+B2-3 vraies matières CC0 (bibliothèque `..\atelya\bibliotheque\matieres`, 29 matières dont 19 sols au catalogue `moteur/matieres.py`,
+photos rangées dans le .blend ; fin des lignes au sol) ; teinte d'un sol d'après une photo du client (`moteur/teinte_photo.py`, mur
+blanc = étalon) ; B2-4 lumière du jour (ciel physique, portails, plafonniers éteints, exposition et balance des blancs « de
+photographe », 512 passes). Habillage 0.7. Note ~71/100 client. Meubles ABO officiels en téléchargement (`..\atelya\bibliotheque\
+meubles-abo`, outil `outils/bibliotheque/telecharger_meubles.py`, REPRENABLE : relancer la même commande, il saute ce qui est fait).
+**ÉTAPE SUIVANTE (accord NT 09/11) : B2 TEMPS 2 = app-001** (`..\atelya\photos-clients\app-001\`, plan sans cotes + 12 photos) :
+lire le plan à la main comme une vérité (échelle : 124 m² au total, portes ~80 cm, HSP 3 m ; ne PAS construire palier, escalier,
+ascenseur), 3D par Atelya, puis chaque pièce prend le sol (motif + teinte) de SA photo, comparaison côte à côte avec l'annonce.
+Détail complet : fin de `docs/projet/memoire/plan-lancement-lecture-claude.md`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

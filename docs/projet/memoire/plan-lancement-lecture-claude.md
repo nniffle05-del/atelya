@@ -279,3 +279,9 @@ blanc (courbes de couleur, `white_level`) : le reflet orangé du parquet ne tein
 défaut des pièces à vivre → `chene_naturel_photo` (NT : l'ancien était trop foncé). Rendus : `..\atelya\b2\b2-4-lumiere.png` (avant B2 /
 après, défaut / adapté à la photo d'app-001 / la photo). Le soleil reste celui inventé du plan (azimut 200°, hauteur 50°) : le VRAI soleil
 (orientation du logement, date, heure) = étape B3, règle 20 (« soleil inventé non »).
+
+**Fin du temps 1 de B2 (09/11/2026)** : NT d'accord pour faire le TEMPS 2 (app-001) dans une NOUVELLE conversation. Note honnête
+~71/100 prêt client (fabriqués ~93, vrais plans ~53, inchangés). Limites connues à reprendre : soleil encore inventé (B3) ; chevrons du
+parquet adapté plus petits que ceux d'app-001 (prévoir une échelle du motif par pièce) ; ~1 min 30 par vue de pièce ; pas de faïence
+murale ; portes de placard toujours blanches ; fin trait sombre dans l'embrasure d'une porte-fenêtre de fr-031. Le téléchargement des
+meubles ABO tourne dans cette conversation : s'il s'arrête (fermeture de VS Code, veille), relancer la même commande (il reprend).
