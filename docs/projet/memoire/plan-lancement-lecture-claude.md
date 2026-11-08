@@ -194,3 +194,9 @@ fr-031, fr-030, fr-021 : `..\atelya\b2\<plan>-avant-apres.png`. fr-021 : 88 morc
 40 d'appui. Limites connues : poteaux isolés au milieu d'une pièce sans plinthe autour ; 3 petits côtés (≤ 1,3 m) de fr-021 où le mur
 est à plus de 2 cm du bord de la pièce → pas de plinthe ; plinthe arrêtée net au bout d'un mur qui borde un passage ouvert (pas de
 retour autour du bout).
+
+**NT, 08/11/2026 (après B2-1)** : les finitions ne doivent PAS être posées partout par une règle fixe : Atelya doit décider
+**logement par logement** s'il y en a ou pas (« s'il voit qu'il y en a ou qu'il n'y en a pas »). Proposé : chaque finition
+(plinthes, et ensuite placards, corniches…) devient un réglage PAR PIÈCE dans le logement (avec / sans / plinthe carrelée,
+statut « estimé » tant que rien ne l'a vu), visible et modifiable à l'écran de vérification ; au temps 2, Atelya le remplit
+lui-même d'après les photos du client (statut « vu sur photo »). En attente du « oui » de NT avant de le faire (avant B2-2).
