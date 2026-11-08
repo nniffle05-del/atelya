@@ -8,7 +8,9 @@ Avec un plan habillé (construction/0.2), il donne aussi à chaque brique son
 matériau, et pose le soleil, les plafonniers et les caméras.
 
 Utilisation (lancé par moteur/construire.py) :
-    blender -b --factory-startup --python poser_briques.py -- construction.json maquette.blend
+    blender -b --factory-startup --python poser_briques.py -- construction.json maquette.blend [bibliotheque_matieres]
+
+B2-3 : avec le dossier de la bibliothèque de matières, les sols sont peints avec les photos de vraies matières.
 """
 
 import json
@@ -26,7 +28,9 @@ SCHEMAS = ("construction/0.1", "construction/0.2")
 
 
 def main() -> None:
-    plan_json, sortie_blend = sys.argv[sys.argv.index("--") + 1:][:2]
+    arguments = sys.argv[sys.argv.index("--") + 1:]
+    plan_json, sortie_blend = arguments[:2]
+    bibliotheque = arguments[2] if len(arguments) > 2 else None
     plan = json.loads(Path(plan_json).read_text(encoding="utf-8"))
     if plan.get("schema") not in SCHEMAS:
         raise ValueError(f"plan de construction inattendu : {plan.get('schema')}")
@@ -43,7 +47,7 @@ def main() -> None:
         collections[categorie] = bpy.data.collections.new(nom)
         scene.collection.children.link(collections[categorie])
 
-    materiaux = creer_materiaux()
+    materiaux = creer_materiaux(bibliotheque, plan.get("orientation_sols", 0.0))
     # B1 (08/11/2026) : deux murs qui se croisent (en X, murs épais) ont leurs dessus exactement à la même hauteur ; au rendu,
     # chacun fait de l'ombre à l'autre et la croisée sort NOIRE. Chaque mur monte donc d'un dixième de millimètre de plus que
     # le précédent (cycle de 10, au plus 0,9 mm) : invisible (caché dans le plafond, ou de quelques millimètres vu de dessus).

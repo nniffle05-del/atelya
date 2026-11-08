@@ -43,7 +43,8 @@ def volume_commun(a, b):
 def test_plan_habille_lisible(plan):
     assert plan["schema"] == "construction/0.2"
     # les briques de l'étape 2 + les menuiseries + (B2-1) 24 chambranles, 4 appuis et 24 morceaux de plinthes
-    assert len(plan["briques"]) == 36 + 45 + 24 + 4 + 24
+    # + (B2-3) une copie sous le sol de chacune des 4 pièces
+    assert len(plan["briques"]) == 36 + 45 + 24 + 4 + 24 + 4
     assert all(b["materiau"] for b in plan["briques"])
 
 
@@ -87,8 +88,8 @@ def test_sol_selon_le_nom(nom, sol):
 
 def test_sols_du_cas_test(plan):
     sols = {b["element"]: b["materiau"] for b in plan["briques"] if b["id"].startswith("sol__")}
-    assert sols == {"sejour": "parquet", "chambre": "parquet",
-                    "entree": "carrelage", "sdb": "carrelage"}
+    assert sols == {"sejour": "parquet_chene_lames", "chambre": "parquet_chene_lames",
+                    "entree": "carrelage_interieur", "sdb": "carrelage_interieur"}
 
 
 def test_un_plafonnier_par_piece_sous_le_plafond(plan, logement):
@@ -209,14 +210,15 @@ def test_plinthes_en_carrelage_plus_basses_et_comme_le_sol():
 
     choisi = {"choix": "carrelage", "statut": "mesure", "source": "verification"}
     plinthes = _plinthes_de(plan_habille(_piece_simple(nom="Salle de bain", plinthes=choisi)))
-    assert plinthes and all(b["z_haut"] == HAUTEUR_PLINTHE_CARRELAGE and b["materiau"] == "carrelage" for b in plinthes)
+    assert plinthes and all(b["z_haut"] == HAUTEUR_PLINTHE_CARRELAGE and b["materiau"] == "carrelage_interieur"
+                            for b in plinthes)
     e = EPAISSEUR_PLINTHE_CARRELAGE  # même tour exact que les plinthes en bois, avec l'épaisseur d'un carreau
     anneau = 4 * 3 - (4 - 2 * e) * (3 - 2 * e)
     trous = (0.9 + 2 * (LARGEUR_CHAMBRANLE + 0.001)) * e + 1.4 * e
     assert sum(_aire(b["contour"]) for b in plinthes) == pytest.approx(anneau - trous, abs=1e-6)
     # dans un séjour en parquet, des plinthes carrelées choisies restent en carrelage (pas en parquet)
     plinthes = _plinthes_de(plan_habille(_piece_simple(plinthes=choisi)))
-    assert {b["materiau"] for b in plinthes} == {"carrelage"}
+    assert {b["materiau"] for b in plinthes} == {"carrelage_interieur"}
 
 
 def test_regle_par_defaut_quand_rien_n_est_vu():
@@ -226,7 +228,7 @@ def test_regle_par_defaut_quand_rien_n_est_vu():
     assert plinthes_par_defaut("WC") == "carrelage"
     assert plinthes_par_defaut("Chambre 2") == "bois"
     assert {b["materiau"] for b in _plinthes_de(plan_habille(_piece_simple()))} == {"menuiserie_blanche"}
-    assert {b["materiau"] for b in _plinthes_de(plan_habille(_piece_simple(nom="Cuisine")))} == {"carrelage"}
+    assert {b["materiau"] for b in _plinthes_de(plan_habille(_piece_simple(nom="Cuisine")))} == {"carrelage_interieur"}
 
 
 def test_completer_plinthes_ecrit_la_regle_sans_toucher_un_choix_deja_fait():
@@ -354,3 +356,72 @@ def test_deux_portes_proches_se_partagent_le_trumeau():
     gauche = [b for b in plan["briques"] if b["id"] == "porte2__chambranle_a_1"][0]
     assert max(p[0] for p in droite["contour"]) <= min(p[0] for p in gauche["contour"]) + 1e-6  # ne se recouvrent pas
     assert LARGEUR_CHAMBRANLE > 0.04  # sans le partage, ils se recouvriraient
+
+
+# ---- Sols en vraies matières (habillage 0.6, B2-3) ----
+
+def test_le_sol_choisi_est_pose_et_les_plinthes_carrelees_le_suivent():
+    tomettes = {"matiere": "tomettes", "statut": "estime", "source": "photo_04"}
+    log = _piece_simple(plinthes=None)
+    d = log.model_dump(by_alias=True, exclude_none=True)
+    d["pieces"][0]["sol"] = tomettes
+    plan = plan_habille(Logement.model_validate(d))
+    assert {b["materiau"] for b in plan["briques"] if b["id"] == "sol__sejour"} == {"tomettes"}
+    # sol carrelé choisi : les plinthes supposées deviennent carrelées, dans la matière du sol
+    assert {b["materiau"] for b in _plinthes_de(plan)} == {"tomettes"}
+    # sous des carreaux de ciment (motif), une plinthe unie
+    d["pieces"][0]["sol"] = {**tomettes, "matiere": "carreaux_ciment"}
+    assert {b["materiau"] for b in _plinthes_de(plan_habille(Logement.model_validate(d)))} == {"carrelage"}
+
+
+def test_le_format_refuse_un_sol_inconnu():
+    d = _piece_simple().model_dump(by_alias=True, exclude_none=True)
+    d["pieces"][0]["sol"] = {"matiere": "moquette", "statut": "mesure", "source": "verification"}
+    with pytest.raises(ValueError):
+        Logement.model_validate(d)
+
+
+def test_completer_ecrit_le_sol_par_defaut():
+    from moteur.habillage import completer_finitions
+
+    d = _piece_simple(nom="Salle de bain").model_dump(by_alias=True, exclude_none=True)
+    p = completer_finitions(d)["pieces"][0]
+    assert p["sol"]["matiere"] == "carrelage_interieur" and p["sol"]["statut"] == "ajoute"
+    assert p["plinthes"]["choix"] == "carrelage"
+
+
+def test_sous_chaque_sol_une_copie_un_peu_plus_large_et_plus_basse():
+    plan = plan_habille(_piece_simple())
+    sol = next(b for b in plan["briques"] if b["id"] == "sol__sejour")
+    dessous = next(b for b in plan["briques"] if b["id"] == "sous_sol__sejour")
+    assert dessous["z_haut"] == dessous["z_bas"] < 0 and dessous["materiau"] == sol["materiau"]
+    xs = [p[0] for p in dessous["contour"]]
+    assert min(xs) == pytest.approx(min(p[0] for p in sol["contour"]) - 0.02, abs=1e-3)
+    assert _aire(dessous["contour"]) > _aire(sol["contour"])
+
+
+def test_les_lames_suivent_les_murs_les_plus_longs():
+    from moteur.habillage import orientation_sols
+
+    assert orientation_sols(_piece_simple()) == pytest.approx(0.0)  # 4 m est-ouest contre 3 m nord-sud
+    d = _piece_simple().model_dump(by_alias=True, exclude_none=True)
+    for m in d["murs"]:  # le même logement tourné d'un quart de tour
+        m["debut"], m["fin"] = [-m["debut"][1], m["debut"][0]], [-m["fin"][1], m["fin"][0]]
+    for p in d["pieces"]:
+        p["contour"] = [[-y, x] for x, y in p["contour"]]
+    import math
+    assert orientation_sols(Logement.model_validate(d)) == pytest.approx(math.pi / 2)
+
+
+def test_l_ecran_connait_les_memes_sols_que_le_moteur():
+    import re
+    from pathlib import Path
+
+    from moteur.matieres import SOLS
+
+    js = (Path(__file__).parent.parent / "outils" / "verification-plan" / "calculs-verif.js").read_text(encoding="utf-8")
+    bloc = js[js.index("const SOLS = {"):]
+    bloc = bloc[:bloc.index("};")]
+    ecran = dict(re.findall(r'(\w+): "([^"]+)"', bloc))
+    assert list(ecran) == list(SOLS)
+    assert ecran == {k: v[0] for k, v in SOLS.items()}

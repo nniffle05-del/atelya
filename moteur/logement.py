@@ -23,6 +23,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from moteur.matieres import NOMS_SOLS
+
 VERSION_SCHEMA = "logement/0.1"
 
 # Écart toléré entre une surface annoncée et la surface calculée (m²).
@@ -118,6 +120,21 @@ class PortesPlacard(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class Sol(BaseModel):
+    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py).
+
+    Même provenance que Plinthes : « ajoute » (règle par défaut), « estime » (vu sur une photo), « mesure » (choisi à
+    l'écran de vérification).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    matiere: Literal[*NOMS_SOLS]
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
 class Piece(Element):
     """Une pièce, décrite par son contour intérieur."""
 
@@ -129,6 +146,9 @@ class Piece(Element):
     )
     placard: PortesPlacard | None = Field(
         default=None, description="Portes d'un placard. Si absent : la règle par défaut (moteur.habillage.choix_placard)"
+    )
+    sol: Sol | None = Field(
+        default=None, description="Revêtement du sol. Si absent : la règle par défaut (moteur.habillage.sol_par_defaut)"
     )
 
     @property

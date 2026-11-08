@@ -998,7 +998,16 @@
         });
         placard.push(el("label", { texte: "Portes du placard" }), portes, el("p", { class: "aide", texte: origineDe(e.placard) }));
       }
+      // B2-3 : le sol de la pièce.
+      const sol = el("select", { id: "f-sol" },
+        ...(e.sol ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        ...Object.entries(C.SOLS).map(([k, n]) => el("option", { value: k, texte: n })));
+      sol.value = e.sol ? e.sol.matiere : "";
+      sol.addEventListener("change", () => {
+        if (sol.value) corriger((x) => C.reglerSol(x, e.id, sol.value), `Sol : ${C.SOLS[sol.value]}.`);
+      });
       fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre,
+        el("label", { texte: "Sol" }), sol, el("p", { class: "aide", texte: origineDe(e.sol) }),
         el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }), ...placard,
         el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
         el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));

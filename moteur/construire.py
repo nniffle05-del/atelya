@@ -30,6 +30,8 @@ from moteur.habillage import plan_habille
 from moteur.logement import charger_logement
 
 DOSSIER_SCRIPTS = Path(__file__).parent / "blender"
+# B2-3 : la bibliothèque de matières (photos CC0, hors Git). Variable ATELYA_MATIERES, sinon à côté du dépôt sur le PC.
+MATIERES_PC = Path(__file__).resolve().parents[2] / "atelya" / "bibliotheque" / "matieres"
 BLENDER_MAC = "/Applications/Blender.app/Contents/MacOS/Blender"
 
 # Qualité des images : (échantillons, pourcentage de la taille finale 1600 × 1000).
@@ -41,6 +43,14 @@ def trouver_blender() -> str | None:
     for candidat in (os.environ.get("BLENDER"), shutil.which("blender"), BLENDER_MAC):
         if candidat and Path(candidat).is_file():
             return candidat
+    return None
+
+
+def trouver_matieres() -> Path | None:
+    """Le dossier de la bibliothèque de matières, ou None (Blender dessine alors ses sols par calcul)."""
+    for candidat in (os.environ.get("ATELYA_MATIERES"), MATIERES_PC):
+        if candidat and (Path(candidat) / "matieres.json").is_file():
+            return Path(candidat)
     return None
 
 
@@ -67,8 +77,9 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
                     encoding="utf-8")
 
     maquette = dossier / "maquette.blend"
+    matieres = trouver_matieres()
     lancer_blender("--python", str(DOSSIER_SCRIPTS / "poser_briques.py"),
-                   "--", str(plan), str(maquette))
+                   "--", str(plan), str(maquette), *([str(matieres.resolve())] if matieres else []))
     return maquette
 
 

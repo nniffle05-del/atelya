@@ -37,6 +37,12 @@ PLACARD_MAX m² (un dressing plus grand est une pièce : il garde une porte ordi
 - le plan dessine sa façade comme une porte dans un mur : les portes de placard remplacent le battant de cette porte.
 Règle par défaut quand rien ne l'a vu : battantes pour une façade de moins de 1 m, coulissantes au-delà.
 
+Version 0.6 (08/11/2026, B2-3) : le SOL de chaque pièce est une vraie matière du catalogue (moteur/matieres.py : parquets,
+carrelages, tomettes, granito…), choisie pièce par pièce (champ `sol`) ; par défaut, parquet de chêne dans les pièces à vivre,
+carrelage clair dans les pièces d'eau, la cuisine et les passages. Le matériau d'une brique de sol est le nom de la matière ;
+Blender la peint avec les photos de la bibliothèque (moteur/blender/materiaux.py). Plinthes carrelées : la matière du sol si
+c'est un carrelage, sinon le carrelage clair.
+
 Tout ce qui est ajouté ici est de la décoration supposée (statut « ajouté ») :
 le plan ne dit ni la couleur des murs ni le type de sol.
 """
@@ -49,6 +55,7 @@ from dataclasses import asdict, replace
 
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
+from moteur.matieres import SOL_PAR_SORTE, sorte
 
 VERSION_PLAN = "construction/0.2"
 
@@ -124,12 +131,17 @@ PUISSANCE_PAR_M2 = 6.0  # watts (unité Blender)
 def plan_habille(logement: Logement) -> dict:
     """Le plan de construction complet, habillé, prêt pour Blender."""
     briques = [replace(b, materiau=materiau_de(b, logement)) for b in calculer_briques(logement)]
+    # B2-3 : les bandes qui raccordent deux sols (B1) passent un demi-millimètre plus bas : posées à la même hauteur que les
+    # sols qu'elles touchent, elles se chevauchaient et faisaient de fines lignes sombres au rendu.
+    briques = [replace(b, z_bas=JOINT_SOL_Z, z_haut=JOINT_SOL_Z) if b.id.startswith("joint_sol__") else b for b in briques]
     briques += menuiseries(logement)
     briques += plinthes(briques, logement)
     briques += portes_de_placard(briques, logement)
+    briques += sous_sols(briques)
     return {
         "schema": VERSION_PLAN,
         "projet_id": logement.projet_id,
+        "orientation_sols": orientation_sols(logement),
         "briques": [asdict(b) for b in briques],
         "lumieres": lumieres(logement),
         "vues": vues(logement),
@@ -153,25 +165,51 @@ def sol_de_la_piece(nom: str) -> str:
     return SOL_PAR_DEFAUT
 
 
-def plinthes_par_defaut(nom: str) -> str:
-    """Les plinthes supposées quand rien ne les a vues : comme le sol dans une pièce carrelée, en bois ailleurs."""
-    return "carrelage" if sol_de_la_piece(nom) == "carrelage" else "bois"
+def orientation_sols(logement: Logement) -> float:
+    """Le sens des lames de parquet (radians depuis l'axe x) : celui des murs les plus longs du logement, le même dans
+    toutes les pièces (le parquet ne change pas de sens au passage d'une porte, et les sols voisins se raccordent)."""
+    poids: dict[int, float] = {}
+    for m in logement.murs:
+        angle = round(math.degrees(math.atan2(m.fin[1] - m.debut[1], m.fin[0] - m.debut[0]))) % 180
+        poids[angle] = poids.get(angle, 0.0) + m.longueur
+    if not poids:
+        return 0.0
+    return round(math.radians(max(poids, key=poids.get)), 6)
+
+
+def sol_par_defaut(nom: str) -> str:
+    """La matière du sol supposée quand rien ne l'a vue : parquet de chêne ou carrelage clair, selon le nom de la pièce."""
+    return SOL_PAR_SORTE["carrelage" if sol_de_la_piece(nom) == "carrelage" else "bois"]
+
+
+def matiere_du_sol(piece: Piece) -> str:
+    """La matière du sol de la pièce : ce qu'elle dit, sinon la règle par défaut."""
+    return piece.sol.matiere if piece.sol is not None else sol_par_defaut(piece.nom)
+
+
+def plinthes_par_defaut(nom: str, matiere_sol: str | None = None) -> str:
+    """Les plinthes supposées quand rien ne les a vues : comme le sol quand il est carrelé, en bois ailleurs. Sans matière
+    de sol connue, on la suppose d'après le nom de la pièce."""
+    return "carrelage" if sorte(matiere_sol or sol_par_defaut(nom)) == "carrelage" else "bois"
 
 
 def choix_plinthes(piece: Piece) -> str:
     """« bois », « carrelage » ou « aucune » : ce que dit la pièce, sinon la règle par défaut."""
-    return piece.plinthes.choix if piece.plinthes is not None else plinthes_par_defaut(piece.nom)
+    return piece.plinthes.choix if piece.plinthes is not None else plinthes_par_defaut(piece.nom, matiere_du_sol(piece))
 
 
 def completer_plinthes(logement: dict) -> dict:
-    """Une copie du logement (forme JSON) où chaque pièce sans plinthes décidées reçoit la règle par défaut, marquée
+    """Une copie du logement (forme JSON) où chaque pièce sans sol ni plinthes décidés reçoit la règle par défaut, marquée
     « ajoute » (supposé, personne ne l'a vu) : l'écran de vérification la montre et une personne peut la changer."""
     import copy
 
     sortie = copy.deepcopy(logement)
     for p in sortie.get("pieces") or []:
+        if not p.get("sol"):
+            p["sol"] = {"matiere": sol_par_defaut(p.get("nom", "")), "statut": "ajoute", "source": "regle_par_defaut",
+                        "confiance": 0.5}
         if not p.get("plinthes"):
-            p["plinthes"] = {"choix": plinthes_par_defaut(p.get("nom", "")), "statut": "ajoute",
+            p["plinthes"] = {"choix": plinthes_par_defaut(p.get("nom", ""), p["sol"]["matiere"]), "statut": "ajoute",
                              "source": "regle_par_defaut", "confiance": 0.5}
     return sortie
 
@@ -216,7 +254,7 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
         return "plafond_blanc"
     pieces = {p.id: p for p in logement.pieces}
     if brique.element in pieces:
-        return sol_de_la_piece(pieces[brique.element].nom)
+        return matiere_du_sol(pieces[brique.element])
     return "seuil"  # le sol sous une porte
 
 
@@ -293,16 +331,18 @@ def _fenetre(o: Ouverture, mur: Mur, cote_interieur: int = 0) -> list[Brique]:
 
 
 def _place_de_chaque_cote(o: Ouverture, mur: Mur, logement: Logement) -> tuple[float, float]:
-    """La place libre sur le mur à gauche et à droite de l'ouverture o : jusqu'au bout du mur, ou la moitié de l'écart
-    avec l'ouverture voisine (deux portes proches se partagent le trumeau : leurs chambranles ne se recouvrent pas)."""
+    """La place libre sur le mur à gauche et à droite de l'ouverture o : jusqu'au bout du mur, ou jusqu'à l'ouverture voisine
+    (la moitié de l'écart si c'est une porte : deux portes proches se partagent le trumeau, leurs chambranles ne se
+    recouvrent pas ; une fenêtre n'a pas de chambranle, celui de la porte peut couvrir tout le trumeau)."""
     gauche, droite = o.position, max(0.0, mur.longueur - o.position - o.largeur)
     for x in logement.ouvertures:
         if x is o or x.mur != o.mur:
             continue
+        partage = 2 if x.type == "porte" else 1
         if x.position + x.largeur <= o.position + 1e-9:
-            gauche = min(gauche, (o.position - x.position - x.largeur) / 2)
+            gauche = min(gauche, (o.position - x.position - x.largeur) / partage)
         elif x.position >= o.position + o.largeur - 1e-9:
-            droite = min(droite, (x.position - o.position - o.largeur) / 2)
+            droite = min(droite, (x.position - o.position - o.largeur) / partage)
     return gauche, droite
 
 
@@ -379,6 +419,56 @@ def _portes_de_placard_dans(o: Ouverture, mur: Mur, piece: Piece, cote: int) -> 
     choix = choix_placard(piece, l - 2 * p)
     return _vantaux_placard(f"{o.id}__placard", o.id, origine, (ux, uy), dedans, l - 2 * p, JEU_SOL, haut - p, choix,
                             profondeur_max=mur.epaisseur - 0.01)
+
+
+SOUS_SOL_DEBORD = 0.02  # m : le dessous de chaque sol déborde de 2 cm (caché sous les murs)
+SOUS_SOL_Z = -0.001  # 1 mm sous le sol
+JOINT_SOL_Z = -0.0005  # les bandes de raccord entre deux sols, entre le sol et sa copie
+
+
+def sous_sols(briques: list[Brique]) -> list[Brique]:
+    """B2-3 : sous le sol de chaque pièce, une copie 1 mm plus bas, élargie de 2 cm, dans la même matière.
+
+    Entre deux pièces, les sols se touchent à quelques dixièmes de millimètre près ; dans ces fentes, on voyait le vide (de
+    fines lignes claires au rendu). La copie les bouche ; comme les matières sont posées selon la position réelle, le dessin
+    du parquet y continue sans raccord visible. Elle déborde sous les murs, où on ne la voit pas."""
+    sortie = []
+    for b in briques:
+        if b.categorie == "sol" and b.id == f"sol__{b.element}":
+            contour = _elargir(b.contour, SOUS_SOL_DEBORD)
+            if contour:
+                sortie.append(Brique(f"sous_sol__{b.element}", "sol", b.element, contour, SOUS_SOL_Z, SOUS_SOL_Z, b.materiau))
+    return sortie
+
+
+def _elargir(contour: list[Point], d: float) -> list[Point] | None:
+    """Le contour (sens direct) poussé de d vers l'extérieur ; coins en pointe (limitée), None s'il se retourne."""
+    n = len(contour)
+    sortie = []
+    for i in range(n):
+        a, b, c = contour[i - 1], contour[i], contour[(i + 1) % n]
+        normales = []
+        for p, q in ((a, b), (b, c)):
+            lg = math.dist(p, q)
+            if lg < 1e-9:
+                normales.append(None)
+                continue
+            normales.append(((q[1] - p[1]) / lg, -(q[0] - p[0]) / lg))  # à droite = dehors (sens direct)
+        n1, n2 = normales
+        n1 = n1 or n2
+        n2 = n2 or n1
+        if n1 is None:
+            sortie.append(b)
+            continue
+        diviseur = 1 + n1[0] * n2[0] + n1[1] * n2[1]
+        if diviseur < 0.3:  # angle très aigu : pointe limitée
+            sortie.append((b[0] + n1[0] * d, b[1] + n1[1] * d))
+            continue
+        sortie.append((b[0] + (n1[0] + n2[0]) * d / diviseur, b[1] + (n1[1] + n2[1]) * d / diviseur))
+    sortie = [_arrondi(p) for p in sortie]
+    if _aire_signee_plan(sortie) <= _aire_signee_plan(contour):
+        return None
+    return sortie
 
 
 def portes_de_placard(briques: list[Brique], logement: Logement) -> list[Brique]:
@@ -545,7 +635,8 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
         if choix == "carrelage":
             epaisseur, hauteur = EPAISSEUR_PLINTHE_CARRELAGE, HAUTEUR_PLINTHE_CARRELAGE
             sol = sols[piece.id].materiau
-            materiau = sol if sol != "parquet" else "carrelage"  # le carrelage du sol, ou un carrelage si le sol n'en a pas
+            # le carrelage du sol ; sous des carreaux de ciment (motif), une plinthe unie ; sous un parquet, du carrelage beige
+            materiau = ("carrelage" if sol == "carreaux_ciment" else sol) if sorte(sol) == "carrelage" else SOL_PAR_SORTE["carrelage"]
         else:
             epaisseur, hauteur, materiau = EPAISSEUR_PLINTHE, HAUTEUR_PLINTHE, "menuiserie_blanche"
         contour = sols[piece.id].contour  # sens direct : l'intérieur de la pièce est à gauche de chaque côté

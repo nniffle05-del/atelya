@@ -377,6 +377,9 @@
     if (!p) throw new Error(`pièce inconnue : ${id}`);
     if (!nom || !nom.trim()) throw new Error("le nom ne peut pas être vide");
     p.nom = nom.trim();
+    // Ce qu'Atelya avait supposé d'après l'ancien nom (sol, plinthes, portes de placard) est oublié : il le supposera de nouveau
+    // d'après le nouveau nom (un « Bureau » devenu « Salle d'eau » n'a pas de parquet). Ce que la personne a choisi reste.
+    for (const k of ["sol", "plinthes", "placard"]) if (p[k] && p[k].statut === "ajoute") delete p[k];
     marquer(v, p);
     return v;
   }
@@ -390,6 +393,30 @@
     const p = (v.logement.pieces || []).find((x) => x.id === id);
     if (!p) throw new Error(`pièce inconnue : ${id}`);
     p.plinthes = { choix, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
+
+  // B2-3 : les sols qu'Atelya sait poser (même liste, même ordre que moteur/matieres.py ; un test le vérifie).
+  const SOLS = {
+    parquet_chene_lames: "Parquet chêne, lames droites",
+    parquet_batons_rompus: "Parquet bâtons rompus",
+    point_de_hongrie: "Parquet point de Hongrie",
+    stratifie: "Stratifié",
+    carrelage_interieur: "Carrelage beige",
+    carreaux_ciment: "Carreaux de ciment",
+    tomettes: "Tomettes",
+    damier_pierre: "Damier de pierre",
+    pierre_beige: "Dalles de pierre beige",
+  };
+
+  /** Le sol d'une pièce, choisi par la personne. */
+  function reglerSol(v0, id, matiere) {
+    if (!(matiere in SOLS)) throw new Error(`sol inconnu : ${matiere}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.sol = { matiere, statut: "mesure", source: "verification", confiance: 1 };
     marquer(v, p);
     return v;
   }
@@ -1463,6 +1490,8 @@
     renommerPiece,
     reglerPlinthes,
     CHOIX_PLINTHES,
+    reglerSol,
+    SOLS,
     reglerPlacard,
     CHOIX_PLACARD,
     estPlacard,

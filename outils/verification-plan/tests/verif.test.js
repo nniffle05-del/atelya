@@ -122,6 +122,20 @@ test("portes de placard choisies à l'écran ; un placard se reconnaît à son n
   assert.ok(!C.estPlacard({ nom: "Chambre", contour: carre(1) }));
 });
 
+test("sol choisi à l'écran ; un changement de nom oublie seulement ce qu'Atelya avait supposé", () => {
+  const v = exemple();
+  const w = C.reglerSol(v, "chambre", "tomettes");
+  assert.deepEqual(w.logement.pieces.find((x) => x.id === "chambre").sol,
+    { matiere: "tomettes", statut: "mesure", source: "verification", confiance: 1 });
+  assert.throws(() => C.reglerSol(v, "chambre", "moquette"));
+  const suppose = { matiere: "parquet_chene_lames", statut: "ajoute", source: "regle_par_defaut", confiance: 0.5 };
+  v.logement.pieces.find((x) => x.id === "sejour").sol = suppose;
+  const r = C.renommerPiece(C.reglerSol(v, "chambre", "tomettes"), "sejour", "Salle d'eau");
+  assert.equal(r.logement.pieces.find((x) => x.id === "sejour").sol, undefined);
+  const r2 = C.renommerPiece(C.reglerSol(v, "chambre", "tomettes"), "chambre", "Bureau");
+  assert.equal(r2.logement.pieces.find((x) => x.id === "chambre").sol.matiere, "tomettes");
+});
+
 test("propositions en un clic : la porte oubliée est ajoutée et le doute disparaît", () => {
   let v = exemple();
   const d = C.trouverDoutes(v).find((x) => x.element === null);

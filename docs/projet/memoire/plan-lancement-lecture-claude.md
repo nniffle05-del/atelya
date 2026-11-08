@@ -226,3 +226,23 @@ fr-030 : placards fermés de tous côtés sur la lecture (aucun accès, défaut 
 dans la fiche d'un placard seulement (`estPlacard`, `reglerPlacard`), testée dans Chrome 7/7 ; préparateur : `completer_finitions`.
 Rendus : `..\atelya\b2\placards-b2-2.png`. Limite vue : petites lignes au sol à la jonction des parquets de deux pièces (fr-021, défaut
 d'avant B2-2, à revoir avec les vraies matières B2-3).
+
+**B2-3 vraies matières (08/11/2026, « Oui » de NT)** — catalogue `moteur/matieres.py` (9 sols : parquet chêne lames droites,
+bâtons rompus, point de Hongrie (calculé avec le chêne clair), stratifié, carrelage beige (photo en biais tournée de 45° :
+`ROTATION_PHOTO`), carreaux de ciment (calculés : cercles aux coins, étoile, losange rouge, 20 cm), tomettes, damier de pierre,
+dalles de pierre beige). ÉCARTÉ après essai à l'œil : granito (la photo terrazzo_tiles brune ressemble à du liège ou de la moquette :
+à remplacer par un vrai granito gris). Format : champ `sol` de la pièce (`Sol` : matiere + statut). Défaut : parquet chêne / carrelage
+beige selon le nom ; plinthes supposées carrelées si le sol est carrelé (matière du sol ; sous des carreaux de ciment, plinthe unie) ;
+renommer une pièce à l'écran oublie ce qu'Atelya avait SUPPOSÉ (statut ajoute) d'après l'ancien nom. Blender (`moteur/blender/materiaux.py`) :
+`Materiaux` créés à la demande, photos de la bibliothèque (couleur sRGB, brillance et relief non-couleur, normale OpenGL) en projection
+boîte à la taille réelle (matieres.json), toutes dans le même sens (`habillage.orientation_sols` = sens des murs les plus longs, le même
+dans tout le logement), murs et plafonds = peinture + grain de l'enduit (rugosité 0,8-0,95, relief 0,25), photos RANGÉES dans le .blend
+(fr-031 : 19 Mo). Bibliothèque trouvée par `construire.trouver_matieres` (variable ATELYA_MATIERES, sinon ..\atelya\bibliotheque\matieres) ;
+sans elle (Mac, tests) : anciens parquet / carrelage calculés. CORRIGÉ : les fines lignes au sol entre deux pièces (fr-021) = fentes entre
+sols (on voyait le vide) + bandes de raccord B1 posées à la même hauteur que les sols ; → copie de chaque sol 1 mm plus bas élargie de 2 cm
+(`sous_sols`, même matière : le dessin continue) et bandes de raccord à -0,5 mm : lignes disparues. Encadrement d'une porte voisine d'une
+fenêtre : peut couvrir tout le trumeau (seules deux portes se le partagent). Écran : liste « Sol » dans la fiche de chaque pièce (Chrome 6/6) ;
+un test Python vérifie que l'écran et le moteur ont la même liste. Rendus : `..\atelya\b2\sols-b2-3.png` (les 9 sols),
+`..\atelya\b2\fr-031-sejour-avant-apres-b2.png`. Reste vu : fin trait sombre dans le tableau d'une porte-fenêtre de fr-031 (existait
+avant, ombre de l'embrasure : à revoir avec la lumière B2-4) ; faïence murale des salles d'eau pas encore posée (les murs sont partagés
+entre deux pièces : il faudra peindre chaque face) ; portes de placard toujours blanches.
