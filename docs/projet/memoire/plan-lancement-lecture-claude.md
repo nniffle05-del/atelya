@@ -120,3 +120,4 @@ la vérification humaine et nos garde-fous d'échelle pour qu'aucune erreur de C
 chaîne « lecture de Claude → vérification → 3D » ; ne jamais faire calculer l'échelle par Claude ; aucune dépense API sans
 accord écrit de NT. Voir [[objectif-global-nt]], [[atelya-verification-reelle]], [[ecran-verification]],
 [[atelya-echelle-vrais-plans]], [[vrais-plans-francais]].
+Meubles (B4) : NT veut du RÉALISTE avant tout (08/11/2026) → ABO retenu, Sand3D écarté (voir audit-technologique-2026-10-31.md).
