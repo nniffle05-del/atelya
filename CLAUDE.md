@@ -241,6 +241,9 @@ plan : ne pas les reprendre sans l'accord de NT**. Coût / exactitude de Claude 
 essai sans clé API sur les vérités des 15 vrais plans + copies abîmées exprès → puis NT chronomètre la correction, puis 3D. Plan
 **validé par NT le 08/11**, avec l'échelle à « deux clés » : Claude donne chaque cote (valeur + bouts du trait en pixels) et sa
 propre échelle, notre code recalcule ; accord à 3 % → « sûre », sinon doute fort. `main` = 33e58de (fusion locale, NT doit pousser).
+Fait : sous-étape 1 (format, `moteur/lecture_claude.py` 0.1.0) et sous-étape 2 (traducteur, `moteur/traduire_claude.py` 0.1.0,
+recalage `moteur/recalage_murs.py`, outil `outils/lecture_claude/traduire_fiche.py` preparer / traduire → ecran.html). Suite :
+sous-étape 3 (doutes propres à la lecture de Claude). Détail : `plan-lancement-lecture-claude.md`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

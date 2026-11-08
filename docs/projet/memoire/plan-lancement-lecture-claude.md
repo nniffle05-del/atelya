@@ -63,6 +63,26 @@ valeur_m + cadre + DEUX BOUTS + mur, surfaces, autres textes, échelle proposée
 écrit ≠ valeur comptée, point hors contour ; petits débords ramenés au bord) ; `consigne()` = texte pour Claude (rien envoyé) ;
 `tests/test_lecture_claude.py` 12 tests.
 
+**Sous-étape 2 FAITE (08/11/2026)** : `moteur/traduire_claude.py` 0.1.0 (`traduire(source, fiche contrôlée, facteur)` → `PlanLu`
+que `preparer_verification.verification_du_plan` affiche SANS changement). Enchaînement : murs recalés sur l'encre
+(`moteur/recalage_murs.py` = `affiner_mur` DÉPLACÉ tel quel depuis `outils/verite/faire_verite.py`, qui l'importe) → bâti → pièces =
+zones fermées autour du point de Claude (contour de Claude si les murs ne ferment pas : doute faible ; sinon pièce non construite,
+doute fort ; deux points dans la même zone sans contours = pièces réunies, doute faible) → « coloriage de Claude » (classes du U-Net,
+768 px) donné à `lire_echelle_plan` avec les textes de Claude comme textes de PDF (textes exacts du PDF prioritaires) + `decider` →
+DEUX CLÉS : Atelya (dessin) et Claude (proposée) d'accord à 3 % → « lue » ; désaccord → « à vérifier » + doute fort
+`echelle_desaccord` (brouillon à l'échelle d'Atelya) ; seulement Atelya → « lue » ; sans clé d'Atelya → toujours « à vérifier »,
+brouillon = cotes de Claude recalculées par nous depuis leurs bouts (plus grand groupe d'accord à 3 %, ≥ 2 cotes) → échelle proposée
+par Claude (taille vraisemblable) → secours d'Atelya. Logement : repère d'Atelya (origine coin sud-ouest intérieur), ouvertures sur
+le mur désigné par Claude s'il passe par elles sinon le plus proche (≤ 12 px ou l'épaisseur), raccourcies au bout du mur. Doutes :
+fiche (fort), Claude (gravité de Claude), plusieurs niveaux (en tête), échelle, pièces, puis `examiner` (bon sens). Défaut trouvé par
+les tests et corrigé : deux cotes en désaccord → la médiane n'en gardait aucune (division par zéro) → plus grand groupe d'accord.
+Constat : notre lecteur trouve l'échelle par les SURFACES recopiées par Claude même sans cotes dessinées (textes non vérifiés sur
+l'image) → piste sous-étape 3 : vérifier que les textes de Claude existent bien sur l'image (OCR sur leur cadre).
+Outil : `outils/lecture_claude/traduire_fiche.py` (`preparer` = envoi.png à la taille exacte + consigne.txt ; `traduire` = mêmes
+sorties que lire_plan.py, ecran.html compris ; aucun appel à l'API). Tests : `tests/test_traduire_claude.py` 11 (plan dessiné exprès,
+positions de Claude décalées de 3 px : murs à 5 mm près, pièces à 1-2 %, calage sur l'encre, désaccord 20 % attrapé, image envoyée
+réduite de moitié, pièce ouverte, pièces réunies, ouverture hors mur, cote mal recopiée, plusieurs niveaux, fiche refusée).
+
 **Why:** lancer Atelya plus vite avec une lecture déjà bonne, sans payer maintenant l'entraînement sur de vrais plans ; garder
 la vérification humaine et nos garde-fous d'échelle pour qu'aucune erreur de Claude ne passe en silence.
 **How to apply:** ne plus proposer d'entraînement du lecteur comme priorité ; juger les étapes sur ce qu'elles apportent à la
