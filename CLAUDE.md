@@ -24,6 +24,8 @@ détaillé correspondant avant d'agir.
   logement dans Blender. Claude = copilote de développement, jamais un composant du logiciel. Le client
   dépose juste son plan (+ 5-6 photos de pièces, max 10) → lecture AUTOMATIQUE → vérification humaine
   ~2 min → 3D. NT veut une lecture PERFORMANTE AVANT les premiers clients.
+  **Changement du 08/11/2026** : au lancement, la LECTURE est faite par Claude via l'API ; l'autonomie complète (sans LLM)
+  reste le but à terme (voir § 5 et `docs/projet/memoire/plan-lancement-lecture-claude.md`).
 - **But commun (NT, 01/11/2026)** : tout optimiser globalement pour rendre Atelya très performant et
   **vendable**, une vraie solution sur le marché. Juger chaque étape sur les **vrais plans**, pas
   seulement sur les plans fabriqués. Toujours choisir ce qui sert le plus ce but.
@@ -225,9 +227,23 @@ jamais touchés) / ~80 à l'entraînement, vérités des 80 (Claude + validation
 
 **Plusieurs niveaux sur une image (08/11/2026)** : échelle 0.14.0 (images à plusieurs blocs repérées : 43/48 du lot 2, 8/9 vrais plans d'entraînement, 0 faux repérage sur ~4 000 niveaux ; surfaces lues sur tous les blocs ; lot2-test 1 → 0 échelle fausse, fr-025 → à vérifier) ; doutes 0.2.0 : doute fort `plusieurs_niveaux` en tête de l'écran de vérification, niveaux non lus entourés en orange, décision jamais « lu ». La 3D ne lit toujours qu'UN niveau (chantier à part, à proposer à NT). Banc des styles du lot 2 avec e5 (`banc-lot2-e5`) : murs justes 59,6 %, pièces 75,7 %, parfaits 28,9 % (point de départ de l'essai 8). Essai 8 : option `-Lot2` prête. 668 tests.
 
-**CHANTIER EN COURS (06/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans. Lire d'abord `docs/projet/etapes/reprise-105-plans.md`.**
+**CHANGEMENT DE PLAN (décision NT, 08/11/2026) — lire `docs/projet/memoire/plan-lancement-lecture-claude.md`** :
+au LANCEMENT, c'est **Claude, par l'API** (clé API, pas l'abonnement) qui lit les plans ; Atelya fait tout le reste (écran de
+vérification, géométrie, Blender, habillage, photos/matières, meubles, soleil, caméra, Unreal, plan 2D). Claude rend sa lecture en
+**pixels** (murs, ouvertures, pièces, textes lus avec leur position, ses doutes) ; **notre code calcule l'échelle** avec les
+garde-fous d'`echelle_plan` (jamais Claude). Le lecteur entraîné (e5 / e7b, aiguillage, traducteur) reste en **secours et second
+avis**. Atelya lira seul à terme. Les chantiers d'entraînement (lot 2, essai 8, 105 vrais plans, ci-dessous) passent **au second
+plan : ne pas les reprendre sans l'accord de NT**. Coût / exactitude de Claude : testés dans un autre fil (branche
+`origin/claude/project-thread-qtyplp`) ; ne rien dépenser ici, jamais de clé API dans le dépôt ni dans le fil.
 
-**Prochaine étape** : les 105 vrais plans (ci-dessus). Restes d'A2 :
+**ÉTAPE EN COURS (08/11/2026) : brancher l'écran de vérification sur la lecture de Claude** (branche dédiée
+`etape-ecran-lecture-claude`) : format de la lecture en pixels → traducteur vers `logement.json` + `verification.json` → doutes →
+essai sans clé API sur les vérités des 15 vrais plans + copies abîmées exprès → puis NT chronomètre la correction, puis 3D. Plan
+proposé à NT le 08/11, en attente de son « oui ».
+
+**Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
+
+**Restes d'A2** (non prioritaires) :
 pose sur le Mac (+ `pdfplumber`/`pypdfium2` dans `pyproject.toml`, ce qui les installe sur le Mac : accord NT),
 option A2-7 (marques des cotes lues dans les traits du PDF : défaut ancien de ~0,5 % quand deux cotes se
 touchent de part et d'autre d'une cloison fine), essai sur de VRAIS PDF dès qu'on en aura.
@@ -330,6 +346,7 @@ bibliothèques matières/meubles ; comparatif de rendu ; soleil réel.
 | Photos de biais, redressement | `atelya-redressement.md`, `atelya-biais-sans-cotes.md`, `atelya-verification.md` |
 | Doutes, PDF, plan 2D | `atelya-doutes-a1.md`, `atelya-pdf-a2.md`, `plan-2d-propre-p7.md` |
 | Licences, technologies | `audit-technologique-2026-10-31.md` |
+| **Lecture des plans par Claude au lancement (décision 08/11/2026)**, écran branché sur la lecture de Claude | `plan-lancement-lecture-claude.md` (+ `lecture-par-api-claude.md` sur la branche `origin/claude/project-thread-qtyplp` : coûts, conditions) |
 | Produit, objectifs, décisions | `objectif-global-nt.md`, `produit-livre-client.md`, `projet-reconstruction-3d-decisions.md`, `sujets-produit-non-traites.md` |
 | Sauvegarde, feuille de route, carte, associé | `sauvegarde-atelya.md`, `feuille-de-route-a-jour.md`, `carte-atelya-associe.md`, `suivi-moteur-associe.md` |
 | Façon de parler à NT, note /100 | `preference-explications-simples.md`, `preference-note-realiste.md` |
