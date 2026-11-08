@@ -96,6 +96,24 @@ passage : les doutes écrits avant la construction désignaient les éléments p
 `verification_du_plan`. Option « second avis d'Atelya » (U-Net) : NON faite, à proposer à NT après mesure du taux de fausses alertes
 (sous-étape 4). Tests : 7 de plus dans `tests/test_traduire_claude.py` (30 pour l'étape).
 
+**DÉCISION NT (08/11/2026, après la sous-étape 3)** : « Non, on testera l'API à la fin. » La sous-étape 4 (essai sur les vérités +
+copies abîmées) et tout test de l'API sont REPORTÉS À LA FIN. Priorité : qu'Atelya soit performant PARTOUT, en commençant par la
+partie Blender (la 3D et les rendus). Entrée de travail : un plan dont FABLE a fait la vérité (vérités Fable relues = fr-021 à fr-027,
+fr-029 à fr-041, plans d'ENTRAÎNEMENT, utilisables librement), pris comme « lecture de Claude ». Plan choisi : fr-031 (coté en m,
+1/50, 115 px/m, 15 murs, 17 ouvertures, 8 pièces, confiance 88 ; image `..\atelya\vrais-plans\lot-2026-11-05\fr-031.jpg`).
+
+**Premier passage fr-031 de bout en bout (08/11/2026)** : `outils/lecture_claude/fiche_depuis_verite.py` (vérité → fiche, murs
+affinés de verite.json, échelle de la vérité = clé de Claude, remarques de Fable = doutes faibles) puis `traduire_fiche.py traduire
+--textes-atelya` (OCR d'Atelya comme textes) → ..\atelya\lectures-claude\fr-031\ (ecran.html) → `python -m moteur.construire` →
+..\atelya\lectures-claude\fr-031\3d\ (maquette.blend, 2 images Cycles, 37 s). Constats : échelle « à vérifier » car la lecture des
+cotes d'Atelya se trompe sur ce plan (8,04 → 106 px/m au lieu de 115, cotes contredites/ambiguës) : les deux clés ont bien refusé
+« lue » ; 2 doutes « porte de 3,01 m / 2,40 m » = conventions des vérités (front de placard et cuisine ouverte tracés en mur de 2-3 px
++ porte de toute la largeur). Rendu : disposition juste, mais DÉFAUTS 3D vérifiés au zoom : (1) filet BLEU (ciel) à la jonction
+sol / mur côté fenêtres = trou entre le sol et le mur ; (2) filet de LUMIÈRE à la jonction plafond / mur ; (3) petits CARRÉS NOIRS aux
+jonctions de murs (vue de dessus) ; (4) faux murs fins des vérités rendus comme des murs. Qualité : pièces vides, lumière plate, soleil
+fixe inventé, pas de plinthes, focale très large, 2 images seulement. Plan Blender (B1 maquette sans défaut → B2 rendu photo d'annonce
+→ B3 soleil réel → B4 meubles → B5 caméra / cinématique + comparatif) proposé à NT, en attente de son choix.
+
 **Why:** lancer Atelya plus vite avec une lecture déjà bonne, sans payer maintenant l'entraînement sur de vrais plans ; garder
 la vérification humaine et nos garde-fous d'échelle pour qu'aucune erreur de Claude ne passe en silence.
 **How to apply:** ne plus proposer d'entraînement du lecteur comme priorité ; juger les étapes sur ce qu'elles apportent à la

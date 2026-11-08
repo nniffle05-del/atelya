@@ -65,6 +65,8 @@ def main() -> int:
     ap.add_argument("--sortie", type=Path, required=True)
     ap.add_argument("--fiche", type=Path, help="traduire : la fiche lecture-claude/0.1 rendue par Claude")
     ap.add_argument("--page", type=int, help="PDF : la page lue (par défaut, celle que choisit le tri)")
+    ap.add_argument("--textes-atelya", action="store_true",
+                    help="traduire : textes du plan lus par l'OCR d'Atelya (fiche tirée d'une vérité, qui n'a pas de textes)")
     a = ap.parse_args()
 
     if not a.plan.is_file():
@@ -86,6 +88,12 @@ def main() -> int:
         print(f"PLANTÉ : fiche introuvable : {a.fiche}", flush=True)
         return 2
     t0 = time.time()
+    if a.textes_atelya and source.textes is None:
+        import numpy as np
+
+        from moteur.lecture_cotes import lire_textes_et_echelle
+
+        source.textes, _ = lire_textes_et_echelle(np.asarray(Image.fromarray(source.image).convert("L")))
     envoi, facteur = image_pour_claude(source.image)
     controlee = controler_fiche(json.loads(a.fiche.read_text(encoding="utf-8")), (envoi.shape[1], envoi.shape[0]))
     plan = traduire(source, controlee, facteur)
