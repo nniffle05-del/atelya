@@ -14,6 +14,7 @@ B2-3 : avec le dossier de la bibliothèque de matières, les sols sont peints av
 """
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -66,9 +67,12 @@ def main() -> None:
     if plan.get("lumieres") or plan.get("vues"):
         eclairage = bpy.data.collections.new("Lumieres et cameras")
         scene.collection.children.link(eclairage)
-        poser_ciel(scene)
+        soleil = next((l for l in plan.get("lumieres", []) if l["type"] == "soleil"), None)
+        poser_ciel(scene, soleil)
         for lumiere in plan.get("lumieres", []):
-            eclairage.objects.link(creer_lumiere(lumiere))
+            objet = creer_lumiere(lumiere)
+            if objet is not None:
+                eclairage.objects.link(objet)
         for vue in plan.get("vues", []):
             eclairage.objects.link(creer_camera(vue))
         if plan.get("vues"):
@@ -109,35 +113,90 @@ def orienter(objet: bpy.types.Object, direction) -> None:
     objet.rotation_quaternion = Vector(direction).to_track_quat("-Z", "Y")
 
 
-def poser_ciel(scene: bpy.types.Scene) -> None:
-    """Le fond : un ciel bleu clair uni, qui éclaire aussi un peu la scène."""
+def poser_ciel(scene: bpy.types.Scene, soleil: dict | None = None) -> None:
+    """Le ciel. B2-4 : le ciel physique de Blender (diffusion de la lumière dans l'atmosphère), soleil compris, placé dans
+    la direction du soleil du plan. Sans soleil : l'ancien ciel bleu uni."""
     monde = bpy.data.worlds.new("Ciel")
     if monde.node_tree is None:
         monde.use_nodes = True
     fond = monde.node_tree.nodes["Background"]
-    fond.inputs["Color"].default_value = (0.45, 0.62, 0.9, 1.0)
-    fond.inputs["Strength"].default_value = 0.5
+    if soleil is None:
+        fond.inputs["Color"].default_value = (0.45, 0.62, 0.9, 1.0)
+        fond.inputs["Strength"].default_value = 0.5
+        scene.world = monde
+        return
+    vers_le_soleil = [-c for c in soleil["direction"]]
+    ciel = monde.node_tree.nodes.new("ShaderNodeTexSky")
+    ciel.sky_type = "MULTIPLE_SCATTERING"
+    ciel.sun_disc = True
+    horizontal = math.hypot(vers_le_soleil[0], vers_le_soleil[1])
+    ciel.sun_elevation = math.atan2(vers_le_soleil[2], horizontal)
+    # Convention de Blender (vérifiée par l'ombre d'un poteau) : rotation 0 = soleil vers +y, 90° = vers +x.
+    ciel.sun_rotation = math.atan2(vers_le_soleil[0], vers_le_soleil[1])
+    n, l = monde.node_tree.nodes, monde.node_tree.links
+    # Sous l'horizon, le ciel physique de Blender est noir : vu par la caméra (vue de dessus, sol vu par une fenêtre), on le
+    # remplace par un sol gris éclairé par le ciel (le ciel à l'horizon, sans sa couleur, × 0,35 : la part qu'un sol renvoie).
+    coord = n.new("ShaderNodeTexCoord")
+    xyz = n.new("ShaderNodeSeparateXYZ")
+    l.new(coord.outputs["Generated"], xyz.inputs[0])
+    horizon = n.new("ShaderNodeCombineXYZ")
+    l.new(xyz.outputs["X"], horizon.inputs["X"])
+    l.new(xyz.outputs["Y"], horizon.inputs["Y"])
+    horizon.inputs["Z"].default_value = 0.05
+    ciel_horizon = n.new("ShaderNodeTexSky")
+    for attribut in ("sky_type", "sun_disc", "sun_elevation", "sun_rotation"):
+        setattr(ciel_horizon, attribut, getattr(ciel, attribut))
+    ciel_horizon.sun_disc = False
+    l.new(horizon.outputs["Vector"], ciel_horizon.inputs["Vector"])
+    gris = n.new("ShaderNodeRGBToBW")
+    l.new(ciel_horizon.outputs["Color"], gris.inputs["Color"])
+    sol = n.new("ShaderNodeMath")
+    sol.operation = "MULTIPLY"
+    l.new(gris.outputs["Val"], sol.inputs[0])
+    sol.inputs[1].default_value = 0.35
+    dessous = n.new("ShaderNodeMath")
+    dessous.operation = "LESS_THAN"
+    l.new(xyz.outputs["Z"], dessous.inputs[0])
+    dessous.inputs[1].default_value = 0.0
+    camera = n.new("ShaderNodeLightPath")
+    choix = n.new("ShaderNodeMath")
+    choix.operation = "MULTIPLY"
+    l.new(dessous.outputs[0], choix.inputs[0])
+    l.new(camera.outputs["Is Camera Ray"], choix.inputs[1])
+    melange = n.new("ShaderNodeMix")
+    melange.data_type = "RGBA"
+    l.new(choix.outputs[0], melange.inputs["Factor"])
+    l.new(ciel.outputs["Color"], next(e for e in melange.inputs if e.name == "A" and e.type == "RGBA"))
+    l.new(sol.outputs[0], next(e for e in melange.inputs if e.name == "B" and e.type == "RGBA"))
+    l.new(next(e for e in melange.outputs if e.name == "Result" and e.type == "RGBA"), fond.inputs["Color"])
+    fond.inputs["Strength"].default_value = 1.0
     scene.world = monde
+    scene["jour"] = True
 
 
-def creer_lumiere(lumiere: dict) -> bpy.types.Object:
+def creer_lumiere(lumiere: dict) -> bpy.types.Object | None:
     if lumiere["type"] == "soleil":
-        donnees = bpy.data.lights.new(lumiere["id"], "SUN")
-        donnees.energy = lumiere["force"]
-        donnees.angle = 0.03  # taille apparente du soleil : des ombres un peu douces
-        donnees.color = (1.0, 0.96, 0.9)
-        objet = bpy.data.objects.new(lumiere["id"], donnees)
-        objet.location = (0.0, 0.0, 10.0)
-        orienter(objet, lumiere["direction"])
-    else:  # plafonnier : un panneau lumineux sous le plafond, qui éclaire vers le bas
+        return None  # B2-4 : le soleil fait partie du ciel physique (poser_ciel)
+    if lumiere["type"] == "portail":
         donnees = bpy.data.lights.new(lumiere["id"], "AREA")
         donnees.shape = "RECTANGLE"
         donnees.size, donnees.size_y = lumiere["taille"]
-        donnees.energy = lumiere["puissance"]
-        donnees.color = (1.0, 0.9, 0.78)  # blanc chaud
+        donnees.cycles.is_portal = True  # n'éclaire pas : guide Blender vers la lumière du ciel qui entre par là
         objet = bpy.data.objects.new(lumiere["id"], donnees)
         objet.location = lumiere["position"]
-        objet.visible_camera = False  # on voit la lumière, pas le panneau
+        orienter(objet, lumiere["direction"])
+        return objet
+    # plafonnier : un panneau lumineux sous le plafond, qui éclaire vers le bas
+    donnees = bpy.data.lights.new(lumiere["id"], "AREA")
+    donnees.shape = "RECTANGLE"
+    donnees.size, donnees.size_y = lumiere["taille"]
+    donnees.energy = lumiere["puissance"]
+    donnees.color = (1.0, 0.9, 0.78)  # blanc chaud
+    objet = bpy.data.objects.new(lumiere["id"], donnees)
+    objet.location = lumiere["position"]
+    objet.visible_camera = False  # on voit la lumière, pas le panneau
+    objet.hide_render = True  # B2-4 : de jour, les plafonniers sont éteints (rallumés pour une vue de nuit)
+    objet["nuit"] = True
     objet["piece"] = lumiere.get("piece", "")
     return objet
 

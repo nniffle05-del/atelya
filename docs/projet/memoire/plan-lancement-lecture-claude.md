@@ -265,3 +265,17 @@ notre parquet par défaut ~(0,22 ; 0,12 ; 0,06) → 2,4 fois plus sombre : NT av
 la clarté suivent la photo, mais la couleur sort ROSÉE au rendu : l'éclairage actuel (plafonniers blanc chaud + ciel uni) teinte
 tout ; à régler avec B2-4 (lumière du jour) avant de juger la couleur. Chevrons d'app-001 plus grands que ceux d'ambientCG (colonnes
 ~40 cm contre ~30). NT : « ça ressemble plus au 15 » (n° 15 de la planche proposée = mosaïque ?) → question posée.
+
+**B2-4 lumière du jour (09/11/2026 nuit, « tu peux commencer la lumière du jour » de NT ; il retire sa remarque sur le « 15 »)** —
+`habillage` 0.7 + `moteur/blender/poser_briques.py` + `rendre.py` : (1) le soleil n'est plus une lampe : ciel physique de Blender
+(`ShaderNodeTexSky`, MULTIPLE_SCATTERING, disque solaire) dans la direction du soleil du plan (convention vérifiée par l'ombre d'un poteau :
+rotation 0 = soleil vers +y, 90° = vers +x ; `sun_direction` ne vaut rien pour ce type) ; sous l'horizon, vu par la caméra, un sol gris
+éclairé par le ciel (sinon fond NOIR en vue de dessus) ; (2) un PORTAIL (lampe `is_portal`) sur la face extérieure de chaque fenêtre /
+porte-fenêtre qui donne dehors (`habillage.portails`) ; (3) plafonniers gardés mais éteints de jour (`hide_render`, propriété « nuit ») ;
+(4) réglage « de photographe » au rendu (`reglage_de_photographe`) : photo d'essai (16 passes, 1/5 de la taille) où tout sauf murs et
+plafonds est découpé (`is_holdout`) → exposition = médiane des murs à 0,55 ; balance des blancs = couleur des murs ramenée à 70 % vers le
+blanc (courbes de couleur, `white_level`) : le reflet orangé du parquet ne teinte plus les murs en rose ; (5) 512 passes en qualité finale
+(128 marbrait les murs ; ~1 min 30 par vue intérieure sur la RTX 2070), lucioles bornées (`sample_clamp_indirect` 10). Parquet par
+défaut des pièces à vivre → `chene_naturel_photo` (NT : l'ancien était trop foncé). Rendus : `..\atelya\b2\b2-4-lumiere.png` (avant B2 /
+après, défaut / adapté à la photo d'app-001 / la photo). Le soleil reste celui inventé du plan (azimut 200°, hauteur 50°) : le VRAI soleil
+(orientation du logement, date, heure) = étape B3, règle 20 (« soleil inventé non »).

@@ -35,7 +35,7 @@ MATIERES_PC = Path(__file__).resolve().parents[2] / "atelya" / "bibliotheque" / 
 BLENDER_MAC = "/Applications/Blender.app/Contents/MacOS/Blender"
 
 # Qualité des images : (échantillons, pourcentage de la taille finale 1600 × 1000).
-QUALITES = {"finale": (128, 100), "brouillon": (16, 25)}
+QUALITES = {"finale": (512, 100), "brouillon": (16, 25)}  # B2-4 : 512 passes, sinon la lumière du jour marbre les murs
 
 
 def trouver_blender() -> str | None:
@@ -114,7 +114,7 @@ def main() -> None:
         maquette = construire(args.logement, args.sortie)
         print(f"Maquette prête : {maquette}")
         if not args.sans_images:
-            print("Calcul des images (une à deux minutes)…")
+            print("Calcul des images (quelques minutes)…")
             qualite = "brouillon" if args.brouillon else "finale"
             for image in rendre(maquette, Path(args.sortie) / "images", qualite):
                 print(f"Image prête : {image}")

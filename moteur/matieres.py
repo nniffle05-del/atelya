@@ -51,7 +51,7 @@ ROTATION_PHOTO = {"carrelage_interieur": 45.0}
 # 060) pas convaincants à la distance d'une photo de pièce (motif trop petit et rosé) ; mosaïque (WoodFloor069) terne et boueuse.
 
 # Le sol supposé quand rien ne l'a vu, selon la sorte de la pièce (moteur.habillage.sol_de_la_piece).
-SOL_PAR_SORTE = {"bois": "parquet_chene_lames", "carrelage": "carrelage_interieur"}
+SOL_PAR_SORTE = {"bois": "chene_naturel_photo", "carrelage": "carrelage_interieur"}  # NT 08/11 : l'ancien défaut (parquet_chene_lames) était trop foncé
 
 
 def nom_materiau(matiere: str, teinte=None) -> str:

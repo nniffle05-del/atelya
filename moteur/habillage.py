@@ -37,6 +37,12 @@ PLACARD_MAX m² (un dressing plus grand est une pièce : il garde une porte ordi
 - le plan dessine sa façade comme une porte dans un mur : les portes de placard remplacent le battant de cette porte.
 Règle par défaut quand rien ne l'a vu : battantes pour une façade de moins de 1 m, coulissantes au-delà.
 
+Version 0.7 (08/11/2026, B2-4) : la LUMIÈRE DU JOUR. Le soleil n'est plus une lampe : c'est le ciel physique de Blender (la
+couleur du ciel et la force du soleil calculées comme dans l'atmosphère), dans la direction du « soleil » du plan. Devant
+chaque fenêtre et porte-fenêtre qui donne dehors, un PORTAIL (une lampe spéciale qui n'éclaire pas : elle dit à Blender par où
+entre la lumière du ciel, ce qui donne une image propre au lieu de granuleuse). Les plafonniers restent dans la maquette mais
+sont éteints de jour. L'exposition (la clarté de l'image) est réglée au rendu, comme un photographe (moteur/blender/rendre.py).
+
 Version 0.6 (08/11/2026, B2-3) : le SOL de chaque pièce est une vraie matière du catalogue (moteur/matieres.py : parquets,
 carrelages, tomettes, granito…), choisie pièce par pièce (champ `sol`) ; par défaut, parquet de chêne dans les pièces à vivre,
 carrelage clair dans les pièces d'eau, la cuisine et les passages. Le matériau d'une brique de sol est le nom de la matière ;
@@ -779,6 +785,7 @@ def lumieres(logement: Logement) -> list[dict]:
     vers_le_soleil = (math.cos(h) * math.cos(az), math.cos(h) * math.sin(az), math.sin(h))
     liste = [{"id": "Soleil", "type": "soleil", "force": SOLEIL_FORCE,
               "direction": _arrondi3([-c for c in vers_le_soleil])}]
+    liste += portails(logement)
     for p in logement.pieces:
         (x_min, y_min), (x_max, y_max) = _boite_plan(p.contour)
         liste.append({
@@ -787,6 +794,28 @@ def lumieres(logement: Logement) -> list[dict]:
             "taille": _arrondi3([(x_max - x_min) * 0.4, (y_max - y_min) * 0.4]),
             "puissance": round(PUISSANCE_PAR_M2 * p.surface_calculee, 1),
         })
+    return liste
+
+
+def portails(logement: Logement) -> list[dict]:
+    """B2-4 : un portail sur la face extérieure de chaque fenêtre ou porte-fenêtre qui donne dehors (une pièce d'un seul
+    côté), de la taille de l'ouverture, tourné vers l'intérieur."""
+    murs = {m.id: m for m in logement.murs}
+    liste = []
+    for o in logement.ouvertures:
+        if o.type == "porte" or o.mur not in murs:
+            continue
+        mur = murs[o.mur]
+        gauche, droite = _cotes_dans_une_piece(o, mur, logement)
+        if gauche == droite:
+            continue
+        ux, uy = (mur.fin[0] - mur.debut[0]) / mur.longueur, (mur.fin[1] - mur.debut[1]) / mur.longueur
+        dedans = (-uy, ux) if gauche else (uy, -ux)
+        t = o.position + o.largeur / 2
+        d = mur.epaisseur / 2 + 0.02
+        centre = (mur.debut[0] + ux * t - dedans[0] * d, mur.debut[1] + uy * t - dedans[1] * d, o.allege + o.hauteur / 2)
+        liste.append({"id": f"Portail_{o.id}", "type": "portail", "position": _arrondi3(centre),
+                      "taille": _arrondi3([o.largeur, o.hauteur]), "direction": _arrondi3([dedans[0], dedans[1], 0.0])})
     return liste
 
 

@@ -88,7 +88,7 @@ def test_sol_selon_le_nom(nom, sol):
 
 def test_sols_du_cas_test(plan):
     sols = {b["element"]: b["materiau"] for b in plan["briques"] if b["id"].startswith("sol__")}
-    assert sols == {"sejour": "parquet_chene_lames", "chambre": "parquet_chene_lames",
+    assert sols == {"sejour": "chene_naturel_photo", "chambre": "chene_naturel_photo",
                     "entree": "carrelage_interieur", "sdb": "carrelage_interieur"}
 
 
@@ -425,3 +425,15 @@ def test_l_ecran_connait_les_memes_sols_que_le_moteur():
     ecran = dict(re.findall(r'(\w+): "([^"]+)"', bloc))
     assert list(ecran) == list(SOLS)
     assert ecran == {k: v[0] for k, v in SOLS.items()}
+
+
+# ---- Lumière du jour (habillage 0.7, B2-4) ----
+
+def test_un_portail_devant_chaque_fenetre_qui_donne_dehors():
+    plan = plan_habille(_piece_simple())
+    portails = {l["id"]: l for l in plan["lumieres"] if l["type"] == "portail"}
+    assert set(portails) == {"Portail_fenetre", "Portail_pf"}  # pas la porte
+    f = portails["Portail_fenetre"]  # fenêtre du mur est (x = 4,1) : portail dehors (x > 4,2), tourné vers l'ouest
+    assert f["position"][0] > 4.2 and f["direction"] == [-1.0, 0.0, 0.0]
+    assert f["taille"] == [1.2, 1.3] and f["position"][2] == pytest.approx(0.9 + 1.3 / 2)
+    assert portails["Portail_pf"]["direction"] == [0.0, -1.0, 0.0]  # mur nord : vers le sud
