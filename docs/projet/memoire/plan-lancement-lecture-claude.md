@@ -180,3 +180,17 @@ renommées : floor_tiles_06 = `damier_pierre`, marble_01 = `pierre_beige`, squar
 Manquent encore : vraie faïence métro, marbre blanc (à ajouter si besoin, même licence). NT parle aussi de « télécharger le GitHub
 envoyé tout à l'heure » (meubles : ABO ou Sand3D ?) → question posée, rien téléchargé. Tailles : ABO officiel abo-3dmodels.tar 154 Go
 en un bloc ; réenvoi codepawl/abo-glb 43,1 Go (fichiers séparés) ; Sand3D (code) 24 Mo, Apache 2.0, écarté par NT le 08/11. Disque D : 900 Go libres.
+
+**B2-1 plinthes et encadrements (08/11/2026, « Oui » de NT ; corniches : plus tard)** — `moteur/habillage.py` 0.3 (règle FIXE, même
+partout ; NT a demandé si c'était d'après les photos : non, règle fixe d'abord, les photos ajusteront au temps 2 avec correction à
+l'écran) : PLINTHES 10 cm × 1,5 cm posées sur le sol calé de chaque pièce, seulement là où un mur existe au niveau du sol 2 cm derrière
+le bord (rien devant porte / porte-fenêtre / passage ouvert), arrêtées à 1 mm du chambranle, biseau dans les angles (rentrants et
+sortants), bout droit sinon ; CHAMBRANLE 6,5 cm × 2 cm sur les deux faces autour de chaque porte (3 morceaux qui ne se recouvrent pas,
+coupés au bout du mur et sous le plafond) ; FENÊTRES : cadre à 5 cm derrière la face intérieure (côté pièce trouvé comme pour la porte
+d'entrée ; au milieu si pièce des deux côtés), APPUI 2,5 cm sous les fenêtres d'allège ≥ 30 cm (pas sous les portes-fenêtres), qui
+dépasse de 3 cm. Tests : 3 de plus dans `test_habillage.py` (aire exacte de l'anneau de plinthes = biseaux sans trou ni recouvrement).
+Géométrie (calculer_briques) INCHANGÉE → contrôle des trous de B1 identique. Rendus avant/après rapprochés (porte, fenêtre, angle) sur
+fr-031, fr-030, fr-021 : `..\atelya\b2\<plan>-avant-apres.png`. fr-021 : 88 morceaux de plinthes (153 m), 84 morceaux de chambranle,
+40 d'appui. Limites connues : poteaux isolés au milieu d'une pièce sans plinthe autour ; 3 petits côtés (≤ 1,3 m) de fr-021 où le mur
+est à plus de 2 cm du bord de la pièce → pas de plinthe ; plinthe arrêtée net au bout d'un mur qui borde un passage ouvert (pas de
+retour autour du bout).
