@@ -1,9 +1,12 @@
 # Essai 8 : essai 5 + oeil DINOv2 + vrais plans (PC). A lancer depuis le depot atelya-code :
-#   powershell -ExecutionPolicy Bypass -File pc\essai8\petits-essais-8.ps1 -Phase jeu|eclair|T0|T1|T2|long
+#   powershell -ExecutionPolicy Bypass -File pc\essai8\petits-essais-8.ps1 -Phase jeu|eclair|T0|T1|T2|long [-Lot2]
+# -Lot2 : ajoute les jeux du lot 2 du generateur (styles vus sur les vrais plans) a leurs familles : lot2-a et lot2-monde aux
+#   styles du monde, lot2-biais aux biais, lot2-photos aux photos. Les parts restent celles des familles : a regler par petits
+#   essais (lecon de l'essai 6 : trop de styles nouveaux fait reculer anciens et photos). lot2-test n'entre JAMAIS : c'est un banc.
 # Regles : petits essais de 25 min avant UN long essai (duree en minutes) ; chemins RELATIFS (piege des accents) ;
 # arret au premier code different de 0 avec une ligne "PLANTE". Suivi : ..\atelya\essai8.suivi
 # Le jeu refuse tout plan d'examen (verites\repartition-vrais-plans.json).
-param([string]$Phase = 'eclair', [double]$PartVrais = 0.3, [string]$Depart = 'resultats-essai-5\atelya-essai-4.pt', [int]$Minutes = 180)
+param([string]$Phase = 'eclair', [double]$PartVrais = 0.3, [string]$Depart = 'resultats-essai-5\atelya-essai-4.pt', [int]$Minutes = 180, [switch]$Lot2)
 $ErrorActionPreference = 'Continue'
 $env:PYTHONIOENCODING = 'utf-8'
 $env:OMP_NUM_THREADS = '1'
@@ -25,10 +28,20 @@ $suivi = 'essai8.suivi'
 $py = '.venv\Scripts\python.exe'
 if (-not (Test-Path 'donnees\vrais-2026-11-05\repartition.json')) { Note 'PLANTE : lancer d''abord -Phase jeu'; exit 1 }
 # Recette de l'essai 7b (pas prudent, maitre, BatchNorm figes), plus les vrais plans.
-$base = @('entrainer_essai8.py', '--jeu', 'donnees\jeu-10000',
-    '--jeu-photos', 'donnees\photos-app-cotes', 'donnees\photos-app-sans-cotes', 'donnees\photos-reel-cotes', 'donnees\photos-reel-sans-cotes',
-    '--jeu-monde', 'donnees\monde-6-19',
-    '--jeu-biais', 'donnees\biais-a3', 'donnees\biais-monde-a3', 'donnees\biais-photos-a3', '--part-biais', '0.15',
+$photos = @('donnees\photos-app-cotes', 'donnees\photos-app-sans-cotes', 'donnees\photos-reel-cotes', 'donnees\photos-reel-sans-cotes')
+$monde = @('donnees\monde-6-19')
+$biais = @('donnees\biais-a3', 'donnees\biais-monde-a3', 'donnees\biais-photos-a3')
+if ($Lot2) {
+    $monde += @('donnees\lot2-a', 'donnees\lot2-monde'); $biais += @('donnees\lot2-biais'); $photos += @('donnees\lot2-photos')
+}
+# entrainer_essai8 apprend sur train + test de ces jeux : un jeu de banc (nom en « test ») n'y entre jamais.
+foreach ($j in $photos + $monde + $biais) {
+    if ($j -match 'test') { Note "PLANTE : jeu de test dans l'apprentissage ($j)"; exit 1 }
+    if (-not (Test-Path "$j\repartition.json")) { Note "PLANTE : jeu introuvable ($j)"; exit 1 }
+}
+Note "jeux : lot2=$Lot2 ; monde $($monde -join ', ') ; biais $($biais -join ', ') ; photos $($photos -join ', ')"
+$base = @('entrainer_essai8.py', '--jeu', 'donnees\jeu-10000', '--jeu-photos') + $photos + @('--jeu-monde') + $monde +
+    @('--jeu-biais') + $biais + @('--part-biais', '0.15',
     '--jeu-vrais', 'donnees\vrais-2026-11-05',
     '--processus', '1', '--figer-bn', '--poids-maitre', '3.0', '--poids-escalier', '3.0',
     '--part-monde', '0.15', '--part-photos', '0.3', '--lr', '5e-5', '--lr-oeil', '1e-4', '--oeil', 'vits14')
