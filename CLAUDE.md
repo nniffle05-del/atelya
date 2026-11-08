@@ -239,7 +239,8 @@ plan : ne pas les reprendre sans l'accord de NT**. Coût / exactitude de Claude 
 **ÉTAPE EN COURS (08/11/2026) : brancher l'écran de vérification sur la lecture de Claude** (branche dédiée
 `etape-ecran-lecture-claude`) : format de la lecture en pixels → traducteur vers `logement.json` + `verification.json` → doutes →
 essai sans clé API sur les vérités des 15 vrais plans + copies abîmées exprès → puis NT chronomètre la correction, puis 3D. Plan
-proposé à NT le 08/11, en attente de son « oui ».
+**validé par NT le 08/11**, avec l'échelle à « deux clés » : Claude donne chaque cote (valeur + bouts du trait en pixels) et sa
+propre échelle, notre code recalcule ; accord à 3 % → « sûre », sinon doute fort. `main` = 33e58de (fusion locale, NT doit pousser).
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
