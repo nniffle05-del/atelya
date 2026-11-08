@@ -319,6 +319,24 @@ test("échelle lue : on demande de contrôler une mesure ; une fois corrigée, p
   assert.equal(C.pointsAVerifier(absente)[0].cle, "echelle");
 });
 
+test("plusieurs niveaux sur l'image : premier point, avant l'échelle, parties non lues entourées ; réglé, il disparaît", () => {
+  const pieces = [{ id: "a", nom: "Séjour", contour: rectangle(0, 0, 5, 4) }];
+  const doute = { element: null, code: "plusieurs_niveaux", gravite: "fort", zone_px: [900, 100, 300, 400],
+    blocs_px: [[900, 100, 300, 400]], raison: "Cette image contient plusieurs niveaux ou logements : un seul a été lu. Vérifiez qu'aucun niveau ne manque." };
+  const v = fichierPieces(pieces, [], { echelle: { etat: "a_verifier" }, doutes: [doute] });
+  const points = C.pointsAVerifier(v);
+  assert.equal(points[0].genre, "niveaux");
+  assert.equal(points[1].cle, "echelle");
+  assert.match(points[0].texte, /plusieurs niveaux ou logements/);
+  assert.deepEqual(points[0].zone_px, [900, 100, 300, 400]);
+  assert.deepEqual(points[0].zones_px, [[900, 100, 300, 400]]);
+  assert.equal(points[0].elements.length, 0);
+  assert.equal(points.filter((p) => p.genre === "niveaux").length, 1, "un seul point, pas aussi un point « À vérifier »");
+  const w = C.reglerPoint(v, points[0], points[0].actions[0].action);
+  assert.ok(!C.pointsAVerifier(w).some((p) => p.genre === "niveaux"));
+  assert.ok(!C.pointsAVerifier(fichierPieces(pieces, [], { echelle: { etat: "a_verifier" } })).some((p) => p.genre === "niveaux"));
+});
+
 test("les textes ne montrent jamais les codes internes", () => {
   const pieces = [{ id: "chambre_1", nom: "Chambre", contour: rectangle(0, 0, 2, 2) }, { id: "chambre_2", nom: "Bureau", contour: rectangle(5, 5, 7, 7) }];
   const v = fichierPieces(pieces, [], { doutes: [{ element: "chambre_1", code: "chevauchement", gravite: "fort", raison: "les pièces chambre_1 et chambre_2 se chevauchent" }] });

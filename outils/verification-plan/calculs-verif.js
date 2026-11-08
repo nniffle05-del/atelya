@@ -15,6 +15,10 @@
  * - générale : {"matrice": [[a,b,c],[d,e,f],[g,h,i]]}, qui donne pour un point (x, y)
  *   en mètres le pixel (u/w, v/w) avec [u, v, w] = matrice × [x, y, 1].
  *   Elle couvre aussi un plan tourné ou une photo prise de biais.
+ *
+ * 08/11/2026 : le doute « plusieurs_niveaux » (moteur/doutes.py 0.2.0 : l'image dessine plusieurs niveaux
+ * ou logements, un seul a été lu) devient le PREMIER point à vérifier, avant même l'échelle, avec les parties
+ * non lues entourées (`blocs_px`, en pixels de l'image). Sans lui, rien ne disait qu'un étage manquait.
  */
 (function (racine) {
   "use strict";
@@ -144,6 +148,7 @@
       const doute = { cle, element, zone_px, raison, propositions: propositions || propositionsAuto(lg, element) };
       if (origine && origine.code) doute.code = origine.code;
       if (origine && origine.gravite) doute.gravite = origine.gravite;
+      if (origine && Array.isArray(origine.blocs_px)) doute.blocs_px = origine.blocs_px;
       doutes.push(doute);
     };
 
@@ -1006,6 +1011,14 @@
     const resolus = new Set(v.resolus || []);
     const points = [];
     let doutes = trouverDoutes(v);
+    // 0. Un niveau entier non lu, avant tout le reste : le reste ne sert à rien si la moitié du logement manque.
+    //    Le texte est la phrase d'Atelya telle quelle (déjà écrite pour la personne, sans code de pièce).
+    for (const d of doutes.filter((x) => x.code === "plusieurs_niveaux")) {
+      points.push({ cle: `niveaux|${d.cle}`, genre: "niveaux", titre: "Plusieurs niveaux sur cette image",
+        texte: d.raison, elements: [], doutes: [d], zone_px: d.zone_px || null, zones_px: d.blocs_px || null,
+        actions: [{ libelle: "Compris, je continue", action: { type: "regler" }, principal: true }] });
+    }
+    doutes = doutes.filter((x) => x.code !== "plusieurs_niveaux");
     if (options.fermeture) {
       // Après un recalcul des pièces : ce qui n'est pas fermé, montré à son endroit exact, avant tout le reste.
       for (const f of piecesDepuisMurs(lg).fuites) {

@@ -20,6 +20,11 @@ Version 0.3.0 (08/11/2026) : une image qui dessine plusieurs niveaux (ou logemen
 le nettoyage des taches au bord (qui efface un niveau dessiné près du bord), et l'échelle en tient compte (moteur.echelle_plan 0.14 :
 surfaces lues sur tous les blocs et confirmées par deux d'entre eux, jamais la taille du logement). Le logement construit, lui, ne
 change pas : un seul niveau est lu (le format à plusieurs niveaux est un autre chantier). `infos["plusieurs_blocs"]` le signale.
+
+Version 0.4.0 (08/11/2026) : sur une telle image, un DOUTE FORT « plusieurs_niveaux » (moteur.doutes.doute_plusieurs_niveaux) le dit
+à la personne qui vérifie, en tête de liste, avec la place des parties non lues (blocs_non_lus, en pixels de l'image pleine taille) ;
+la décision passe donc « à vérifier », jamais « lu ». Avant, rien ne le signalait : la personne pouvait valider un logement auquel
+il manque un étage entier. La lecture (logement, échelle) ne change pas.
 """
 from __future__ import annotations
 
@@ -32,15 +37,15 @@ from PIL import Image, ImageOps
 
 from moteur.aiguillage import SEUIL_LIBRES_M, choisir, longueur_libre
 from moteur.coloriage import lire_coloriage
-from moteur.doutes import examiner
-from moteur.echelle_plan import (LOGEMENT_MAX, LOGEMENT_MIN, EchelleLue, coloriage_douteux, decider, lire_echelle_plan,
-                                 plusieurs_blocs, sans_taches_au_bord)
+from moteur.doutes import doute_plusieurs_niveaux, examiner
+from moteur.echelle_plan import (LOGEMENT_MAX, LOGEMENT_MIN, EchelleLue, blocs_de_bati, coloriage_douteux, decider,
+                                 lire_echelle_plan, plusieurs_blocs, sans_taches_au_bord)
 from moteur.lecture_cotes import TexteLu
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere,
                                  rapport_par_optique, rapport_plausible)
 
-VERSION_LECTURE_COMPLETE = "0.3.0"
+VERSION_LECTURE_COMPLETE = "0.4.0"
 COTE_ATELYA = 768  # grand côté de l'image donnée à Atelya (comme à l'entraînement)
 PLAN_SECOURS_M = 15.0  # échelle de secours, quand rien ne la donne : un logement d'environ 15 m (même repli que l'échelle)
 FORMATS_IMAGE = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
@@ -181,12 +186,44 @@ def _echelle_de_secours(e: EchelleLue, forme: tuple[int, int]) -> tuple[float, s
     return max(forme) / PLAN_SECOURS_M, "aucune mesure sur le plan (taille supposée)"
 
 
+def blocs_non_lus(col_brut: np.ndarray, logement: dict, details: dict, redressement: Redressement | None = None,
+                  forme_image: tuple[int, int] | None = None) -> list[list[float]]:
+    """Les blocs de bâti de l'image que la lecture du logement n'a PAS gardés (version 0.4.0) : [x, y, largeur, hauteur],
+    en pixels de l'image pleine taille si `forme_image` (hauteur, largeur) est donnée, sinon du coloriage.
+
+    `col_brut` : le coloriage avant le nettoyage du bord (le repérage des blocs se fait dessus, voir echelle_plan.plusieurs_blocs).
+    Le bloc lu est celui que recouvre le LOGEMENT LU (ses murs ramenés dans le coloriage par le même calage que l'écran,
+    preparer_verification.matrice_calage, rotation ou redressement compris). Refaire la règle du traducteur (le plus gros morceau de
+    bâti, coloriage.bati_du_logement) ne suffit pas : il la prend après avoir régularisé les ouvertures, et deux niveaux de taille
+    voisine peuvent s'inverser (vrai plan fr-025 : 11 517 contre 11 243 pixels de murs, l'autre niveau était lu).
+    Un bloc enfermé dans la boîte du bloc lu n'est pas un autre niveau : il n'est pas rendu."""
+    from moteur.preparer_verification import matrice_calage, projeter  # importé ici : ce module importe lecture_complete
+
+    blocs = blocs_de_bati(col_brut)
+    if len(blocs) < 2:
+        return []
+    M = matrice_calage(details, col_brut.shape, col_brut.shape, redressement)  # mètres → pixels du coloriage
+    pts = np.array([projeter(M, *p) for m in logement["murs"] for p in (m["debut"], m["fin"])])
+    (u0, v0), (u1, v1) = pts.min(0), pts.max(0)
+    recouvre = [max(0.0, min(u1, x + w) - max(u0, x)) * max(0.0, min(v1, y + h) - max(v0, y)) for x, y, w, h, _ in blocs]
+    lu = int(np.argmax(recouvre)) if max(recouvre) > 0 else 0
+    x, y, w, h, _ = blocs[lu]
+    marge = 0.02 * max(col_brut.shape)
+    autres = [b for i, b in enumerate(blocs) if i != lu
+              and not (b[0] >= x - marge and b[1] >= y - marge and b[0] + b[2] <= x + w + marge and b[1] + b[3] <= y + h + marge)]
+    rx, ry = 1.0, 1.0
+    if forme_image is not None:
+        rx, ry = forme_image[1] / col_brut.shape[1], forme_image[0] / col_brut.shape[0]  # pixel i = [i, i + 1], comme le calage
+    return [[round(bx * rx, 1), round(by * ry, 1), round(bw * rx, 1), round(bh * ry, 1)] for bx, by, bw, bh, _ in autres]
+
+
 def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray | None, modele: str = "atelya",
                         noms: list | None = None, projet_id: str | None = None) -> Lecture:
     """La lecture d'un plan à partir du coloriage d'un modèle : même enchaînement que le banc (--echelle lue
     --proportions optique --doutes), sans la vérité. `noms` : voir noms_du_plan (None : on ne s'en sert pas)."""
     projet_id = projet_id or source.nom
     infos: dict = {}
+    col_brut = col
     blocs = plusieurs_blocs(col)  # sur le coloriage brut : le nettoyage ci-dessous peut effacer un niveau dessiné près du bord
     if blocs:
         infos["plusieurs_blocs"] = True
@@ -260,6 +297,8 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
         erreur = f"{type(err).__name__}: {str(err)[:200]}"
         return Lecture(modele, None, None, examiner(None, erreur=erreur), echelle, R, col, carte, infos, erreur)
     infos["murs_libres_m"] = round(longueur_libre(logement) + details.get("libres_ecartes_m", 0.0), 2)
+    if blocs:  # un seul niveau a été lu : la personne doit le savoir (doute fort, en tête de liste ; version 0.4.0)
+        autres.append(doute_plusieurs_niveaux(blocs_non_lus(col_brut, logement, details, R, (h_img, l_img))))
     examen = examiner(logement, details, carte=carte, redressement=R, autres=autres)
     return Lecture(modele, logement, details, examen, echelle, R, col, carte, infos)
 

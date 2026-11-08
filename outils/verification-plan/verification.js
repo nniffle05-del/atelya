@@ -3,6 +3,10 @@
  * à vérifier présentés un par un, avec les corrections.
  * Les calculs (et toutes les corrections) sont dans calculs-verif.js ; ici, seulement
  * les clics, le panneau de droite et le dessin.
+ *
+ * 08/11/2026 : un point peut montrer plusieurs zones (`zones_px` : les niveaux non lus d'une image à
+ * plusieurs niveaux, voir calculs-verif.js) ; chacune est entourée en orange, et tant que ce point est en
+ * cours, le cadrage (ajuster) montre le logement lu ET ces parties.
  */
 (function () {
   "use strict";
@@ -314,7 +318,14 @@
     const r = canvas.getBoundingClientRect();
     let rect = [0, 0, etat.image.naturalWidth, etat.image.naturalHeight];
     if (etat.v) {
-      const b = rectangleDe(formes(etat.v).murs.flatMap((m) => m.points));
+      let b = rectangleDe(formes(etat.v).murs.flatMap((m) => m.points));
+      // Point « plusieurs niveaux » en cours : on cadre aussi les parties non lues, pour voir d'un coup ce qui a été lu et ce qui manque.
+      const point = etat.points && etat.points[etat.rangPoint];
+      if (point && point.genre === "niveaux" && point.zone_px) {
+        const [zx, zy, zl, zh] = point.zone_px;
+        const x0 = Math.min(b[0], zx), y0 = Math.min(b[1], zy);
+        b = [x0, y0, Math.max(b[0] + b[2], zx + zl) - x0, Math.max(b[1] + b[3], zy + zh) - y0];
+      }
       const marge = Math.max(0.08 * Math.max(b[2], b[3]), pixelsParMetre());
       const x0 = Math.max(0, b[0] - marge), y0 = Math.max(0, b[1] - marge);
       rect = [x0, y0, Math.min(etat.image.naturalWidth, b[0] + b[2] + marge) - x0, Math.min(etat.image.naturalHeight, b[1] + b[3] + marge) - y0];
@@ -469,15 +480,17 @@
       ctx.stroke();
     }
     if (point && point.zone_px && !point.elements.length) {
-      const [x, y, l, h] = point.zone_px;
-      const m = 6 * trait;
-      ctx.fillStyle = COULEURS.douteFond;
-      ctx.fillRect(x, y, l, h);
-      ctx.lineWidth = 3 * trait;
-      ctx.strokeStyle = COULEURS.doute;
-      ctx.setLineDash([8 * trait, 5 * trait]);
-      ctx.strokeRect(x - m, y - m, l + 2 * m, h + 2 * m);
-      ctx.setLineDash([]);
+      // Plusieurs parties à montrer (niveaux non lus) : chacune entourée ; sinon la zone du point.
+      for (const [x, y, l, h] of (point.zones_px && point.zones_px.length ? point.zones_px : [point.zone_px])) {
+        const m = 6 * trait;
+        ctx.fillStyle = COULEURS.douteFond;
+        ctx.fillRect(x, y, l, h);
+        ctx.lineWidth = 3 * trait;
+        ctx.strokeStyle = COULEURS.doute;
+        ctx.setLineDash([8 * trait, 5 * trait]);
+        ctx.strokeRect(x - m, y - m, l + 2 * m, h + 2 * m);
+        ctx.setLineDash([]);
+      }
     }
 
     // Le point qu'on vient de régler : l'endroit reste entouré en vert, le temps de regarder le résultat.
@@ -922,8 +935,8 @@
   function montrerPoint() {
     etat.fait = null;
     const point = etat.points[etat.rangPoint];
-    if (point && point.zone_px) cadrer(point.zone_px);
-    else ajuster();
+    if (point && point.zone_px && point.genre !== "niveaux") cadrer(point.zone_px);
+    else ajuster(); // « plusieurs niveaux » : le logement lu ET les parties non lues (voir ajuster)
     rafraichir();
   }
 

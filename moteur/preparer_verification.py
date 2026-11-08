@@ -7,6 +7,10 @@ La matrice du calage fait tout ce chemin à l'envers, des mètres vers les pixel
 Convention : à l'écran comme dans le traducteur, le pixel n° i couvre l'intervalle [i, i + 1] ; pour OpenCV (rotation,
 redressement), le pixel n° i est centré sur i. D'où le décalage d'un demi-pixel de part et d'autre de ces deux étapes.
 Sans lui, le dessin glisserait d'un demi-pixel de coloriage, soit plus d'un pixel sur une grande image.
+
+Version 0.2.0 (08/11/2026) : un doute dont la place est déjà en pixels de l'image (`zone_px`, `blocs_px` : le doute
+« plusieurs_niveaux » de moteur.doutes 0.2.0, parties de l'image hors du logement lu) les garde tels quels ; avant, seule une
+zone en mètres (`zone_m`) était passée à l'écran, et l'écran n'aurait pas pu montrer où sont les niveaux non lus.
 """
 from __future__ import annotations
 
@@ -15,7 +19,7 @@ import numpy as np
 from moteur.coloriage import _rotation
 from moteur.lecture_complete import PlanLu
 
-VERSION_PREPARATEUR = "0.1.0"
+VERSION_PREPARATEUR = "0.2.0"
 SCHEMA = "verification/0.1"
 ANGLE_NUL = 0.01  # degrés : en dessous, le traducteur ne tourne pas le coloriage
 
@@ -105,6 +109,10 @@ def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | No
         sortie = {"element": d.get("element"), "raison": d["raison"], "code": d["code"], "gravite": d["gravite"]}
         if d.get("zone_m"):
             sortie["zone_px"] = zone_en_pixels(M, d["zone_m"])
+        elif d.get("zone_px"):  # déjà en pixels de l'image (hors du logement lu : pas de mètres)
+            sortie["zone_px"] = [float(v) for v in d["zone_px"]]
+        if d.get("blocs_px"):
+            sortie["blocs_px"] = [[float(v) for v in b] for b in d["blocs_px"]]
         doutes.append(sortie)
     return {"schema": SCHEMA, "plan": nom_image, "calage": {"matrice": [[round(float(v), 10) for v in ligne] for ligne in M]},
             "echelle": _echelle(g.echelle), "logement": g.logement, "doutes": doutes,

@@ -19,6 +19,13 @@ faible est seulement montré.
 Format d'un doute : {"code", "element" (id ou None), "raison" (phrase pour l'humain), "gravite"
 ("fort" ou "faible"), "zone_m" [x0, y0, x1, y1] dans le repère du logement}. L'écran de vérification
 (outils/verification-plan) attend `zone_px` : on la calcule avec le calage du plan quand il est connu.
+
+Version 0.2.0 (08/11/2026) : doute fort « plusieurs_niveaux » (doute_plusieurs_niveaux). Quand l'image dessine plusieurs
+niveaux ou logements séparés (moteur.echelle_plan.plusieurs_blocs), la lecture n'en garde qu'un (coloriage.bati_du_logement,
+le plus gros bloc) et rien ne le disait : la personne pouvait valider un logement auquel il manque un étage entier, erreur
+silencieuse grave pour le client. Ce doute est fort (le plan part donc « à vérifier », jamais « lu ») et passe en tête de la
+liste. Les parties non lues sont HORS du logement lu : leur place est donnée directement en pixels de l'image pleine taille
+(`zone_px` = la boîte qui les réunit, `blocs_px` = une boîte par partie), pas en mètres. La lecture elle-même ne change pas.
 """
 
 from __future__ import annotations
@@ -30,7 +37,8 @@ import numpy as np
 
 from moteur.coloriage import redresser
 
-VERSION_DOUTES = "0.1.0"
+VERSION_DOUTES = "0.2.0"
+PLUSIEURS_NIVEAUX = "plusieurs_niveaux"  # code du doute : l'image dessine plusieurs niveaux ou logements, un seul est lu
 
 # --- Seuils (réglés sur les bancs ; voir /mnt/project-files/atelya-doutes/plan.md) ---
 EPAISSEUR_MIN, EPAISSEUR_MAX = 0.025, 0.70  # m
@@ -54,6 +62,28 @@ def _doute(code: str, raison: str, gravite: str = "fort", element: str | None = 
     d = {"code": code, "element": element, "raison": raison, "gravite": gravite}
     if zone is not None:
         d["zone_m"] = [round(float(v), 3) for v in zone]
+    return d
+
+
+def doute_plusieurs_niveaux(blocs_px: list | None = None) -> dict:
+    """Le doute fort « plusieurs niveaux ou logements sur l'image : un seul a été lu » (version 0.2.0).
+
+    `blocs_px` : les parties NON lues, chacune [x, y, largeur, hauteur] en pixels de l'image pleine taille (l'écran les entoure) ;
+    None ou vide : on ne sait pas les situer, le doute est posé quand même."""
+    # « un seul », pas « le plus grand » : le traducteur garde le plus gros morceau de MURS, qui n'est pas toujours le niveau qui
+    # paraît le plus grand (vrai plan fr-025 : le 1er étage lu, le rez-de-jardin plus vaste ignoré).
+    raison = "Cette image contient plusieurs niveaux ou logements : un seul a été lu. Vérifiez qu'aucun niveau ne manque."
+    blocs = [[round(float(v), 1) for v in b] for b in (blocs_px or [])]
+    if len(blocs) == 1:
+        raison += " La partie non lue est entourée en orange."
+    elif blocs:
+        raison += f" Les {len(blocs)} parties non lues sont entourées en orange."
+    d = {"code": PLUSIEURS_NIVEAUX, "element": None, "raison": raison, "gravite": "fort"}
+    if blocs:
+        x0, y0 = min(b[0] for b in blocs), min(b[1] for b in blocs)
+        x1, y1 = max(b[0] + b[2] for b in blocs), max(b[1] + b[3] for b in blocs)
+        d["zone_px"] = [round(x0, 1), round(y0, 1), round(x1 - x0, 1), round(y1 - y0, 1)]
+        d["blocs_px"] = blocs
     return d
 
 
@@ -344,7 +374,9 @@ def examiner(logement: dict | None, details: dict | None = None, *, carte: np.nd
     if carte is not None and "origine_px" in details:
         d, mesures = doutes_de_la_carte(logement, details, carte_au_repere(carte, details, redressement))
         doutes += d
-    doutes += autres or []
+    autres = autres or []
+    # Un niveau entier non lu passe avant tout le reste (version 0.2.0) : c'est la première chose à regarder.
+    doutes = [d for d in autres if d["code"] == PLUSIEURS_NIVEAUX] + doutes + [d for d in autres if d["code"] != PLUSIEURS_NIVEAUX]
     fort = any(d["gravite"] == "fort" for d in doutes)
     return {"version": VERSION_DOUTES, "decision": "a_verifier" if fort else "lu", "doutes": doutes,
             "mesures": mesures}

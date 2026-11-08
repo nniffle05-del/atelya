@@ -26,6 +26,9 @@ et noté à part (avec l'échelle exacte, pour ne pas mélanger deux défauts).
 08/11/2026 (echelle_plan 0.14) : une image à plusieurs blocs de bâti (plusieurs niveaux dessinés côte à côte) est repérée sur le
 coloriage BRUT, avant le nettoyage des taches au bord, comme dans moteur.lecture_complete ; le cache des échelles lues garde ce
 repérage (`plusieurs_blocs`), et une entrée de cache qui ne correspond pas au repérage du coloriage est relue.
+
+08/11/2026 (moteur.doutes 0.2.0, lecture_complete 0.4.0) : avec --doutes, une telle image reçoit le doute fort « plusieurs_niveaux »,
+comme dans moteur.lecture_complete (un seul niveau est lu) : sa décision passe « à vérifier ». Rien d'autre ne change.
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ import numpy as np
 from PIL import Image
 
 from moteur.coloriage import PIECES, lire_coloriage
-from moteur.doutes import examiner
+from moteur.doutes import doute_plusieurs_niveaux, examiner
 from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan, plusieurs_blocs, sans_taches_au_bord
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique,
@@ -501,6 +504,8 @@ def noter_niveau(args) -> dict:
         if resultat.get("coloriage_douteux"):
             autres.append({"code": "coloriage_douteux", "element": None, "raison": "coloriage collé au bord de l'image",
                            "gravite": "faible"})
+        if blocs:  # un seul niveau lu (voir moteur.lecture_complete 0.4.0) ; le banc n'a pas besoin de situer les autres
+            autres.append(doute_plusieurs_niveaux())
         resultat["doutes"] = examiner(lu, details, carte=carte, redressement=R, autres=autres)
         resultat["erreurs_zones"] = zones_des_erreurs(vrai, resultat)
     resultat["pieces_nom_lu"] = len(details["pieces_nom_lu"])
