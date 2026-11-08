@@ -74,3 +74,18 @@ Chaque chantier laisse les tests verts et le témoin identique, et écrit une pl
 Le lot 2 ne change aucune note tant qu'un modèle n'a pas appris dessus. Fabriquer le jeu (`tout --nombre 3300 --depart 70001 --lot2 ...`) et lancer l'essai 8 demandent l'accord de NT.
 
 **Leçon de l'essai 6 à garder pour l'essai 8** : une part trop forte de styles nouveaux a fait reculer les anciens et les photos (`atelya-styles-monde.md`). Le lot 2 s'ajoute aux jeux existants, il ne les remplace pas ; sa part se règle par petits essais.
+
+## Banc des styles du lot 2 avec le lecteur en service (08/11/2026)
+
+Pourquoi : un point de départ mesuré avant l'essai 8. Jeu `..\atelya\donnees\lot2-test` (412 exemples, 439 niveaux dont 48 composés), tout en partition test depuis le 08/11 (`repartir --parts 0,0,1` ; l'ancienne répartition est gardée dans `repartition-origine.json`), jamais appris. Script `pc/lot2/banc-lot2.ps1` (essai 5, 4 angles, doutes ; coloriage 2 min sur la carte graphique, banc 24 min). Résultats `..\atelya\banc-lot2-e5\`.
+
+| | lot 2 (e5) | plans fabriqués habituels | photos réalistes |
+|---|---|---|---|
+| murs justes | 59,6 % | 90,6 % | 78,7 % |
+| pièces trouvées / bon type | 75,7 / 69,5 % | 99,1 / 97,4 % | 94,7 / 90,8 % |
+| ouvertures justes | 58,1 % | 92,0 % | 85,5 % |
+| plans parfaits | 28,9 % | 53,2 % | 27,1 % |
+| échelle lue | 273 / 439 | 1 010 / 1 066 | 286 / 343 |
+| fausse > 3 % sans alerte | 1 (129128-ensemble, surfaces, −6 %) | 0 | 0 |
+
+L'erreur d'échelle vient des images à plusieurs niveaux (même défaut que fr-025) : traitée à part.
