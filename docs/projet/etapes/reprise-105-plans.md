@@ -11,7 +11,8 @@
 - Coût mesuré : ~1 M de tokens et ~1 h pour une passe de 2 paquets (8 plans tracés + relus, dont 1 seul paquet relu quand la limite coupe).
 
 - **Lot 2 du générateur : FINI** (chantiers 1 à 3 + corrections de la relecture adverse, 627 tests, témoin identique). Détail : `lot2-conception.md`. Reste : décision de NT sur le jeu à fabriquer ; à regarder avant l'essai 8 : aplat vert des extérieurs proche des murs gris en image grise (famille logiciel, graine 70106), fidèle à fr-102, laissé tel quel.
-- **Lecteur d'échelle** : défaut d'échelle silencieuse sur les cotes en cm, voir la fin de `atelya-echelle-vrais-plans.md`. Attend le « oui » de NT.
+- **Lecteur d'échelle 0.13.0 : FINI** (08/11, bancs sans recul), voir la fin de `atelya-echelle-vrais-plans.md`. Fusion dans `main` : accord de NT.
+- **Jeux du lot 2 fabriqués** (`pc/lot2/fabriquer-jeux-lot2.ps1`) : lot2-a 3 436, lot2-monde 838, lot2-biais 1 155, lot2-photos 1 153 (entraînement), lot2-test 412 (JAMAIS appris).
 
 ## Pourquoi une nouvelle conversation
 
