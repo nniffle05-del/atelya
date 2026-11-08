@@ -981,11 +981,25 @@
       plinthes.addEventListener("change", () => {
         if (plinthes.value) corriger((x) => C.reglerPlinthes(x, e.id, plinthes.value), `${NOMS_PLINTHES[plinthes.value]}.`);
       });
-      const origine = !e.plinthes ? "" : e.plinthes.statut === "mesure" ? "Choisi à l'écran."
-        : e.plinthes.statut === "estime" ? `Vu par Atelya sur la photo (${e.plinthes.source}).`
+      const origineDe = (f) => !f ? "" : f.statut === "mesure" ? "Choisi à l'écran."
+        : f.statut === "estime" ? `Vu par Atelya sur la photo (${f.source}).`
         : "Supposé par Atelya : personne ne l'a vu. À changer si besoin.";
+      const origine = origineDe(e.plinthes);
+      // B2-2 : les portes d'un placard, même principe que les plinthes.
+      const placard = [];
+      if (C.estPlacard(e)) {
+        const NOMS_PLACARD = { coulissantes: "Portes coulissantes", battantes: "Portes battantes (comme une armoire)", aucune: "Pas de portes (placard ouvert)" };
+        const portes = el("select", { id: "f-placard" },
+          ...(e.placard ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+          ...C.CHOIX_PLACARD.map((k) => el("option", { value: k, texte: NOMS_PLACARD[k] })));
+        portes.value = e.placard ? e.placard.choix : "";
+        portes.addEventListener("change", () => {
+          if (portes.value) corriger((x) => C.reglerPlacard(x, e.id, portes.value), `${NOMS_PLACARD[portes.value]}.`);
+        });
+        placard.push(el("label", { texte: "Portes du placard" }), portes, el("p", { class: "aide", texte: origineDe(e.placard) }));
+      }
       fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre,
-        el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }),
+        el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }), ...placard,
         el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
         el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));
     } else if (genre === "ouverture") {

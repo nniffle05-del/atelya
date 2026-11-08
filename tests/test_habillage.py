@@ -245,3 +245,112 @@ def test_completer_plinthes_ecrit_la_regle_sans_toucher_un_choix_deja_fait():
 def test_le_format_refuse_des_plinthes_inconnues():
     with pytest.raises(ValueError):
         _piece_simple(plinthes={"choix": "marbre", "statut": "mesure", "source": "verification"})
+
+
+# ---- Portes de placard (habillage 0.5, B2-2) ----
+
+def _chambre_et_placard(facade="ouverte", nom="Placard", placard=None):
+    """Une chambre de 4 × 3 m et, au nord-ouest, un placard de 1,6 m de large : ouvert sur la chambre (pas de mur entre
+    eux), ou fermé par un mur percé d'une porte de 1,2 m (la façade dessinée comme une porte)."""
+    mur = lambda i, d, f: {"id": i, "debut": d, "fin": f, "epaisseur": 0.2, "statut": "mesure", "source": "test"}
+    murs = [mur("S", [-0.1, -0.1], [4.1, -0.1]), mur("E", [4.1, -0.1], [4.1, 3.1])]
+    ouvertures = []
+    if facade == "ouverte":
+        murs += [mur("O", [-0.1, -0.1], [-0.1, 3.7]), mur("N", [1.7, 3.1], [4.1, 3.1]),
+                 mur("PE", [1.7, 3.1], [1.7, 3.7]), mur("PN", [-0.1, 3.7], [1.7, 3.7])]
+        haut = 3.0
+    else:
+        murs += [mur("O", [-0.1, -0.1], [-0.1, 3.9]), mur("N", [-0.1, 3.1], [4.1, 3.1]),
+                 mur("PE", [1.7, 3.1], [1.7, 3.9]), mur("PN", [-0.1, 3.9], [1.7, 3.9])]
+        ouvertures = [{"id": "porte_placard", "type": "porte", "mur": "N", "position": 0.3, "largeur": 1.2,
+                       "hauteur": 2.04, "statut": "mesure", "source": "test"}]
+        haut = 3.2
+    piece = {"id": "placard", "nom": nom, "contour": [[0, haut], [1.6, haut], [1.6, haut + 0.6], [0, haut + 0.6]],
+             "statut": "mesure", "source": "test", **({"placard": placard} if placard else {})}
+    return Logement.model_validate({
+        "schema": "logement/0.1", "projet_id": "PLACARD", "hauteur_sous_plafond": 2.5, "murs": murs,
+        "ouvertures": ouvertures,
+        "pieces": [{"id": "chambre", "nom": "Chambre", "contour": [[0, 0], [4, 0], [4, 3], [0, 3]],
+                    "statut": "mesure", "source": "test"}, piece],
+    })
+
+
+def _briques_placard(plan, prefixe="placard__"):
+    return [b for b in plan["briques"] if b["id"].startswith(prefixe)]
+
+
+def test_placard_ouvert_ferme_par_des_portes_coulissantes_par_defaut():
+    plan = plan_habille(_chambre_et_placard())
+    briques = _briques_placard(plan)
+    panneaux = [b for b in briques if "__panneau_" in b["id"]]
+    assert len(panneaux) == 2 and len([b for b in briques if "__rail_" in b["id"]]) == 2
+    # dans la façade : de x = 0 à 1,6, juste derrière la ligne y = 3 (côté placard), du sol presque au plafond
+    xs = [p[0] for b in panneaux for p in b["contour"]]
+    ys = [p[1] for b in panneaux for p in b["contour"]]
+    assert min(xs) == pytest.approx(0.0, abs=1e-3) and max(xs) == pytest.approx(1.6, abs=1e-3)
+    assert 3.0 <= min(ys) and max(ys) <= 3.06
+    assert all(b["z_haut"] > 2.4 for b in panneaux)
+    # les deux panneaux se recouvrent un peu, sur deux plans différents
+    (a, b) = sorted(panneaux, key=lambda x: min(p[0] for p in x["contour"]))
+    assert max(p[0] for p in a["contour"]) > min(p[0] for p in b["contour"])
+    assert max(p[1] for p in a["contour"]) <= min(p[1] for p in b["contour"]) + 1e-6
+    # pas de plinthe dans la façade : le long du bord nord de la chambre, seulement contre le mur (x ≥ 1,6)
+    nord = [p for p in _plinthes_de(plan) if p["element"] == "chambre" and min(q[1] for q in p["contour"]) > 2.9]
+    assert nord and all(min(q[0] for q in p["contour"]) >= 1.6 - 0.02 for p in nord)
+
+
+def test_placard_portes_battantes_ou_ouvert_selon_le_choix():
+    battantes = {"choix": "battantes", "statut": "mesure", "source": "verification"}
+    briques = _briques_placard(plan_habille(_chambre_et_placard(placard=battantes)))
+    assert len([b for b in briques if "__vantail_" in b["id"]]) == 3  # 1,6 m : trois portes de 0,53 m
+    assert len([b for b in briques if "__poignee_" in b["id"]]) == 3
+    aucune = {"choix": "aucune", "statut": "estime", "source": "photo_02"}
+    assert _briques_placard(plan_habille(_chambre_et_placard(placard=aucune))) == []
+
+
+def test_facade_dessinee_comme_une_porte_recoit_des_portes_de_placard():
+    plan = plan_habille(_chambre_et_placard(facade="porte"))
+    porte = [b for b in plan["briques"] if b["element"] == "porte_placard"]
+    noms = {b["id"].split("__", 1)[1] for b in porte}
+    assert "battant" not in noms and "poignee_1" not in noms  # plus de porte de pièce
+    assert {"montant_1", "chambranle_a_1", "chambranle_b_1"} <= noms  # le cadre reste
+    panneaux = [b for b in porte if "__panneau_" in b["id"]]
+    assert len(panneaux) == 2  # 1,2 m - 2 montants = 1,08 m : coulissantes par défaut
+    ys = [p[1] for b in panneaux for p in b["contour"]]
+    assert 3.0 - 1e-6 <= min(ys) and max(ys) <= 3.2 + 1e-6  # dans l'épaisseur du mur
+
+
+def test_un_grand_dressing_n_est_pas_un_placard():
+    from moteur.habillage import est_placard
+    from moteur.logement import Piece
+
+    carre = lambda c: [[0, 0], [c, 0], [c, c], [0, c]]
+    piece = lambda nom, c: Piece(id="x", nom=nom, contour=carre(c), statut="mesure", source="test")
+    assert est_placard(piece("Placard 2", 1.0)) and est_placard(piece("Pièce 4 (rangement)", 1.2))
+    assert not est_placard(piece("Dressing", 3.0))  # 9 m² : une pièce, avec une porte ordinaire
+    assert not est_placard(piece("Chambre", 1.0))
+
+
+def test_completer_finitions_ecrit_le_choix_par_defaut_des_placards():
+    from moteur.habillage import completer_finitions
+
+    logement = _chambre_et_placard().model_dump(by_alias=True, exclude_none=True)
+    complet = completer_finitions(logement)
+    pieces = {p["id"]: p for p in complet["pieces"]}
+    assert pieces["placard"]["placard"] == {"choix": "coulissantes", "statut": "ajoute", "source": "regle_par_defaut",
+                                            "confiance": 0.5}
+    assert "placard" not in pieces["chambre"]
+    assert pieces["chambre"]["plinthes"]["choix"] == "bois"
+
+
+def test_deux_portes_proches_se_partagent_le_trumeau():
+    from moteur.habillage import LARGEUR_CHAMBRANLE
+
+    log = _piece_simple()
+    d = log.model_dump(by_alias=True, exclude_none=True)
+    d["ouvertures"].append({**d["ouvertures"][0], "id": "porte2", "position": 1.0 + 0.9 + 0.08})  # trumeau de 8 cm
+    plan = plan_habille(Logement.model_validate(d))
+    droite = [b for b in plan["briques"] if b["id"] == "porte__chambranle_a_2"][0]
+    gauche = [b for b in plan["briques"] if b["id"] == "porte2__chambranle_a_1"][0]
+    assert max(p[0] for p in droite["contour"]) <= min(p[0] for p in gauche["contour"]) + 1e-6  # ne se recouvrent pas
+    assert LARGEUR_CHAMBRANLE > 0.04  # sans le partage, ils se recouvriraient

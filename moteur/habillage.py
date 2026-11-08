@@ -30,6 +30,13 @@ ou aucune). Quand rien ne l'a vu, la règle par défaut (plinthes_par_defaut) : 
 ailleurs ; elle est écrite dans le fichier de l'écran de vérification (completer_plinthes) pour qu'une personne la voie et la
 change. Au temps 2, Atelya la remplira d'après les photos du client.
 
+Version 0.5 (08/11/2026, B2-2) : les PORTES DE PLACARD, sur le même principe (champ `placard` de la pièce : battantes,
+coulissantes ou aucune). Un placard = une pièce dont le nom dit placard / rangement / dressing / penderie, de moins de
+PLACARD_MAX m² (un dressing plus grand est une pièce : il garde une porte ordinaire). Deux cas :
+- le placard est ouvert sur une pièce voisine, sans mur (la « façade ») : les portes ferment la façade, du sol au plafond ;
+- le plan dessine sa façade comme une porte dans un mur : les portes de placard remplacent le battant de cette porte.
+Règle par défaut quand rien ne l'a vu : battantes pour une façade de moins de 1 m, coulissantes au-delà.
+
 Tout ce qui est ajouté ici est de la décoration supposée (statut « ajouté ») :
 le plan ne dit ni la couleur des murs ni le type de sol.
 """
@@ -68,6 +75,17 @@ RETRAIT_FENETRE = 0.05  # le cadre de fenêtre est à 5 cm derrière la face int
 EPAISSEUR_APPUI = 0.025
 DEBORD_APPUI = 0.03  # l'appui dépasse du mur côté pièce, et de chaque côté de la fenêtre
 ALLEGE_MIN_APPUI = 0.30  # pas d'appui sous une ouverture plus basse (porte-fenêtre)
+# B2-2 : portes de placard (en mètres).
+MOTS_PLACARD = ("placard", "rangement", "dressing", "penderie")
+PLACARD_MAX = 4.0  # m² : un dressing plus grand est une vraie pièce, avec une porte ordinaire
+FACADE_MIN = 0.40  # une façade ouverte plus courte n'est pas fermée (bout de mur, encoche)
+COULISSANTES_DES = 1.0  # par défaut : battantes en dessous de cette largeur, coulissantes au-delà
+VANTAIL_MAX = 0.60  # largeur maximale d'une porte battante de placard
+PANNEAU_MAX = 1.00  # largeur maximale d'un panneau coulissant
+RECOUVREMENT = 0.03  # deux panneaux coulissants voisins se recouvrent un peu
+EPAISSEUR_VANTAIL = 0.019
+JEU_VANTAUX = 0.003  # fente entre deux portes battantes
+HAUTEUR_RAIL = 0.04
 
 # Mots du nom d'une pièce → matériau du sol. On cherche dans l'ordre :
 # « Séjour + cuisine » a du parquet, car le séjour passe avant la cuisine.
@@ -108,6 +126,7 @@ def plan_habille(logement: Logement) -> dict:
     briques = [replace(b, materiau=materiau_de(b, logement)) for b in calculer_briques(logement)]
     briques += menuiseries(logement)
     briques += plinthes(briques, logement)
+    briques += portes_de_placard(briques, logement)
     return {
         "schema": VERSION_PLAN,
         "projet_id": logement.projet_id,
@@ -157,6 +176,38 @@ def completer_plinthes(logement: dict) -> dict:
     return sortie
 
 
+def est_placard(piece: Piece) -> bool:
+    """Un placard : son choix de portes est écrit, ou son nom le dit et il est petit (un grand dressing est une pièce)."""
+    if piece.placard is not None:
+        return True
+    nom = sans_accents(piece.nom)
+    return any(mot in nom for mot in MOTS_PLACARD) and piece.surface_calculee <= PLACARD_MAX
+
+
+def choix_placard(piece: Piece, largeur: float) -> str:
+    """« battantes », « coulissantes » ou « aucune » : ce que dit la pièce, sinon la règle par défaut selon la largeur."""
+    if piece.placard is not None:
+        return piece.placard.choix
+    return "coulissantes" if largeur >= COULISSANTES_DES else "battantes"
+
+
+def completer_finitions(logement: dict) -> dict:
+    """Une copie du logement (forme JSON) où chaque finition non décidée reçoit la règle par défaut, marquée « ajoute »
+    (supposé, personne ne l'a vu) : plinthes de chaque pièce, portes de chaque placard (d'après la largeur de sa façade).
+    Si le logement ne se construit pas encore (à corriger à l'écran), seules les plinthes sont complétées."""
+    sortie = completer_plinthes(logement)
+    try:
+        log = Logement.model_validate(sortie)
+        largeurs = largeurs_des_facades(calculer_briques(log), log)
+    except Exception:  # noqa: BLE001 — un logement impossible est signalé par ailleurs (doutes de construction)
+        return sortie
+    for p, piece in zip(sortie.get("pieces") or [], log.pieces):
+        if not p.get("placard") and piece.id in largeurs:
+            p["placard"] = {"choix": choix_placard(piece, largeurs[piece.id]), "statut": "ajoute",
+                            "source": "regle_par_defaut", "confiance": 0.5}
+    return sortie
+
+
 def materiau_de(brique: Brique, logement: Logement) -> str:
     """Le matériau d'une brique des murs, sols et plafonds."""
     if brique.categorie == "mur":
@@ -178,7 +229,14 @@ def menuiseries(logement: Logement) -> list[Brique]:
     for o in logement.ouvertures:
         mur = murs[o.mur]
         if o.type == "porte":
-            briques += _porte(o, mur, entree=_donne_dehors(o, mur, logement), hsp=logement.hauteur_sous_plafond)
+            porte = _porte(o, mur, entree=_donne_dehors(o, mur, logement), hsp=logement.hauteur_sous_plafond,
+                           libres=_place_de_chaque_cote(o, mur, logement))
+            placard = _placard_derriere(o, mur, logement)
+            if placard is not None:  # B2-2 : la façade du placard dessinée comme une porte
+                piece, cote = placard
+                porte = [b for b in porte if not b.id.endswith(("__battant", "__poignee_1", "__poignee_2"))]
+                porte += _portes_de_placard_dans(o, mur, piece, cote)
+            briques += porte
         else:
             gauche, droite = _cotes_dans_une_piece(o, mur, logement)
             briques += _fenetre(o, mur, cote_interieur=(1 if gauche else -1) if gauche != droite else 0)
@@ -234,8 +292,25 @@ def _fenetre(o: Ouverture, mur: Mur, cote_interieur: int = 0) -> list[Brique]:
     return briques + appui
 
 
-def _porte(o: Ouverture, mur: Mur, entree: bool, hsp: float = 99.0) -> list[Brique]:
-    """Dormant (sur toute l'épaisseur du mur), battant fermé, deux poignées, et un chambranle sur chaque face."""
+def _place_de_chaque_cote(o: Ouverture, mur: Mur, logement: Logement) -> tuple[float, float]:
+    """La place libre sur le mur à gauche et à droite de l'ouverture o : jusqu'au bout du mur, ou la moitié de l'écart
+    avec l'ouverture voisine (deux portes proches se partagent le trumeau : leurs chambranles ne se recouvrent pas)."""
+    gauche, droite = o.position, max(0.0, mur.longueur - o.position - o.largeur)
+    for x in logement.ouvertures:
+        if x is o or x.mur != o.mur:
+            continue
+        if x.position + x.largeur <= o.position + 1e-9:
+            gauche = min(gauche, (o.position - x.position - x.largeur) / 2)
+        elif x.position >= o.position + o.largeur - 1e-9:
+            droite = min(droite, (x.position - o.position - o.largeur) / 2)
+    return gauche, droite
+
+
+def _porte(o: Ouverture, mur: Mur, entree: bool, hsp: float = 99.0,
+           libres: tuple[float, float] | None = None) -> list[Brique]:
+    """Dormant (sur toute l'épaisseur du mur), battant fermé, deux poignées, et un chambranle sur chaque face.
+
+    libres : la place sur le mur de chaque côté (_place_de_chaque_cote) ; par défaut, jusqu'aux bouts du mur."""
     l, p = o.largeur, PROFIL
     haut = o.allege + o.hauteur
     e = mur.epaisseur / 2 + DEBORD_CHAMBRANLE
@@ -256,8 +331,9 @@ def _porte(o: Ouverture, mur: Mur, entree: bool, hsp: float = 99.0) -> list[Briq
     # Chambranle : deux montants et une traverse posés SUR chaque face du mur, qui recouvrent le joint du dormant d'un cm.
     # Les trois morceaux ne se recouvrent pas (deux faces au même endroit scintillent au rendu). Coupés au bout du mur.
     lc, recouvre = LARGEUR_CHAMBRANLE, 0.01
-    gauche = (-min(lc, o.position), recouvre)
-    droite = (l - recouvre, l + min(lc, max(0.0, mur.longueur - o.position - l)))
+    libre_g, libre_d = libres if libres is not None else (o.position, max(0.0, mur.longueur - o.position - l))
+    gauche = (-min(lc, libre_g), recouvre)
+    droite = (l - recouvre, l + min(lc, libre_d))
     z_haut = min(haut + lc, hsp - 0.001)
     for nom, s in (("a", 1), ("b", -1)):
         n = tuple(sorted((s * mur.epaisseur / 2, s * (mur.epaisseur / 2 + EPAISSEUR_CHAMBRANLE))))
@@ -268,6 +344,161 @@ def _porte(o: Ouverture, mur: Mur, entree: bool, hsp: float = 99.0) -> list[Briq
         if z_haut > haut - recouvre + 0.005:
             briques.append(_boite(o, mur, f"chambranle_{nom}_haut", (recouvre, l - recouvre), n,
                                   (haut - recouvre, z_haut), m))
+    return briques
+
+
+def _placard_derriere(o: Ouverture, mur: Mur, logement: Logement) -> tuple[Piece, int] | None:
+    """(le placard, son côté du mur : +1 à gauche, -1 à droite) si la porte o donne dans un placard depuis une pièce."""
+    (x0, y0), (x1, y1) = mur.debut, mur.fin
+    ux, uy = (x1 - x0) / mur.longueur, (y1 - y0) / mur.longueur
+    t = o.position + o.largeur / 2
+    cx, cy = x0 + ux * t, y0 + uy * t
+    d = mur.epaisseur / 2 + 0.05
+    cotes = []
+    for s in (1, -1):
+        pt = (cx - uy * d * s, cy + ux * d * s)
+        cotes.append(next((p for p in logement.pieces if _dans(pt, p.contour)), None))
+    gauche, droite = cotes
+    for placard, autre, s in ((gauche, droite, 1), (droite, gauche, -1)):
+        if placard is not None and autre is not None and est_placard(placard) and not est_placard(autre):
+            return placard, s
+    return None
+
+
+def _portes_de_placard_dans(o: Ouverture, mur: Mur, piece: Piece, cote: int) -> list[Brique]:
+    """Les portes de placard posées dans l'ouverture o, entre les montants du dormant, près de la face côté pièce."""
+    l, p = o.largeur, PROFIL
+    haut = o.allege + o.hauteur
+    ux, uy = (mur.fin[0] - mur.debut[0]) / mur.longueur, (mur.fin[1] - mur.debut[1]) / mur.longueur
+    gauche = (-uy, ux)
+    # face du mur côté pièce (opposée au placard), un peu en retrait ; « dedans » = vers le placard
+    face = -cote * (mur.epaisseur / 2 - 0.005)
+    debut = o.position + p
+    origine = (mur.debut[0] + ux * debut + gauche[0] * face, mur.debut[1] + uy * debut + gauche[1] * face)
+    dedans = (gauche[0] * cote, gauche[1] * cote)
+    choix = choix_placard(piece, l - 2 * p)
+    return _vantaux_placard(f"{o.id}__placard", o.id, origine, (ux, uy), dedans, l - 2 * p, JEU_SOL, haut - p, choix,
+                            profondeur_max=mur.epaisseur - 0.01)
+
+
+def portes_de_placard(briques: list[Brique], logement: Logement) -> list[Brique]:
+    """B2-2 : les portes qui ferment la façade ouverte de chaque placard (là où il n'y a pas de mur, face à une pièce)."""
+    sortie: list[Brique] = []
+    hsp = logement.hauteur_sous_plafond
+    for piece, facades in _facades_des_placards(briques, logement).values():
+        for k, (origine, u, dedans, longueur) in enumerate(facades):
+            choix = choix_placard(piece, longueur)
+            sortie += _vantaux_placard(f"placard__{piece.id}__{k}", piece.id, origine, u, dedans, longueur, 0.0,
+                                       hsp - 0.002, choix, rail=True)
+    return sortie
+
+
+def largeurs_des_facades(briques: list[Brique], logement: Logement) -> dict[str, float]:
+    """Pour chaque placard : la largeur de sa plus grande façade (ouverte, ou dessinée comme une porte)."""
+    largeurs = {pid: max(f[3] for f in facades) for pid, (_, facades) in _facades_des_placards(briques, logement).items()}
+    murs = {m.id: m for m in logement.murs}
+    for o in logement.ouvertures:
+        if o.type == "porte" and o.mur in murs:
+            placard = _placard_derriere(o, murs[o.mur], logement)
+            if placard is not None:
+                pid = placard[0].id
+                largeurs[pid] = max(largeurs.get(pid, 0.0), o.largeur - 2 * PROFIL)
+    return largeurs
+
+
+def _facades_des_placards(briques: list[Brique], logement: Logement) -> dict:
+    """{id du placard: (placard, [(origine, u, dedans, longueur)])} : les morceaux du bord du sol d'un placard sans mur derrière, qui
+    donnent sur une autre pièce (pas un bout de mur, pas une porte : celles-là sont traitées avec la porte)."""
+    murs_au_sol = [b.contour for b in briques
+                   if b.categorie == "mur" and b.z_bas <= 1e-6 and b.z_haut >= HAUTEUR_PLINTHE - 1e-6]
+    boites = [_boite_plan(c) for c in murs_au_sol]
+    sols = {b.element: b for b in briques if b.categorie == "sol" and b.id == f"sol__{b.element}"}
+    murs = {m.id: m for m in logement.murs}
+    portes = [(o, murs[o.mur]) for o in logement.ouvertures if o.mur in murs]
+    resultat: dict = {}
+    for piece in logement.pieces:
+        if piece.id not in sols or not est_placard(piece):
+            continue
+        contour = sols[piece.id].contour  # sens direct : l'intérieur du placard est à gauche
+        facades = []
+        for i in range(len(contour)):
+            a, b = contour[i], contour[(i + 1) % len(contour)]
+            longueur = math.dist(a, b)
+            if longueur < FACADE_MIN:
+                continue
+            u = ((b[0] - a[0]) / longueur, (b[1] - a[1]) / longueur)
+            gauche = (-u[1], u[0])
+            libres = [(0.0, longueur)]
+            for m in _morceaux_contre_un_mur(a, u, gauche, longueur, murs_au_sol, boites):
+                libres = _retirer(libres, m)
+            for o, mur in portes:
+                place = _place_du_chambranle(a, u, longueur, o, mur)
+                if place:
+                    libres = _retirer(libres, place)
+            for s0, s1 in libres:
+                if s1 - s0 < FACADE_MIN:
+                    continue
+                milieu = (a[0] + u[0] * (s0 + s1) / 2 - gauche[0] * 0.10, a[1] + u[1] * (s0 + s1) / 2 - gauche[1] * 0.10)
+                if not any(q.id != piece.id and _dans(milieu, q.contour) for q in logement.pieces):
+                    continue
+                facades.append(((a[0] + u[0] * s0, a[1] + u[1] * s0), u, gauche, s1 - s0))
+        if facades:
+            resultat[piece.id] = (piece, facades)
+    return resultat
+
+
+def _vantaux_placard(nom: str, element: str, origine: Point, u: Point, dedans: Point, longueur: float,
+                     z0: float, z1: float, choix: str, rail: bool = False, profondeur_max: float = 1.0) -> list[Brique]:
+    """Les portes d'une façade de placard de `longueur` m, posées à partir d'origine le long de u, vers « dedans ».
+
+    battantes : des portes de VANTAIL_MAX m au plus, séparées d'une fente, une poignée verticale près de chaque jonction ;
+    coulissantes : des panneaux de PANNEAU_MAX m au plus (deux au moins) qui se recouvrent, sur deux plans, avec un rail
+    en haut et en bas quand la façade va du sol au plafond ; aucune : rien (placard ouvert)."""
+    m, metal = "menuiserie_blanche", "metal"
+
+    def boite(suffixe, t0, t1, n0, n1, za, zb, materiau):
+        pts = [(origine[0] + u[0] * t + dedans[0] * n, origine[1] + u[1] * t + dedans[1] * n)
+               for t, n in ((t0, n0), (t1, n0), (t1, n1), (t0, n1))]
+        return Brique(f"{nom}__{suffixe}", "menuiserie", element, _sens_direct([_arrondi(q) for q in pts]), za, zb,
+                      materiau)
+
+    briques: list[Brique] = []
+    if choix == "aucune" or longueur <= 0.05:
+        return briques
+    if choix == "battantes":
+        k = max(1, math.ceil(longueur / VANTAIL_MAX - 1e-9))
+        largeur = (longueur - (k - 1) * JEU_VANTAUX) / k
+        n0, n1 = 0.002, 0.002 + EPAISSEUR_VANTAIL
+        for j in range(k):
+            t0 = j * (largeur + JEU_VANTAUX)
+            briques.append(boite(f"vantail_{j}", t0, t0 + largeur, n0, n1, z0 + 0.003, z1 - 0.003, m))
+            # poignée près de la jonction de chaque paire (j pair : à droite, j impair : à gauche) ;
+            # une porte seule, ou la dernière d'un nombre impair, l'a à gauche (côté opposé aux gonds)
+            tp = t0 + largeur - 0.06 if j % 2 == 0 else t0 + 0.045
+            if k % 2 == 1 and j == k - 1:
+                tp = t0 + 0.045
+            briques.append(boite(f"poignee_{j}", tp, tp + 0.015, -0.025, n0, 0.95, 1.25, metal))
+        return briques
+    # coulissantes
+    k = max(2, math.ceil((longueur - RECOUVREMENT) / (PANNEAU_MAX - RECOUVREMENT) - 1e-9))
+    largeur = (longueur + (k - 1) * RECOUVREMENT) / k
+    plans = ((0.005, 0.005 + EPAISSEUR_VANTAIL), (0.030, 0.030 + EPAISSEUR_VANTAIL))
+    if plans[1][1] > profondeur_max:  # cloison mince : les deux plans se serrent
+        e = EPAISSEUR_VANTAIL * 0.6
+        plans = ((0.002, 0.002 + e), (0.004 + e, 0.004 + 2 * e))
+    za, zb = z0 + 0.003, z1 - 0.003
+    if rail:
+        za, zb = z0 + 0.012, z1 - HAUTEUR_RAIL
+        fond = plans[1][1] + 0.005
+        briques.append(boite("rail_haut", 0.0, longueur, 0.0, fond, z1 - HAUTEUR_RAIL, z1, metal))
+        briques.append(boite("rail_bas", 0.0, longueur, 0.0, fond, z0, z0 + 0.008, metal))
+    for j in range(k):
+        t0 = j * (largeur - RECOUVREMENT)
+        n0, n1 = plans[j % 2]
+        briques.append(boite(f"panneau_{j}", t0, t0 + largeur, n0, n1, za, zb, m))
+        # prise de main : une baguette verticale sur le bord extérieur du panneau, côté pièce
+        tp = t0 + 0.02 if j < k / 2 else t0 + largeur - 0.032
+        briques.append(boite(f"prise_{j}", tp, tp + 0.012, n0 - 0.004, n0, 0.80, 1.40, metal))
     return briques
 
 
@@ -328,14 +559,7 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
                 continue
             u = ((b[0] - a[0]) / longueur, (b[1] - a[1]) / longueur)
             gauche = (-u[1], u[0])
-            a2 = (a[0] - gauche[0] * SONDE_MUR, a[1] - gauche[1] * SONDE_MUR)
-            b2 = (b[0] - gauche[0] * SONDE_MUR, b[1] - gauche[1] * SONDE_MUR)
-            (sx0, sy0), (sx1, sy1) = _boite_plan([a2, b2])
-            morceaux: list[tuple[float, float]] = []
-            for contour_mur, ((bx0, by0), (bx1, by1)) in zip(murs_au_sol, boites):
-                if bx0 <= sx1 and sx0 <= bx1 and by0 <= sy1 and sy0 <= by1:
-                    morceaux += [(t0 * longueur, t1 * longueur) for t0, t1 in _segment_dans(a2, b2, contour_mur)]
-            morceaux = _reunir(morceaux)
+            morceaux = _morceaux_contre_un_mur(a, u, gauche, longueur, murs_au_sol, boites)
             for o, mur in portes:
                 place = _place_du_chambranle(a, u, longueur, o, mur)
                 if place:
@@ -360,6 +584,20 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
                 sortie.append(Brique(f"plinthe__{piece.id}__{i}_{k}", "menuiserie", piece.id,
                                      _sens_direct([_arrondi(q) for q in quad]), 0.0, hauteur, materiau))
     return sortie
+
+
+def _morceaux_contre_un_mur(a: Point, u: Point, gauche: Point, longueur: float, murs_au_sol: list,
+                            boites: list) -> list[tuple[float, float]]:
+    """Les morceaux (s0, s1) du côté qui part de a le long de u où un mur au niveau du sol est juste derrière (à SONDE_MUR,
+    du côté opposé à « gauche », l'intérieur de la pièce)."""
+    a2 = (a[0] - gauche[0] * SONDE_MUR, a[1] - gauche[1] * SONDE_MUR)
+    b2 = (a[0] + u[0] * longueur - gauche[0] * SONDE_MUR, a[1] + u[1] * longueur - gauche[1] * SONDE_MUR)
+    (sx0, sy0), (sx1, sy1) = _boite_plan([a2, b2])
+    morceaux: list[tuple[float, float]] = []
+    for contour_mur, ((bx0, by0), (bx1, by1)) in zip(murs_au_sol, boites):
+        if bx0 <= sx1 and sx0 <= bx1 and by0 <= sy1 and sy0 <= by1:
+            morceaux += [(t0 * longueur, t1 * longueur) for t0, t1 in _segment_dans(a2, b2, contour_mur)]
+    return _reunir(morceaux)
 
 
 def _onglet_plinthe(sommet: Point, gauche_avant: Point, gauche_apres: Point,

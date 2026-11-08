@@ -102,6 +102,22 @@ class Plinthes(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class PortesPlacard(BaseModel):
+    """Les portes d'un placard (B2-2, 08/11/2026) : décidées pièce par pièce, comme les plinthes.
+
+    « battantes » (des portes qui s'ouvrent comme une armoire), « coulissantes » (des panneaux qui glissent sur un rail) ou
+    « aucune » (placard ouvert, une simple niche). Même provenance que Plinthes : « ajoute » (règle par défaut), « estime »
+    (vu sur une photo), « mesure » (choisi à l'écran de vérification).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    choix: Literal["battantes", "coulissantes", "aucune"]
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
 class Piece(Element):
     """Une pièce, décrite par son contour intérieur."""
 
@@ -110,6 +126,9 @@ class Piece(Element):
     surface: Longueur | None = Field(default=None, description="Surface annoncée, en m²")
     plinthes: Plinthes | None = Field(
         default=None, description="Si absent : la règle par défaut d'Atelya (moteur.habillage.plinthes_par_defaut)"
+    )
+    placard: PortesPlacard | None = Field(
+        default=None, description="Portes d'un placard. Si absent : la règle par défaut (moteur.habillage.choix_placard)"
     )
 
     @property

@@ -394,6 +394,31 @@
     return v;
   }
 
+  const CHOIX_PLACARD = ["coulissantes", "battantes", "aucune"];
+  // Même règle que moteur/habillage.py (est_placard) : le nom dit placard, et c'est petit (un grand dressing est une pièce).
+  const MOTS_PLACARD = /placard|rangement|dressing|penderie/;
+  const PLACARD_MAX = 4.0; // m²
+
+  function sansAccents(texte) {
+    return texte.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  /** Cette pièce est-elle un placard (portes à choisir) ? */
+  function estPlacard(p) {
+    return !!p.placard || (MOTS_PLACARD.test(sansAccents(p.nom || "")) && surfacePolygone(p.contour) <= PLACARD_MAX);
+  }
+
+  /** Les portes d'un placard, choisies par la personne (B2-2) : « coulissantes », « battantes » ou « aucune ». */
+  function reglerPlacard(v0, id, choix) {
+    if (!CHOIX_PLACARD.includes(choix)) throw new Error(`portes de placard inconnues : ${choix}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.placard = { choix, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
+
   /** Supprime un élément ; un mur emporte ses portes et fenêtres. */
   function supprimer(v0, id) {
     const v = copie(v0);
@@ -1438,6 +1463,9 @@
     renommerPiece,
     reglerPlinthes,
     CHOIX_PLINTHES,
+    reglerPlacard,
+    CHOIX_PLACARD,
+    estPlacard,
     supprimer,
     confirmer,
     resoudre,

@@ -211,3 +211,18 @@ l'écran (fiche de la pièce) montre la liste « Plinthes » + d'où vient le ch
 choix de la personne. Écran testé dans Chrome sans fenêtre (Node absent du PC) : 9/9. Rendus : `..\atelya\b2\fr-031-plinthes-par-piece.png`
 (séjour bois / carrelage / aucune, salle d'eau par défaut), capture `..\atelya\b2\ecran-plinthes.png`. Même principe prévu pour les
 portes de placard (B2-2) et les corniches.
+
+**B2-2 portes de placard (08/11/2026, « Oui » de NT)** — même principe que les plinthes : champ `placard` de la pièce
+(`PortesPlacard` : coulissantes / battantes / aucune + statut ajoute / estime / mesure). Un placard = nom placard / rangement /
+dressing / penderie ET ≤ 4 m² (`habillage.est_placard` ; un dressing plus grand = une pièce, porte ordinaire : fr-038 9 et 16 m²),
+ou choix écrit. Règle par défaut : battantes sous 1 m de façade, coulissantes au-delà. `habillage` 0.5 : (1) façade OUVERTE (bord du
+sol du placard sans mur derrière, ≥ 40 cm, avec une autre pièce devant) → portes du sol au plafond juste derrière la ligne
+(coulissantes : panneaux ≤ 1 m, deux au moins, recouvrement 3 cm, deux plans, rails haut et bas, baguettes de prise ; battantes :
+portes ≤ 60 cm, fente 3 mm, poignées près des jonctions) ; (2) façade dessinée comme une PORTE dans un mur → le battant et les
+poignées de la porte sont remplacés par des portes de placard (cadre et chambranles gardés). Corrigé au passage : deux portes
+proches se partagent le trumeau (`_place_de_chaque_cote`) ; avant, leurs chambranles se recouvraient → filet noir (fr-031).
+Vrais plans : fr-031 (façade 3,04 m → 4 coulissants ; porte 1,57 m → 2), fr-021 (façade 2,17 m → 3 ; porte 0,62 → 1 battante),
+fr-030 : placards fermés de tous côtés sur la lecture (aucun accès, défaut de la vérité) → rien. Écran : liste « Portes du placard »
+dans la fiche d'un placard seulement (`estPlacard`, `reglerPlacard`), testée dans Chrome 7/7 ; préparateur : `completer_finitions`.
+Rendus : `..\atelya\b2\placards-b2-2.png`. Limite vue : petites lignes au sol à la jonction des parquets de deux pièces (fr-021, défaut
+d'avant B2-2, à revoir avec les vraies matières B2-3).

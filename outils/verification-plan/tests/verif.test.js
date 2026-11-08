@@ -108,6 +108,20 @@ test("plinthes choisies à l'écran : la pièce les garde, marquées « mesure �
   assert.throws(() => C.reglerPlinthes(v, "inconnue", "bois"));
 });
 
+test("portes de placard choisies à l'écran ; un placard se reconnaît à son nom et à sa petite taille", () => {
+  const v = exemple();
+  const w = C.reglerPlacard(v, "chambre", "battantes");
+  const p = w.logement.pieces.find((x) => x.id === "chambre");
+  assert.deepEqual(p.placard, { choix: "battantes", statut: "mesure", source: "verification", confiance: 1 });
+  assert.ok(C.estPlacard(p)); // un choix écrit suffit
+  assert.throws(() => C.reglerPlacard(v, "chambre", "miroir"));
+  const carre = (c) => [[0, 0], [c, 0], [c, c], [0, c]];
+  assert.ok(C.estPlacard({ nom: "Placard 1", contour: carre(1) }));
+  assert.ok(C.estPlacard({ nom: "Pièce 4 (rangement)", contour: carre(1) }));
+  assert.ok(!C.estPlacard({ nom: "Dressing", contour: carre(3) })); // 9 m² : une vraie pièce
+  assert.ok(!C.estPlacard({ nom: "Chambre", contour: carre(1) }));
+});
+
 test("propositions en un clic : la porte oubliée est ajoutée et le doute disparaît", () => {
   let v = exemple();
   const d = C.trouverDoutes(v).find((x) => x.element === null);
