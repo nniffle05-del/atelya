@@ -171,3 +171,12 @@ chacune : couleur, relief, brillance ; ~106 Mo ; dossier proposé `..\atelya\bib
 carreaux de ciment fabriqués par calcul ; B2-4 lumière du jour (ciel physique intégré à Blender, plafonniers éteints le jour, réglage
 d'exposition « comme un photographe »). Temps 2 (après) : lecture d'app-001 faite à la main comme une vérité, puis photos → matières.
 Licences relues : voir audit-technologique-2026-10-31.md (fin).
+**Accord NT (08/11/2026, écrit) : « télécharger toutes les matières »** → les 14 matières proposées sont téléchargées par
+`outils/bibliotheque/telecharger_matieres.py` dans `..\atelya\bibliotheque\matieres\` (hors Git) : 14 dossiers × 3 images 2048 × 2048
+(couleur.jpg, relief.jpg = normale OpenGL, brillance.jpg = rugosité), 98,6 Mo, sommes de contrôle Poly Haven vérifiées, `matieres.json`
+(source, auteurs, taille réelle couverte par une image en m) et `CREDITS.txt`. Vu à l'œil : 4 fiches ne ressemblaient pas à leur nom →
+renommées : floor_tiles_06 = `damier_pierre`, marble_01 = `pierre_beige`, square_tiled_wall = `mosaique_rayee` (brun/gris), Tiles036 =
+`faience_blanche` (carrés, pas métro) ; white_plaster_02 est gris taché → servira pour le grain, couleur de peinture posée par Atelya.
+Manquent encore : vraie faïence métro, marbre blanc (à ajouter si besoin, même licence). NT parle aussi de « télécharger le GitHub
+envoyé tout à l'heure » (meubles : ABO ou Sand3D ?) → question posée, rien téléchargé. Tailles : ABO officiel abo-3dmodels.tar 154 Go
+en un bloc ; réenvoi codepawl/abo-glb 43,1 Go (fichiers séparés) ; Sand3D (code) 24 Mo, Apache 2.0, écarté par NT le 08/11. Disque D : 900 Go libres.
