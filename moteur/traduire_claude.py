@@ -21,10 +21,11 @@ Pourquoi (décision NT du 08/11/2026, docs/projet/memoire/plan-lancement-lecture
    donné par Claude (ou son contour si les murs ne la ferment pas). Repère d'Atelya : mètres, origine au coin sud-ouest de
    l'intérieur, y vers le nord (comme le générateur, le traducteur des coloriages et les vérités).
 5. Les doutes : ceux de la fiche (nombre mal recopié…), ceux de Claude, ceux de l'échelle, les pièces mal fermées, plusieurs
-   niveaux sur l'image, puis les contrôles de bon sens habituels (moteur.doutes.examiner). Les contrôles propres à la lecture
-   de Claude (cote contre mur, surface contre pièce) sont la sous-étape 3.
+   niveaux sur l'image, les contrôles propres à la lecture de Claude (moteur.doutes_claude : textes introuvables, cotes contre
+   le dessin, surfaces contre les pièces), puis les contrôles de bon sens habituels (moteur.doutes.examiner).
 
 Version 0.1.0 (08/11/2026) : première version (plans vus de face ; photo de biais : envoyer à Claude l'image déjà redressée).
+Version 0.2.0 (08/11/2026) : doutes propres à la lecture de Claude (moteur.doutes_claude 0.1.0).
 """
 from __future__ import annotations
 
@@ -36,6 +37,7 @@ from PIL import Image
 
 from moteur.coloriage import FENETRE, MUR, PIECES, PORTE, PORTE_FENETRE, _contour_orthogonal
 from moteur.doutes import doute_plusieurs_niveaux, examiner
+from moteur.doutes_claude import doutes_des_cotes, doutes_des_surfaces, doutes_des_textes
 from moteur.echelle_plan import decider, lire_echelle_plan
 from moteur.lecture_claude import Cadre, FicheControlee, LectureClaude
 from moteur.lecture_complete import COTE_ATELYA, Lecture, PlanLu, PlanSource, _echelle_de_secours, _taille_vraisemblable
@@ -43,7 +45,7 @@ from moteur.lecture_cotes import ECART_MAX, TexteLu
 from moteur.logement import Logement
 from moteur.recalage_murs import affiner_mur
 
-VERSION_TRADUCTEUR_CLAUDE = "0.1.0"
+VERSION_TRADUCTEUR_CLAUDE = "0.2.0"
 MODELE = "claude"
 ACCORD_DEUX_CLES = 0.03  # 3 % : écart maximal entre l'échelle retrouvée par Atelya et celle proposée par Claude
 PORTEE_OUVERTURE_PX = 12.0  # une ouverture appartient à un mur dont l'axe passe à moins de ça (ou de son épaisseur)
@@ -156,7 +158,7 @@ def _refus(source: PlanSource, raison: str, echelle: dict | None = None, coloria
 
 
 def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0, *, projet_id: str | None = None,
-             recaler: bool = True) -> PlanLu:
+             recaler: bool = True, ocr: bool = True) -> PlanLu:
     """La lecture complète d'un plan à partir de la fiche de Claude.
 
     `source` : le plan tel que l'écran l'affichera (image pleine taille, textes exacts du PDF s'il y en a) ;
@@ -217,8 +219,9 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
             if contour_claude and zones[k][3]:
                 zones.append((p.id, p.type, _polygone(contour_claude, (H, W)) & (etiq == z), True))
             else:  # même zone, sans cloison entre elles (cuisine ouverte…) : une seule pièce
-                autres.append(_doute("pieces_reunies", f"{p.nom or NOM_PIECE[p.type]} et {zones[k][0]} sans mur entre elles : "
-                                     "réunies en une seule pièce", "faible", zones[k][0], ici))
+                premiere = next(q for q in fiche.pieces if q.id == zones[k][0])
+                autres.append(_doute("pieces_reunies", f"{p.nom or NOM_PIECE[p.type]} et {premiere.nom or NOM_PIECE[premiere.type]} "
+                                     "sans mur entre elles : réunies en une seule pièce", "faible", zones[k][0], ici))
             continue
         prises[z] = len(zones)
         zones.append((p.id, p.type, etiq == z, bool(contour_claude)))
@@ -330,11 +333,11 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
         ident = f"O{len(sortie_ouv) + 1}"
         if b - a <= 0:
             autres.append(_doute("ouverture_hors_mur", f"{o.type.replace('_', '-')} au-delà du bout de son mur : non construite",
-                                 "fort", ids_murs[fiche.murs[k].id], _autour((bords[0] + bords[2]) / 2, (bords[1] + bords[3]) / 2, 15)))
+                                 "fort", fiche.murs[k].id, _autour((bords[0] + bords[2]) / 2, (bords[1] + bords[3]) / 2, 15)))
             continue
         if debord > DEBORD_OUVERTURE_M:
             autres.append(_doute("ouverture_debord", f"{o.type.replace('_', '-')} lue au-delà du bout de son mur "
-                                 f"({100 * debord:.0f} cm) : raccourcie", "faible", ident))
+                                 f"({100 * debord:.0f} cm) : raccourcie", "faible", o.id))
         largeur = (b - a) / s
         if o.type == "porte":
             hauteur, allege = HAUTEUR_PORTE, 0.0
@@ -370,8 +373,14 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
     except Exception as err:  # noqa: BLE001 — un logement incohérent est un résultat (refusé), pas un plantage
         return _refus(source, f"logement incohérent : {str(err)[:200]}", echelle, masque)
 
-    # 6. Les doutes venus de la fiche et de Claude, avec les noms du logement.
+    # 6. Les doutes venus de la fiche et de Claude, avec les noms du logement, puis ce que Claude affirme contrôlé contre le dessin.
     ids = {**ids_murs, **ids_ouv, **ids_pieces}
+    for d in autres:  # les doutes écrits jusqu'ici désignent les éléments par leur id dans la fiche de Claude
+        d["element"] = ids.get(d["element"]) if d.get("element") else None
+    autres += doutes_des_textes(fiche, f, gris, source.textes, ocr=ocr)
+    if etat == "lue":  # sans échelle lue, chaque cote et chaque surface seraient accusées à tort
+        autres += doutes_des_cotes(fiche, f, s, e.cotes, ids)
+        autres += doutes_des_surfaces(fiche, f, logement, ids, lambda u, v: m_(u, v))
     for p in controlee.problemes:  # seuls les « doute » arrivent ici (un « refus » a déjà arrêté la traduction)
         autres.append(_doute(p.code, p.raison, "fort", ids.get(p.element), _xywh(p.cadre, f) if p.cadre else None))
     for d in fiche.doutes:

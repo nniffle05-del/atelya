@@ -218,3 +218,74 @@ def test_fiche_non_modifiee(plan):
     avant = copy.deepcopy(d)
     _lire(plan, d)
     assert d == avant
+
+
+# ---------------------------------------------------------------- doutes propres à la lecture de Claude (moteur.doutes_claude)
+
+def _doute(plan_lu, code):
+    return next((d for d in plan_lu.gardee.examen["doutes"] if d["code"] == code), None)
+
+
+def test_texte_invente_sur_l_image(plan):
+    d = _fiche()
+    d["surfaces"].append({"texte": "8,0 m2", "valeur_m2": 8.0, "cadre": [780, 40, 870, 65]})  # coin vide de l'image
+    doute = _doute(_lire(plan, d), "texte_introuvable")
+    assert doute["gravite"] == "fort" and doute["zone_px"] == [780.0, 40.0, 90.0, 25.0]
+
+
+def test_texte_invente_dans_un_pdf():
+    from moteur.lecture_cotes import TexteLu
+
+    def boite(x0, y0, x1, y1):
+        return np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], float)
+
+    textes = [TexteLu("6,00", boite(X(3) - 30, YC - 28, X(3) + 30, YC - 6), 1.0),
+              TexteLu("4,00", boite(XC - 60, Y(2) - 12, XC - 5, Y(2) + 10), 1.0)]
+    source = PlanSource("studio", _dessin(), textes=textes)
+    d = _fiche()
+    d["surfaces"] = []
+    d["cotes"][1]["texte"], d["cotes"][1]["valeur_m"] = "4,10", 4.1  # le PDF dit « 4,00 »
+    doute = _doute(_lire(source, d), "texte_introuvable")
+    assert doute["gravite"] == "fort" and "4,00" in doute["raison"]
+
+
+def test_ocr_voit_un_autre_nombre(plan):
+    d = _fiche()
+    d["cotes"][0].update(texte="6,50", valeur_m=6.5)  # le dessin dit « 6,00 »
+    lu = _lire(plan, d)
+    doute = _doute(lu, "texte_different")
+    assert doute["gravite"] == "faible" and "6,00" in doute["raison"]
+    assert lu.decision == "a_verifier"
+
+
+def test_cote_contre_le_dessin(plan):
+    d = _fiche()
+    d["cotes"][1]["bouts"] = [[XC, Y(4)], [XC, Y(1)]]  # « 4,00 » posé sur 3 m de dessin
+    doute = _doute(_lire(plan, d), "cote_contre_dessin")
+    assert doute["gravite"] == "fort" and "3.00 m" in doute["raison"] and "-25 %" in doute["raison"]
+
+
+def test_surface_contre_la_piece(plan):
+    d = _fiche()
+    d["murs"] = [m for m in d["murs"] if m["id"] != "M5"]  # cloison oubliée : une seule pièce de 24 m²
+    d["ouvertures"] = d["ouvertures"][1:]
+    lu = _lire(plan, d)
+    doute = _doute(lu, "surface_contre_piece")
+    assert doute["gravite"] == "fort" and doute["element"] == "sejour_1" and "14 m²" in doute["raison"]
+    assert _doute(lu, "pieces_reunies")["raison"].startswith("Chambre et Séjour")
+
+
+def test_pas_de_controle_des_cotes_sans_echelle_lue(plan):
+    lu = _lire(plan, _fiche(prop=120.0))  # échelle à vérifier : les cotes ne sont pas accusées une à une
+    assert _doute(lu, "cote_contre_dessin") is None and _doute(lu, "surface_contre_piece") is None
+
+
+def test_doutes_designent_les_elements_du_logement(plan):
+    d = _fiche()
+    d["pieces"][1]["contour"] = [[X(3.55), Y(4)], [X(6), Y(4)], [X(6), Y(0)], [X(3.55), Y(0)]]
+    d["murs"] = [m for m in d["murs"] if m["id"] != "M4"]
+    lu = _lire(plan, d)
+    ids = {e["id"] for genre in ("murs", "ouvertures", "pieces") for e in lu.gardee.logement[genre]}
+    for doute in lu.gardee.examen["doutes"]:
+        assert doute["element"] is None or doute["element"] in ids, doute
+    assert _doute(lu, "piece_ouverte")["element"] == "chambre_1"

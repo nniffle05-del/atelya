@@ -83,6 +83,19 @@ sorties que lire_plan.py, ecran.html compris ; aucun appel à l'API). Tests : `t
 positions de Claude décalées de 3 px : murs à 5 mm près, pièces à 1-2 %, calage sur l'encre, désaccord 20 % attrapé, image envoyée
 réduite de moitié, pièce ouverte, pièces réunies, ouverture hors mur, cote mal recopiée, plusieurs niveaux, fiche refusée).
 
+**Sous-étape 3 FAITE (08/11/2026)** : `moteur/doutes_claude.py` 0.1.0, branché dans `traduire_claude` 0.2.0. Trois contrôles de ce que
+Claude affirme contre ce qu'il n'a pas produit : (1) textes recopiés : PDF → un texte exact du PDF avec le même nombre doit être dans
+le cadre (sinon fort) ; image → cadre presque sans encre (< 1 %) = texte inventé (fort), sinon OCR d'Atelya sur le seul cadre (agrandi
+×2) : autres chiffres lus → FAIBLE (l'OCR se trompe souvent sur les vrais plans), rien lu → rien ; (2) cote contre le dessin
+(échelle LUE seulement) : longueur entre les marques retrouvées par Atelya (tolérance 3 %) sinon entre les bouts de Claude (5 % ou
+8 px) contre le nombre ÉCRIT → fort ; (3) surface écrite contre la pièce construite (échelle lue seulement ; pièce rattachée par
+Claude, sinon celle qui contient le texte) : écart > 10 % et > 0,5 m² → fort. Seuils posés par principe, à recalibrer sur les vérités
+d'ENTRAÎNEMENT. Limite connue : un texte inventé posé sur un trait (encre présente) n'est pas vu si l'OCR ne lit rien. Corrigé au
+passage : les doutes écrits avant la construction désignaient les éléments par l'id de la fiche (« P1 ») → remis aux ids du logement
+(l'écran surligne le bon élément) ; message « pièces réunies » avec les noms. Doutes de construction (3D) : déjà ajoutés par
+`verification_du_plan`. Option « second avis d'Atelya » (U-Net) : NON faite, à proposer à NT après mesure du taux de fausses alertes
+(sous-étape 4). Tests : 7 de plus dans `tests/test_traduire_claude.py` (30 pour l'étape).
+
 **Why:** lancer Atelya plus vite avec une lecture déjà bonne, sans payer maintenant l'entraînement sur de vrais plans ; garder
 la vérification humaine et nos garde-fous d'échelle pour qu'aucune erreur de Claude ne passe en silence.
 **How to apply:** ne plus proposer d'entraînement du lecteur comme priorité ; juger les étapes sur ce qu'elles apportent à la
