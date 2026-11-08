@@ -381,6 +381,19 @@
     return v;
   }
 
+  const CHOIX_PLINTHES = ["bois", "carrelage", "aucune"];
+
+  /** Les plinthes d'une pièce, choisies par la personne (B2) : « bois », « carrelage » ou « aucune ». */
+  function reglerPlinthes(v0, id, choix) {
+    if (!CHOIX_PLINTHES.includes(choix)) throw new Error(`plinthes inconnues : ${choix}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.plinthes = { choix, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
+
   /** Supprime un élément ; un mur emporte ses portes et fenêtres. */
   function supprimer(v0, id) {
     const v = copie(v0);
@@ -1423,6 +1436,8 @@
     modifierOuverture,
     modifierMur,
     renommerPiece,
+    reglerPlinthes,
+    CHOIX_PLINTHES,
     supprimer,
     confirmer,
     resoudre,

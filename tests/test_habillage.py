@@ -130,7 +130,7 @@ def test_vue_interieure_du_sejour(plan, logement):
 # ------------------------------------------------------------------ B2-1 : plinthes, chambranles, appuis
 
 
-def _piece_simple(**ouvertures_en_plus):
+def _piece_simple(nom="Séjour", plinthes=None, **ouvertures_en_plus):
     """Une pièce de 4 × 3 m (murs de 20 cm, axes à ±0,1 m du bord) : porte au sud, fenêtre à l'est, porte-fenêtre au nord."""
     mur = lambda i, d, f: {"id": i, "debut": d, "fin": f, "epaisseur": 0.2, "statut": "mesure", "source": "test"}
     ouv = lambda i, t, m, pos, l, h, a: {"id": i, "type": t, "mur": m, "position": pos, "largeur": l, "hauteur": h,
@@ -142,8 +142,8 @@ def _piece_simple(**ouvertures_en_plus):
         "ouvertures": [ouv("porte", "porte", "S", 1.0, 0.9, 2.04, 0.0),
                        ouv("fenetre", "fenetre", "E", 1.0, 1.2, 1.3, 0.9),
                        ouv("pf", "porte_fenetre", "N", 2.0, 1.4, 2.15, 0.0)],
-        "pieces": [{"id": "sejour", "nom": "Séjour", "contour": [[0, 0], [4, 0], [4, 3], [0, 3]],
-                    "statut": "mesure", "source": "test"}],
+        "pieces": [{"id": "sejour", "nom": nom, "contour": [[0, 0], [4, 0], [4, 3], [0, 3]],
+                    "statut": "mesure", "source": "test", **({"plinthes": plinthes} if plinthes else {})}],
     })
 
 
@@ -191,3 +191,57 @@ def test_fenetre_pres_de_la_face_interieure_avec_appui():
     assert min(p[0] for p in nez["contour"]) == pytest.approx(4.0 - 0.03)  # dépasse de 3 cm dans la pièce
     assert nez["z_bas"] == pytest.approx(0.9)
     assert not any(i.startswith("pf__appui") for i in briques)  # pas d'appui sous une porte-fenêtre
+
+
+# ---- Plinthes décidées pièce par pièce (habillage 0.4) ----
+
+def _plinthes_de(plan):
+    return [b for b in plan["briques"] if b["id"].startswith("plinthe__")]
+
+
+def test_une_piece_sans_plinthes_n_en_a_pas():
+    vu = {"choix": "aucune", "statut": "estime", "source": "photo_03"}
+    assert _plinthes_de(plan_habille(_piece_simple(plinthes=vu))) == []
+
+
+def test_plinthes_en_carrelage_plus_basses_et_comme_le_sol():
+    from moteur.habillage import EPAISSEUR_PLINTHE_CARRELAGE, HAUTEUR_PLINTHE_CARRELAGE
+
+    choisi = {"choix": "carrelage", "statut": "mesure", "source": "verification"}
+    plinthes = _plinthes_de(plan_habille(_piece_simple(nom="Salle de bain", plinthes=choisi)))
+    assert plinthes and all(b["z_haut"] == HAUTEUR_PLINTHE_CARRELAGE and b["materiau"] == "carrelage" for b in plinthes)
+    e = EPAISSEUR_PLINTHE_CARRELAGE  # même tour exact que les plinthes en bois, avec l'épaisseur d'un carreau
+    anneau = 4 * 3 - (4 - 2 * e) * (3 - 2 * e)
+    trous = (0.9 + 2 * (LARGEUR_CHAMBRANLE + 0.001)) * e + 1.4 * e
+    assert sum(_aire(b["contour"]) for b in plinthes) == pytest.approx(anneau - trous, abs=1e-6)
+    # dans un séjour en parquet, des plinthes carrelées choisies restent en carrelage (pas en parquet)
+    plinthes = _plinthes_de(plan_habille(_piece_simple(plinthes=choisi)))
+    assert {b["materiau"] for b in plinthes} == {"carrelage"}
+
+
+def test_regle_par_defaut_quand_rien_n_est_vu():
+    from moteur.habillage import plinthes_par_defaut
+
+    assert plinthes_par_defaut("Salle de bain") == "carrelage"
+    assert plinthes_par_defaut("WC") == "carrelage"
+    assert plinthes_par_defaut("Chambre 2") == "bois"
+    assert {b["materiau"] for b in _plinthes_de(plan_habille(_piece_simple()))} == {"menuiserie_blanche"}
+    assert {b["materiau"] for b in _plinthes_de(plan_habille(_piece_simple(nom="Cuisine")))} == {"carrelage"}
+
+
+def test_completer_plinthes_ecrit_la_regle_sans_toucher_un_choix_deja_fait():
+    from moteur.habillage import completer_plinthes
+
+    logement = _piece_simple().model_dump(by_alias=True, exclude_none=True)
+    logement["pieces"].append({**logement["pieces"][0], "id": "sdb", "nom": "Salle de bain",
+                               "plinthes": {"choix": "aucune", "statut": "estime", "source": "photo_05"}})
+    complet = completer_plinthes(logement)
+    assert "plinthes" not in logement["pieces"][0]  # l'original n'est pas modifié
+    assert complet["pieces"][0]["plinthes"] == {"choix": "bois", "statut": "ajoute", "source": "regle_par_defaut",
+                                                "confiance": 0.5}
+    assert complet["pieces"][1]["plinthes"]["choix"] == "aucune"
+
+
+def test_le_format_refuse_des_plinthes_inconnues():
+    with pytest.raises(ValueError):
+        _piece_simple(plinthes={"choix": "marbre", "statut": "mesure", "source": "verification"})

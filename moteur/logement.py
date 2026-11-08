@@ -85,12 +85,32 @@ class Ouverture(Element):
     )
 
 
+class Plinthes(BaseModel):
+    """Les plinthes d'une pièce (B2, 08/11/2026) : décidées pièce par pièce, pas une règle fixe pour tout le logement.
+
+    Le plan n'en dit rien, d'où la provenance, avec les mêmes mots que le reste du format :
+    - « ajoute » : supposé par la règle par défaut d'Atelya, personne ne l'a vu (source « regle_par_defaut ») ;
+    - « estime » : vu par Atelya sur une photo du client (source « photo_07 », par exemple) ;
+    - « mesure » : choisi ou confirmé par une personne à l'écran de vérification (source « verification »).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    choix: Literal["bois", "carrelage", "aucune"]
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
 class Piece(Element):
     """Une pièce, décrite par son contour intérieur."""
 
     nom: str = Field(min_length=1)
     contour: list[Point] = Field(min_length=3)
     surface: Longueur | None = Field(default=None, description="Surface annoncée, en m²")
+    plinthes: Plinthes | None = Field(
+        default=None, description="Si absent : la règle par défaut d'Atelya (moteur.habillage.plinthes_par_defaut)"
+    )
 
     @property
     def surface_calculee(self) -> float:

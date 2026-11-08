@@ -97,6 +97,17 @@ test("une correction ne touche jamais l'original (c'est ce qui permet « Annuler
   assert.equal(JSON.stringify(v), avant);
 });
 
+test("plinthes choisies à l'écran : la pièce les garde, marquées « mesure » (vu par la personne)", () => {
+  const v = exemple();
+  const w = C.reglerPlinthes(v, "chambre", "aucune");
+  const p = w.logement.pieces.find((x) => x.id === "chambre");
+  assert.deepEqual(p.plinthes, { choix: "aucune", statut: "mesure", source: "verification", confiance: 1 });
+  assert.ok(w.verifies.includes("chambre"));
+  assert.equal(v.logement.pieces.find((x) => x.id === "chambre").plinthes, undefined); // l'original ne bouge pas
+  assert.throws(() => C.reglerPlinthes(v, "chambre", "marbre"));
+  assert.throws(() => C.reglerPlinthes(v, "inconnue", "bois"));
+});
+
 test("propositions en un clic : la porte oubliée est ajoutée et le doute disparaît", () => {
   let v = exemple();
   const d = C.trouverDoutes(v).find((x) => x.element === null);

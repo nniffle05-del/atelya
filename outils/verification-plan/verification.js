@@ -972,7 +972,21 @@
       avec.addEventListener("change", () => {
         if (avec.value && corriger((x) => C.fusionnerPieces(x, [e.id, avec.value], e.nom), "Pièces réunies.")) rafraichir();
       });
-      fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre, el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
+      // B2 : les plinthes de la pièce. Atelya les suppose (règle par défaut) ou les voit sur une photo ; la personne tranche.
+      const NOMS_PLINTHES = { bois: "Plinthes en bois", carrelage: "Plinthes en carrelage (comme le sol)", aucune: "Pas de plinthes" };
+      const plinthes = el("select", { id: "f-plinthes" },
+        ...(e.plinthes ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        ...C.CHOIX_PLINTHES.map((k) => el("option", { value: k, texte: NOMS_PLINTHES[k] })));
+      plinthes.value = e.plinthes ? e.plinthes.choix : "";
+      plinthes.addEventListener("change", () => {
+        if (plinthes.value) corriger((x) => C.reglerPlinthes(x, e.id, plinthes.value), `${NOMS_PLINTHES[plinthes.value]}.`);
+      });
+      const origine = !e.plinthes ? "" : e.plinthes.statut === "mesure" ? "Choisi à l'écran."
+        : e.plinthes.statut === "estime" ? `Vu par Atelya sur la photo (${e.plinthes.source}).`
+        : "Supposé par Atelya : personne ne l'a vu. À changer si besoin.";
+      fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre,
+        el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }),
+        el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
         el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));
     } else if (genre === "ouverture") {
       $("choix-titre").textContent = `${NOMS_OUVERTURES[e.type]} de ${formatM(e.largeur)} m`;

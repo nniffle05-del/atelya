@@ -24,6 +24,12 @@ B2-1 (08/11/2026), les finitions qu'on voit dans tout vrai logement (version 0.3
 Le plan ne dit rien de tout ça : règle fixe (mêmes mesures partout), statut « ajouté ». Au temps 2 de B2, les photos du
 client pourront changer hauteur, couleur ou matière.
 
+Version 0.4 (08/11/2026, demande de NT : « il doit savoir le faire en fonction du logement, s'il voit qu'il y en a ou pas ») :
+les plinthes se décident PIÈCE PAR PIÈCE (champ `plinthes` de chaque pièce du logement : en bois, en carrelage comme le sol,
+ou aucune). Quand rien ne l'a vu, la règle par défaut (plinthes_par_defaut) : en carrelage dans une pièce carrelée, en bois
+ailleurs ; elle est écrite dans le fichier de l'écran de vérification (completer_plinthes) pour qu'une personne la voie et la
+change. Au temps 2, Atelya la remplira d'après les photos du client.
+
 Tout ce qui est ajouté ici est de la décoration supposée (statut « ajouté ») :
 le plan ne dit ni la couleur des murs ni le type de sol.
 """
@@ -51,6 +57,8 @@ HAUTEUR_POIGNEE = 1.00
 # B2-1 : finitions (en mètres). Règle fixe, la même partout (voir la tête du module).
 HAUTEUR_PLINTHE = 0.10
 EPAISSEUR_PLINTHE = 0.015
+HAUTEUR_PLINTHE_CARRELAGE = 0.08  # une plinthe carrelée : un carreau coupé, plus bas et plus fin qu'une plinthe en bois
+EPAISSEUR_PLINTHE_CARRELAGE = 0.01
 PLINTHE_MIN = 0.03  # un morceau de plinthe plus court n'est pas posé
 SONDE_MUR = 0.02  # on cherche le mur à cette distance derrière le bord de la pièce
 LARGEUR_CHAMBRANLE = 0.065  # vue de face
@@ -124,6 +132,29 @@ def sol_de_la_piece(nom: str) -> str:
         if any(mot in nom for mot in mots):
             return materiau
     return SOL_PAR_DEFAUT
+
+
+def plinthes_par_defaut(nom: str) -> str:
+    """Les plinthes supposées quand rien ne les a vues : comme le sol dans une pièce carrelée, en bois ailleurs."""
+    return "carrelage" if sol_de_la_piece(nom) == "carrelage" else "bois"
+
+
+def choix_plinthes(piece: Piece) -> str:
+    """« bois », « carrelage » ou « aucune » : ce que dit la pièce, sinon la règle par défaut."""
+    return piece.plinthes.choix if piece.plinthes is not None else plinthes_par_defaut(piece.nom)
+
+
+def completer_plinthes(logement: dict) -> dict:
+    """Une copie du logement (forme JSON) où chaque pièce sans plinthes décidées reçoit la règle par défaut, marquée
+    « ajoute » (supposé, personne ne l'a vu) : l'écran de vérification la montre et une personne peut la changer."""
+    import copy
+
+    sortie = copy.deepcopy(logement)
+    for p in sortie.get("pieces") or []:
+        if not p.get("plinthes"):
+            p["plinthes"] = {"choix": plinthes_par_defaut(p.get("nom", "")), "statut": "ajoute",
+                             "source": "regle_par_defaut", "confiance": 0.5}
+    return sortie
 
 
 def materiau_de(brique: Brique, logement: Logement) -> str:
@@ -264,6 +295,7 @@ def _cotes_dans_une_piece(o: Ouverture, mur: Mur, logement: Logement) -> tuple[b
 def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
     """Les plinthes de chaque pièce (B2-1), posées sur le sol calé de la pièce (voir geometrie, B1).
 
+    Chaque pièce suit son choix (choix_plinthes) : aucune, en bois (blanche), ou en carrelage (comme le sol, plus basse).
     Le long de chaque côté du sol, on garde les morceaux où il y a un mur au niveau du sol juste derrière (sonde à
     SONDE_MUR) : rien devant une porte, une porte-fenêtre ou un passage ouvert. On retire la place du chambranle autour de
     chaque porte. Dans un angle où deux morceaux se rejoignent, coupe en biseau (onglet) ; ailleurs, bout droit.
@@ -276,8 +308,15 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
     sols = {b.element: b for b in briques if b.categorie == "sol" and b.id == f"sol__{b.element}"}
     sortie: list[Brique] = []
     for piece in logement.pieces:
-        if piece.id not in sols:
+        choix = choix_plinthes(piece)
+        if piece.id not in sols or choix == "aucune":
             continue
+        if choix == "carrelage":
+            epaisseur, hauteur = EPAISSEUR_PLINTHE_CARRELAGE, HAUTEUR_PLINTHE_CARRELAGE
+            sol = sols[piece.id].materiau
+            materiau = sol if sol != "parquet" else "carrelage"  # le carrelage du sol, ou un carrelage si le sol n'en a pas
+        else:
+            epaisseur, hauteur, materiau = EPAISSEUR_PLINTHE, HAUTEUR_PLINTHE, "menuiserie_blanche"
         contour = sols[piece.id].contour  # sens direct : l'intérieur de la pièce est à gauche de chaque côté
         n = len(contour)
         cotes = []  # par côté : (a, u, gauche, longueur, morceaux [(s0, s1)])
@@ -303,14 +342,14 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
                     morceaux = _retirer(morceaux, place)
             cotes.append((a, u, gauche, longueur, [m for m in morceaux if m[1] - m[0] >= PLINTHE_MIN]))
 
-        onglets = [_onglet_plinthe(contour[i], cotes[i - 1][2], cotes[i][2]) for i in range(n)]
+        onglets = [_onglet_plinthe(contour[i], cotes[i - 1][2], cotes[i][2], epaisseur) for i in range(n)]
         for i, (a, u, gauche, longueur, morceaux) in enumerate(cotes):
             precedent, suivant = cotes[i - 1][4], cotes[(i + 1) % n][4]
             for k, (s0, s1) in enumerate(morceaux):
                 p0 = (a[0] + u[0] * s0, a[1] + u[1] * s0)
                 p1 = (a[0] + u[0] * s1, a[1] + u[1] * s1)
-                droit0 = (p0[0] + gauche[0] * EPAISSEUR_PLINTHE, p0[1] + gauche[1] * EPAISSEUR_PLINTHE)
-                droit1 = (p1[0] + gauche[0] * EPAISSEUR_PLINTHE, p1[1] + gauche[1] * EPAISSEUR_PLINTHE)
+                droit0 = (p0[0] + gauche[0] * epaisseur, p0[1] + gauche[1] * epaisseur)
+                droit1 = (p1[0] + gauche[0] * epaisseur, p1[1] + gauche[1] * epaisseur)
                 q0 = onglets[i] if (s0 <= 1e-6 and precedent and precedent[-1][1] >= cotes[i - 1][3] - 1e-6
                                     and onglets[i]) else droit0
                 q1 = onglets[(i + 1) % n] if (s1 >= longueur - 1e-6 and suivant and suivant[0][0] <= 1e-6
@@ -319,20 +358,20 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
                 if _aire_signee_plan(quad) <= 1e-9 or _projete(q1, a, u) < _projete(q0, a, u):
                     quad = [p0, p1, droit1, droit0]  # biseau impossible (morceau trop court) : bouts droits
                 sortie.append(Brique(f"plinthe__{piece.id}__{i}_{k}", "menuiserie", piece.id,
-                                     _sens_direct([_arrondi(q) for q in quad]), 0.0, HAUTEUR_PLINTHE,
-                                     "menuiserie_blanche"))
+                                     _sens_direct([_arrondi(q) for q in quad]), 0.0, hauteur, materiau))
     return sortie
 
 
-def _onglet_plinthe(sommet: Point, gauche_avant: Point, gauche_apres: Point) -> Point | None:
-    """Le coin intérieur de la plinthe dans l'angle : croisement des deux lignes décalées de EPAISSEUR_PLINTHE.
+def _onglet_plinthe(sommet: Point, gauche_avant: Point, gauche_apres: Point,
+                    epaisseur: float = EPAISSEUR_PLINTHE) -> Point | None:
+    """Le coin intérieur de la plinthe dans l'angle : croisement des deux lignes décalées de l'épaisseur de la plinthe.
 
     None si l'angle est trop aigu (le biseau partirait trop loin)."""
     somme = (gauche_avant[0] + gauche_apres[0], gauche_avant[1] + gauche_apres[1])
     diviseur = 1 + gauche_avant[0] * gauche_apres[0] + gauche_avant[1] * gauche_apres[1]
     if diviseur < 0.15:
         return None
-    return (sommet[0] + somme[0] * EPAISSEUR_PLINTHE / diviseur, sommet[1] + somme[1] * EPAISSEUR_PLINTHE / diviseur)
+    return (sommet[0] + somme[0] * epaisseur / diviseur, sommet[1] + somme[1] * epaisseur / diviseur)
 
 
 def _segment_dans(a: Point, b: Point, contour: list[Point]) -> list[tuple[float, float]]:

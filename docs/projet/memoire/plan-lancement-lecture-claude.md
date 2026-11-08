@@ -200,3 +200,14 @@ retour autour du bout).
 (plinthes, et ensuite placards, corniches…) devient un réglage PAR PIÈCE dans le logement (avec / sans / plinthe carrelée,
 statut « estimé » tant que rien ne l'a vu), visible et modifiable à l'écran de vérification ; au temps 2, Atelya le remplit
 lui-même d'après les photos du client (statut « vu sur photo »). En attente du « oui » de NT avant de le faire (avant B2-2).
+
+**Plinthes pièce par pièce (08/11/2026, « Oui » de NT)** — format : champ facultatif `plinthes` de chaque pièce
+(`moteur/logement.py`, `Plinthes` : choix bois / carrelage / aucune + statut : « ajoute » = règle par défaut, personne ne l'a vu ;
+« estime » = vu par Atelya sur une photo (source photo_xx, temps 2) ; « mesure » = choisi à l'écran (source verification)). Sans
+champ : règle par défaut `habillage.plinthes_par_defaut` (carrelage dans une pièce carrelée d'après son nom, bois ailleurs).
+`habillage` 0.4 : « aucune » → rien ; « carrelage » → 8 cm × 1 cm, matière du sol (carrelage si le sol est en parquet).
+`preparer_verification` 0.3.0 : le fichier de l'écran porte la règle par défaut écrite (`completer_plinthes`, confiance 0,5) →
+l'écran (fiche de la pièce) montre la liste « Plinthes » + d'où vient le choix, et `reglerPlinthes` (calculs-verif.js) enregistre le
+choix de la personne. Écran testé dans Chrome sans fenêtre (Node absent du PC) : 9/9. Rendus : `..\atelya\b2\fr-031-plinthes-par-piece.png`
+(séjour bois / carrelage / aucune, salle d'eau par défaut), capture `..\atelya\b2\ecran-plinthes.png`. Même principe prévu pour les
+portes de placard (B2-2) et les corniches.

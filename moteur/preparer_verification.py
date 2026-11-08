@@ -11,15 +11,19 @@ Sans lui, le dessin glisserait d'un demi-pixel de coloriage, soit plus d'un pixe
 Version 0.2.0 (08/11/2026) : un doute dont la place est déjà en pixels de l'image (`zone_px`, `blocs_px` : le doute
 « plusieurs_niveaux » de moteur.doutes 0.2.0, parties de l'image hors du logement lu) les garde tels quels ; avant, seule une
 zone en mètres (`zone_m`) était passée à l'écran, et l'écran n'aurait pas pu montrer où sont les niveaux non lus.
+
+Version 0.3.0 (08/11/2026, B2) : chaque pièce arrive avec ses plinthes (moteur.habillage.completer_plinthes) : la règle par
+défaut, marquée « ajoute », que la personne voit et peut changer dans la fiche de la pièce.
 """
 from __future__ import annotations
 
 import numpy as np
 
 from moteur.coloriage import _rotation
+from moteur.habillage import completer_plinthes
 from moteur.lecture_complete import PlanLu
 
-VERSION_PREPARATEUR = "0.2.0"
+VERSION_PREPARATEUR = "0.3.0"
 SCHEMA = "verification/0.1"
 ANGLE_NUL = 0.01  # degrés : en dessous, le traducteur ne tourne pas le coloriage
 
@@ -127,5 +131,5 @@ def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | No
             sortie["blocs_px"] = [[float(v) for v in b] for b in d["blocs_px"]]
         doutes.append(sortie)
     return {"schema": SCHEMA, "plan": nom_image, "calage": {"matrice": [[round(float(v), 10) for v in ligne] for ligne in M]},
-            "echelle": _echelle(g.echelle), "logement": g.logement, "doutes": doutes,
+            "echelle": _echelle(g.echelle), "logement": completer_plinthes(g.logement), "doutes": doutes,
             "lecture": {"decision": plan.decision, "modele": g.modele, "aiguillage": plan.aiguillage, "preparateur": VERSION_PREPARATEUR}}
