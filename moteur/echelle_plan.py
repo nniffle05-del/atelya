@@ -69,6 +69,18 @@ fr-090, fr-110 ; fr-090 est très probablement faux de −4 à −5 %). Écarté
 sans optique (34 plans concernés, aucun déclenché, aucun faux rattrapé — fr-090 est à 3,9 % — et deux plans justes à 4,1 et 4,97 % de
 l'écart : trop près du seuil) ; baisser le seuil de 5 % (pas sur la foi de fr-090 seul). La mesure des cotes change aussi
 (lecture_cotes 0.3 : marques larges des chaînes extérieures).
+
+Version 0.14 (08/11/2026) : IMAGES À PLUSIEURS BLOCS DE BÂTI (rez-de-chaussée + étage, ou deux logements, dessinés côte à côte et
+séparés par du fond ; plusieurs_blocs, sur le coloriage brut). Le logement lu (coloriage.bati_du_logement) n'en garde qu'un : les
+surfaces écrites dans les autres blocs tombaient « dehors » et étaient ignorées SANS être comptées (la règle « la moitié des surfaces
+lues » ne voyait que celles du bloc gardé), et la taille du logement ne mesurait qu'un niveau. Vrai plan d'entraînement fr-025
+(3 niveaux) : 2 surfaces sur 9 servaient, +5,5 % annoncé sûr ; plan fabriqué 129128-ensemble (lot 2) : 11 surfaces sur 18, −6,0 %.
+Désormais, sur une telle image : (1) les surfaces se lisent sur TOUS les blocs (bati_de_tous_les_blocs ; la lecture du logement en 3D,
+elle, ne change pas) et ne sont sûres que si leur groupe d'accord réunit des pièces d'au moins deux blocs (deux niveaux qui se
+confirment) ; (2) jamais de surfaces sur une image jugée de biais (le redressement suppose un seul plan de logement et recadre sur un
+bloc ; 129128, plan à plat pris pour une photo de biais, y donnait −6,5 % même avec tous les blocs) ; (3) jamais d'échelle tirée de la
+taille du logement (secours « cote d'ensemble ») ; (4) une cote seule ne suffit plus (il faut des cotes sûres, ou la barre).
+Les plans à un seul bloc ne changent pas (0 repéré sur les 4 bancs habituels).
 """
 
 from __future__ import annotations
@@ -85,7 +97,7 @@ from moteur.lecture_cotes import (CONTRADICTION, COTE_MIN, ECART_MAX, ESSAIS_LEC
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import FORME_DIMENSIONS, FORME_LEGENDE, SurfaceLue, echelle_par_surfaces, surfaces_dans_textes, surfaces_de_legende
 
-VERSION_ECHELLE = "0.13.0"
+VERSION_ECHELLE = "0.14.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -113,6 +125,19 @@ PORTES_SUR_EPAISSEUR_MIN = 1.8  # largeur médiane des portes / épaisseur médi
 PORTES_MAX = 30  # au-delà, ce ne sont pas des portes
 DIMENSIONS_REDITES = 0.15  # « 3,05 m × 2,85 m » à moins de 15 % de la surface écrite dans la même pièce : c'est la même chose, dite deux fois
 EPAISSEUR_MUR_COURANTE = 0.20  # m : l'épaisseur de mur courante ; en secours seulement (±20 % en médiane sur les vrais plans)
+# Image à plusieurs blocs de bâti (version 0.14 : rez-de-chaussée + étage, ou deux logements, dessinés côte à côte et séparés par du
+# fond). Un « bloc » : une composante du bâti colorié (après fermeture des trous de moins de BLOC_FERMETURE pixels) dont les pièces
+# enfermées font au moins BLOC_TROUS_MIN de la surface remplie (un morceau de mur isolé n'enferme rien) ; un second bloc compte s'il
+# est hors de la boîte du premier et fait au moins BLOC_PART_MIN de sa surface remplie. Mesuré sur les coloriages bruts d'Atelya
+# (aucun plan d'examen) : les seconds blocs des images à plusieurs niveaux font 0,36 à 1,0 fois le premier (43 des 48 images à deux
+# niveaux du lot 2 repérées, 8 des 9 vrais plans d'entraînement à plusieurs niveaux) ; sur les 4 385 niveaux à un seul logement
+# (lot2-test 391, images 1 066, PDF 2 132, photos 343, biais 384, vrais plans d'entraînement 69), aucun autre bloc ne dépasse 0,05 :
+# aucun n'est repéré. Marge des seuils : BLOC_TROUS_MIN de 0,3 à 0,6 (avec BLOC_PART_MIN 0,2) et BLOC_PART_MIN de 0,1 à 0,35 (avec
+# BLOC_TROUS_MIN 0,5) donnent exactement le même tri. Réglés sans aucun plan d'examen.
+BLOC_FERMETURE = 9  # pixels du coloriage (grand côté 768)
+BLOC_TROUS_MIN = 0.5
+BLOC_PART_MIN = 0.2
+BLOC_AIRE_MIN = 30  # pixels de bâti : en dessous, une tache n'est pas un bloc
 
 
 @dataclass
@@ -154,6 +179,10 @@ class EchelleLue:
     epaisseur: float | None = None
     # Deux groupes de cotes presque d'accord se disputent l'échelle (version 0.13, voir lecture_cotes.Echelle.ambigue) : à vérifier.
     ambigue: bool = False
+    # L'image dessine plusieurs blocs de bâti (version 0.14, voir plusieurs_blocs) ; et de combien de blocs viennent les pièces du
+    # groupe d'accord des surfaces (0 : un seul bloc vu, ou image à un seul bloc).
+    plusieurs_blocs: bool = False
+    surfaces_blocs: int = 0
 
     @property
     def px_par_m(self) -> float | None:
@@ -165,7 +194,7 @@ class EchelleLue:
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
                        self.interieur_px, de_biais, self.barre if self.barre_sure else None,
                        self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee, self.douteux,
-                       ecrite=self.ecrite, ambigue=self.ambigue)
+                       ecrite=self.ecrite, ambigue=self.ambigue, plusieurs_blocs=self.plusieurs_blocs)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -191,7 +220,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             de_biais: bool, barre: float | None = None,
             surfaces: float | None = None, proportions_optiques: bool = False,
             approchee: float | None = None, douteux: bool = False,
-            surfaces_lues: float | None = None, ecrite: float | None = None, ambigue: bool = False) -> tuple[float | None, float | None, str]:
+            surfaces_lues: float | None = None, ecrite: float | None = None, ambigue: bool = False,
+            plusieurs_blocs: bool = False) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -243,11 +273,19 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     pas les jeter). Sur une photo de biais aux proportions de l'optique, des surfaces sûres passent toujours avant des cotes douteuses
     (version 0.6), avant cette règle.
 
+    Version 0.14 : `plusieurs_blocs` (voir plusieurs_blocs) — l'image dessine plusieurs niveaux ou logements séparés. Le logement
+    colorié n'en est qu'un : sa taille ne peut plus donner l'échelle (pas de « cote d'ensemble ») ni rendre une cote seule
+    acceptable (il faut des cotes sûres) ; sur une image de biais, les surfaces écrites ne servent pas du tout (le redressement ne
+    vaut que pour un seul plan de logement). Les surfaces sûres reçues ici ont déjà été lues sur tous les blocs et confirmées par
+    au moins deux d'entre eux (lire_echelle_plan).
+
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « échelle écrite », « cote d'ensemble »
     ou « à vérifier »
     (échelles à None)."""
     if douteux:  # le logement colorié est faux : il ne peut plus contrôler aucun chiffre lu
         return None, None, "à vérifier"
+    if plusieurs_blocs and de_biais:
+        surfaces = surfaces_lues = None  # version 0.14 : voir plus haut
     il, ih = interieur_px or (None, None)
     plat = not de_biais or proportions_optiques  # les proportions de l'image sont les vraies
     if de_biais and proportions_optiques and (largeur or hauteur):
@@ -273,6 +311,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             # Version 0.12 : une cote seule, sans logement colorié pour la contrôler, n'est contrôlée par rien. Vrai plan fr-066 : la cote
             # « 12,26 » mesurée sur 245 pixels au lieu de ~900 (son trait traverse un sol carrelé), échelle fausse de −74 %, annoncée lue.
             bon = False
+        if plusieurs_blocs and not sure:
+            bon = False  # version 0.14 : une cote seule, contrôlée par la taille d'un seul des niveaux dessinés, ne suffit pas
         if bon and ambigue:
             return None, None, "à vérifier"  # deux groupes de cotes presque d'accord : un humain tranche
         if bon and not sure and surfaces and not de_biais and abs(surfaces / (largeur or hauteur) - 1) > ACCORD_SURFACES:
@@ -303,6 +343,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
         return surfaces, surfaces, "surfaces"
     if largeur or hauteur:
         return None, None, "à vérifier"
+    if plusieurs_blocs:
+        return None, None, "à vérifier"  # version 0.14 : la taille du logement colorié n'est celle que d'un des niveaux dessinés
     ctrl_l = il / cote_max_largeur if il and cote_max_largeur else None
     ctrl_h = ih / cote_max_hauteur if ih and cote_max_hauteur else None
     if not de_biais and ctrl_l and ctrl_h and abs(ctrl_l / ctrl_h - 1) <= ACCORD_SECOURS:
@@ -371,6 +413,73 @@ def sans_taches_au_bord(col: np.ndarray) -> np.ndarray:
     propre = col.copy()
     propre[effacer] = FOND
     return propre
+
+
+def blocs_de_bati(col: np.ndarray) -> list[tuple[int, int, int, int, int]]:
+    """Les blocs de bâti du coloriage qui enferment des pièces (voir BLOC_TROUS_MIN) : (x, y, largeur, hauteur, surface remplie),
+    du plus grand au plus petit. Un plan d'un seul logement en a un ; une image qui dessine plusieurs niveaux côte à côte, un par
+    niveau (s'ils sont séparés par du fond)."""
+    bati = ((col >= MUR) & (col <= PORTE_FENETRE)).astype(np.uint8)
+    bati = cv2.morphologyEx(bati, cv2.MORPH_CLOSE, np.ones((BLOC_FERMETURE, BLOC_FERMETURE), np.uint8))
+    n, etiq, stats, _ = cv2.connectedComponentsWithStats(bati, connectivity=8)
+    blocs = []
+    for i in range(1, n):
+        x, y, w, h, aire = (int(v) for v in stats[i])
+        if aire < BLOC_AIRE_MIN:
+            continue
+        cadre = np.zeros((h + 2, w + 2), np.uint8)
+        cadre[1:-1, 1:-1] = etiq[y:y + h, x:x + w] == i
+        cv2.floodFill(cadre, np.zeros((h + 4, w + 4), np.uint8), (0, 0), 2)  # le dehors du bloc
+        rempli = int((cadre != 2).sum())  # le bloc et les pièces qu'il enferme
+        if rempli and (rempli - aire) / rempli >= BLOC_TROUS_MIN:
+            blocs.append((x, y, w, h, rempli))
+    return sorted(blocs, key=lambda b: -b[4])
+
+
+def plusieurs_blocs(col: np.ndarray) -> bool:
+    """L'image dessine-t-elle plusieurs blocs de bâti séparés (plusieurs niveaux ou logements côte à côte) ? Version 0.14.
+
+    À calculer sur le coloriage BRUT (avant sans_taches_au_bord, qui efface un niveau dessiné près du bord de l'image). Le logement
+    lu (coloriage.bati_du_logement) n'en garde qu'un : les surfaces écrites dans les autres sont ignorées sans bruit, et la taille du
+    logement ne mesure qu'un niveau. L'échelle ne peut alors venir ni des surfaces ni de la taille du logement (voir decider)."""
+    blocs = blocs_de_bati(col)
+    if len(blocs) < 2:
+        return False
+    x, y, w, h, rempli = blocs[0]
+    marge = 0.02 * max(col.shape)
+    for xi, yi, wi, hi, ri in blocs[1:]:
+        dedans = xi >= x - marge and yi >= y - marge and xi + wi <= x + w + marge and yi + hi <= y + h + marge
+        if not dedans and ri >= BLOC_PART_MIN * rempli:
+            return True
+    return False
+
+
+def bati_de_tous_les_blocs(col: np.ndarray, px_par_m: float) -> np.ndarray:
+    """Comme coloriage.bati_du_logement, mais en gardant le bâti de TOUS les blocs (voir blocs_de_bati), pour l'échelle seulement
+    (version 0.14) : les surfaces écrites dans chaque niveau dessiné retrouvent ainsi leurs pièces. La lecture du logement en 3D
+    garde, elle, coloriage.bati_du_logement (un seul bloc)."""
+    garde = bati_du_logement(col, px_par_m)
+    blocs = blocs_de_bati(col)
+    if len(blocs) < 2:
+        return garde
+    bati = cv2.morphologyEx(((col >= MUR) & (col <= PORTE_FENETRE)).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    n, etiq, stats, _ = cv2.connectedComponentsWithStats(bati, connectivity=8)  # mêmes morceaux que bati_du_logement
+    marge = int(round(0.3 * px_par_m))
+    ok = np.zeros(n, bool)
+    for i in range(1, n):
+        xi, yi, wi, hi, aire = stats[i]
+        if aire < (0.05 * px_par_m) ** 2:
+            continue
+        ok[i] = any(xi >= x - marge and yi >= y - marge and xi + wi <= x + w + marge and yi + hi <= y + h + marge
+                    for x, y, w, h, _ in blocs)
+    return garde | ok[etiq]
+
+
+def _blocs_du_groupe(col: np.ndarray, centres: list[tuple[float, float]]) -> int:
+    """De combien de blocs différents viennent ces pièces (centres en pixels de `col`) ?"""
+    blocs = blocs_de_bati(col)
+    vus = {next((k for k, (x, y, w, h, _) in enumerate(blocs) if x <= cx <= x + w and y <= cy <= y + h), None) for cx, cy in centres}
+    return len(vus - {None})
 
 
 def echelle_par_portes(col: np.ndarray) -> float | None:
@@ -608,7 +717,7 @@ def interieur_du_logement(col: np.ndarray, px_par_m: float) -> tuple[float, floa
 
 def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: Redressement | None = None,
                       angle: float | None = None, textes: list[TexteLu] | None = None,
-                      px_par_pt: float | None = None) -> EchelleLue:
+                      px_par_pt: float | None = None, blocs: bool | None = None) -> EchelleLue:
     """L'échelle du coloriage, lue sur les cotes du dessin d'origine (gris ou couleurs, pleine taille).
 
     `redressement` : celui appliqué au coloriage (plan photographié de biais) ; l'échelle rendue
@@ -616,7 +725,11 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
     coloriage s'il n'est pas donné), ce qui ne change pas l'échelle.
     `textes` : textes déjà connus (PDF vectoriel), en pixels du dessin ; l'OCR n'est alors pas lancé.
     `px_par_pt` : pixels du dessin par point PDF (moteur.lecture_pdf.rendre_page) ; avec `textes`, il permet de
-    lire l'échelle écrite (« 1/50 ») du plan."""
+    lire l'échelle écrite (« 1/50 ») du plan.
+    `blocs` : l'image dessine-t-elle plusieurs blocs de bâti (plusieurs_blocs, à calculer sur le coloriage BRUT, avant
+    sans_taches_au_bord) ? None : calculé ici sur `coloriage` (version 0.14)."""
+    if blocs is None:
+        blocs = plusieurs_blocs(coloriage)
     gris = dessin if dessin.ndim == 2 else cv2.cvtColor(dessin, cv2.COLOR_RGB2GRAY)
     r = coloriage.shape[1] / gris.shape[1]  # dessin → coloriage
     if redressement is not None:
@@ -685,14 +798,16 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
         # de 12 × 8,6 m tombaient d'accord par hasard (plan fabriqué 80362 : +86 %, source « cote d'ensemble »).
         horiz, verti = [], []
     interieur = interieur_du_logement(col, largeur or hauteur or max(col.shape) / 15)
-    surf = _echelle_des_surfaces(col, textes, vers_col, largeur or hauteur or max(col.shape) / 15)
+    surf = _echelle_des_surfaces(col, textes, vers_col, largeur or hauteur or max(col.shape) / 15, blocs)
+    surfaces_blocs = surf.blocs if surf else 0
     return EchelleLue(largeur, hauteur, echelle.sure, cotes, echelle.hauteur_sous_plafond,
                       max(horiz) if horiz else None, max(verti) if verti else None, interieur,
                       barre.px_par_m * facteur if barre else None, bool(barre and barre.sure),
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
                       surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage),
                       ecrite, ecrite_detail, retenues=echelle.retenues, contredite=contredite,
-                      portes_fiables=portes_fiables(col), epaisseur=echelle_par_epaisseur(col), ambigue=ambigue)
+                      portes_fiables=portes_fiables(col), epaisseur=echelle_par_epaisseur(col), ambigue=ambigue,
+                      plusieurs_blocs=bool(blocs), surfaces_blocs=surfaces_blocs)
 
 
 def _sans_les_dimensions_en_double(dimensions: list[SurfaceLue], surfaces: list[SurfaceLue], dedans: np.ndarray) -> list[SurfaceLue]:
@@ -715,8 +830,12 @@ def _sans_les_dimensions_en_double(dimensions: list[SurfaceLue], surfaces: list[
     return [d for d in dimensions if not any(abs(d.valeur / v - 1) <= DIMENSIONS_REDITES for v in par_zone.get(zone(d), ()))]
 
 
-def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float):
-    """L'échelle des surfaces écrites (voir moteur.surfaces_ecrites), placées sur le coloriage remis droit."""
+def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, px_par_m: float, blocs: bool = False):
+    """L'échelle des surfaces écrites (voir moteur.surfaces_ecrites), placées sur le coloriage remis droit ; `blocs` du résultat :
+    de combien de blocs viennent les pièces du groupe d'accord (0 sur une image à un seul bloc).
+
+    Version 0.14, image à plusieurs blocs (`blocs`) : les pièces se cherchent dans tous les blocs (bati_de_tous_les_blocs), et
+    l'échelle n'est sûre que si le groupe d'accord réunit des pièces d'au moins deux blocs."""
     # Les dimensions d'une pièce (« 3,05 m × 2,85 m ») sont lues à part : voir _sans_les_dimensions_en_double.
     dimensions = [t for t in textes if FORME_DIMENSIONS.match(t.texte.strip())]
     ecrites = [t for t in textes if not FORME_DIMENSIONS.match(t.texte.strip())]
@@ -728,7 +847,7 @@ def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, p
         pts = np.array([[x, y, 1.0] for _, x, y in liste]).reshape(-1, 3) @ vers_col.T
         return [SurfaceLue(v, float(p[0] / p[2]), float(p[1] / p[2])) for (v, _, _), p in zip(liste, pts)]
 
-    bati = bati_du_logement(col, px_par_m)
+    bati = bati_de_tous_les_blocs(col, px_par_m) if blocs else bati_du_logement(col, px_par_m)
     if not bati.any():
         return None
     dehors = dehors_du_logement(bati)
@@ -744,4 +863,9 @@ def _echelle_des_surfaces(col: np.ndarray, textes: list, vers_col: np.ndarray, p
     r = echelle_par_surfaces(dedans, surfaces + de_legende)
     if r and de_legende:
         r.detail += f" ; {len(de_legende)} ramenée(s) depuis la légende"
+    if r and blocs:
+        r.blocs = _blocs_du_groupe(col, r.groupe)
+        r.detail += f" ; image à plusieurs blocs : pièces d'accord dans {r.blocs} bloc(s)"
+        if r.blocs < 2:
+            r.sure = False
     return r

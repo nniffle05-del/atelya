@@ -12,6 +12,10 @@ et qu'elles réunissent au moins la moitié des surfaces lues. Sinon : « à vé
 
 Une zone sans mur intérieur qui porte plusieurs surfaces (séjour et cuisine ouverte) compte pour la
 somme de ses surfaces.
+
+Version 0.2 (08/11/2026) : EchelleSurfaces.groupe donne le centre des zones du groupe d'accord. Sur une image qui dessine plusieurs
+niveaux côte à côte, moteur.echelle_plan vérifie ainsi que l'accord vient d'au moins deux niveaux (voir echelle_plan, version 0.14).
+Rien d'autre ne change.
 """
 
 from __future__ import annotations
@@ -51,6 +55,8 @@ class EchelleSurfaces:
     sure: bool
     avis: list[tuple[float, float]] = field(default_factory=list)  # (surface écrite de la zone, échelle qu'elle donne)
     detail: str = ""
+    groupe: list[tuple[float, float]] = field(default_factory=list)  # centres (x, y) des zones du groupe d'accord (version 0.2)
+    blocs: int = 0  # image à plusieurs niveaux : de combien de blocs viennent les zones du groupe (rempli par moteur.echelle_plan)
 
 
 def surfaces_dans_textes(textes: list[TexteLu]) -> list[tuple[float, float, float]]:
@@ -154,14 +160,14 @@ def echelle_par_surfaces(dedans: np.ndarray, surfaces: list[SurfaceLue]) -> Eche
     les pièces. `surfaces` : les surfaces lues, placées sur ce coloriage."""
     if not surfaces:
         return None
-    n, etiq, stats, _ = cv2.connectedComponentsWithStats(dedans.astype(np.uint8), connectivity=4)
+    n, etiq, stats, centres = cv2.connectedComponentsWithStats(dedans.astype(np.uint8), connectivity=4)
     h, w = dedans.shape
     par_zone: dict[int, float] = {}
     for s in surfaces:
         x, y = int(round(s.x)), int(round(s.y))
         if 0 <= y < h and 0 <= x < w and etiq[y, x] > 0:
             par_zone[int(etiq[y, x])] = par_zone.get(int(etiq[y, x]), 0.0) + s.valeur
-    avis = [(ecrite, float(np.sqrt(stats[z, cv2.CC_STAT_AREA] / ecrite)), int(stats[z, cv2.CC_STAT_AREA]))
+    avis = [(ecrite, float(np.sqrt(stats[z, cv2.CC_STAT_AREA] / ecrite)), int(stats[z, cv2.CC_STAT_AREA]), z)
             for z, ecrite in par_zone.items()]
     if not avis:
         return None
@@ -173,4 +179,5 @@ def echelle_par_surfaces(dedans: np.ndarray, surfaces: list[SurfaceLue]) -> Eche
     part = sum(a[0] for a in groupe) / sum(a[0] for a in avis)
     sure = len(groupe) >= 2 and part >= PART_MIN
     detail = f"{len(groupe)} pièce(s) d'accord sur {len(avis)}, {round(100 * part)} % des surfaces lues"
-    return EchelleSurfaces(round(px_par_m, 3), sure, [(a[0], round(a[1], 3)) for a in avis], detail)
+    return EchelleSurfaces(round(px_par_m, 3), sure, [(a[0], round(a[1], 3)) for a in avis], detail,
+                           [(float(centres[a[3]][0]), float(centres[a[3]][1])) for a in groupe])

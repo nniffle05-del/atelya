@@ -16,6 +16,9 @@ lisent ainsi exactement les mêmes textes. --code : le dossier du code à mesure
 Depuis le dossier du dépôt, OMP_NUM_THREADS=1, chemins relatifs :
   python pc/lot2/mesurer_echelle_lot2.py jeu ..\\atelya\\donnees\\lot2-test --sortie ..\\atelya\\echelle-cm\\avant-lot2-test.json
   python pc/lot2/mesurer_echelle_lot2.py comparer A.json B.json
+
+08/11/2026 (echelle_plan 0.14) : repère les images à plusieurs blocs de bâti sur le coloriage BRUT, comme moteur.lecture_complete, et
+le passe au lecteur (seulement si le code mesuré le connaît : une copie d'un ancien moteur est lue comme avant).
 """
 
 from __future__ import annotations
@@ -84,7 +87,13 @@ def _lire(image_rgb, col, a_plat: bool = False, textes: list | None = None, px_p
     from moteur.echelle_plan import coloriage_douteux, decider, lire_echelle_plan, sans_taches_au_bord
     from moteur.redressement import corriger_proportions, estimer_redressement, photo_entiere, rapport_par_optique, rapport_plausible
 
+    import inspect
+
+    import moteur.echelle_plan as ep
+
     infos: dict = {}
+    connait_blocs = hasattr(ep, "plusieurs_blocs") and "plusieurs_blocs" in inspect.signature(decider).parameters
+    blocs = ep.plusieurs_blocs(col) if connait_blocs else None  # coloriage brut, avant le nettoyage (version 0.14)
     if coloriage_douteux(col):
         propre = sans_taches_au_bord(col)
         if not coloriage_douteux(propre):
@@ -103,15 +112,17 @@ def _lire(image_rgb, col, a_plat: bool = False, textes: list | None = None, px_p
         else:
             optique, infos["optique_douteuse"] = False, True
     gris = np.asarray(Image.fromarray(image_rgb).convert("L"))
-    e = lire_echelle_plan(gris, col, R, textes=textes, px_par_pt=px_par_pt)
+    e = lire_echelle_plan(gris, col, R, textes=textes, px_par_pt=px_par_pt, **({"blocs": blocs} if connait_blocs else {}))
     douteux = coloriage_douteux(col)
     lx, ly, source = decider(e.largeur, e.hauteur, e.sure, e.cote_max_largeur, e.cote_max_hauteur, e.interieur_px,
                              R is not None, e.barre if e.barre_sure else None, e.surfaces if e.surfaces_sure else None,
                              optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite,
-                             **({"ambigue": e.ambigue} if hasattr(e, "ambigue") else {}))  # 0.13 ; le code d'avant n'a pas ce champ
+                             **({"ambigue": e.ambigue} if hasattr(e, "ambigue") else {}),  # 0.13 ; le code d'avant n'a pas ce champ
+                             **({"plusieurs_blocs": e.plusieurs_blocs} if connait_blocs else {}))  # 0.14
     if R is None:
         lx = ly = lx or ly
     sortie = {"lx": lx, "ly": ly, "source": source, "lu": bool(lx or ly), "sure": e.sure, "contredite": e.contredite, "ambigue": getattr(e, "ambigue", None),
+              "plusieurs_blocs": getattr(e, "plusieurs_blocs", None), "surfaces_blocs": getattr(e, "surfaces_blocs", None),
               "de_biais": R is not None, "optique": optique, "douteux": douteux, "largeur_cotes": e.largeur, "hauteur_cotes": e.hauteur,
               "interieur_px": e.interieur_px, "cote_max": [e.cote_max_largeur, e.cote_max_hauteur],
               "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail,

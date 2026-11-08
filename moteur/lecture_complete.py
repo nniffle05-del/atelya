@@ -15,6 +15,11 @@ Différences voulues avec le banc :
   recaler à l'écran : `echelle["etat"]` vaut « a_verifier » et un doute fort l'annonce ;
 - noms de pièces lus par défaut (le banc ne les lit que sur demande) ;
 - photo de téléphone : on la remet à l'endroit (orientation EXIF), comme le navigateur l'affichera à l'écran.
+
+Version 0.3.0 (08/11/2026) : une image qui dessine plusieurs niveaux (ou logements) séparés est repérée sur le coloriage BRUT, avant
+le nettoyage des taches au bord (qui efface un niveau dessiné près du bord), et l'échelle en tient compte (moteur.echelle_plan 0.14 :
+surfaces lues sur tous les blocs et confirmées par deux d'entre eux, jamais la taille du logement). Le logement construit, lui, ne
+change pas : un seul niveau est lu (le format à plusieurs niveaux est un autre chantier). `infos["plusieurs_blocs"]` le signale.
 """
 from __future__ import annotations
 
@@ -29,13 +34,13 @@ from moteur.aiguillage import SEUIL_LIBRES_M, choisir, longueur_libre
 from moteur.coloriage import lire_coloriage
 from moteur.doutes import examiner
 from moteur.echelle_plan import (LOGEMENT_MAX, LOGEMENT_MIN, EchelleLue, coloriage_douteux, decider, lire_echelle_plan,
-                                 sans_taches_au_bord)
+                                 plusieurs_blocs, sans_taches_au_bord)
 from moteur.lecture_cotes import TexteLu
 from moteur.noms_pieces import lire_textes, noms_depuis_textes
 from moteur.redressement import (Redressement, corriger_proportions, estimer_redressement, photo_entiere,
                                  rapport_par_optique, rapport_plausible)
 
-VERSION_LECTURE_COMPLETE = "0.2.0"
+VERSION_LECTURE_COMPLETE = "0.3.0"
 COTE_ATELYA = 768  # grand côté de l'image donnée à Atelya (comme à l'entraînement)
 PLAN_SECOURS_M = 15.0  # échelle de secours, quand rien ne la donne : un logement d'environ 15 m (même repli que l'échelle)
 FORMATS_IMAGE = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
@@ -182,6 +187,9 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
     --proportions optique --doutes), sans la vérité. `noms` : voir noms_du_plan (None : on ne s'en sert pas)."""
     projet_id = projet_id or source.nom
     infos: dict = {}
+    blocs = plusieurs_blocs(col)  # sur le coloriage brut : le nettoyage ci-dessous peut effacer un niveau dessiné près du bord
+    if blocs:
+        infos["plusieurs_blocs"] = True
     if coloriage_douteux(col):  # taches au bord de l'image, séparées du logement (table, bord de feuille)
         propre = sans_taches_au_bord(col)
         if not coloriage_douteux(propre):
@@ -202,13 +210,14 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
             optique, infos["optique_douteuse"] = False, True
 
     gris = np.asarray(Image.fromarray(source.image).convert("L"))
-    e = lire_echelle_plan(gris, col, R, textes=source.textes, px_par_pt=source.px_par_pt)
+    e = lire_echelle_plan(gris, col, R, textes=source.textes, px_par_pt=source.px_par_pt, blocs=blocs)
     douteux = coloriage_douteux(col)
     if douteux:
         infos["coloriage_douteux"] = True
     lx, ly, origine = decider(e.largeur, e.hauteur, e.sure, e.cote_max_largeur, e.cote_max_hauteur, e.interieur_px,
                               R is not None, e.barre if e.barre_sure else None, e.surfaces if e.surfaces_sure else None,
-                              optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite, ambigue=e.ambigue)
+                              optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite, ambigue=e.ambigue,
+                              plusieurs_blocs=e.plusieurs_blocs)
     if R is None:
         lx = ly = lx or ly
     autres = list(source.doutes_tri)
@@ -220,7 +229,7 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
               "portes_fiables": e.portes_fiables, "epaisseur_px_par_m": e.epaisseur,
               "interieur_px": list(e.interieur_px) if e.interieur_px else None, "coloriage_douteux": douteux,
               "largeur_px_par_m": e.largeur, "hauteur_px_par_m": e.hauteur, "cote_max": [e.cote_max_largeur, e.cote_max_hauteur],
-              "de_biais": R is not None, "optique": optique}
+              "de_biais": R is not None, "optique": optique, "plusieurs_blocs": e.plusieurs_blocs, "surfaces_blocs": e.surfaces_blocs}
     if lx or ly:
         vx, vy = lx or ly, ly or lx
         echelle = {"etat": "lue", "source": origine, "px_par_m_largeur": vx, "px_par_m_hauteur": vy, "cotes": len(e.cotes),
@@ -230,6 +239,8 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
         s = vx
     else:
         s, comment = _echelle_de_secours(e, col.shape)
+        if e.plusieurs_blocs:
+            comment += " ; l'image dessine plusieurs niveaux ou logements"
         echelle = {"etat": "a_verifier", "source": origine, "provisoire": s, "raison": f"échelle non lue : {comment}",
                    "cotes": len(e.cotes), "detail": detail}
         autres.append({"code": "echelle", "element": None, "gravite": "fort",
