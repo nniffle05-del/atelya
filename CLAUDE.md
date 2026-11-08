@@ -98,6 +98,11 @@ détaillé correspondant avant d'agir.
   (Apache), SAM 2 (Apache), pypdfium2 (Apache/BSD) ou pdfplumber (MIT) pour les PDF, ezdxf (MIT),
   IfcOpenShell (LGPL), matières/meubles CC0 (ambientCG, Poly Haven), polices libres (`moteur/polices/`).
 - **À faire vérifier** : ResPlan (CC BY 4.0 mais annonces aspirées → avis juridique).
+- **Meubles 3D (lus le 08/11/2026, envoyés par NT)** : ABO, Amazon Berkeley Objects = OK (CC BY 4.0, texte de la licence lu,
+  aucune clause ajoutée ; ~7 900 meubles réels en glTF avec textures PBR 4K ; 154 Go en tout ; créditer « Amazon.com », ne pas
+  utiliser les marques ; préférer la source officielle au réenvoi `codepawl/abo-glb`, qui ne cite pas sa source). Sand3D =
+  code Apache 2.0, objets CC BY 4.0 ; le lot `sand3d-objaverse` garde la licence d'origine de chaque objet (`source_license`,
+  `attribution`) : filtrer objet par objet et lire la section Licence avant tout téléchargement. Téléchargement = accord NT.
 - Toute nouvelle bibliothèque ou donnée : **lire sa licence** (le fichier, pas un résumé) avant de la
   proposer à NT. Détail : `docs/projet/memoire/audit-technologique-2026-10-31.md`.
 
