@@ -153,3 +153,13 @@ sombres le long de murs extérieurs de fr-021 (marches entre morceaux de mur d'�
 des niches ouvertes (portes de placard à ajouter en B2/B4). Tests : `tests/test_controle_maquette.py` (6), 6 de plus dans
 `test_geometrie.py`, 1 de plus dans `test_traduire_claude.py`.
 
+**Après B1 (08/11/2026), discussion sur B2** : NT rappelle qu'Atelya produit TOUTE la maquette 3D (maquette.blend), pas seulement des
+images ; produit livré = visite libre (Unreal plus tard), cinématique, photos fixes, tous tirés de la même maquette. B2 renommée
+« maquette 3D réaliste », en deux temps : (1) dans la maquette (plinthes, portes de placard, encadrements, bibliothèque de vraies
+matières CC0, lumière du jour) puis (2) photos du client → matières de chaque pièce (choix dans la bibliothèque, corrigé à l'écran de
+vérification). NT : « il faudrait des photos de bonne qualité que le client délivre » → oui, c'est la brique photos (décision du 22/10 :
+le plan donne la forme, les photos l'apparence). PREMIER JEU D'ESSAI PLAN + PHOTOS reçu de NT le 08/11/2026 « avec les accords » :
+`..\atelya\photos-clients\app-001\` (4 pièces 124 m², HSP 3 m ; captures d'écran d'une annonce : plan basse définition sans cotes,
+12 photos ~1206 × 800 px avec marques ; LISEZMOI.txt = pièces et matières vues). À demander si possible : les originaux en pleine
+définition, sans marques. Ces photos de photographe servent aussi de RÉFÉRENCE de qualité pour les rendus.
+
