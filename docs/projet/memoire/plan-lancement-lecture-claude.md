@@ -163,3 +163,11 @@ le plan donne la forme, les photos l'apparence). PREMIER JEU D'ESSAI PLAN + PHOT
 12 photos ~1206 × 800 px avec marques ; LISEZMOI.txt = pièces et matières vues). À demander si possible : les originaux en pleine
 définition, sans marques. Ces photos de photographe servent aussi de RÉFÉRENCE de qualité pour les rendus.
 
+
+**B2 proposée à NT (08/11/2026, en attente de son accord)** : temps 1 en 4 sous-étapes, une à la fois, chacune montrée en images
+avant/après sur fr-031 + 2 autres vérités, contrôle des trous inchangé : B2-1 plinthes et encadrements (portes, appuis de fenêtre) ;
+B2-2 portes de placard (les niches ouvertes de B1) ; B2-3 bibliothèque de vraies matières (13 Poly Haven + 1 ambientCG en 2K, 3 cartes
+chacune : couleur, relief, brillance ; ~106 Mo ; dossier proposé `..\atelya\bibliotheque\matieres\` hors Git) + point de Hongrie et
+carreaux de ciment fabriqués par calcul ; B2-4 lumière du jour (ciel physique intégré à Blender, plafonniers éteints le jour, réglage
+d'exposition « comme un photographe »). Temps 2 (après) : lecture d'app-001 faite à la main comme une vérité, puis photos → matières.
+Licences relues : voir audit-technologique-2026-10-31.md (fin).
