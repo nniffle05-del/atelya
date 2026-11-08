@@ -208,14 +208,14 @@ def lire_avec_coloriage(source: PlanSource, col: np.ndarray, carte: np.ndarray |
         infos["coloriage_douteux"] = True
     lx, ly, origine = decider(e.largeur, e.hauteur, e.sure, e.cote_max_largeur, e.cote_max_hauteur, e.interieur_px,
                               R is not None, e.barre if e.barre_sure else None, e.surfaces if e.surfaces_sure else None,
-                              optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite)
+                              optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite, ambigue=e.ambigue)
     if R is None:
         lx = ly = lx or ly
     autres = list(source.doutes_tri)
     # Le détail de ce qui a été lu, pour comprendre une décision après coup (diagnostic), jamais pour construire.
     detail = {"cotes_retenues": [[c.valeur, round(c.px_par_m, 2)] for c in e.retenues],
               "cotes": [[c.valeur, round(c.px_par_m, 2), "V" if c.verticale else "H"] for c in e.cotes],
-              "sure": e.sure, "contredite": e.contredite, "barre": e.barre_detail or None, "surfaces": e.surfaces_detail or None,
+              "sure": e.sure, "contredite": e.contredite, "ambigue": e.ambigue, "barre": e.barre_detail or None, "surfaces": e.surfaces_detail or None,
               "surfaces_px_par_m": e.surfaces, "ecrite": e.ecrite_detail or None, "portes_px_par_m": e.approchee,
               "portes_fiables": e.portes_fiables, "epaisseur_px_par_m": e.epaisseur,
               "interieur_px": list(e.interieur_px) if e.interieur_px else None, "coloriage_douteux": douteux,

@@ -362,7 +362,8 @@ def echelle_du_plan(niveau: Path, dessin: Path, col: np.ndarray, R: Redressement
           "cote_max_largeur": e.cote_max_largeur, "cote_max_hauteur": e.cote_max_hauteur, "interieur_px": e.interieur_px,
           "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail,
           "surfaces": e.surfaces, "surfaces_sure": e.surfaces_sure, "surfaces_detail": e.surfaces_detail,
-          "approchee": e.approchee, "ecrite": e.ecrite, "ecrite_detail": e.ecrite_detail, "textes_pdf": tp is not None}
+          "approchee": e.approchee, "ecrite": e.ecrite, "ecrite_detail": e.ecrite_detail, "textes_pdf": tp is not None,
+          "ambigue": e.ambigue}
     if f:
         f.write_text(json.dumps(lu), encoding="utf-8")
     return lu
@@ -427,7 +428,7 @@ def noter_niveau(args) -> dict:
         lx, ly, source = decider(lu["largeur"], lu["hauteur"], lu.get("sure", False), lu.get("cote_max_largeur"), lu.get("cote_max_hauteur"),
                                  lu.get("interieur_px"), R is not None, lu.get("barre") if lu.get("barre_sure") else None,
                                  lu.get("surfaces") if lu.get("surfaces_sure") else None, optique, lu.get("approchee"),
-                                 douteux, lu.get("surfaces"), ecrite=lu.get("ecrite"))
+                                 douteux, lu.get("surfaces"), ecrite=lu.get("ecrite"), ambigue=lu.get("ambigue", False))
         if R is None:
             lx = ly = lx or ly
         if lu.get("textes_pdf"):

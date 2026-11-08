@@ -58,6 +58,17 @@ dans les pièces) : la mesure des cotes est corrigée dans moteur.lecture_cotes 
 redisent la surface écrite dans la même pièce ne comptent plus deux fois (_sans_les_dimensions_en_double : −29,3 % sur 14 plans sur 439) ;
 des cotes contradictoires ne passent plus par le secours « cote d'ensemble » (+86 %) ; le garde-fou DESACCORD_COTES_SURES dans decider ;
 et une cote seule, sans logement colorié pour la contrôler, part à la vérification (vrai plan fr-066 : −74 %).
+
+Version 0.13 (08/11/2026, après la relecture adverse de 0.12) : nouvelle règle « cotes presque d'accord » (EchelleLue.ambigue, decider
+`ambigue`). Deux groupes de cotes qui se disputent l'échelle (au moins 2 cotes écartées entre 3 et 15 % de l'échelle gardée, et autant
+que les gardées moins une) : des cotes qui auraient été gardées partent à la vérification. Sur un plan à plat, toutes les cotes ensemble ;
+sur une photo de biais, sens par sens (_sens_ambigu : mêler les deux sens envoyait 4 plans justes sur 54 en vérification, sens par sens
+aucun). Mesure sur 1 816 plans (mêmes textes OCR qu'avant) : rattrape 80252 (−8,7 %, scan ancien, faux et sûr en 0.12) et 129265 (−3,1 %
+en hauteur, photo de biais) ; coût : 1 plan juste envoyé en vérification (122002), et 3 vrais plans d'entraînement sans vérité (fr-071,
+fr-090, fr-110 ; fr-090 est très probablement faux de −4 à −5 %). Écartés : le garde-fou DESACCORD_COTES_SURES étendu aux photos de biais
+sans optique (34 plans concernés, aucun déclenché, aucun faux rattrapé — fr-090 est à 3,9 % — et deux plans justes à 4,1 et 4,97 % de
+l'écart : trop près du seuil) ; baisser le seuil de 5 % (pas sur la foi de fr-090 seul). La mesure des cotes change aussi
+(lecture_cotes 0.3 : marques larges des chaînes extérieures).
 """
 
 from __future__ import annotations
@@ -69,12 +80,12 @@ import numpy as np
 
 from moteur.barre_echelle import lire_barre
 from moteur.coloriage import FOND, MUR, PORTE, PORTE_FENETRE, _rotation, bati_du_logement, dehors_du_logement, dehors_pour_les_pieces, estimer_rotation, redresser
-from moteur.lecture_cotes import (CONTRADICTION, COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, lire_echelle,
-                                  lire_textes, plan_en_cm, valeur_de_cote)
+from moteur.lecture_cotes import (CONTRADICTION, COTE_MIN, ECART_MAX, ESSAIS_LECTURE, FORME_COTE, CoteLue, Echelle, TexteLu, cotes_ambigues,
+                                  lire_echelle, lire_textes, plan_en_cm, valeur_de_cote)
 from moteur.redressement import Redressement
 from moteur.surfaces_ecrites import FORME_DIMENSIONS, FORME_LEGENDE, SurfaceLue, echelle_par_surfaces, surfaces_dans_textes, surfaces_de_legende
 
-VERSION_ECHELLE = "0.12.0"
+VERSION_ECHELLE = "0.13.0"
 ACCORD_ENSEMBLE = 0.05  # tolérance entre la taille du logement mesurée et la cote d'ensemble
 ACCORD_SECOURS = 0.03  # sans cote mesurée : largeur et hauteur d'ensemble doivent s'accorder à 3 % près
 ACCORD_SURFACES = 0.03  # des cotes peu sûres que les surfaces écrites contredisent de plus de 3 % : à vérifier
@@ -141,6 +152,8 @@ class EchelleLue:
     # l'épaisseur des murs (voir echelle_par_epaisseur), dernier secours d'un brouillon (version 0.11).
     portes_fiables: bool = False
     epaisseur: float | None = None
+    # Deux groupes de cotes presque d'accord se disputent l'échelle (version 0.13, voir lecture_cotes.Echelle.ambigue) : à vérifier.
+    ambigue: bool = False
 
     @property
     def px_par_m(self) -> float | None:
@@ -152,7 +165,7 @@ class EchelleLue:
         return decider(self.largeur, self.hauteur, self.sure, self.cote_max_largeur, self.cote_max_hauteur,
                        self.interieur_px, de_biais, self.barre if self.barre_sure else None,
                        self.surfaces if self.surfaces_sure else None, proportions_optiques, self.approchee, self.douteux,
-                       ecrite=self.ecrite)
+                       ecrite=self.ecrite, ambigue=self.ambigue)
 
 
 def _plausible(echelle: float | None, interieur: float | None, cote_max: float | None, sure: bool) -> bool:
@@ -178,7 +191,7 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             de_biais: bool, barre: float | None = None,
             surfaces: float | None = None, proportions_optiques: bool = False,
             approchee: float | None = None, douteux: bool = False,
-            surfaces_lues: float | None = None, ecrite: float | None = None) -> tuple[float | None, float | None, str]:
+            surfaces_lues: float | None = None, ecrite: float | None = None, ambigue: bool = False) -> tuple[float | None, float | None, str]:
     """Contrôle l'échelle lue sur les cotes par la cote d'ensemble.
 
     La plus grande cote d'un plan est presque toujours la cote d'ensemble du logement : rapportée à
@@ -222,6 +235,14 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
     fausses (fr-024, fr-029), seul un humain peut trancher. Et des cotes peu sûres (une seule) sans logement colorié pour les
     contrôler (interieur_px inconnu) ne suffisent plus.
 
+    Version 0.13 : `ambigue` (EchelleLue.ambigue) — des cotes écartées mais presque d'accord (3 à 15 %), au moins deux et autant que les
+    gardées moins une : deux groupes de cotes se disputent l'échelle. Des cotes qui auraient été gardées (contrôles passés) partent
+    alors à la vérification, même si d'autres sources (barre, surfaces) existent : rien ne dit quel groupe a raison (plan fabriqué
+    80252, scan ancien : −8,7 % annoncé sûr en 0.12). Des cotes déjà refusées par les contrôles laissent la place à la barre ou aux
+    surfaces comme avant (plan fabriqué 124016 : une cote seule et deux presque d'accord, surfaces justes à 0,06 % : la règle ne doit
+    pas les jeter). Sur une photo de biais aux proportions de l'optique, des surfaces sûres passent toujours avant des cotes douteuses
+    (version 0.6), avant cette règle.
+
     Rend (largeur, hauteur, source) ; source = « cotes », « barre », « surfaces », « échelle écrite », « cote d'ensemble »
     ou « à vérifier »
     (échelles à None)."""
@@ -252,6 +273,8 @@ def decider(largeur: float | None, hauteur: float | None, sure: bool, cote_max_l
             # Version 0.12 : une cote seule, sans logement colorié pour la contrôler, n'est contrôlée par rien. Vrai plan fr-066 : la cote
             # « 12,26 » mesurée sur 245 pixels au lieu de ~900 (son trait traverse un sol carrelé), échelle fausse de −74 %, annoncée lue.
             bon = False
+        if bon and ambigue:
+            return None, None, "à vérifier"  # deux groupes de cotes presque d'accord : un humain tranche
         if bon and not sure and surfaces and not de_biais and abs(surfaces / (largeur or hauteur) - 1) > ACCORD_SURFACES:
             return None, None, "à vérifier"  # deux avis sérieux en désaccord : un humain tranche
         if bon and sure and surfaces and not de_biais and round(abs(surfaces / (largeur or hauteur) - 1), 6) > DESACCORD_COTES_SURES:
@@ -446,6 +469,17 @@ def _sens_contredit(valeurs: list[CoteLue]) -> bool:
     return loin > gardees
 
 
+def _sens_ambigu(valeurs: list[CoteLue]) -> bool:
+    """Dans un sens d'une photo : deux groupes de cotes presque d'accord (même règle qu'Echelle.ambigue, sens par sens, autour de
+    l'échelle de ce sens telle que la calcule _mediane_accordee)."""
+    if len(valeurs) < 2:
+        return False
+    m = float(np.median([c.px_par_m for c in valeurs]))
+    gardees = [c for c in valeurs if abs(c.px_par_m - m) / m <= ECART_MAX] or valeurs
+    ecartees = [c for c in valeurs if not any(c is g for g in gardees)]
+    return cotes_ambigues(gardees, ecartees, sum(c.longueur_px for c in gardees) / sum(c.valeur for c in gardees))
+
+
 def _cadre_entier(G: np.ndarray, forme: tuple[int, int], taille: tuple[int, int], k: float,
                   marge: float = 0.6) -> tuple[np.ndarray, tuple[int, int]]:
     """Le redressement recadre sur le logement, ce qui couperait les cotes dessinées autour.
@@ -621,12 +655,17 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
     barre = lire_barre(vu, textes)
     cotes = echelle.retenues + echelle.ecartees
     contredite = echelle.contredite
+    ambigue = echelle.ambigue
     if redressement is not None:
         # Sur une photo, largeur et hauteur peuvent différer : chaque sens a sa propre médiane, et sa propre
         # contradiction (version 0.11 : les deux sens mélangés ne veulent rien dire quand leurs échelles diffèrent).
         horizontales, verticales = [c for c in cotes if not c.verticale], [c for c in cotes if c.verticale]
         largeur, hauteur = _mediane_accordee(horizontales), _mediane_accordee(verticales)
         contredite = _sens_contredit(horizontales) or _sens_contredit(verticales)
+        # Version 0.13 : l'ambiguïté aussi, sens par sens. Mêler les deux sens d'une photo de biais sans optique, dont les échelles
+        # diffèrent de quelques % sans erreur de lecture, faisait passer les cotes d'un sens pour « presque d'accord » avec celles de
+        # l'autre (4 plans justes sur 54 envoyés à tort en vérification ; sens par sens : aucun).
+        ambigue = _sens_ambigu(horizontales) or _sens_ambigu(verticales)
     else:
         largeur = hauteur = echelle.px_par_m
     if contredite:
@@ -653,7 +692,7 @@ def lire_echelle_plan(dessin: np.ndarray, coloriage: np.ndarray, redressement: R
                       barre.detail if barre else "", surf.px_par_m if surf else None, bool(surf and surf.sure),
                       surf.detail if surf else "", echelle_par_portes(col), coloriage_douteux(coloriage),
                       ecrite, ecrite_detail, retenues=echelle.retenues, contredite=contredite,
-                      portes_fiables=portes_fiables(col), epaisseur=echelle_par_epaisseur(col))
+                      portes_fiables=portes_fiables(col), epaisseur=echelle_par_epaisseur(col), ambigue=ambigue)
 
 
 def _sans_les_dimensions_en_double(dimensions: list[SurfaceLue], surfaces: list[SurfaceLue], dedans: np.ndarray) -> list[SurfaceLue]:

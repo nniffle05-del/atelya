@@ -107,10 +107,11 @@ def _lire(image_rgb, col, a_plat: bool = False, textes: list | None = None, px_p
     douteux = coloriage_douteux(col)
     lx, ly, source = decider(e.largeur, e.hauteur, e.sure, e.cote_max_largeur, e.cote_max_hauteur, e.interieur_px,
                              R is not None, e.barre if e.barre_sure else None, e.surfaces if e.surfaces_sure else None,
-                             optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite)
+                             optique, e.approchee, douteux, e.surfaces, ecrite=e.ecrite,
+                             **({"ambigue": e.ambigue} if hasattr(e, "ambigue") else {}))  # 0.13 ; le code d'avant n'a pas ce champ
     if R is None:
         lx = ly = lx or ly
-    sortie = {"lx": lx, "ly": ly, "source": source, "lu": bool(lx or ly), "sure": e.sure, "contredite": e.contredite,
+    sortie = {"lx": lx, "ly": ly, "source": source, "lu": bool(lx or ly), "sure": e.sure, "contredite": e.contredite, "ambigue": getattr(e, "ambigue", None),
               "de_biais": R is not None, "optique": optique, "douteux": douteux, "largeur_cotes": e.largeur, "hauteur_cotes": e.hauteur,
               "interieur_px": e.interieur_px, "cote_max": [e.cote_max_largeur, e.cote_max_hauteur],
               "barre": e.barre, "barre_sure": e.barre_sure, "barre_detail": e.barre_detail,

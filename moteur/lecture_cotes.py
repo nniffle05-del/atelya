@@ -1,4 +1,4 @@
-"""Lecture automatique de l'échelle d'un plan, à partir de ses cotes (version 0.2).
+"""Lecture automatique de l'échelle d'un plan, à partir de ses cotes (version 0.3).
 
 Une cote, c'est un trait fin avec une petite marque à chaque bout et un
 nombre écrit à côté (par exemple « 4,80 ») : la distance réelle, en mètres,
@@ -32,6 +32,19 @@ générateur (24 échelles fausses sur 150 tirages en cm, 25 sur 439 plans) :
   longueur faisaient une échelle (_cotes_en_cm_admises).
 Tout ce qui est propre à ces plans ne joue que si le trait continue au-delà sans porter de nombre : les chaînes autour du plan ne
 bougent pas (sur 224 plans anciens : 6 échelles changées, toutes de moins de 0,1 %).
+
+Version 0.3 (08/11/2026, relecture adverse de 0.2) : la règle « face du mur » de 0.2 prenait pour un mur toute marque de plus de 4 pixels
+(40 % du chiffre) : un point, une barre oblique de 3-4 pixels, une ligne d'attache épaisse ou floue d'une chaîne EXTÉRIEURE. La cote était
+mesurée à la face de la marque, raccourcie d'une demi-marque à chaque bout : à 57 px/m (vrai plan fr-090), 53 cas fabriqués sur 432
+devenaient faux de −3,2 à −6,3 %, et sûrs. Un groupe large n'est plus un mur que s'il en a la forme (_est_un_mur) : plus de
+MUR_LARGEUR_MIN (6) pixels, long en travers du trait (max(11 px, hauteur du chiffre) d'un côté au moins), encore aussi large loin du trait
+(pas une oblique), et aussi large en noir franc (pas le flou gris d'une attache épaisse). Cas fabriqués : 60 → 0 nouveaux faux sûrs sur
+les chaînes ; plans mesurés (1 816, mêmes textes OCR) : aucune lecture perdue, aucun faux nouveau, 9 échelles bougent de moins de
+0,4 point, toutes justes avant comme après. Aussi : Echelle.ambigue (cotes presque d'accord, voir echelle_plan 0.13).
+Défaut connu laissé (cas fabriqués seulement) : un trait de cote intérieur qui en croise un autre à 5-8 pixels d'un mur (7 cas, −3,7 à
+−5,9 %, sûrs au niveau de lire_echelle) ; le correctif « B » essayé par la relecture créait 12 erreurs nouvelles. Les 7 sont
+« ambigus » (Echelle.ambigue) : la décision les envoie en vérification (echelle_plan 0.13) ; mais sur ces mêmes cas fabriqués de
+pièces, 45 lectures justes sont aussi ambiguës (cotes intérieures dispersées de quelques %).
 """
 
 from __future__ import annotations
@@ -64,6 +77,7 @@ CROISEMENT_HAUTEUR = 1.0  # … et d'au moins la hauteur du chiffre : une marque
 CROISEMENT_LARGEUR = 4  # en pixels, ou 40 % de la hauteur du chiffre : au-delà, c'est un mur, pas un trait
 HALO_MUR = 14  # en pixels : _traits efface un trait gris sur cette distance autour d'un mur noir (fenêtre de 25 pixels, voir _mur_au_bout)
 BOUT_MAX = 10  # en pixels : un mur à moins de ça du bout du trait de cote en est la fin (voir _colonnes_d_un_mur_au_bout)
+MUR_LARGEUR_MIN = 6  # en pixels : un groupe de 6 pixels de large ou moins est une marque (point, oblique, attache épaisse), pas un mur (voir _est_un_mur)
 TRAIT_MINCE_PLEIN = 0.55  # part de la rangée qui doit être foncée pour que ce soit un trait, et non des hachures (voir _trait_mince)
 QUEUE_FINE = 12  # en pixels : la longueur de prolongement regardée juste après le croisement (voir _trait_mince)
 QUEUE_MIN = 6  # en pixels : le trait de cote continue au moins de ça au-delà du croisement (sinon il s'arrête là : c'est sa fin)
@@ -73,6 +87,7 @@ FORME_COTE_CM = re.compile(r"^[1-9]\d{1,2}$")  # « 405 » : cote en centimètre
 SOMBRE = 128  # niveau de gris : en dessous, un trait est franc (noir) ; les hachures de sol d'un PDF sont gris clair
 MARQUE_MIN_FORT = 4  # sur les traits francs, une marque de bout de cote peut n'avoir que 4 pixels (PDF à 300 dpi)
 CONTRADICTION = 0.15  # une cote écartée à plus de 15 % de l'échelle gardée la contredit vraiment (voir Echelle.contredite)
+PRESQUE_MIN = 2  # cotes écartées mais presque d'accord (3 à 15 %) : à partir de 2, et autant que les gardées moins une, l'échelle est ambiguë (Echelle.ambigue)
 HACHURE_MIN = 40  # pixels : une marque gris clair qui continue si loin d'un côté est une hachure de sol, pas une marque
 LIGNE_FRANCHE = 0.5  # part du trait de cote qui doit être noire pour qu'on lui applique les règles des traits francs (un trait fin de PDF, adouci par le rendu, l'est à moitié)
 # « Murs extérieurs : 20 cm », « Cloisons : 7 cm » (le modèle de lecture abîme souvent les mots, pas les nombres).
@@ -117,6 +132,22 @@ class Echelle:
             return False
         loin = [c for c in self.ecartees if abs(c.px_par_m / self.px_par_m - 1) > CONTRADICTION]
         return len(loin) > len(self.retenues)
+
+    @property
+    def ambigue(self) -> bool:
+        """Des cotes écartées mais PRESQUE d'accord (entre ECART_MAX et CONTRADICTION de l'échelle gardée), au moins PRESQUE_MIN et au
+        moins aussi nombreuses que les cotes gardées moins une : deux groupes de cotes se disputent l'échelle, et rien ne dit lequel
+        est le bon (version 0.3). Plan fabriqué 80252 (scan ancien) : trois cotes d'accord à 86 px/m, deux autres à 77 et 94 ; la
+        vraie échelle était 94, l'échelle « sûre » se trompait de −8,7 %. Voir echelle_plan.decider (`ambigue`)."""
+        return cotes_ambigues(self.retenues, self.ecartees, self.px_par_m)
+
+
+def cotes_ambigues(retenues: list[CoteLue], ecartees: list[CoteLue], px_par_m: float | None) -> bool:
+    """Voir Echelle.ambigue ; sert aussi sens par sens sur une photo (echelle_plan._sens_ambigu)."""
+    if not px_par_m:
+        return False
+    presque = [c for c in ecartees if ECART_MAX < abs(c.px_par_m / px_par_m - 1) <= CONTRADICTION]
+    return len(presque) >= PRESQUE_MIN and len(presque) >= len(retenues) - 1
 
 
 def lire_textes(gris: np.ndarray, agrandir: int = 1) -> list[TexteLu]:
@@ -431,7 +462,8 @@ def _marques(noir: np.ndarray, x0: float, y0: float, x1: float, y1: float, fort:
     au_bout = _colonnes_d_un_mur_au_bout(noir, y, colonnes, debut, fin, cx, hauteur) if voisins is not None else set()
     colonnes = [c for c in colonnes if c in au_bout or (not _trainee(noir[:, c], y)
                 and not (ligne_franche and franche[c - decalage] == 0 and _longue_d_un_cote(noir[:, c], y)))]
-    marques = _centres_des_groupes(np.array(colonnes, dtype=int), poids, decalage, cx, max(CROISEMENT_LARGEUR, 0.4 * hauteur))
+    marques = _centres_des_groupes(np.array(colonnes, dtype=int), poids, decalage, cx, max(CROISEMENT_LARGEUR, 0.4 * hauteur),
+                                   noir, fort, y, hauteur)
     gauche = [m for m in marques if m < cx]
     droite = [m for m in marques if m > cx]
     if voisins is not None:  # pas de marque de ce côté : le trait va peut-être jusqu'à un mur, dans le halo duquel il s'efface
@@ -693,13 +725,61 @@ def _plus_longue_suite(bande: np.ndarray) -> np.ndarray:
     return meilleur
 
 
+def _est_un_mur(groupe: list[int], cx: int, large: float, noir: np.ndarray | None, fort: np.ndarray | None, y: int | None,
+                hauteur: float | None) -> bool:
+    """Le groupe de colonnes est-il un mur où le trait de cote vient buter (et non une marque épaisse) ? Version 0.3 de ce module.
+
+    En 0.2, « plus large que `large` » suffisait (4 pixels, ou 40 % de la hauteur du chiffre). Mais une marque de chaîne extérieure
+    l'est souvent aussi : un point, une barre oblique de 3-4 pixels, une ligne d'attache épaisse ou floue. Mesurée à sa face, la
+    cote était raccourcie d'une demi-marque à chaque bout ; à 57 px/m, 53 cas fabriqués sur 432 devenaient faux de −3,2 à −6,3 %, et
+    sûrs (relecture adverse du 08/11/2026). Un mur, lui :
+    - fait plus de MUR_LARGEUR_MIN pixels de large (et plus que `large`) ;
+    - est long en travers du trait de cote : il dépasse d'au moins max(11 px, hauteur du chiffre) d'un côté au moins
+      (une marque est courte ; une ligne d'attache, elle, dépasse, d'où les deux conditions suivantes) ;
+    - il reste aussi large LOIN du trait (moitié extérieure de cette distance) : une barre oblique épaisse, large au croisement,
+      n'y est plus qu'une pointe ;
+    - s'il est franc (noir), sa partie franche y est aussi large : une ligne d'attache épaisse et floue paraît large de 7 pixels dans
+      le masque des traits (son flou gris compte), mais n'en fait que 5 en noir franc ; un mur noir de 7 pixels en fait 7.
+    Les deux dernières conditions ont été ajoutées après la relecture (correctif « F2 » de la relecture = les deux premières) : elles
+    traitent les 13 cas fabriqués restés faux avec F2 (obliques de 3-4 px, attaches de 3 px floues, ±12 à ±40 px), sans rien changer
+    d'autre sur 1 816 plans mesurés (par rapport à F2 seul : 3 échelles bougent de moins de 0,4 point, toutes justes).
+    Sans le dessin (noir None), la seule largeur décide, comme avant."""
+    c0, c1 = groupe[0], groupe[-1]
+    if c1 - c0 + 1 <= max(large, MUR_LARGEUR_MIN):
+        return False
+    if noir is None or y is None:
+        return True
+    long_min = max(CROISEMENT_MIN, CROISEMENT_HAUTEUR * (hauteur or 0))
+    limite = max(large, MUR_LARGEUR_MIN)
+    tout = noir[:, c0:c1 + 1].max(axis=1)  # foncé loin du trait : un mur noir plein n'apparaît que par ses bords dans _traits
+    for sens in (-1, 1):
+        if not _depasse(tout, y, sens, long_min):
+            continue
+        n = int(np.ceil(long_min))
+        rangees = [y + 2 * sens + sens * k for k in range(n // 2, n)]  # la moitié loin du trait (_depasse : elles existent)
+        loin = np.flatnonzero(noir[rangees, c0:c1 + 1].mean(axis=0) >= 0.5)
+        if not len(loin) or loin[-1] - loin[0] + 1 <= limite:
+            continue  # étroit loin du trait : les pointes d'une barre oblique, pas la face d'un mur
+        if fort is not None:
+            f = fort[rangees, c0:c1 + 1]
+            if f.sum() >= 0.5 * noir[rangees, c0:c1 + 1].sum():  # un trait franc (noir), pas un trait gris où le grain fait des trous
+                franc = np.flatnonzero(f.mean(axis=0) >= 0.5)
+                if not len(franc) or franc[-1] - franc[0] + 1 <= limite:
+                    continue
+        return True
+    return False
+
+
 def _centres_des_groupes(colonnes: np.ndarray, poids: np.ndarray, decalage: int, cx: int | None = None,
-                         large: float | None = None) -> list[float]:
+                         large: float | None = None, noir: np.ndarray | None = None, fort: np.ndarray | None = None,
+                         y: int | None = None, hauteur: float | None = None) -> list[float]:
     """Regroupe les colonnes voisines (une marque floue en couvre plusieurs) et donne leur centre.
 
     Un groupe plus large que `large` n'est pas une marque mais un mur où le trait de cote vient buter (cotes intérieures, de mur
     à mur) : la cote s'arrête à la face du mur, du côté du chiffre (colonne cx). Prendre le milieu du mur allongeait chaque cote
-    d'une épaisseur de mur : l'échelle était trop grande de 3 à 5 %, d'autant plus sûrement que toutes les cotes l'étaient."""
+    d'une épaisseur de mur : l'échelle était trop grande de 3 à 5 %, d'autant plus sûrement que toutes les cotes l'étaient.
+    Version 0.3 : seulement si c'est bien un mur (_est_un_mur) ; une marque large (point, oblique, attache épaisse) reste mesurée
+    en son centre."""
     centres = []
     groupe: list[int] = []
     for c in list(colonnes) + [None]:
@@ -707,7 +787,7 @@ def _centres_des_groupes(colonnes: np.ndarray, poids: np.ndarray, decalage: int,
             groupe.append(c)
             continue
         if groupe:
-            if large is not None and groupe[-1] - groupe[0] + 1 > large:
+            if large is not None and _est_un_mur(groupe, cx, large, noir, fort, y, hauteur):
                 centres.append(float(groupe[-1] if groupe[-1] < cx else groupe[0]))
             else:
                 p = np.array([poids[g - decalage] for g in groupe], dtype=float)

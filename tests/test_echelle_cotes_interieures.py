@@ -62,7 +62,10 @@ def test_un_meuble_ou_une_porte_qui_coupe_le_trait_n_est_pas_sa_fin():
     cv2.rectangle(g, (180, 240), (260, 360), 150, 1)  # un meuble, dont le bord coupe le trait de part et d'autre
     cv2.rectangle(g, (780, 240), (860, 360), 150, 1)
     e = lire_echelle(g, [_h("410", 400, 300), _h("420", 650, 300)])
-    assert e.px_par_m == pytest.approx(100, rel=0.015)
+    # Sûre ET juste : les deux cotes mesurées de face à face, d'accord à 1 % (renforcé après la relecture du 08/11/2026).
+    assert e.sure and len(e.retenues) == 2
+    assert e.px_par_m == pytest.approx(100, rel=0.01)
+    assert sorted(round(c.longueur_px) for c in e.retenues) == pytest.approx([410, 420], abs=2)
 
 
 def test_trait_gris_efface_contre_un_mur_noir_mesure_de_face_a_face():
@@ -133,6 +136,102 @@ def test_une_trainee_de_photocopieuse_au_milieu_du_trait_reste_ignoree():
     assert sorted(round(c.longueur_px) for c in e.retenues) == [300, 300]
 
 
+def _chaine_57(marque: str, epaisseur: int, demi: int, h: int, aa: bool, flou: float) -> tuple[np.ndarray, list[TexteLu]]:
+    """Chaîne extérieure 3,20 / 2,80 / 4,00 m à 57 px/m (l'échelle du vrai plan fr-090), sans aucun mur, avec des marques larges :
+    un point plein, une barre oblique épaisse ou une ligne d'attache épaisse (cas fabriqués de la relecture adverse du 08/11/2026)."""
+    g = np.full((400, 1300), 255, np.uint8)
+    y, lt = 200, cv2.LINE_AA if aa else cv2.LINE_8
+    xs = [100, 100 + round(3.2 * 57), 100 + round(6.0 * 57), 100 + round(10.0 * 57)]
+    cv2.line(g, (xs[0], y), (xs[-1], y), 40, 1, lt)
+    for x in xs:
+        if marque == "point":
+            cv2.circle(g, (x, y), demi, 40, -1, lt)
+        elif marque == "oblique":
+            cv2.line(g, (x - demi, y + demi), (x + demi, y - demi), 40, epaisseur, lt)
+        else:
+            cv2.line(g, (x, y - demi), (x, y + demi), 40, epaisseur, lt)
+    if flou:
+        g = cv2.GaussianBlur(g, (0, 0), flou)
+    textes = [_texte(v, (a + b) / 2 - 1.1 * h, y - 4 - h, (a + b) / 2 + 1.1 * h, y - 4)
+              for (a, b), v in zip(zip(xs, xs[1:]), ("3,20", "2,80", "4,00"))]
+    return g, textes
+
+
+@pytest.mark.parametrize("marque, epaisseur, demi, h, aa, flou", [
+    ("point", -1, 5, 13, False, 0.0),
+    ("oblique", 3, 6, 13, True, 0.0),
+    ("oblique", 3, 6, 13, True, 0.8),
+    ("oblique", 4, 7, 10, True, 0.8),  # large et assez haute pour « dépasser » : seule sa forme dit que ce n'est pas un mur
+    ("attache", 3, 12, 10, True, 0.8),  # ligne d'attache épaisse et floue : 7 pixels dans le masque des traits, 5 en noir franc
+    ("attache", 3, 40, 13, True, 0.8),
+])
+def test_une_marque_large_d_une_chaine_exterieure_n_est_pas_un_mur(marque, epaisseur, demi, h, aa, flou):
+    """Défaut de la version 0.12.0 (lecture_cotes 0.2) : toute marque plus large que 4 pixels (40 % du chiffre) était prise pour un mur
+    et mesurée à sa face : chaque cote perdait une demi-marque à chaque bout. À 57 px/m : −3,2 à −6,3 %, et sûr (53 cas sur 432)."""
+    g, textes = _chaine_57(marque, epaisseur, demi, h, aa, flou)
+    e = lire_echelle(g, textes)
+    assert e.sure and e.px_par_m == pytest.approx(57, rel=0.01)
+    assert sorted(round(c.longueur_px) for c in e.retenues) == pytest.approx([160, 182, 228], abs=2)
+
+
+def test_un_mur_plein_etroit_mais_franc_arrete_toujours_la_cote_a_sa_face():
+    """La contrepartie : un vrai mur noir de 8 pixels, flou ou pas, reste un mur (cote intérieure de face à face).
+    (Défaut connu, plus ancien : si les traits des deux pièces sont sur la même rangée, une cloison de moins de 2 × `large` pixels au
+    milieu du trait est prise pour une traînée de photocopieuse et la cote traverse la cloison ; les cotes ne s'accordent alors pas,
+    rien n'est annoncé sûr.)"""
+    for flou in (0.0, 0.8):
+        g = np.full((560, 1100), 255, np.uint8)
+        cv2.rectangle(g, (80, 80), (970, 440), NOIR, -1)
+        g[88:432, 88:498] = 255  # 4,10 m à 100 px/m
+        g[88:432, 506:946] = 255  # 4,40 m ; entre les deux, un mur de 8 pixels (8 cm)
+        _ligne(g, (88, 300), (497, 300), NOIR), _ligne(g, (506, 250), (945, 250), NOIR)  # pas sur la même rangée (voir plus bas)
+        if flou:
+            g = cv2.GaussianBlur(g, (0, 0), flou)
+        e = lire_echelle(g, [_h("410", 300, 300), _h("440", 720, 250)])
+        assert e.sure and e.px_par_m == pytest.approx(100, rel=0.005)
+
+
+def _chaine_ambigue(px_par_m: list[float]) -> tuple[np.ndarray, list[TexteLu]]:
+    """Une chaîne de cinq cotes (1,50 1,20 1,00 1,00 1,00 m) dont chaque morceau est dessiné à l'échelle donnée : un scan ancien
+    déformé, ou des cotes mal reportées sur le dessin (plan fabriqué 80252)."""
+    from moteur.coloriage import MUR
+    from tests.test_coloriage import coloriage_t2
+
+    col = coloriage_t2()
+    g = cv2.resize(np.where(col == MUR, 30, 255).astype(np.uint8), None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
+    valeurs = (1.50, 1.20, 1.00, 1.00, 1.00)
+    xs = [250]
+    for v, s in zip(valeurs, px_par_m):
+        xs.append(xs[-1] + round(v * s))
+    _chaine(g, 120, xs, attaches=9)
+    textes = [_h(f"{v:.2f}".replace(".", ","), (a + b) / 2, 120) for (a, b), v in zip(zip(xs, xs[1:]), valeurs)]
+    return g, textes
+
+
+def test_deux_groupes_de_cotes_presque_d_accord_partent_a_la_verification():
+    """Règle « cotes presque d'accord » (version 0.13) : trois cotes d'accord à 184 px/m, deux autres à 200 et 168 (± 8,7 %).
+    L'échelle « sûre » de 0.12 était celle des trois ; rien ne dit que ce sont elles qui ont raison (80252 : −8,7 %, sans alerte)."""
+    from moteur.echelle_plan import lire_echelle_plan
+    from tests.test_coloriage import coloriage_t2
+
+    g, textes = _chaine_ambigue([184, 184, 184, 200, 168])
+    e = lire_echelle_plan(g, coloriage_t2(), textes=textes, px_par_pt=None)
+    assert e.decision(False) == (None, None, "à vérifier")
+    assert e.sure and e.ambigue and len(e.retenues) == 3
+
+
+def test_une_seule_cote_presque_d_accord_ne_declenche_rien():
+    """Une cote un peu à côté (dessin imprécis) parmi des cotes d'accord : l'échelle reste lue par les cotes."""
+    from moteur.echelle_plan import lire_echelle_plan
+    from tests.test_coloriage import coloriage_t2
+
+    g, textes = _chaine_ambigue([184, 184, 184, 184, 168])
+    e = lire_echelle_plan(g, coloriage_t2(), textes=textes, px_par_pt=None)
+    assert not e.ambigue
+    lx, _, source = e.decision(False)
+    assert source == "cotes" and lx == pytest.approx(92, rel=0.01)  # 184 px/m du dessin, coloriage deux fois plus petit
+
+
 def test_les_nombres_d_un_tableau_de_surfaces_ne_sont_pas_des_cotes():
     """Un tableau à bordures : chaque nombre a un trait au-dessus et une bordure de chaque côté. Sans ce filtre : −39 %, jugé sûr."""
     g = np.full((400, 700), 255, np.uint8)
@@ -186,7 +285,9 @@ def test_cotes_contradictoires_ne_passent_pas_par_la_cote_d_ensemble():
     textes = [_texte(t, 500 + 150 * k, 140 - 30 * k - 24, 570 + 150 * k, 140 - 30 * k - 4) for k, t in enumerate(("6,00", "3,00", "2,00", "1,00"))]
     e = lire_echelle_plan(g, col, textes=textes, px_par_pt=None)
     assert e.contredite and e.cote_max_largeur is None and e.cote_max_hauteur is None
-    assert e.decision(False)[2] != "cote d'ensemble"
+    assert e.largeur is None and e.hauteur is None
+    # Rien d'autre (ni barre, ni surfaces) : le plan part à la vérification (renforcé après la relecture du 08/11/2026).
+    assert e.decision(False) == (None, None, "à vérifier")
 
 
 # ---------------------------------------------------------------- les dimensions et la surface, écrites toutes les deux
