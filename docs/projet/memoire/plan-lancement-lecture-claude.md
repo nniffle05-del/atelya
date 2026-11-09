@@ -639,3 +639,11 @@ trop, place à 0,30 m ; canapé 0/1, lits 0/2, fauteuils 1/3, chaises 5/9, range
 ≠ vrais meubles). Modèle `moteur/modeles/meubles-vits14-v1.pt`. Pistes : plus de photos d'essai meublées (tous les logements,
 plus de tirages), lampes et plantes plus fréquentes, segmentation plus fine (carrés de 14 px sur 448 px = 25 px de photo),
 orientation lue sur la photo.
+**APP-002 = EXAMEN (décision NT du 09/11/2026 : « Examen »).** 2e logement plan + photos (reçu de NT « avec les accords »),
+`..\atelya\photos-clients\app-002\` (plan-capture.jpg, photos\photo-01 à 15.jpg dans l'ordre d'envoi, LISEZMOI.txt). JAMAIS
+utilisé pour mettre Atelya au point (ni apprentissage, ni seuil) ; Atelya y passe UNE fois quand plan, caméras et vérités sont
+prêts. Étapes : (1) vérité du plan FAITE : `verites/app-002/` (verite-saisie.json, logement.json, controle.png ; plan.jpg copié
+mais pas dans Git) : 64,0 px/m d'après 8 cotes (± 2 %), HSP 2,50 supposée, 12 pièces ; AUCUNE cloison dessinée entre séjour et
+chambre 1 → une seule pièce « séjour + chambre 1 (ouverts) » (règle NT) ; porte du WC placée sur son mur ouest (à vérifier) ;
+gaines en murs épais. Piège : une ouverture doit être saisie SUR un mur (porte dans un trou entre deux murs = deux pièces
+fusionnées) ; (2) calage des 15 caméras ; (3) vérités sols et meubles ; (4) passage unique d'Atelya et note.
