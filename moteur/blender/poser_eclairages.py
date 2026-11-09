@@ -15,6 +15,7 @@ from pathlib import Path
 import bpy
 
 sys.path.insert(0, str(Path(__file__).parent))
+from poser_briques import regler_apercu  # noqa: E402
 from rendre import appliquer_reglage, reglage_de_photographe  # noqa: E402
 
 
@@ -56,6 +57,7 @@ def main() -> None:
 
     camera = camera_interieure(origine)
     for scene in scenes:
+        regler_apercu(scene)  # aussi pour les maquettes construites avant ce réglage (09/11/2026)
         if camera is not None:  # exposition enregistrée dans la scène, réglée depuis la vue de la pièce principale
             scene.camera = camera
             scene.render.resolution_x, scene.render.resolution_y = camera.get("format", (1600, 1000))

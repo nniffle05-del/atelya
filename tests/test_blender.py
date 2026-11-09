@@ -97,7 +97,9 @@ def test_une_scene_par_eclairage(resultat, tmp_path):
         "d = {s.name: {'ambiance': s.get('ambiance'), 'collections': sorted(c.name for c in s.collection.children),"
         " 'lampes': sum(1 for o in s.objects if o.type == 'LIGHT' and not o.hide_render and o.data.type == 'AREA'"
         " and not o.data.cycles.is_portal), 'exposition': s.view_settings.exposure,"
-        " 'murs': len(bpy.data.collections['Murs'].objects)} for s in bpy.data.scenes}\n"
+        " 'murs': len(bpy.data.collections['Murs'].objects),"
+        " 'apercu': [s.cycles.device, s.cycles.use_preview_denoising, s.cycles.preview_adaptive_threshold]}"
+        " for s in bpy.data.scenes}\n"
         f"open(r'{sortie}', 'w', encoding='utf-8').write(json.dumps(d))\n"
     )
     lancer_blender(str(maquette), "--python-expr", code)
@@ -109,6 +111,8 @@ def test_une_scene_par_eclairage(resultat, tmp_path):
         assert {"Murs", "Sols", "Plafonds", "Menuiseries"} <= set(s["collections"])
         assert (s["lampes"] > 0) == a["lampes"], a["nom"]
         assert s["exposition"] != 0.0, a["nom"]  # réglée par le « photographe »
+        # aperçu « Rendu » de Blender propre (carte graphique, débruité) : NT le 09/11, « l'image est un peu pixelisée »
+        assert s["apercu"][:2] == ["GPU", True] and s["apercu"][2] <= 0.02 + 1e-6, a["nom"]
         # chaque scène n'a QUE ses lampes (défaut du 09/11 : « 5 Nuit » avait aussi celles de « 4 Soirée »)
         propres = [c for c in s["collections"] if c.startswith("Lampes allumées")]
         assert propres == (["Lampes allumées " + a["nom"]] if a["lampes"] else []), a["nom"]

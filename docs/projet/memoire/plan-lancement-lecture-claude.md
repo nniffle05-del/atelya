@@ -494,3 +494,13 @@ toutes les scènes PUIS allume les lampes ; test renforcé (`test_une_scene_par_
 scène, même nombre en soirée et la nuit ; échoue sur l'ancien code). App-001 refaite (`maquette-eclairages.blend` ; l'ancienne
 = `maquette-eclairages-avant-correctif-nuit.blend`) : 4 premières scènes identiques, Nuit exposition −1,27 → −0,37, image
 quasi identique (l'exposition compensait). Les copies de visite `maquette-visite*.blend` gardent l'ancien défaut.
+**APERÇU GRANULEUX dans Blender (NT 09/11 : « l'image est un peu pixelisée »).** Ce n'était PAS le PC : la vue 3D en mode
+« Rendu » gardait les réglages par défaut de Blender = calcul sur le PROCESSEUR (`scene.cycles.device` CPU, la carte graphique
+n'était prise qu'au rendu final par `rendre.choisir_processeur`), aucun débruitage, arrêt dès 10 % de bruit (« Rendering Done »
+mais plein de grain, vu par capture d'écran). Correctif : `poser_briques.regler_apercu` (GPU, débruitage OpenImageDenoise dès la
+1re passe, seuil 2 %, 256 passes), appelé à la construction et par `poser_eclairages` pour chaque scène ; test
+`test_une_scene_par_eclairage` étendu. Vérifié à l'écran : image propre dès la 29e passe. App-001 `maquette-eclairages.blend`
+refaite. `look` de MCP ne capture PAS l'aperçu Cycles (EEVEE / Workbench seulement) : faire une capture d'écran Windows
+(System.Drawing en PowerShell). CE QUI EST ATELYA ET CE QUI NE L'EST PAS : maquette, scènes d'éclairage, réglages, correctifs =
+code d'Atelya (`moteur/`) ; MCP = outil du copilote pour regarder et essayer en direct, jamais une brique d'Atelya (le client
+n'en a pas besoin) ; tout réglage trouvé par MCP doit être reporté dans le code d'Atelya, sinon il est perdu à la maquette suivante.

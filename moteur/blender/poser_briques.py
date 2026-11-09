@@ -78,9 +78,31 @@ def main() -> None:
         if plan.get("vues"):
             scene.camera = bpy.data.objects["Vue_" + plan["vues"][-1]["id"]]
 
+    regler_apercu(scene)
     Path(sortie_blend).parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(Path(sortie_blend).resolve()))
     print(f"Maquette enregistrée : {sortie_blend} ({len(plan['briques'])} briques)")
+
+
+def regler_apercu(scene) -> None:
+    """Aperçu « Rendu » de la vue 3D propre quand NT ouvre la maquette (09/11/2026, NT : « l'image est un peu pixelisée »).
+
+    Réglages par défaut de Blender = calcul sur le PROCESSEUR, sans débruitage, arrêt dès un bruit de 10 % : l'aperçu restait
+    granuleux même « terminé ». Ici : carte graphique (Blender revient seul au processeur s'il n'en trouve pas), débruitage
+    OpenImageDenoise dès la 1re passe, seuil de bruit 2 %, 256 passes. Ne touche pas au rendu final (réglé par rendre.py).
+    """
+    scene.render.engine = "CYCLES"
+    c = scene.cycles
+    c.device = "GPU"
+    c.use_preview_denoising = True
+    try:
+        c.preview_denoiser = "OPENIMAGEDENOISE"
+    except TypeError:
+        pass  # Blender sans ce débruiteur : il garde le sien
+    c.preview_denoising_input_passes = "RGB_ALBEDO_NORMAL"
+    c.preview_denoising_start_sample = 1
+    c.preview_adaptive_threshold = 0.02
+    c.preview_samples = 256
 
 
 def creer_maillage(brique: dict) -> bpy.types.Mesh:
