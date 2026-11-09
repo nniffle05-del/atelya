@@ -279,8 +279,10 @@ gros plans, non calable) ; rendus depuis ces caméras dans une COPIE de la maque
 `moteur/blender/poser_cameras_photos.py`) ; planches `..\atelya\b2\app-001\etape4\`. Constats : forme des pièces juste ; fenêtres
 trop petites, pan coupé du coin repas presque droit en vrai, mur de la porte de la courette plus long, plafond cuisine 2,80 ;
 parquet trop foncé / rouge dans ces vues ; lames droites (et non point de Hongrie / carreaux) autour de l'îlot et dans l'entrée ;
-lumière trop dure (voilages, ciel doux sur les photos) ; murs de couleur absents. Suite (ordre NT) : plusieurs ÉCLAIRAGES dans la
-maquette Blender (une scène par éclairage, murs neutres), puis brique photos (notée contre `verites/app-001/sols.json`).
+lumière trop dure (voilages, ciel doux sur les photos) ; murs de couleur absents. **ÉCLAIRAGES FAITS (09/11)** : une scène Blender par
+éclairage (1 Jour ensoleillé, 2 Jour voilé, 3 Fin de journée, 4 Soirée lampes allumées, 5 Nuit ; `moteur/eclairages.py`,
+`moteur/blender/poser_eclairages.py`, posées par `construire`) ; app-001 : `..\atelya\b2\app-001\eclairages\`. Suite (ordre NT) :
+brique photos (Atelya reconnaît seul les sols sur les photos, notée contre `verites/app-001/sols.json`).
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

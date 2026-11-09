@@ -5,7 +5,7 @@
 Produit dans le dossier de sortie :
 - construction.json : les briques calculées, avec leur matériau, les lampes
   et les caméras (lisible, utile pour vérifier) ;
-- maquette.blend : la maquette habillée, à ouvrir dans Blender ;
+- maquette.blend : la maquette habillée, à ouvrir dans Blender, avec une scène par éclairage (menu des scènes) ;
 - images/vue-dessus.png et images/vue-<pièce>.png : les deux images rendues.
 
 Options : --sans-images (maquette seulement, rapide) ; --brouillon (images
@@ -84,6 +84,11 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
         # B2 temps 2 : la teinte des sols vus sur une photo du client est réglée au rendu (voir regler_teintes.py).
         lancer_blender(str(maquette), "--python", str(DOSSIER_SCRIPTS / "regler_teintes.py"),
                        "--", str(plan), str(dossier / "reglages_teinte.json"))
+    if json.loads(plan.read_text(encoding="utf-8")).get("vues"):
+        # B2 temps 2 (09/11/2026) : une scène Blender par éclairage (jour, voilé, fin de journée, soirée, nuit) ; la scène
+        # active reste le jour ensoleillé, où la teinte des sols vient d'être réglée (voir moteur/eclairages.py).
+        from moteur.eclairages import poser as poser_eclairages
+        poser_eclairages(plan, maquette, maquette)
     return maquette
 
 

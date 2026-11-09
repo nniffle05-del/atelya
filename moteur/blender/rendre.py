@@ -6,7 +6,9 @@ Plus on suit de rayons (les « échantillons »), plus l'image est propre ;
 un « débruiteur » nettoie ensuite le grain qui reste.
 
 Utilisation (lancé par moteur/construire.py) :
-    blender -b --factory-startup maquette.blend --python rendre.py -- dossier_images echantillons pourcentage
+    blender -b --factory-startup maquette.blend --python rendre.py -- dossier_images echantillons pourcentage [scène]
+
+La scène (facultative) : le nom d'un éclairage (poser_eclairages.py), par exemple « 2 Jour voilé » ; sinon la scène active.
 """
 
 import sys
@@ -17,8 +19,10 @@ import bpy
 
 
 def main() -> None:
-    dossier, echantillons, pourcentage = sys.argv[sys.argv.index("--") + 1:][:3]
-    scene = bpy.context.scene
+    arguments = sys.argv[sys.argv.index("--") + 1:]
+    dossier, echantillons, pourcentage = arguments[:3]
+    # 4e argument facultatif : le nom de la scène (un éclairage, voir poser_eclairages.py) ; sinon la scène active
+    scene = bpy.data.scenes[arguments[3]] if len(arguments) > 3 else bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.samples = int(echantillons)
     scene.cycles.use_denoising = True
@@ -39,19 +43,24 @@ def main() -> None:
         nom = camera.name.removeprefix("Vue_")
         if scene.get("jour"):
             exposition, blanc = reglage_de_photographe(scene, Path(dossier))
-            scene.view_settings.exposure = exposition
-            scene.view_settings.use_curve_mapping = True
-            courbes = scene.view_settings.curve_mapping
-            courbes.white_level = blanc  # balance des blancs : la couleur des murs devient le blanc
-            courbes.update()
+            appliquer_reglage(scene, exposition, blanc)
             print(f"Réglage {nom} : exposition {exposition:+.2f}, blanc {tuple(round(v, 3) for v in blanc)}")
         scene.render.filepath = str(Path(dossier).resolve() / f"vue-{nom}.png")
         scene.render.image_settings.file_format = "PNG"
-        bpy.ops.render.render(write_still=True)
+        bpy.ops.render.render(write_still=True, scene=scene.name)
         print(f"Image {scene.render.filepath} en {time.time() - debut:.0f} s")
 
     for collection in scene.collection.children:
         collection.hide_render = False
+
+
+def appliquer_reglage(scene, exposition: float, blanc) -> None:
+    """Exposition et balance des blancs (la couleur des murs devient le blanc) enregistrées dans la scène."""
+    scene.view_settings.exposure = exposition
+    scene.view_settings.use_curve_mapping = True
+    courbes = scene.view_settings.curve_mapping
+    courbes.white_level = blanc
+    courbes.update()
 
 
 CLARTE_MURS = 0.55  # clarté (linéaire) visée pour les murs et plafonds blancs : une pièce claire, comme sur une photo d'annonce
@@ -86,7 +95,7 @@ def reglage_de_photographe(scene, dossier: Path) -> tuple[float, tuple[float, fl
     essai = dossier.resolve() / "_essai_exposition.exr"
     scene.render.filepath = str(essai)
     try:
-        bpy.ops.render.render(write_still=True)
+        bpy.ops.render.render(write_still=True, scene=scene.name)
         image = bpy.data.images.load(str(essai))
         pixels = np.array(image.pixels[:], dtype=float).reshape(-1, 4)
         bpy.data.images.remove(image)
@@ -103,13 +112,14 @@ def reglage_de_photographe(scene, dossier: Path) -> tuple[float, tuple[float, fl
         return 0.0, (1.0, 1.0, 1.0)
     luminance = murs @ poids
     milieu = float(np.median(luminance))
-    exposition = float(np.clip(np.log2(CLARTE_MURS / max(milieu, 1e-9)), EXPOSITION_MIN, EXPOSITION_MAX))
+    clarte = float(scene.get("clarte_murs", CLARTE_MURS))  # chaque éclairage a sa clarté visée (poser_eclairages.py)
+    exposition = float(np.clip(np.log2(clarte / max(milieu, 1e-9)), EXPOSITION_MIN, EXPOSITION_MAX))
     # couleur des murs « ordinaires » (entre le 20e et le 90e centile de clarté : ni coins sombres ni taches de soleil)
     bas, haut = np.percentile(luminance, [20, 90])
     ordinaires = murs[(luminance >= bas) & (luminance <= haut)]
     couleur = ordinaires.mean(axis=0) if len(ordinaires) else murs.mean(axis=0)
     teinte = couleur / max(float(couleur @ poids), 1e-9)  # (1, 1, 1) pour des murs parfaitement blancs
-    blanc = 1 + FORCE_BALANCE * (teinte - 1)
+    blanc = 1 + float(scene.get("force_balance", FORCE_BALANCE)) * (teinte - 1)
     blanc = blanc / float(blanc @ poids)
     return exposition, tuple(float(v) for v in blanc)
 

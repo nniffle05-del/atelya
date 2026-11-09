@@ -82,3 +82,30 @@ def test_deux_images_ni_noires_ni_blanches(resultat, tmp_path):
         assert pixels.shape[:2] == (250, 400)  # 25 % de 1600 × 1000
         assert 60 < pixels.mean() < 230, image.name  # ni trop sombre, ni brûlée
         assert pixels.std() > 10, image.name  # pas une image toute unie
+
+
+def test_une_scene_par_eclairage(resultat, tmp_path):
+    """B2 temps 2 (09/11/2026) : la maquette a une scène par éclairage ; elles partagent murs et sols ; les lampes ne sont
+    allumées qu'en soirée et la nuit ; chaque scène a son exposition déjà réglée."""
+    from moteur.construire import lancer_blender
+    from moteur.eclairages import AMBIANCES
+
+    maquette, _, _ = resultat
+    sortie = tmp_path / "scenes.json"
+    code = (
+        "import bpy, json\n"
+        "d = {s.name: {'ambiance': s.get('ambiance'), 'collections': sorted(c.name for c in s.collection.children),"
+        " 'lampes': sum(1 for o in s.objects if o.type == 'LIGHT' and not o.hide_render and o.data.type == 'AREA'"
+        " and not o.data.cycles.is_portal), 'exposition': s.view_settings.exposure,"
+        " 'murs': len(bpy.data.collections['Murs'].objects)} for s in bpy.data.scenes}\n"
+        f"open(r'{sortie}', 'w', encoding='utf-8').write(json.dumps(d))\n"
+    )
+    lancer_blender(str(maquette), "--python-expr", code)
+    scenes = json.loads(sortie.read_text(encoding="utf-8"))
+    assert sorted(scenes) == sorted(a["nom"] for a in AMBIANCES)
+    for a in AMBIANCES:
+        s = scenes[a["nom"]]
+        assert s["ambiance"] == a["id"]
+        assert {"Murs", "Sols", "Plafonds", "Menuiseries"} <= set(s["collections"])
+        assert (s["lampes"] > 0) == a["lampes"], a["nom"]
+        assert s["exposition"] != 0.0, a["nom"]  # réglée par le « photographe »

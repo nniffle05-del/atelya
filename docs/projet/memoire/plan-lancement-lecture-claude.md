@@ -440,3 +440,21 @@ Hongrie → la vérité des sols est à revoir (brique photos) ; taches de solei
 filtrée par les voilages ; murs de couleur absents (gris de l'entrée, rouge de la salle de bains) ; petits carreaux de la salle
 de bains ressemblants. **NT (09/11) : « J'aime beaucoup, on est sur la bonne voie »** = étape 4 validée. Suite : éclairages, puis
 brique photos.
+**ÉCLAIRAGES dans la maquette Blender (09/11/2026, accord NT « Oui »).** Une SCÈNE Blender par éclairage, changée par NT dans le
+menu des scènes (en haut à droite de Blender) : « 1 Jour ensoleillé » (la scène d'origine : ciel physique, soleil 50°, c'est
+là que la teinte des sols est réglée), « 2 Jour voilé » (ciel couvert de la CIE, clarté (1 + 2 sin h)/3, sans soleil), « 3 Fin
+de journée » (soleil à 7°, balance des blancs faible pour garder l'or), « 4 Soirée lampes allumées » (soleil à −3° = ciel du
+crépuscule dans les fenêtres, plafonniers allumés blanc chaud ≈ 2 700 K), « 5 Nuit » (fond bleu nuit, plafonniers allumés).
+Scènes = COPIES LIÉES (bpy.ops.scene.new LINK_COPY) : murs, sols, plafonds, menuiseries, portails et caméras PARTAGÉS (une
+matière changée l'est partout) ; chaque scène a son monde, sa collection « Lampes allumées … » (copies des plafonniers) et son
+exposition / balance des blancs DÉJÀ réglées (réglage « de photographe » depuis la vue de la pièce principale), donc l'image est
+juste dès qu'on change de scène. Murs neutres de jour (balance 0,85-0,95), couleur de la lumière gardée le soir (0,25-0,35).
+Règle 20 : la direction du soleil reste la direction PROVISOIRE du plan (orientation réelle = étape B3), seule la hauteur change.
+Code : `moteur/eclairages.py` (définitions + `python -m moteur.eclairages construction.json maquette.blend sortie.blend`),
+`moteur/blender/poser_eclairages.py`, `rendre.py` (4e argument = nom de la scène ; clarté et balance lues dans la scène),
+`construire` pose les scènes à chaque maquette (scène active = jour ensoleillé, images inchangées), `caler_photos.py rendre
+--scene`. Tests : `tests/test_eclairages.py` (4), `test_blender.py::test_une_scene_par_eclairage`. App-001 :
+`..\atelya\b2\app-001\eclairages\maquette-eclairages.blend` (copie, la maquette 3d-sols n'est pas touchée), aperçu
+`apercu-5-eclairages.jpg`, comparaison des 11 photos en jour voilé `planche-jour-voile.jpg` : plus de taches de soleil, murs
+neutres, lumière douce = bien plus proche des photos ; RESTE : parquet du séjour trop foncé / rouge (teinte, pas lumière),
+voilages, mobilier, murs de couleur.

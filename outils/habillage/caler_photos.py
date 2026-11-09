@@ -108,7 +108,7 @@ def planche(photo: Path, rendu: Path, sortie: Path, titre: str) -> None:
     feuille.save(sortie)
 
 
-def rendre(releve: dict, maquette: Path, dossier: Path, echantillons: int = 512) -> list[Path]:
+def rendre(releve: dict, maquette: Path, dossier: Path, echantillons: int = 512, scene: str | None = None) -> list[Path]:
     """Caméras posées dans une copie de la maquette (dossier/maquette-photos.blend), puis une image par caméra."""
     from moteur.construire import DOSSIER_SCRIPTS, lancer_blender
 
@@ -122,7 +122,8 @@ def rendre(releve: dict, maquette: Path, dossier: Path, echantillons: int = 512)
                    str(chemin_reglages), str(copie))
     images = dossier / "rendus"
     images.mkdir(exist_ok=True)
-    lancer_blender(str(copie), "--python", str(DOSSIER_SCRIPTS / "rendre.py"), "--", str(images), str(echantillons), "100")
+    lancer_blender(str(copie), "--python", str(DOSSIER_SCRIPTS / "rendre.py"), "--", str(images), str(echantillons), "100",
+                   *([scene] if scene else []))
     return sorted(images.glob("vue-*.png"))
 
 
@@ -135,6 +136,7 @@ def main() -> None:
     r = sous.add_parser("rendre")
     r.add_argument("releve"), r.add_argument("maquette"), r.add_argument("dossier")
     r.add_argument("--echantillons", type=int, default=512)
+    r.add_argument("--scene", help="éclairage à rendre, ex. « 2 Jour voilé » (maquette avec éclairages)")
     p = sous.add_parser("planche")
     p.add_argument("releve"), p.add_argument("dossier")
     args = parser.parse_args()
@@ -150,7 +152,7 @@ def main() -> None:
                  set(args.pieces) if args.pieces else None)
         print(f"Contrôle : {args.sortie}")
     elif args.commande == "rendre":
-        for image in rendre(releve, Path(args.maquette), Path(args.dossier), args.echantillons):
+        for image in rendre(releve, Path(args.maquette), Path(args.dossier), args.echantillons, args.scene):
             print(f"Image prête : {image}")
     else:
         dossier = Path(args.dossier)
