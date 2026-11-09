@@ -46,9 +46,13 @@ def main() -> None:
         scene["force_balance"] = a["balance"]
         if i > 0:
             scene.world = monde(a, ciel_origine)
+        scenes.append(scene)
+    # Lampes allumées seulement une fois TOUTES les scènes créées : sans fenêtre, bpy.ops.scene.new copie la dernière scène
+    # créée (pas `origine`, malgré temp_override) ; allumer dans la boucle donnait à « 5 Nuit » les lampes de « 4 Soirée »
+    # en plus des siennes (plafonniers deux fois trop forts, vu par MCP le 09/11/2026).
+    for scene, a in zip(scenes, ambiances):
         if a["lampes"]:
             allumer(scene, a, plafonniers)
-        scenes.append(scene)
 
     camera = camera_interieure(origine)
     for scene in scenes:

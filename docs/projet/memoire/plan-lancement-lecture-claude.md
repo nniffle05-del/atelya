@@ -479,3 +479,18 @@ préférences en se fermant) : activer le module (`blender -b --python-expr` : `
 puis `bpy.ops.wm.save_userpref()`), relancer Claude Code et accepter le serveur « blender » du projet, ouvrir Blender, vérifier la
 liaison. Règle : n'agir par MCP que sur des COPIES de maquettes. Piège : le classificateur de sécurité a refusé une commande qui
 fermait Blender de force ET installait ; séparer les actions, demander à NT de fermer Blender.
+**MCP for Blender EN SERVICE (09/11/2026, 13h30).** Module activé Blender fermé par `blender -b --python activer.py`
+(`addon_enable("blender_mcp")` + `save_userpref`) ; préférences d'avant gardées dans `config\userpref-avant-mcp.blend`. PIÈGE :
+`--python-expr` depuis PowerShell 5.1 perd les guillemets → passer par un fichier .py. Le serveur s'ouvre seul sur
+localhost:9876 quelques secondes APRÈS le chargement de la maquette (35 Mo) : si « Could not connect », attendre et réessayer.
+`get_addon_status` : collecte éteinte, bibliothèques et générateurs internet éteints. Ce qui marche par MCP : lire les scènes,
+changer la scène affichée à l'écran de NT (`context.window.scene = …`), rendre (Cycles GPU, 800 × 500, ~6 s par scène),
+`wm.open_mainfile` sur une autre COPIE sans relancer Blender. Copies de travail : `..\atelya\b2\app-001\eclairages\maquette-mcp.blend`,
+`maquette-mcp-2.blend` ; planche des 5 éclairages rendus par MCP : `planche-5-eclairages-mcp.jpg`.
+**DÉFAUT TROUVÉ PAR MCP ET CORRIGÉ (09/11)** : « 5 Nuit » contenait AUSSI la collection « Lampes allumées 4 Soirée… » (20
+plafonniers au lieu de 10). Cause : sans fenêtre, `bpy.ops.scene.new(LINK_COPY)` copie la DERNIÈRE scène créée, pas `origine`
+(le `temp_override(scene=…)` est ignoré) ; les lampes étaient allumées dans la même boucle. Correctif : `poser_eclairages` crée
+toutes les scènes PUIS allume les lampes ; test renforcé (`test_une_scene_par_eclairage` : une seule collection de lampes par
+scène, même nombre en soirée et la nuit ; échoue sur l'ancien code). App-001 refaite (`maquette-eclairages.blend` ; l'ancienne
+= `maquette-eclairages-avant-correctif-nuit.blend`) : 4 premières scènes identiques, Nuit exposition −1,27 → −0,37, image
+quasi identique (l'exposition compensait). Les copies de visite `maquette-visite*.blend` gardent l'ancien défaut.

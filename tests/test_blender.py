@@ -109,3 +109,8 @@ def test_une_scene_par_eclairage(resultat, tmp_path):
         assert {"Murs", "Sols", "Plafonds", "Menuiseries"} <= set(s["collections"])
         assert (s["lampes"] > 0) == a["lampes"], a["nom"]
         assert s["exposition"] != 0.0, a["nom"]  # réglée par le « photographe »
+        # chaque scène n'a QUE ses lampes (défaut du 09/11 : « 5 Nuit » avait aussi celles de « 4 Soirée »)
+        propres = [c for c in s["collections"] if c.startswith("Lampes allumées")]
+        assert propres == (["Lampes allumées " + a["nom"]] if a["lampes"] else []), a["nom"]
+    allumees = {scenes[a["nom"]]["lampes"] for a in AMBIANCES if a["lampes"]}
+    assert len(allumees) == 1  # autant de plafonniers allumés en soirée que la nuit
