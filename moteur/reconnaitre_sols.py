@@ -482,8 +482,9 @@ def prototypes_bibliotheque(oeil, bibliotheque, par_matiere: int = 16, graine: i
             continue
         tex = lire_image(bib / matiere / "couleur.jpg")
         tex = cv2.cvtColor(tex, cv2.COLOR_BGR2RGB)
-        grand = np.tile(tex, (2, 2, 1))
         cote = int(tex.shape[1] / infos[matiere]["taille_image_m"][0] * VIGNETTE_M)
+        copies = int(np.ceil(cote / min(tex.shape[:2]))) + 1  # une matière de 30 cm se répète plusieurs fois dans 1 m
+        grand = np.tile(tex, (copies, copies, 1))
         vignettes_m = []
         for _ in range(par_matiere):
             l0 = int(alea.integers(0, max(1, grand.shape[0] - cote)))

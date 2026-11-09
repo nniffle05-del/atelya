@@ -612,3 +612,21 @@ puis départage par la vraie couleur (poids 1,2) ; mémoire `..\atelya\bibliothe
 table « White » = bois (173, 136, 101) → plus choisie ; tabourets maintenant JAUNES, table de repas blanche. Rendus v3 (sols
 trouvés seuls + meubles détaillés + rideaux) : `..\atelya\b2\app-001\v3\` (planche-v3.jpg). Reste : rangement mural de la salle à
 manger (cases ouvertes bois/blanc) rendu en placard à portes ; carreaux cubes → carrelage beige ; caisson visible sur la photo 07.
+**BIBLIOTHÈQUE DE SOLS ÉLARGIE (09/11/2026, accord écrit NT « Oui » après liste, tailles et licences).** 40 matières CC0 de plus
+(`outils/bibliotheque/telecharger_matieres.py`, qui COMPLÈTE maintenant matieres.json au lieu de l'écraser ; sauvegarde
+`matieres-avant-2026-11-09.json`) : ambientCG Tiles099-104 (« carreaux décorés bleus », plutôt azulejos que ciment), damiers et
+motifs de marbre Tiles012-016, mosaïques hexagonales Tiles071-072, tomettes hexagonales Tiles064-066, granitos Tiles109/110/040/043
+et Terrazzo013/018, pierre en damier Tiles139, marbre Tiles074, grandes dalles grises Tiles050, carrelage blanc Tiles025, pastilles
+Tiles129B/120 ; Poly Haven : parquets diagonal, rectangulaire, lames ×3, usé, plancher, stratifié 2, lames foncées 2, mosaïque de
+marbre, carreaux longs blancs, carreaux carrés, granit, vieux carrelage. 620 Mo en tout ; 71 matières dans la bibliothèque. Taille
+réelle : fiche ambientCG (dimensionX, cm) sinon ESTIMÉE en comptant les carreaux (`taille_estimee`). Catalogue `moteur/matieres.py` :
+61 sols (39 carrelages, 16 lames, 3 bâtons rompus, 3 point de Hongrie) ; écran de vérification régénéré (même liste, test) ;
+Blender reçoit la sorte de chaque sol par le plan (`sortes_sols`), plus de liste recopiée à la main. Plantage corrigé : une matière
+de 30 cm (pastilles) se répète plus de 3 fois dans une vignette d'1 m. Classificateur réappris avec cette bibliothèque (v3) :
+contrôle vides 92,7 %, meublées 81,0 % (v2 : 93,5 / 84,5) → v2 GARDÉ pour les familles ; la bibliothèque élargie sert au CHOIX de
+la matière dans la famille (prototypes) et à la pose.
+**REPÉRAGE DES MEUBLES (en cours, 09/11/2026).** `moteur/reperer_meubles.py` : œil DINOv2 par carrés de 14 px (photo réduite à
+672 × 448), 9 groupes + « rien » appris sur les photos d'essai meublées (masques de catégories : `masques_meubles.py -- dossier
+'["canape", …]'` → pixel = n° de catégorie) ; taches → pied (bas de la tache) → sol par la caméra → recul d'une demi-profondeur ;
+fusion entre photos ; dos au mur le plus proche ; note contre la vérité (même groupe, < 0,8 m). Outil
+`outils/habillage/apprendre_meubles.py` (contrôle fr-031/fr-038, `--app001`).

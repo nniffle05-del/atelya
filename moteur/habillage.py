@@ -61,7 +61,7 @@ from dataclasses import asdict, replace
 
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
-from moteur.matieres import SOL_PAR_SORTE, matiere_et_teinte, nom_materiau, sorte
+from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, matiere_et_teinte, nom_materiau, sorte
 
 VERSION_PLAN = "construction/0.2"
 
@@ -154,6 +154,9 @@ def plan_habille(logement: Logement) -> dict:
         "vues": vues(logement),
         "reglages_teinte": reglages_teinte(logement, briques),
         "meubles": meubles_du_plan(logement),
+        # la sorte (bois ou carrelage) de chaque matière du catalogue : Blender en a besoin pour la brillance et le relief,
+        # sans pouvoir lire moteur/matieres.py (catalogue passé à 61 matières le 09/11/2026)
+        "sortes_sols": {nom: sorte(nom) for nom in NOMS_SOLS},
         "rideaux": rideaux_du_plan(logement),
     }
 

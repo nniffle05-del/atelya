@@ -53,6 +53,20 @@ POLY_HAVEN = [
     ("chene_clair_photo", "laminate_floor_03", "parquet chêne clair (photo)"),
     ("chene_naturel_photo", "oak_wood_planks", "parquet chêne naturel (photo)"),
     ("vieux_parquet", "old_wooden_floor_03", "vieux parquet (photo)"),
+    # Sols en plus (accord écrit de NT le 09/11/2026 : « Oui », liste et tailles données avant)
+    ("parquet_diagonal", "diagonal_parquet", "parquet posé en diagonale"),
+    ("parquet_rectangulaire", "rectangular_parquet", "parquet à motif rectangulaire"),
+    ("lames_parquet_1", "plank_flooring", "parquet à lames (1)"),
+    ("lames_parquet_2", "plank_flooring_02", "parquet à lames (2)"),
+    ("parquet_use", "wood_floor_worn", "parquet usé"),
+    ("lames_bois", "wooden_floor_01", "plancher à lames"),
+    ("stratifie_2", "laminate_floor", "stratifié (2)"),
+    ("lames_foncees_2", "dark_wooden_planks", "lames de bois foncées"),
+    ("mosaique_marbre", "marble_mosaic_tiles", "mosaïque de marbre"),
+    ("carreaux_longs_blancs", "long_white_tiles", "carreaux longs blancs"),
+    ("carreaux_carres", "square_tiles_02", "carreaux carrés"),
+    ("granit", "granite_tile", "dalles de granit"),
+    ("vieux_carrelage", "worn_tile_floor", "vieux carrelage"),
 ]
 # carte Poly Haven → nom de fichier Atelya
 CARTES_PH = {"Diffuse": "couleur.jpg", "nor_gl": "relief.jpg", "Rough": "brillance.jpg"}
@@ -74,6 +88,34 @@ AMBIENTCG = [
     ("versailles_clair", "WoodFloor055", "parquet Versailles clair", 1.2),
     ("versailles_chaud", "WoodFloor060", "parquet Versailles chaud", 1.0),
     ("mosaique_parquet", "WoodFloor069", "parquet mosaïque (années 60-70)", (1.0, "estimée")),
+    # Sols en plus (accord écrit de NT le 09/11/2026 : « Oui ») ; taille « api » = celle de la fiche ambientCG (dimensionX, cm)
+    ("ciment_motifs_1", "Tiles099", "carreaux de ciment à motifs (1)", "api"),
+    ("ciment_motifs_2", "Tiles100", "carreaux de ciment à motifs (2)", "api"),
+    ("ciment_motifs_3", "Tiles101", "carreaux de ciment à motifs (3)", "api"),
+    ("ciment_motifs_4", "Tiles102", "carreaux de ciment à motifs (4)", "api"),
+    ("ciment_motifs_5", "Tiles103", "carreaux de ciment à motifs (5)", "api"),
+    ("ciment_motifs_6", "Tiles104", "carreaux de ciment à motifs (6)", "api"),
+    ("damier_marbre_noir_blanc", "Tiles012", "damier de marbre noir et blanc", "api"),
+    ("damier_marbre_jaune", "Tiles013", "damier de marbre clair et jaune", "api"),
+    ("marbre_motif_noir_blanc", "Tiles014", "marbre à motif noir et blanc", "api"),
+    ("marbre_motif_bleu", "Tiles015", "marbre à motif bleu et noir", "api"),
+    ("damier_marbre", "Tiles016", "damier de marbre", "api"),
+    ("mosaique_hexa_blanche", "Tiles071", "mosaïque hexagonale blanche", "api"),
+    ("mosaique_hexa_noire", "Tiles072", "mosaïque hexagonale noire", "api"),
+    ("tomettes_hexa_orange", "Tiles064", "tomettes hexagonales orange", "api"),
+    ("tomettes_hexa_brunes", "Tiles066", "tomettes hexagonales brunes", "api"),
+    ("granito_beige", "Tiles109", "granito beige", "api"),
+    ("granito_beige_2", "Tiles110", "granito beige (2)", "api"),
+    ("granito_blanc", "Tiles040", "granito blanc", "api"),
+    ("granito_gris", "Tiles043", "granito gris", "api"),
+    ("granito_colore", "Terrazzo013", "granito coloré", "api"),
+    ("granito_colore_2", "Terrazzo018", "granito coloré (2)", "api"),
+    ("pierre_damier_claire", "Tiles139", "pierre claire en damier", "api"),
+    ("marbre_dalles", "Tiles074", "dalles de marbre", "api"),
+    ("grands_carreaux_gris", "Tiles050", "grands carreaux gris foncé", "api"),
+    ("carrelage_blanc_moderne", "Tiles025", "carrelage blanc moderne", "api"),
+    ("pastilles_rondes", "Tiles129B", "petites pastilles rondes", "api"),
+    ("pastilles_rondes_2", "Tiles120", "petites pastilles rondes (2)", "api"),
 ]
 # fin du nom de fichier dans le zip ambientCG → nom Atelya
 CARTES_ACG = {"_Color.jpg": "couleur.jpg", "_NormalGL.jpg": "relief.jpg", "_Roughness.jpg": "brillance.jpg"}
@@ -121,7 +163,16 @@ def poly_haven(dossier: Path, nom: str, ident: str) -> dict:
     }
 
 
+def taille_api(ident: str):
+    """La taille réelle couverte par une image d'après la fiche ambientCG (dimensionX en cm), sinon None (à estimer)."""
+    fiche = lire_json(f"https://ambientcg.com/api/v2/full_json?id={ident}&include=dimensionsData")["foundAssets"]
+    x = fiche[0].get("dimensionX") if fiche else 0
+    return round(x / 100, 3) if x else None
+
+
 def ambientcg(dossier: Path, nom: str, ident: str, taille=None) -> dict:
+    if taille == "api":
+        taille = taille_api(ident)
     cible = dossier / nom
     estimee = isinstance(taille, tuple)
     taille_m = [taille[0], taille[0]] if estimee else ([taille, taille] if taille else None)
@@ -152,7 +203,9 @@ def main() -> None:
         raise SystemExit(__doc__)
     dossier = Path(sys.argv[1])
     dossier.mkdir(parents=True, exist_ok=True)
-    catalogue = {}
+    # on COMPLÈTE le catalogue : les matières qui n'en viennent pas (dessinées par Atelya) y restent
+    ancien = dossier / "matieres.json"
+    catalogue = json.loads(ancien.read_text(encoding="utf-8")) if ancien.is_file() else {}
     for nom, ident, description in POLY_HAVEN:
         print(f"{nom} <- Poly Haven {ident}")
         catalogue[nom] = {"description": description, **poly_haven(dossier, nom, ident)}
@@ -165,8 +218,8 @@ def main() -> None:
     lignes = ["Matières de la bibliothèque d'Atelya : toutes sous licence CC0 1.0 (domaine public).",
               "Crédit non obligatoire, donné par reconnaissance.", ""]
     for nom, e in catalogue.items():
-        lignes.append(f"{nom} : « {e['identifiant']} » de {e['source']} ({e['page']}), "
-                      f"par {', '.join(e['auteurs']) or 'non précisé'}, CC0 1.0.")
+        lignes.append(f"{nom} : « {e.get('identifiant', nom)} » de {e.get('source', '?')} ({e.get('page', '-')}), "
+                      f"par {', '.join(e.get('auteurs', [])) or 'non précisé'}, {e.get('licence', 'CC0 1.0')}.")
     (dossier / "CREDITS.txt").write_text("\n".join(lignes) + "\n", encoding="utf-8")
     total = sum(e["octets"] for e in catalogue.values())
     print(f"FINI : {len(catalogue)} matières, {total / 1e6:.1f} Mo dans {dossier}")

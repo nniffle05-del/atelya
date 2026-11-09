@@ -6,6 +6,7 @@ par image : chaque objet de la collection « Meubles » (et ses instances) en bl
 
     blender -b maquette-photos.blend --python masques_meubles.py -- dossier_masques
 """
+import json
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import bpy
 
 def main() -> None:
     dossier = Path(sys.argv[sys.argv.index("--") + 1:][0])
+    prefixe = "categories" if len(sys.argv[sys.argv.index("--") + 1:]) > 1 else "masque"
     dossier.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
     try:
@@ -33,15 +35,27 @@ def main() -> None:
     scene.render.film_transparent = False
     scene.world.color = (0, 0, 0)
     scene.display.render_aa = "OFF"
+    arguments = sys.argv[sys.argv.index("--") + 1:]
+    # 2e argument facultatif : la liste des catégories (JSON) → chaque pixel vaut le n° de la catégorie du meuble vu (1, 2…),
+    # 0 = pas de meuble (repérage des meubles, 09/11/2026) ; sinon blanc = meuble, noir = le reste
+    categories = json.loads(arguments[1]) if len(arguments) > 1 else None
     meubles = bpy.data.collections.get("Meubles")
-    dans_meubles = set()
+    valeur_de = {}  # nom d'objet → valeur du pixel (0..255)
     if meubles is not None:
-        for o in meubles.all_objects:
-            dans_meubles.add(o.name)
-            if o.instance_type == "COLLECTION" and o.instance_collection is not None:
-                dans_meubles.update(x.name for x in o.instance_collection.all_objects)
+        for racine in meubles.objects:
+            if "categorie" not in racine:
+                continue
+            v = 255 if categories is None else (categories.index(racine["categorie"]) + 1
+                                                 if racine["categorie"] in categories else 0)
+            for o in [racine, *racine.children_recursive]:
+                valeur_de[o.name] = v
+                if o.instance_type == "COLLECTION" and o.instance_collection is not None:
+                    for x in o.instance_collection.all_objects:
+                        valeur_de[x.name] = v
     for o in bpy.data.objects:
-        o.color = (1, 1, 1, 1) if o.name in dans_meubles else (0, 0, 0, 1)
+        v = valeur_de.get(o.name, 0) / 255.0
+        lin = v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4  # « Standard » remet en sRGB : on vise la valeur exacte
+        o.color = (lin, lin, lin, 1)
         if o.type == "LIGHT":
             o.hide_render = True
     for c in scene.collection.children:
@@ -53,7 +67,7 @@ def main() -> None:
         scene.camera = camera
         largeur, hauteur = camera.get("format", (1600, 1000))
         scene.render.resolution_x, scene.render.resolution_y = largeur, hauteur
-        scene.render.filepath = str((dossier / f"masque-{camera.name.removeprefix('Vue_')}.png").resolve())
+        scene.render.filepath = str((dossier / f"{prefixe}-{camera.name.removeprefix('Vue_')}.png").resolve())
         bpy.ops.render.render(write_still=True)
     print(f"Masques des meubles : {dossier}")
 

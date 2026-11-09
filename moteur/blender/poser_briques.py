@@ -50,6 +50,8 @@ def main() -> None:
         collections[categorie] = bpy.data.collections.new(nom)
         scene.collection.children.link(collections[categorie])
 
+    import materiaux as module_materiaux
+    module_materiaux.SORTES.update(plan.get("sortes_sols", {}))  # le catalogue complet d'Atelya (moteur/matieres.py)
     materiaux = creer_materiaux(bibliotheque, plan.get("orientation_sols", 0.0))
     # B1 (08/11/2026) : deux murs qui se croisent (en X, murs épais) ont leurs dessus exactement à la même hauteur ; au rendu,
     # chacun fait de l'ombre à l'autre et la croisée sort NOIRE. Chaque mur monte donc d'un dixième de millimètre de plus que

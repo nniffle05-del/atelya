@@ -97,13 +97,16 @@ def vignettes_bibliotheque(alea: random.Random, par_matiere: int = PAR_MATIERE):
         texture = cv2.cvtColor(texture, cv2.COLOR_BGR2RGB)
         h, w = texture.shape[:2]
         px_par_m = w / infos[matiere]["taille_image_m"][0]
-        grand = np.tile(texture, (3, 3, 1))  # les matières se répètent sans raccord visible
+        # les matières se répètent sans raccord visible : assez de copies pour la plus grande vignette tournée (une matière
+        # de 30 cm, comme les pastilles rondes, demande plus de 3 copies : plantage du 09/11/2026)
+        copies = int(np.ceil(VIGNETTE_M / 0.8 * px_par_m * 1.45 / min(h, w))) + 1
+        grand = np.tile(texture, (copies, copies, 1))
         for _ in range(par_matiere):
             echelle = alea.uniform(0.8, 1.25)
             cote = int(VIGNETTE_M / echelle * px_par_m)
             angle = alea.choice([0, 90, 0, 90, alea.uniform(0, 180)])
             large = int(cote * 1.45)
-            l0, c0 = alea.randint(0, 3 * h - large - 1), alea.randint(0, 3 * w - large - 1)
+            l0, c0 = alea.randint(0, copies * h - large - 1), alea.randint(0, copies * w - large - 1)
             bout = grand[l0:l0 + large, c0:c0 + large]
             rot = cv2.getRotationMatrix2D((large / 2, large / 2), angle, 1.0)
             bout = cv2.warpAffine(bout, rot, (large, large))
