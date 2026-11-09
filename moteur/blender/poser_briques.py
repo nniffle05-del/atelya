@@ -196,6 +196,7 @@ def creer_lumiere(lumiere: dict) -> bpy.types.Object | None:
     objet.location = lumiere["position"]
     objet.visible_camera = False  # on voit la lumière, pas le panneau
     objet.hide_render = True  # B2-4 : de jour, les plafonniers sont éteints (rallumés pour une vue de nuit)
+    objet.hide_viewport = True  # … aussi dans la vue 3D de Blender, qui ne lit pas hide_render (09/11 : vue toute blanche chez NT)
     objet["nuit"] = True
     objet["piece"] = lumiere.get("piece", "")
     return objet

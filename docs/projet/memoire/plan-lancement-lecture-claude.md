@@ -458,3 +458,13 @@ Code : `moteur/eclairages.py` (définitions + `python -m moteur.eclairages const
 `apercu-5-eclairages.jpg`, comparaison des 11 photos en jour voilé `planche-jour-voile.jpg` : plus de taches de soleil, murs
 neutres, lumière douce = bien plus proche des photos ; RESTE : parquet du séjour trop foncé / rouge (teinte, pas lumière),
 voilages, mobilier, murs de couleur.
+**Correctifs des éclairages après essai de NT dans Blender (09/11/2026).** (1) NT : « jour voilé c'est super blanc » → clarté
+visée du jour voilé 0,60 → 0,47 (murs 196 → 186 / 255). (2) La VRAIE cause de la vue toute blanche : les plafonniers, éteints
+par `hide_render` (calcul final seulement), restaient ALLUMÉS dans la vue 3D de Blender (elle ne lit pas hide_render) → avec
+l'exposition faite pour le ciel seul, tout était brûlé ; la « Nuit » paraissait en plein jour. Corrigé : `hide_viewport = True`
+aussi (`poser_briques.creer_lumiere`, et `poser_eclairages` pour les maquettes déjà construites) ; les copies allumées du soir et de
+la nuit restent visibles. Vérifié par capture de l'écran de NT (Blender relancé par script, `bpy.app.timers` pour choisir la scène
+et le mode Rendu une fois la fenêtre ouverte). Aussi : direction du ciel couvert normée (sans effet sur le rendu, gardé par
+prudence). PIÈGES pour NT : Blender installé depuis une archive → Windows n'ouvre pas les .blend d'un double-clic (lancer
+blender.exe avec le fichier) ; se déplacer en vue caméra déplace la CAMÉRA ; cliquer sur le TEXTE du nom de scène le renomme
+(cliquer l'icône à gauche). Copie de visite : `..\atelya\b2\app-001\eclairages\maquette-visite-4.blend`.

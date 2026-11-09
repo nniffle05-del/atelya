@@ -23,7 +23,7 @@ from pathlib import Path
 AMBIANCES = [
     {"id": "jour_soleil", "nom": "1 Jour ensoleillé", "ciel": "physique", "hauteur_soleil": 50.0, "disque_soleil": True,
      "lampes": False, "clarte_murs": 0.55, "balance": 0.85},
-    {"id": "jour_voile", "nom": "2 Jour voilé", "ciel": "couvert", "lampes": False, "clarte_murs": 0.60, "balance": 0.95},
+    {"id": "jour_voile", "nom": "2 Jour voilé", "ciel": "couvert", "lampes": False, "clarte_murs": 0.47, "balance": 0.95},
     {"id": "fin_de_journee", "nom": "3 Fin de journée", "ciel": "physique", "hauteur_soleil": 7.0, "disque_soleil": True,
      "lampes": False, "clarte_murs": 0.50, "balance": 0.25},
     {"id": "soiree", "nom": "4 Soirée lampes allumées", "ciel": "physique", "hauteur_soleil": -3.0, "disque_soleil": False,

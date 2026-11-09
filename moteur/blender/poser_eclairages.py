@@ -26,6 +26,10 @@ def main() -> None:
         raise RuntimeError("cette maquette a déjà ses éclairages")
     ciel_origine = origine.world
     plafonniers = [o for o in origine.objects if o.type == "LIGHT" and o.get("nuit")]
+    for o in plafonniers:
+        # éteints aussi dans la VUE 3D de Blender (elle ne lit pas hide_render) : sinon, de jour, chaque pièce a son
+        # plafonnier allumé à l'écran et l'image est brûlée (vu par NT le 09/11 : « jour voilé c'est super blanc »)
+        o.hide_viewport = True
     scenes = []
     for i, a in enumerate(ambiances):
         if i == 0:
@@ -83,8 +87,13 @@ def monde(a: dict, ciel_origine) -> bpy.types.World:
     if a["ciel"] == "couvert":
         # ciel couvert de la CIE : clarté (1 + 2 sin h) / 3, h = hauteur au-dessus de l'horizon (1/3 à l'horizon, 1 au zénith)
         coord = n.new("ShaderNodeTexCoord")
+        # direction ramenée à une longueur 1 : la vue 3D de Blender ne le fait pas (le ciel y était ~20 fois trop fort, vu
+        # par NT le 09/11 : « jour voilé c'est super blanc ») ; le calcul final, lui, la donnait déjà normée
+        norme = n.new("ShaderNodeVectorMath")
+        norme.operation = "NORMALIZE"
+        l.new(coord.outputs["Generated"], norme.inputs[0])
         xyz = n.new("ShaderNodeSeparateXYZ")
-        l.new(coord.outputs["Generated"], xyz.inputs[0])
+        l.new(norme.outputs["Vector"], xyz.inputs[0])
         haut = n.new("ShaderNodeMath")
         haut.operation = "MAXIMUM"
         l.new(xyz.outputs["Z"], haut.inputs[0])
