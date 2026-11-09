@@ -101,3 +101,39 @@ def test_carreaux_dessines_se_raccordent():
     assert joint_bords.all()
     # au milieu d'un carreau : du joint seulement là où passent les joints horizontaux (2 px par carreau de 50 px)
     assert np.all(c[:, 25] == d.CLAIRS_JOINT, axis=1).mean() == pytest.approx(2 / 50)
+
+
+def _avec_corniche(choix, ecart=0.0):
+    """La pièce de 4 × 3 m avec une corniche ; `ecart` : contour lu à quelques centimètres des murs (comme les lectures réelles)."""
+    donnees = _piece_simple().model_dump(by_alias=True, mode="json")
+    piece = donnees["pieces"][0]
+    e = ecart
+    piece["contour"] = [[e, e], [4 - e, e], [4 - e, 3 - e], [e, 3 - e]]
+    if choix:
+        piece["corniche"] = {"choix": choix, "statut": "estime", "source": "photo"}
+    return Logement.model_validate(donnees)
+
+
+@pytest.mark.parametrize("ecart", [0.0, 0.03])
+def test_corniche_moulure_fait_le_tour_du_plafond(ecart):
+    """NT (09/11/2026) : « la jonction des murs est trop brute » : la corniche moulurée, 4 gradins tout autour du plafond, angles
+    en biseau sans trou ; même quand le contour lu de la pièce s'arrête à 3 cm des murs (app-001 : trou sombre dans l'angle)."""
+    from moteur.habillage import PROFILS_CORNICHE
+
+    log = _avec_corniche("moulure", ecart)
+    briques = [b for b in plan_habille(log)["briques"] if b["id"].startswith("corniche__")]
+    profil = PROFILS_CORNICHE["moulure"]
+    assert len(briques) == 4 * len(profil)  # un morceau par côté et par gradin : rien n'est coupé
+    assert all(b["categorie"] == "plafond" and b["materiau"] == "plafond_blanc" and b["z_haut"] == 2.5 for b in briques)
+    l, h = 4, 3  # le sol de la pièce est recalé contre les faces des murs (geometrie, B1) : la corniche les suit aussi
+    for g, (avancee, hauteur) in enumerate(profil):
+        gradin = [b for b in briques if b["id"].split("__")[2].startswith(f"{g}_")]
+        assert gradin and all(b["z_bas"] == pytest.approx(2.5 - hauteur) for b in gradin)
+        anneau = l * h - (l - 2 * avancee) * (h - 2 * avancee)  # le tour complet, angles en biseau : ni trou ni recouvrement
+        assert sum(_aire(b["contour"]) for b in gradin) == pytest.approx(anneau, abs=1e-6)
+
+
+def test_pas_de_corniche_sans_choix():
+    assert not [b for b in plan_habille(_avec_corniche(None))["briques"] if b["id"].startswith("corniche__")]
+    simple = [b for b in plan_habille(_avec_corniche("simple"))["briques"] if b["id"].startswith("corniche__")]
+    assert len(simple) == 4

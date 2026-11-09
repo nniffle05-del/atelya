@@ -379,12 +379,24 @@
     p.nom = nom.trim();
     // Ce qu'Atelya avait supposé d'après l'ancien nom (sol, plinthes, portes de placard) est oublié : il le supposera de nouveau
     // d'après le nouveau nom (un « Bureau » devenu « Salle d'eau » n'a pas de parquet). Ce que la personne a choisi reste.
-    for (const k of ["sol", "plinthes", "placard"]) if (p[k] && p[k].statut === "ajoute") delete p[k];
+    for (const k of ["sol", "plinthes", "placard", "corniche"]) if (p[k] && p[k].statut === "ajoute") delete p[k];
     marquer(v, p);
     return v;
   }
 
   const CHOIX_PLINTHES = ["bois", "carrelage", "aucune"];
+  const CHOIX_CORNICHE = ["moulure", "simple", "aucune"];
+
+  /** La corniche d'une pièce (moulure du plafond), choisie par la personne : « moulure », « simple » ou « aucune ». */
+  function reglerCorniche(v0, id, choix) {
+    if (!CHOIX_CORNICHE.includes(choix)) throw new Error(`corniche inconnue : ${choix}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.corniche = { choix, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
 
   /** Les plinthes d'une pièce, choisies par la personne (B2) : « bois », « carrelage » ou « aucune ». */
   function reglerPlinthes(v0, id, choix) {
@@ -1502,6 +1514,8 @@
     renommerPiece,
     reglerPlinthes,
     CHOIX_PLINTHES,
+    reglerCorniche,
+    CHOIX_CORNICHE,
     reglerSol,
     SOLS,
     reglerPlacard,

@@ -985,6 +985,15 @@
         : f.statut === "estime" ? `Vu par Atelya sur la photo (${f.source}).`
         : "Supposé par Atelya : personne ne l'a vu. À changer si besoin.";
       const origine = origineDe(e.plinthes);
+      // B2 temps 2 : la corniche (moulure du plafond), même principe que les plinthes.
+      const NOMS_CORNICHE = { moulure: "Corniche moulurée (gradins)", simple: "Corniche simple (une bande)", aucune: "Pas de corniche" };
+      const corniche = el("select", { id: "f-corniche" },
+        ...(e.corniche ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        ...C.CHOIX_CORNICHE.map((k) => el("option", { value: k, texte: NOMS_CORNICHE[k] })));
+      corniche.value = e.corniche ? e.corniche.choix : "";
+      corniche.addEventListener("change", () => {
+        if (corniche.value) corriger((x) => C.reglerCorniche(x, e.id, corniche.value), `${NOMS_CORNICHE[corniche.value]}.`);
+      });
       // B2-2 : les portes d'un placard, même principe que les plinthes.
       const placard = [];
       if (C.estPlacard(e)) {
@@ -1009,6 +1018,7 @@
       fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre,
         el("label", { texte: "Sol" }), sol, el("p", { class: "aide", texte: origineDe(e.sol) }),
         el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }), ...placard,
+        el("label", { texte: "Corniche (la moulure autour du plafond)" }), corniche, el("p", { class: "aide", texte: origineDe(e.corniche) }),
         el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
         el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));
     } else if (genre === "ouverture") {

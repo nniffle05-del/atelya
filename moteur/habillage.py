@@ -142,6 +142,7 @@ def plan_habille(logement: Logement) -> dict:
     briques = [replace(b, z_bas=JOINT_SOL_Z, z_haut=JOINT_SOL_Z) if b.id.startswith("joint_sol__") else b for b in briques]
     briques += menuiseries(logement)
     briques += plinthes(briques, logement)
+    briques += corniches(briques, logement)
     briques += portes_de_placard(briques, logement)
     briques += sous_sols(briques)
     return {
@@ -699,6 +700,93 @@ def _cotes_dans_une_piece(o: Ouverture, mur: Mur, logement: Logement) -> tuple[b
 # --------------------------------------------------------------- plinthes
 
 
+# Corniches (B2 temps 2) : le profil, gradin par gradin, (avancée depuis le mur, hauteur sous le plafond), en m. « moulure » imite
+# la gorge à gradins des photos d'app-001 (07, 08, 11) ; « simple », une seule bande.
+PROFILS_CORNICHE = {"simple": [(0.03, 0.08)], "moulure": [(0.02, 0.15), (0.045, 0.11), (0.075, 0.065), (0.10, 0.03)]}
+CORNICHE_PAR_DEFAUT = "aucune"  # rien de vu : pas de corniche (un logement récent n'en a pas)
+SONDES_CORNICHE = (0.02, 0.05, 0.09)  # m : distances derrière le bord du plafond où l'on cherche le mur
+TROU_CORNICHE = 0.12  # m : un trou plus petit dans la corniche est refermé
+BOUT_CORNICHE = 0.06  # m : un morceau qui s'arrête plus près d'un angle va jusqu'à l'angle
+
+
+def _refermer(morceaux: list[tuple[float, float]], trou: float) -> list[tuple[float, float]]:
+    sortie: list[tuple[float, float]] = []
+    for s0, s1 in sorted(morceaux):
+        if sortie and s0 - sortie[-1][1] < trou:
+            sortie[-1] = (sortie[-1][0], max(sortie[-1][1], s1))
+        else:
+            sortie.append((s0, s1))
+    return sortie
+
+
+def choix_corniche(piece: Piece) -> str:
+    return piece.corniche.choix if piece.corniche is not None else CORNICHE_PAR_DEFAUT
+
+
+def corniches(briques: list[Brique], logement: Logement) -> list[Brique]:
+    """Les corniches de chaque pièce qui en a une : des bandes de plâtre en gradins le long de chaque côté du plafond, là où un mur
+    monte jusqu'au plafond juste derrière, coupées en biseau dans les angles comme les plinthes. Rangées avec les plafonds (même
+    plâtre blanc, cachées avec eux sur la vue de dessus)."""
+    hsp = logement.hauteur_sous_plafond
+    sols = {b.element: b for b in briques if b.categorie == "sol" and b.id == f"sol__{b.element}"}
+    sortie: list[Brique] = []
+    for piece in logement.pieces:
+        profil = PROFILS_CORNICHE.get(choix_corniche(piece))
+        if not profil or piece.id not in sols:
+            continue
+        haut_max = max(h for _, h in profil)
+        murs_en_haut = [b.contour for b in briques if b.categorie == "mur" and b.z_haut >= hsp - 1e-6
+                        and b.z_bas <= hsp - haut_max + 1e-6]
+        boites = [_boite_plan(c) for c in murs_en_haut]
+        contour = sols[piece.id].contour
+        n = len(contour)
+        cotes = []
+        for i in range(n):
+            a, b = contour[i], contour[(i + 1) % n]
+            longueur = math.dist(a, b)
+            if longueur < 1e-6:
+                cotes.append((a, (1.0, 0.0), (0.0, 1.0), 0.0, []))
+                continue
+            u = ((b[0] - a[0]) / longueur, (b[1] - a[1]) / longueur)
+            gauche = (-u[1], u[0])
+            # Le contour lu d'une pièce s'arrête parfois à quelques centimètres d'un mur fin (app-001 : 3 cm du mur de 8 cm de
+            # l'entrée) : on sonde à plusieurs distances ; les petits trous sont refermés et un morceau qui s'arrête à moins de
+            # BOUT_CORNICHE d'un angle va jusqu'à l'angle (sinon pas de biseau : un trou sombre dans l'angle, 10 cm de profondeur).
+            morceaux = _reunir([m for sonde in SONDES_CORNICHE
+                                for m in _morceaux_contre_un_mur(a, u, gauche, longueur, murs_en_haut, boites, sonde)])
+            morceaux = _refermer(morceaux, TROU_CORNICHE)
+            morceaux = [(0.0 if s0 < BOUT_CORNICHE else s0, longueur if s1 > longueur - BOUT_CORNICHE else s1)
+                        for s0, s1 in morceaux]
+            cotes.append((a, u, gauche, longueur, morceaux))
+        for g, (avancee, hauteur) in enumerate(profil):
+            for k, quad in enumerate(_bandes(contour, cotes, avancee)):
+                sortie.append(Brique(f"corniche__{piece.id}__{g}_{k}", "plafond", piece.id, quad, hsp - hauteur, hsp,
+                                     "plafond_blanc"))
+    return sortie
+
+
+def _bandes(contour: list[Point], cotes: list, epaisseur: float) -> list[list[Point]]:
+    """Les bandes d'épaisseur donnée le long des morceaux de chaque côté, en biseau dans les angles (comme les plinthes)."""
+    n = len(contour)
+    onglets = [_onglet_plinthe(contour[i], cotes[i - 1][2], cotes[i][2], epaisseur) for i in range(n)]
+    sortie = []
+    for i, (a, u, gauche, longueur, morceaux) in enumerate(cotes):
+        precedent, suivant = cotes[i - 1][4], cotes[(i + 1) % n][4]
+        for s0, s1 in morceaux:
+            p0 = (a[0] + u[0] * s0, a[1] + u[1] * s0)
+            p1 = (a[0] + u[0] * s1, a[1] + u[1] * s1)
+            droit0 = (p0[0] + gauche[0] * epaisseur, p0[1] + gauche[1] * epaisseur)
+            droit1 = (p1[0] + gauche[0] * epaisseur, p1[1] + gauche[1] * epaisseur)
+            q0 = onglets[i] if (s0 <= 1e-6 and precedent and precedent[-1][1] >= cotes[i - 1][3] - 1e-6 and onglets[i]) else droit0
+            q1 = onglets[(i + 1) % n] if (s1 >= longueur - 1e-6 and suivant and suivant[0][0] <= 1e-6
+                                           and onglets[(i + 1) % n]) else droit1
+            quad = [p0, p1, q1, q0]
+            if _aire_signee_plan(quad) <= 1e-9 or _projete(q1, a, u) < _projete(q0, a, u):
+                quad = [p0, p1, droit1, droit0]
+            sortie.append(_sens_direct([_arrondi(q) for q in quad]))
+    return sortie
+
+
 def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
     """Les plinthes de chaque pièce (B2-1), posées sur le sol calé de la pièce (voir geometrie, B1).
 
@@ -766,11 +854,12 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
 
 
 def _morceaux_contre_un_mur(a: Point, u: Point, gauche: Point, longueur: float, murs_au_sol: list,
-                            boites: list) -> list[tuple[float, float]]:
+                            boites: list, sonde: float = None) -> list[tuple[float, float]]:
     """Les morceaux (s0, s1) du côté qui part de a le long de u où un mur au niveau du sol est juste derrière (à SONDE_MUR,
     du côté opposé à « gauche », l'intérieur de la pièce)."""
-    a2 = (a[0] - gauche[0] * SONDE_MUR, a[1] - gauche[1] * SONDE_MUR)
-    b2 = (a[0] + u[0] * longueur - gauche[0] * SONDE_MUR, a[1] + u[1] * longueur - gauche[1] * SONDE_MUR)
+    sonde = SONDE_MUR if sonde is None else sonde
+    a2 = (a[0] - gauche[0] * sonde, a[1] - gauche[1] * sonde)
+    b2 = (a[0] + u[0] * longueur - gauche[0] * sonde, a[1] + u[1] * longueur - gauche[1] * sonde)
     (sx0, sy0), (sx1, sy1) = _boite_plan([a2, b2])
     morceaux: list[tuple[float, float]] = []
     for contour_mur, ((bx0, by0), (bx1, by1)) in zip(murs_au_sol, boites):

@@ -4,7 +4,7 @@ photo de la pièce (mur blanc = étalon, moteur/teinte_photo.py).
 
 Le fichier de choix (JSON) :
     {"photos": "<dossier des photos>", "bibliotheque": "<..\atelya\bibliotheque\matieres>",
-     "pieces": {"<id de la pièce>": {"matiere": "...", "echelle": 1.13, "source": "photo 03",
+     "pieces": {"<id de la pièce>": {"matiere": "...", "echelle": 1.13, "source": "photo 03", "corniche": {"choix": "moulure", "source": "photo 08"},
                                      "photo": "photo-03.png", "zone_sol": [x0, x1, y0, y1], "zone_mur_blanc": [x0, x1, y0, y1],
                                      "zones": [{"contour": [[x, y], ...], "matiere": "...", "source": "photos 05, 06", ...}]}}}
 Les zones de photo sont en fractions de la largeur et de la hauteur ; sans photo, pas de teinte. Les contours des zones de sol
@@ -53,6 +53,8 @@ def poser_sols(logement: dict, choix: dict, racine: Path) -> dict:
         piece = pieces[pid]
         piece["sol"] = sol_vu(c, photos, bibliotheque)
         piece["zones_sol"] = [{"contour": z["contour"], "sol": sol_vu(z, photos, bibliotheque)} for z in c.get("zones", [])]
+        if c.get("corniche"):  # la moulure du plafond vue sur la photo : {"choix": "moulure", "source": "photo 08"}
+            piece["corniche"] = {"choix": c["corniche"]["choix"], "statut": "estime", "source": c["corniche"]["source"], "confiance": 0.8}
     Logement.model_validate(logement)  # zones convexes, matières du catalogue…
     return logement
 

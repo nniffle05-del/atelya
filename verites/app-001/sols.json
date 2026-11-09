@@ -1,5 +1,5 @@
 {
- "note": "Sols d'app-001 vus sur les photos de l'annonce (B2 temps 2, étape 3, 09/11/2026), validés par NT : entre séjour et cuisine DEUX sols, point de Hongrie jusqu'à l'îlot (chaises comprises), carreaux de ciment en cubes après l'îlot côté évier, limite parallèle aux meubles de cuisine ; entrée et passage en lames droites jusqu'à la cuisine. Contours en mètres, repère du logement traduit (..\\atelya\\lectures-claude\\app-001\\logement.json).",
+ "note": "Sols d'app-001 vus sur les photos de l'annonce (B2 temps 2, étape 3, 09/11/2026), validés par NT : entre séjour et cuisine DEUX sols, point de Hongrie jusqu'à l'îlot (chaises comprises), carreaux de ciment en cubes après l'îlot côté évier, limite parallèle aux meubles de cuisine ; entrée et passage en lames droites jusqu'à la cuisine. Contours en mètres, repère du logement traduit (..\\atelya\\lectures-claude\\app-001\\logement.json). Corniches moulurées vues sur les photos 07, 08 et 11 (NT : « la jonction des murs est trop brute »).",
  "photos": "../atelya/photos-clients/app-001/photos",
  "bibliotheque": "../atelya/bibliotheque/matieres",
  "pieces": {
@@ -79,7 +79,11 @@
       0.45
      ]
     }
-   ]
+   ],
+   "corniche": {
+    "choix": "moulure",
+    "source": "photo 07 (entrée)"
+   }
   },
   "chambre_1": {
    "matiere": "chene_clair_photo",
@@ -97,7 +101,11 @@
     0.25,
     0.1,
     0.35
-   ]
+   ],
+   "corniche": {
+    "choix": "moulure",
+    "source": "photo 08"
+   }
   },
   "chambre_2": {
    "matiere": "chene_clair_photo",
@@ -115,7 +123,11 @@
     0.52,
     0.15,
     0.35
-   ]
+   ],
+   "corniche": {
+    "choix": "moulure",
+    "source": "photo 11"
+   }
   },
   "salle_d_eau_1": {
    "matiere": "petits_carreaux_clairs",

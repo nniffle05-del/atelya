@@ -391,3 +391,22 @@ relançait tout le rendu. PIÈGE corrigé : `reglage_de_photographe` impose RGBA
 comme du mur → image brûlée). App-001 : séjour (146, 107, 92) contre photos (150, 99, 72) / (161, 106, 57), murs (212, 216, 216) ;
 construction 5 min 10 (dont ~2 min de réglage). Images : `..\atelya\b2\app-001\etape3-sejour.png`, `etape3-vue-dessus.png`.
 Tests : `tests/test_zones_sol.py` (6).
+**Retour NT sur l'étape 3 (09/11/2026)** : (1) la comparaison était TROMPEUSE : la vue 3D (caméra automatique d'Atelya dans un coin du
+séjour) a été mise à côté des photos 04 (salle à manger) et 02 (séjour) comme si c'était la même vue → ne plus jamais comparer une vue
+3D à une photo prise d'ailleurs ; c'est l'étape 4 (caméras au même endroit que chaque photo). (2) « La jonction des murs est trop
+brute, sur le plan et les photos c'est plus smooth » : sur les photos 07, 08, 11, une CORNICHE moulurée fait le tour du plafond
+(gorge à gradins de ~10-15 cm) ; en 3D, murs et plafond se coupent à angle vif. Proposé : corniches choisies pièce par pièce (comme
+plinthes et sols) + arêtes de murs légèrement adoucies ; image `..\atelya\b2\app-001\corniches-photos.png`. En attente de NT.
+**Corniches FAITES (09/11/2026, accord NT « oui ça marche »).** `Piece.corniche` (Corniche : « aucune » / « simple » / « moulure »,
+statut comme les plinthes ; défaut `CORNICHE_PAR_DEFAUT` = aucune) ; `habillage.corniches` : bandes de plâtre en gradins le long de
+chaque côté du plafond où un mur monte jusqu'au plafond (`PROFILS_CORNICHE` : moulure = 4 gradins, avancée 2 / 4,5 / 7,5 / 10 cm,
+hauteur 15 / 11 / 6,5 / 3 cm ; simple = 3 × 8 cm), biseaux dans les angles comme les plinthes (`_bandes`), rangées avec les PLAFONDS
+(matériau plafond_blanc, cachées sur la vue de dessus). PIÈGE corrigé : le contour lu d'une pièce s'arrête parfois à 3 cm d'un mur fin
+(app-001, mur de 8 cm de l'entrée) → sondes à 2, 5 et 9 cm (`SONDES_CORNICHE`), trous < 12 cm refermés, morceau à < 6 cm d'un angle
+prolongé jusqu'à l'angle (sinon trou sombre de 10 cm dans l'angle saillant). Écran de vérification : liste « Corniche » dans la fiche de
+chaque pièce (`reglerCorniche`). `poser_sols` pose la corniche vue sur photo (clé `corniche`) ; app-001 : séjour, chambres 1 et 2 =
+moulure (photos 07, 08, 11). ESSAYÉ ET RETIRÉ : arrondi des arêtes par le nœud « Bevel » de Cycles (traits verticaux à chaque raccord
+de briques de mur). Question NT « pourquoi un effet sur les murs ? » : les marbrures viennent de la compression des APERÇUS (fichier
+lisse à la taille réelle, vérifié contraste ×4 ; 512 / 1024 passes, seuil adaptatif 0,003, plus de rebonds : aucune différence
+mesurable) ; NT : « c'est bon ». À garder en tête : murs rosés à gauche / bleutés à droite (lumière renvoyée par le parquet ensoleillé
+contre lumière du ciel), physiquement juste mais neutralisé par les photographes → à traiter avec les éclairages.

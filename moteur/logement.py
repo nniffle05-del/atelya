@@ -144,6 +144,18 @@ class Sol(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class Corniche(BaseModel):
+    """La moulure de plâtre qui fait le tour du plafond d'une pièce (B2 temps 2, 09/11/2026 : app-001, NT « la jonction des
+    murs est trop brute ») : « aucune », « simple » (une bande) ou « moulure » (gradins). Même provenance que Plinthes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    choix: Literal["aucune", "simple", "moulure"]
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
 class ZoneSol(BaseModel):
     """Un morceau du sol d'une pièce posé dans un autre revêtement (B2 temps 2, 09/11/2026 : app-001, carreaux de ciment
     devant les meubles d'une cuisine ouverte sur un séjour en point de Hongrie).
@@ -171,6 +183,9 @@ class Piece(Element):
     )
     sol: Sol | None = Field(
         default=None, description="Revêtement du sol. Si absent : la règle par défaut (moteur.habillage.sol_par_defaut)"
+    )
+    corniche: Corniche | None = Field(
+        default=None, description="Moulure du plafond. Si absent : la règle par défaut (moteur.habillage.CORNICHE_PAR_DEFAUT)"
     )
     zones_sol: list[ZoneSol] = Field(
         default_factory=list, description="Morceaux du sol dans un autre revêtement (cuisine ouverte…), sans mur ni trait"
