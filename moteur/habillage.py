@@ -151,7 +151,81 @@ def plan_habille(logement: Logement) -> dict:
         "briques": [asdict(b) for b in briques],
         "lumieres": lumieres(logement),
         "vues": vues(logement),
+        "reglages_teinte": reglages_teinte(logement, briques),
     }
+
+
+# ------------------------------------------------- réglage de la teinte des sols au rendu
+
+DISTANCE_REGLAGE = 3.5  # m : la caméra de réglage regarde le sol à régler d'environ cette distance (vue en biais, murs derrière)
+PAS_REGLAGE = 0.4  # m : pas de la grille des positions essayées dans la pièce
+FOCALE_REGLAGE = 16.0  # mm : grand angle, pour voir à la fois le sol et des murs
+
+
+def reglages_teinte(logement: Logement, briques: list[Brique]) -> list[dict]:
+    """Les sols vus sur une photo du client (champ couleur_photo) : leur matériau, la couleur visée et une caméra de réglage.
+
+    Pourquoi (B2 temps 2, 09/11/2026) : la teinte calculée sur la photo vise la couleur du BOIS ; mais au rendu, le reflet du ciel
+    et le réglage de pellicule (AgX) délavent le parquet (app-001 : miel sur la photo, rosé-gris au rendu). moteur/blender/
+    regler_teintes.py fait donc une petite image depuis cette caméra, mesure le sol contre les murs blancs, comme sur la photo,
+    corrige la teinte et recommence."""
+    par_piece = {b.element: b for b in briques if b.categorie == "sol" and b.id == f"sol__{b.element}"}
+    zones = {b.id: b for b in briques if b.id.startswith("zone_sol__")}
+    sortie, vus = [], set()
+    for p in logement.pieces:
+        if p.id not in par_piece:
+            continue
+        cibles = []
+        if p.sol is not None and p.sol.couleur_photo is not None:
+            cibles.append((par_piece[p.id], p.sol))
+        for k, z in enumerate(p.zones_sol, start=1):
+            if z.sol.couleur_photo is not None and f"zone_sol__{p.id}__{k}" in zones:
+                cibles.append((zones[f"zone_sol__{p.id}__{k}"], z.sol))
+        for brique, sol in cibles:
+            if brique.materiau in vus:  # deux sols de même matière et même teinte : un seul réglage
+                continue
+            vus.add(brique.materiau)
+            camera = vue_de_reglage(p, brique.contour)
+            if camera is not None:
+                sortie.append({"materiau": brique.materiau, "piece": p.id, "cible": list(sol.couleur_photo), "camera": camera})
+    return sortie
+
+
+def vue_de_reglage(piece: Piece, sol: list[Point]) -> dict | None:
+    """Une caméra dans la pièce, à environ DISTANCE_REGLAGE du milieu du sol à régler, qui le regarde en plongée."""
+    cx = sum(x for x, _ in sol) / len(sol)
+    cy = sum(y for _, y in sol) / len(sol)
+    if not _dans((cx, cy), sol):  # sol en L : le point du sol le plus proche de son milieu
+        cx, cy = min(sol, key=lambda q: math.dist(q, (cx, cy)))
+    (x0, y0), (x1, y1) = _boite_plan(piece.contour)
+    meilleur = None
+    x = x0 + PAS_REGLAGE / 2
+    while x < x1:
+        y = y0 + PAS_REGLAGE / 2
+        while y < y1:
+            if _dans((x, y), piece.contour) and _distance_au_bord((x, y), piece.contour) >= RETRAIT_COIN:
+                ecart = abs(math.dist((x, y), (cx, cy)) - DISTANCE_REGLAGE)
+                if meilleur is None or ecart < meilleur[0]:
+                    meilleur = (ecart, (x, y))
+            y += PAS_REGLAGE
+        x += PAS_REGLAGE
+    if meilleur is None:
+        return None
+    (px, py) = meilleur[1]
+    if math.dist((px, py), (cx, cy)) < 0.5:  # pièce trop petite pour s'éloigner : on regarde vers le mur le plus loin
+        cx, cy = max(piece.contour, key=lambda q: math.dist(q, (px, py)))
+    return {"position": _arrondi3((px, py, HAUTEUR_OEIL)), "cible": _arrondi3((cx, cy, 0.3)),
+            "focale": FOCALE_REGLAGE, "capteur": CAPTEUR}
+
+
+def _distance_au_bord(point: Point, contour: list[Point]) -> float:
+    d = math.inf
+    for a, b in zip(contour, contour[1:] + contour[:1]):
+        ux, uy = b[0] - a[0], b[1] - a[1]
+        n = ux * ux + uy * uy
+        t = 0.0 if n == 0 else max(0.0, min(1.0, ((point[0] - a[0]) * ux + (point[1] - a[1]) * uy) / n))
+        d = min(d, math.dist(point, (a[0] + t * ux, a[1] + t * uy)))
+    return d
 
 
 # ---------------------------------------------------------------- matériaux
@@ -261,7 +335,12 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
     pieces = {p.id: p for p in logement.pieces}
     if brique.element in pieces:
         piece = pieces[brique.element]
-        return nom_materiau(matiere_du_sol(piece), piece.sol.teinte if piece.sol is not None else None)
+        if brique.id.startswith("zone_sol__"):  # « zone_sol__<pièce>__<n° de la zone, à partir de 1> »
+            zone = piece.zones_sol[int(brique.id.rsplit("__", 1)[1]) - 1]
+            return nom_materiau(zone.sol.matiere, zone.sol.teinte, zone.sol.echelle)
+        if piece.sol is None:
+            return nom_materiau(matiere_du_sol(piece))
+        return nom_materiau(piece.sol.matiere, piece.sol.teinte, piece.sol.echelle)
     return "seuil"  # le sol sous une porte
 
 
@@ -643,7 +722,8 @@ def plinthes(briques: list[Brique], logement: Logement) -> list[Brique]:
             epaisseur, hauteur = EPAISSEUR_PLINTHE_CARRELAGE, HAUTEUR_PLINTHE_CARRELAGE
             sol = sols[piece.id].materiau
             # le carrelage du sol ; sous des carreaux de ciment (motif), une plinthe unie ; sous un parquet, du carrelage beige
-            materiau = (("carrelage" if matiere_et_teinte(sol)[0] == "carreaux_ciment" else sol) if sorte(sol) == "carrelage"
+            materiau = (("carrelage" if matiere_et_teinte(sol)[0] in ("carreaux_ciment", "carreaux_cubes") else sol)
+                        if sorte(sol) == "carrelage"
                         else SOL_PAR_SORTE["carrelage"])
         else:
             epaisseur, hauteur, materiau = EPAISSEUR_PLINTHE, HAUTEUR_PLINTHE, "menuiserie_blanche"

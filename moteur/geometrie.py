@@ -53,6 +53,8 @@ OUVERTURE_MIN = 0.25  # m : ce qui doit rester d'une ouverture raccourcie
 PRECISION = 1e-6
 # B1 : imprécisions de lecture rattrapées pour que la maquette n'ait aucun jour (voir la tête du module).
 TOLERANCE_NOEUD = 0.03  # m : deux bouts de murs plus proches sont le même point ; un bout aussi près d'une face la touche
+ZONE_SOL_Z = 0.0005  # m : une zone de sol (autre revêtement dans la pièce) est posée un demi-millimètre au-dessus du sol de la
+# pièce : à la même hauteur, les deux surfaces se disputeraient chaque point au rendu (taches noires)
 CALAGE_SOL = 0.10  # m : un côté de pièce à moins de ça de la face d'un mur (parallèle) est posé dessus
 DEPASSEMENT_MAX = 0.50  # m : un bout qui traverse un autre mur et dépasse de moins que ça est coupé (angle lu croisé)
 ALIGNES_T = math.cos(math.radians(10.0))  # deux murs d'un même nœud à moins de 10° l'un de l'autre se prolongent (T)
@@ -104,6 +106,10 @@ def calculer_briques(logement: Logement) -> list[Brique]:
         contour = _sens_direct([_arrondi(pt) for pt in _caler_sur_les_murs(list(p.contour), murs_lus)])
         briques.append(Brique(f"sol__{p.id}", "sol", p.id, contour, 0.0, 0.0))
         briques.append(Brique(f"plafond__{p.id}", "plafond", p.id, contour, hsp, hsp))
+        for k, zone in enumerate(p.zones_sol, start=1):
+            morceau = _couper_par_convexe(contour, _sens_direct([_arrondi(pt) for pt in zone.contour]))
+            if len(morceau) >= 3 and abs(_aire_signee(morceau)) > 1e-4:
+                briques.append(Brique(f"zone_sol__{p.id}__{k}", "sol", p.id, _sens_direct(morceau), ZONE_SOL_Z, ZONE_SOL_Z))
 
     murs = {m.id: m for m in murs_lus}
     for o in ouvertures:
@@ -509,6 +515,36 @@ def _aire_signee(contour: list[Point]) -> float:
     for (x1, y1), (x2, y2) in zip(contour, contour[1:] + contour[:1]):
         total += x1 * y2 - x2 * y1
     return total / 2
+
+
+def _couper_par_convexe(sujet: list[Point], coupe: list[Point]) -> list[Point]:
+    """La partie de `sujet` (un polygone, creux permis) qui tombe dans `coupe` (convexe, sens direct) : découpe de
+    Sutherland-Hodgman, un côté de `coupe` après l'autre. Une pièce en L coupée peut garder un côté aller-retour de largeur
+    nulle, sans surface : invisible."""
+    sortie = list(sujet)
+    for (ax, ay), (bx, by) in zip(coupe, coupe[1:] + coupe[:1]):
+        if not sortie:
+            break
+
+        def dedans(p: Point) -> bool:
+            return (bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax) >= -PRECISION
+
+        def croisement(p: Point, q: Point) -> Point:
+            dx, dy = q[0] - p[0], q[1] - p[1]
+            den = (bx - ax) * dy - (by - ay) * dx
+            t = ((p[0] - ax) * dy - (p[1] - ay) * dx) / den if abs(den) > 1e-15 else 0.0
+            return _arrondi((ax + t * (bx - ax), ay + t * (by - ay)))
+
+        entree, sortie = sortie, []
+        for i, q in enumerate(entree):
+            p = entree[i - 1]
+            if dedans(q):
+                if not dedans(p):
+                    sortie.append(croisement(p, q))
+                sortie.append(q)
+            elif dedans(p):
+                sortie.append(croisement(p, q))
+    return [pt for i, pt in enumerate(sortie) if pt != sortie[i - 1]] if sortie else []
 
 
 def _sens_direct(contour: list[Point]) -> list[Point]:

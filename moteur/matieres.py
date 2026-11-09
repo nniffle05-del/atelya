@@ -35,6 +35,9 @@ SOLS: dict[str, tuple[str, str]] = {
     "tomettes": ("Tomettes", "carrelage"),
     "damier_pierre": ("Damier de pierre", "carrelage"),
     "pierre_beige": ("Dalles de pierre beige", "carrelage"),
+    # Dessinés par Atelya d'après les photos d'app-001 (outils/bibliotheque/dessiner_carreaux.py, 09/11/2026).
+    "carreaux_cubes": ("Carreaux de ciment en cubes (losanges)", "carrelage"),
+    "petits_carreaux_clairs": ("Petits carreaux clairs, 10 cm", "carrelage"),
 }
 # Écartées après essai à l'œil (08/11/2026) : « granito » (la photo terrazzo_tiles, brune et mouchetée, ressemble à du liège ou
 # à de la moquette une fois posée : pas réaliste ; à remplacer par un vrai granito gris à éclats).
@@ -54,19 +57,30 @@ ROTATION_PHOTO = {"carrelage_interieur": 45.0}
 SOL_PAR_SORTE = {"bois": "chene_naturel_photo", "carrelage": "carrelage_interieur"}  # NT 08/11 : l'ancien défaut (parquet_chene_lames) était trop foncé
 
 
-def nom_materiau(matiere: str, teinte=None) -> str:
-    """Le nom du matériau d'une brique : la matière, suivie de sa teinte s'il y en a une (« chene_beige~1.20,1.00,0.80 »)."""
+def nom_materiau(matiere: str, teinte=None, echelle: float | None = None) -> str:
+    """Le nom du matériau d'une brique : la matière, son échelle de motif si elle n'est pas 1 (« @1.13 »), puis sa teinte
+    s'il y en a une (« hongrie_naturel@1.13~1.20,1.00,0.80 »)."""
+    nom = matiere
+    if echelle and abs(echelle - 1.0) > 0.005:
+        nom += f"@{echelle:.2f}"
     if not teinte:
-        return matiere
-    return matiere + "~" + ",".join(f"{g:.2f}" for g in teinte)
+        return nom
+    return nom + "~" + ",".join(f"{g:.2f}" for g in teinte)
 
 
 def matiere_et_teinte(nom: str) -> tuple[str, tuple[float, float, float] | None]:
-    """L'inverse de nom_materiau."""
-    if "~" not in nom:
-        return nom, None
-    matiere, gains = nom.split("~", 1)
+    """L'inverse de nom_materiau (sans l'échelle du motif, voir echelle_du_nom)."""
+    matiere, _, gains = nom.partition("~")
+    matiere = matiere.split("@", 1)[0]
+    if not gains:
+        return matiere, None
     return matiere, tuple(float(g) for g in gains.split(","))
+
+
+def echelle_du_nom(nom: str) -> float:
+    """L'échelle du motif écrite dans le nom d'un matériau (1 si rien n'est écrit)."""
+    debut = nom.partition("~")[0]
+    return float(debut.split("@", 1)[1]) if "@" in debut else 1.0
 
 
 def sorte(matiere: str) -> str:

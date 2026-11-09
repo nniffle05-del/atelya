@@ -23,7 +23,7 @@ import numpy as np
 from moteur.matieres import CALCULEES
 
 BLANC_PEINTURE = 0.86  # la peinture blanche des murs d'Atelya (moteur/blender/materiaux.py, COULEUR_PEINTURE)
-GAIN_MIN, GAIN_MAX = 0.2, 4.0  # mêmes bornes que le format (moteur/logement.py, Sol.teinte)
+GAIN_MIN, GAIN_MAX = 0.02, 4.0  # mêmes bornes que le format (moteur/logement.py, Sol.teinte)
 ALBEDO_MAX = 0.85  # aucune couleur de sol ne renvoie plus de 85 % de la lumière
 
 

@@ -336,3 +336,58 @@ des contours de pièces divisés par ~2 ; pièces un peu plus grandes (elles von
 annoncés). App-001 : bouche-trous 19 → 8 au plafond, plus de filet ni de trace à l'angle saillant
 (`..\atelya\b2\app-001\angle-avant-apres.png`). RESTE (autre cause, dans la 3D) : un petit trait clair au raccord du mur du poteau
 avec la façade EN BIAIS (≈ 10,5 ; 1,7 m), raccord de deux murs de travers dans `moteur/geometrie.py`. 2 tests ajoutés.
+**Étape 3 (sols d'après les photos), proposition puis correction de NT (09/11/2026).** Format : UN sol par pièce aujourd'hui ;
+proposé : des « zones de sol » dans une pièce (polygone + sol, statut estimé « vu sur photo », sans mur, sans trait, sans plinthe,
+corrigeables à l'écran), découpe avec Shapely (BSD-3, déjà installé partout comme dépendance de RapidOCR : rien à installer).
+Photos → sols : séjour / salle à manger = point de Hongrie (01-04) ; entrée + passage = lames droites étroites (07) ; chambres =
+lames droites étroites (08, 10, 11) ; salle de bains = petits carreaux blancs ~10 cm (12) ; carreaux de ciment « cubes » jaune / gris
+/ blanc dans la cuisine (05, 06) ; salle d'eau, WC, dégagement, rangement, placard : sol jamais vu (supposé). CORRECTION NT : dans
+l'espace ouvert il n'y a que DEUX sols entre séjour et cuisine : le point de Hongrie s'avance jusqu'à l'îlot (chaises et « table »
+comprises) ; APRÈS l'îlot, côté évier / meubles de cuisine, les carreaux de ciment ; la limite est PARALLÈLE aux meubles de
+cuisine (et non sur le côté, au milieu de l'îlot, comme proposé d'abord ; pas de lames dans la cuisine). Croquis :
+`..\atelya\b2\app-001\etape3-proposition-sols.png` (limite au milieu de l'îlot, y ≈ 147 px du plan).
+**Étape 3, suite (09/11/2026).** NT : l'entrée et le passage restent en lames droites jusqu'à la cuisine. FAIT dans Atelya : format
+`Piece.zones_sol` (ZoneSol : contour CONVEXE + sol ; `logement.verifier_coherence`), `Sol.echelle` (taille du motif 0,3-3 ; nom de
+matériau « matiere@1.13~r,g,b », `matieres.echelle_du_nom`), briques `zone_sol__<pièce>__<n>` découpées sur le contour calé de la pièce
+(`geometrie._couper_par_convexe`, Sutherland-Hodgman, vérifié contre Shapely sur 300 rectangles) et posées 0,5 mm au-dessus du sol
+(`ZONE_SOL_Z`), matériau de la zone (`habillage.materiau_de`) ; deux carrelages DESSINÉS par Atelya (`outils/bibliotheque/dessiner_carreaux.py`,
+rien de téléchargé) : `carreaux_cubes` (losanges 11,5 cm en cubes, blanc / gris clair / gris / moutarde, joint gris foncé ; 1,593 ×
+1,725 m) et `petits_carreaux_clairs` (10 cm) ; images non carrées dans Blender (`taille_image_m` [l, h]) ; outil
+`outils/habillage/poser_sols.py` + choix d'app-001 `verites/app-001/sols.json` (= VÉRITÉ DES SOLS d'app-001, faite À LA MAIN par Claude :
+NT a fait remarquer que ce travail n'est pas fait par Atelya → prochaine étape proposée : la BRIQUE PHOTOS, notée contre cette vérité).
+Choix : séjour point de Hongrie ×1,13 (teinte mesurée sur la photo 04 ; la 03 est faussée par le reflet des fenêtres), zone carreaux en
+cubes devant la cuisine (y ≥ 9,3 m), zone lames `chene_clair_photo` ×0,32 (lames ~7 cm) x ≥ 13,54 m (entrée + passage), chambres
+`chene_clair_photo` ×0,32, salle de bains petits carreaux ; `vieux_parquet` écarté (trop foncé : teinte hors bornes). 3D :
+`..\atelya\lectures-claude\app-001\3d-sols\` (0 trou, 0 sol superposé).
+DÉFAUT DE COULEUR AU RENDU trouvé (touche tous les clients) : parquet miel sur la photo (161, 106, 57), rosé-gris au rendu (177, 158,
+152) malgré la bonne teinte. Causes mesurées (essais dans le dossier temporaire, vue séjour) : (1) le parquet est presque CIRÉ (carte de
+brillance du chêne clair) et renvoie la lumière blanche/bleue du ciel vu en biais ; (2) AgX (réglage de pellicule par défaut de
+Blender 5, jamais choisi par nos scripts) délave les couleurs ; « Standard » ou « Khronos PBR Neutral » gardent la couleur mais rendent les
+murs cyan d'un côté et orangés de l'autre (la balance des blancs sur la moyenne des murs ne peut pas neutraliser une pièce éclairée à
+la fois par le ciel et par le parquet ensoleillé ; un ciel plus brumeux n'y change rien). SOLUTION retenue à l'essai : garder AgX (murs
+blancs), parquet SATINÉ (rugosité 0,7, reflet 0,1) et TEINTE RÉGLÉE AU RENDU (boucle : petite image, sol mesuré contre le mur blanc,
+comparé au rapport sol / mur de la photo, teinte corrigée ; bornes de teinte abaissées à 0,02) : en 3 tours le sol passe à
+(159, 108, 81), murs blancs (207, 214, 214). Image : `..\atelya\b2\app-001\etape3-couleur-essais.png`. Reste : bleu un peu haut (81
+contre 57), chevrons moins contrastés que la photo (nuance par lame à augmenter). À rendre automatique dans Atelya (accord NT demandé).
+**DEMANDE NT (09/11/2026) : « je veux qu'Atelya ait plein de types d'éclairage, et qu'on puisse les changer à l'écran de
+vérification ».** Aujourd'hui : un seul éclairage (ciel physique + soleil inventé du plan, azimut 200° / hauteur 50°, portails aux
+fenêtres, plafonniers éteints le jour, réglage « de photographe » au rendu). Proposition faite à NT (en attente de sa réponse) : des
+AMBIANCES au niveau du logement (jour ensoleillé, jour voilé, fin de journée, soirée lampes allumées, nuit) et des LUMINAIRES par
+pièce (plafonnier, suspension, spots, appliques, lampe d'appoint, ruban sous meubles de cuisine ; blanc chaud / neutre), supposés selon
+la pièce puis modifiables à l'écran ; règle 20 respectée (moment flatteur oui, soleil inventé non : le soleil suit l'orientation réelle,
+étape B3) ; la teinte des sols se règle UNE fois dans l'ambiance de référence (jour, comme les photos d'annonce), les autres ambiances
+sont calculées physiquement à partir de là.
+**PRÉCISION NT (09/11/2026) : PAS à l'écran de vérification** : il veut que la MAQUETTE BLENDER d'Atelya contienne PLUSIEURS éclairages tout prêts, qu'il change lui-même DANS BLENDER. Proposé : une SCÈNE Blender par éclairage (copies liées : murs, sols, meubles partagés ; chaque scène a son ciel, ses lampes et son réglage de photographe) : jour ensoleillé, jour voilé, fin de journée, soirée lampes allumées, nuit ; on change d'éclairage par le menu des scènes. Ordre : d'abord finir le défaut de couleur, puis les éclairages.
+**Défaut de couleur CORRIGÉ dans Atelya (09/11/2026, accord NT « on corrige d'abord le défaut de couleur »).** (1) Parquets
+SATINÉS (`materiaux.RUGOSITE_BOIS` 0,6-0,85 à partir de la brillance de la photo, `REFLET_BOIS` 0,15 ; `_sorte` : tout nom inconnu
+= bois, les parquets du temps 1 n'étaient pas dans `SORTES`) ; nuance par lame du point de Hongrie ±12 % → ±20 %. (2) TEINTE RÉGLÉE AU
+RENDU, automatique : `Sol.couleur_photo` (part de lumière du sol sur la photo, mur blanc = étalon, posée par `poser_sols`) ;
+`habillage.reglages_teinte` (matériau, cible, caméra de réglage DANS la pièce à ~3,5 m du sol visé, 16 mm) ; `moteur/blender/
+regler_teintes.py` lancé par `construire` après `poser_briques` : masques du sol et des murs (objets « découpés »), même réglage de
+photographe que l'image finale, sol mesuré contre les murs bien éclairés (50e-90e centile), teinte corrigée, 3 tours, maquette
+enregistrée, `reglages_teinte.json` ; bornes de teinte 0,02-4. AgX GARDÉ (murs blancs ; « Standard » / « PBR Neutral » rendaient les
+murs cyan / orangés). Scripts Blender : `main()` seulement si lancés par Blender (`if __name__ == "__main__"`) — avant, un import
+relançait tout le rendu. PIÈGE corrigé : `reglage_de_photographe` impose RGBA pour son essai (une image sans transparence comptait tout
+comme du mur → image brûlée). App-001 : séjour (146, 107, 92) contre photos (150, 99, 72) / (161, 106, 57), murs (212, 216, 216) ;
+construction 5 min 10 (dont ~2 min de réglage). Images : `..\atelya\b2\app-001\etape3-sejour.png`, `etape3-vue-dessus.png`.
+Tests : `tests/test_zones_sol.py` (6).

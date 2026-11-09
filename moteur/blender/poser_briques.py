@@ -221,4 +221,5 @@ def creer_camera(vue: dict) -> bpy.types.Object:
     return objet
 
 
-main()
+if __name__ == "__main__":  # lancé par Blender (--python) ; importé par un autre script : rien ne démarre
+    main()

@@ -71,6 +71,7 @@ def reglage_de_photographe(scene, dossier: Path) -> tuple[float, tuple[float, fl
 
     reglages = (scene.render.resolution_percentage, scene.cycles.samples, scene.cycles.use_denoising,
                 scene.render.image_settings.file_format, scene.view_settings.exposure, scene.render.film_transparent)
+    mode_avant = scene.render.image_settings.color_mode
     blancs = {"Murs", "Plafonds"}
     decoupes = [o for c in scene.collection.children if c.name not in blancs for o in c.objects if o.type == "MESH"]
     for o in decoupes:
@@ -80,6 +81,7 @@ def reglage_de_photographe(scene, dossier: Path) -> tuple[float, tuple[float, fl
     scene.cycles.samples = 16
     scene.cycles.use_denoising = False
     scene.render.image_settings.file_format = "OPEN_EXR"  # valeurs brutes, avant tout réglage de couleur
+    scene.render.image_settings.color_mode = "RGBA"  # la transparence repère les murs (sans elle : tout compterait, image brûlée)
     scene.view_settings.exposure = 0.0
     essai = dossier.resolve() / "_essai_exposition.exr"
     scene.render.filepath = str(essai)
@@ -94,6 +96,7 @@ def reglage_de_photographe(scene, dossier: Path) -> tuple[float, tuple[float, fl
             o.is_holdout = False
         (scene.render.resolution_percentage, scene.cycles.samples, scene.cycles.use_denoising,
          scene.render.image_settings.file_format, _, scene.render.film_transparent) = reglages
+        scene.render.image_settings.color_mode = mode_avant
     murs = pixels[pixels[:, 3] > 0.5, :3]
     poids = np.array([0.2126, 0.7152, 0.0722])
     if len(murs) < 20:
@@ -131,4 +134,5 @@ def choisir_processeur(scene) -> str:
     return "processeur"
 
 
-main()
+if __name__ == "__main__":  # lancé par Blender (--python) ; importé par un autre script : rien ne démarre
+    main()

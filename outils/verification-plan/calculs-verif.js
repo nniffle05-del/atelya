@@ -418,6 +418,8 @@
     tomettes: "Tomettes",
     damier_pierre: "Damier de pierre",
     pierre_beige: "Dalles de pierre beige",
+    carreaux_cubes: "Carreaux de ciment en cubes (losanges)",
+    petits_carreaux_clairs: "Petits carreaux clairs, 10 cm",
   };
 
   /** Le sol d'une pièce, choisi par la personne. */

@@ -130,12 +130,31 @@ class Sol(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     matiere: Literal[*NOMS_SOLS]
-    teinte: tuple[Annotated[float, Field(ge=0.2, le=4.0)], Annotated[float, Field(ge=0.2, le=4.0)],
-                  Annotated[float, Field(ge=0.2, le=4.0)]] | None = Field(
+    teinte: tuple[Annotated[float, Field(ge=0.02, le=4.0)], Annotated[float, Field(ge=0.02, le=4.0)],
+                  Annotated[float, Field(ge=0.02, le=4.0)]] | None = Field(
         default=None, description="Correction de couleur (rouge, vert, bleu) qui rapproche la matière de la photo du client")
+    couleur_photo: tuple[Annotated[float, Field(ge=0, le=1)], Annotated[float, Field(ge=0, le=1)],
+                         Annotated[float, Field(ge=0, le=1)]] | None = Field(
+        default=None, description="Part de lumière (rouge, vert, bleu) que renvoie ce sol sur la photo du client, un mur blanc de la "
+        "même photo servant d'étalon (moteur/teinte_photo.py) : la cible du réglage de la teinte au rendu (moteur/blender/regler_teintes.py)")
+    echelle: Annotated[float, Field(ge=0.3, le=3.0)] | None = Field(
+        default=None, description="Taille du motif par rapport à la matière du catalogue (1,13 = chevrons 13 % plus grands)")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
+
+
+class ZoneSol(BaseModel):
+    """Un morceau du sol d'une pièce posé dans un autre revêtement (B2 temps 2, 09/11/2026 : app-001, carreaux de ciment
+    devant les meubles d'une cuisine ouverte sur un séjour en point de Hongrie).
+
+    Ni mur, ni trait, ni plinthe : seul le revêtement change, la pièce reste UNE pièce (règle NT : jamais de limite absente du
+    plan). Le contour est CONVEXE (un rectangle le plus souvent) ; ce qui sort de la pièce est coupé à la construction."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    contour: list[Point] = Field(min_length=3)
+    sol: Sol
 
 
 class Piece(Element):
@@ -152,6 +171,9 @@ class Piece(Element):
     )
     sol: Sol | None = Field(
         default=None, description="Revêtement du sol. Si absent : la règle par défaut (moteur.habillage.sol_par_defaut)"
+    )
+    zones_sol: list[ZoneSol] = Field(
+        default_factory=list, description="Morceaux du sol dans un autre revêtement (cuisine ouverte…), sans mur ni trait"
     )
 
     @property
@@ -214,8 +236,23 @@ def verifier_coherence(logement: Logement) -> list[str]:
                 f"la pièce {p.id} annonce {p.surface:.2f} m² "
                 f"mais son contour mesure {p.surface_calculee:.2f} m²"
             )
+        for k, z in enumerate(p.zones_sol, start=1):
+            if not _convexe(z.contour):
+                erreurs.append(f"la zone de sol n° {k} de la pièce {p.id} n'est pas convexe (découper en rectangles)")
 
     return erreurs
+
+
+def _convexe(contour: list[Point]) -> bool:
+    """Vrai si le polygone tourne toujours du même côté (points alignés tolérés) et n'est pas plat."""
+    signes = set()
+    n = len(contour)
+    for i in range(n):
+        (ax, ay), (bx, by), (cx, cy) = contour[i], contour[(i + 1) % n], contour[(i + 2) % n]
+        v = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
+        if abs(v) > 1e-9:
+            signes.add(v > 0)
+    return len(signes) == 1
 
 
 def charger_logement(chemin: str | Path) -> Logement:

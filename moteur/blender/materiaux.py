@@ -26,10 +26,16 @@ import bpy
 # La sorte de chaque matière de sol (même liste que moteur/matieres.py, que ce script ne peut pas importer).
 SORTES = {"parquet_chene_lames": "bois", "parquet_batons_rompus": "bois", "point_de_hongrie": "bois", "stratifie": "bois",
           "carrelage_interieur": "carrelage", "carreaux_ciment": "carrelage", "tomettes": "carrelage",
-          "damier_pierre": "carrelage", "pierre_beige": "carrelage"}
+          "damier_pierre": "carrelage", "pierre_beige": "carrelage", "carreaux_cubes": "carrelage",
+          "petits_carreaux_clairs": "carrelage"}
 # Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (même liste que moteur/matieres.py).
 ROTATION_PHOTO = {"carrelage_interieur": 45.0}
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
+# B2 temps 2 (09/11/2026) : un parquet d'appartement est vitrifié SATINÉ, pas ciré. Avec la brillance des photos de la
+# bibliothèque (presque miroir) et le reflet normal, le bois renvoyait le ciel vu en biais : app-001, parquet miel sur la photo,
+# rosé-gris au rendu. Rugosité ramenée entre ces deux valeurs, reflet diminué.
+RUGOSITE_BOIS = (0.6, 0.85)
+REFLET_BOIS = 0.15  # « Specular IOR Level » (0,5 = reflet normal d'un vernis)
 
 
 class Materiaux(dict):
@@ -79,16 +85,32 @@ def _sol(materiau, m):
     Un nom « matiere~r,g,b » porte une teinte : la couleur est multipliée par ces trois nombres (rouge, vert, bleu), pour
     rapprocher la matière de ce que montrent les photos du client."""
     nom, _, gains = materiau.name.partition("~")
+    nom, _, echelle = nom.partition("@")  # « matiere@1.13 » : motif 13 % plus grand (champ echelle du sol)
+    echelle = float(echelle) if echelle else 1.0
     if nom == "carreaux_ciment":
-        _carreaux_ciment(materiau, m)
+        _carreaux_ciment(materiau, m, echelle)
     elif nom == "point_de_hongrie" and m.photo("chene_clair"):
-        _point_de_hongrie(materiau, m)
+        _point_de_hongrie(materiau, m, echelle)
     elif m.photo(nom):
-        _photo(materiau, m, nom)
+        _photo(materiau, m, nom, echelle)
     else:
         (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
     if gains:
         _teinter(materiau, [float(g) for g in gains.split(",")])
+
+
+def _sorte(nom):
+    """« bois » ou « carrelage » (même règle que moteur/matieres.sorte : un nom inconnu compte comme du bois)."""
+    return SORTES.get(nom, "carrelage" if "carrel" in nom else "bois")
+
+
+def _satine(noeuds, liens, brillance, bsdf):
+    """La brillance d'une photo de bois ramenée à un vernis satiné (RUGOSITE_BOIS, REFLET_BOIS)."""
+    plage = noeuds.new("ShaderNodeMapRange")
+    plage.inputs["To Min"].default_value, plage.inputs["To Max"].default_value = RUGOSITE_BOIS
+    liens.new(brillance, plage.inputs["Value"])  # une couleur branchée sur un nombre : Blender prend sa clarté
+    liens.new(plage.outputs["Result"], bsdf.inputs["Roughness"])
+    bsdf.inputs["Specular IOR Level"].default_value = REFLET_BOIS
 
 
 def _teinter(materiau, gains):
@@ -98,6 +120,7 @@ def _teinter(materiau, gains):
     entree = bsdf.inputs["Base Color"]
     melange = _melange_multiplier(arbre.nodes)
     couleur = arbre.nodes.new("ShaderNodeRGB")
+    couleur.name = couleur.label = "teinte"  # retrouvé par regler_teintes.py, qui l'ajuste au rendu
     couleur.outputs[0].default_value = (*gains, 1.0)
     if entree.is_linked:
         arbre.links.new(entree.links[0].from_socket, _entree(melange, "A"))
@@ -271,11 +294,12 @@ def _tourne(noeuds, liens, m, en_plus=0.0):
     return coord, tourne.outputs["Vector"]
 
 
-def _coordonnees(noeuds, liens, m, taille, en_plus=0.0):
-    """Les coordonnées d'une photo : position réelle, tournée dans le sens des sols, à la taille réelle de la photo."""
+def _coordonnees(noeuds, liens, m, taille, en_plus=0.0, hauteur=None):
+    """Les coordonnées d'une photo : position réelle, tournée dans le sens des sols, à la taille réelle de la photo
+    (`taille` en largeur, `hauteur` si l'image n'est pas carrée : carreaux en cubes dessinés par Atelya)."""
     _, vecteur = _tourne(noeuds, liens, m, en_plus)
     echelle = noeuds.new("ShaderNodeMapping")
-    echelle.inputs["Scale"].default_value = (1 / taille, 1 / taille, 1 / taille)
+    echelle.inputs["Scale"].default_value = (1 / taille, 1 / (hauteur or taille), 1 / taille)
     liens.new(vecteur, echelle.inputs["Vector"])
     return echelle.outputs["Vector"]
 
@@ -289,17 +313,25 @@ def _texture(noeuds, liens, chemin, couleur, vecteur):
     return tex
 
 
-def _photo(materiau, m, nom):
+def _photo(materiau, m, nom, echelle=1.0):
     """Couleur, relief et brillance d'une photo de la bibliothèque, à sa taille réelle."""
     dossier, taille = m.photo(nom)
     noeuds, liens, sortie = _noeuds(materiau)
     bsdf = _principled(noeuds, liens, sortie, rugosite=0.5)
-    vecteur = _coordonnees(noeuds, liens, m, taille, ROTATION_PHOTO.get(nom, 0.0))
+    hauteur = (m.fiches[nom].get("taille_image_m") or [taille, taille])[-1] * echelle
+    taille *= echelle
+    vecteur = _coordonnees(noeuds, liens, m, taille, ROTATION_PHOTO.get(nom, 0.0), hauteur)
     couleur = _texture(noeuds, liens, dossier / "couleur.jpg", True, vecteur)
     liens.new(couleur.outputs["Color"], bsdf.inputs["Base Color"])
     if (dossier / "brillance.jpg").is_file():
         brillance = _texture(noeuds, liens, dossier / "brillance.jpg", False, vecteur)
-        liens.new(brillance.outputs["Color"], bsdf.inputs["Roughness"])
+        if _sorte(nom) == "bois":
+            _satine(noeuds, liens, brillance.outputs["Color"], bsdf)
+        else:
+            liens.new(brillance.outputs["Color"], bsdf.inputs["Roughness"])
+    elif _sorte(nom) == "bois":
+        bsdf.inputs["Roughness"].default_value = sum(RUGOSITE_BOIS) / 2
+        bsdf.inputs["Specular IOR Level"].default_value = REFLET_BOIS
     if (dossier / "relief.jpg").is_file():
         relief = _texture(noeuds, liens, dossier / "relief.jpg", False, vecteur)
         normale = noeuds.new("ShaderNodeNormalMap")
@@ -357,7 +389,7 @@ def _gris(noeuds, liens, valeur):
     return gris.outputs["Color"]
 
 
-def _point_de_hongrie(materiau, m):
+def _point_de_hongrie(materiau, m, echelle=1.0):
     """Le point de Hongrie : des lames coupées en biais (45°), en colonnes qui changent de sens, comme des chevrons.
 
     Dans chaque colonne (largeur = la lame vue de face), les lames sont parallèles, penchées d'un côté puis de l'autre
@@ -365,7 +397,7 @@ def _point_de_hongrie(materiau, m):
     dossier, taille = m.photo("chene_clair")
     noeuds, liens, sortie = _noeuds(materiau)
     bsdf = _principled(noeuds, liens, sortie, rugosite=0.45)
-    longueur, largeur, joint = 0.50, 0.09, 0.002
+    longueur, largeur, joint = 0.50 * echelle, 0.09 * echelle, 0.002
     c45 = math.cos(math.radians(45))
     colonne_l = longueur * c45
     pas = largeur / c45  # écart vertical entre deux joints d'une même colonne
@@ -409,10 +441,10 @@ def _point_de_hongrie(materiau, m):
     rugo = noeuds.new("ShaderNodeTexImage")
     rugo.image = _image(dossier / "brillance.jpg", False)
     liens.new(uv.outputs["Vector"], rugo.inputs["Vector"])
-    liens.new(rugo.outputs["Color"], bsdf.inputs["Roughness"])
+    _satine(noeuds, liens, rugo.outputs["Color"], bsdf)
 
-    # nuance par lame (±12 %) et joints sombres
-    nuance = _math(noeuds, liens, "ADD", 0.88, _math(noeuds, liens, "MULTIPLY", alea.outputs["Z"], valeur_b=0.24))
+    # nuance par lame (±20 % : sur les photos d'app-001, chaque lame a sa couleur) et joints sombres
+    nuance = _math(noeuds, liens, "ADD", 0.80, _math(noeuds, liens, "MULTIPLY", alea.outputs["Z"], valeur_b=0.40))
     dans_joint = _math(noeuds, liens, "MAXIMUM", _math(noeuds, liens, "LESS_THAN", fv, valeur_b=joint / pas),
                        _math(noeuds, liens, "LESS_THAN", xl, valeur_b=joint))
     facteur = _math(noeuds, liens, "MULTIPLY", nuance,
@@ -425,11 +457,11 @@ def _point_de_hongrie(materiau, m):
     materiau.diffuse_color = (0.62, 0.45, 0.3, 1.0)
 
 
-def _carreaux_ciment(materiau, m):
+def _carreaux_ciment(materiau, m, echelle=1.0):
     """Des carreaux de ciment de 20 cm : un motif de losanges et d'anneaux, gris anthracite et gris bleu sur fond crème."""
     noeuds, liens, sortie = _noeuds(materiau)
     bsdf = _principled(noeuds, liens, sortie, rugosite=0.55)
-    cote = 0.20
+    cote = 0.20 * echelle
     coord, vecteur = _tourne(noeuds, liens, m)
     xyz = noeuds.new("ShaderNodeSeparateXYZ")
     liens.new(vecteur, xyz.inputs[0])

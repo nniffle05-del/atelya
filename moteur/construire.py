@@ -80,6 +80,10 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     matieres = trouver_matieres()
     lancer_blender("--python", str(DOSSIER_SCRIPTS / "poser_briques.py"),
                    "--", str(plan), str(maquette), *([str(matieres.resolve())] if matieres else []))
+    if json.loads(plan.read_text(encoding="utf-8")).get("reglages_teinte"):
+        # B2 temps 2 : la teinte des sols vus sur une photo du client est réglée au rendu (voir regler_teintes.py).
+        lancer_blender(str(maquette), "--python", str(DOSSIER_SCRIPTS / "regler_teintes.py"),
+                       "--", str(plan), str(dossier / "reglages_teinte.json"))
     return maquette
 
 

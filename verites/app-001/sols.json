@@ -1,0 +1,125 @@
+{
+ "note": "Sols d'app-001 vus sur les photos de l'annonce (B2 temps 2, étape 3, 09/11/2026), validés par NT : entre séjour et cuisine DEUX sols, point de Hongrie jusqu'à l'îlot (chaises comprises), carreaux de ciment en cubes après l'îlot côté évier, limite parallèle aux meubles de cuisine ; entrée et passage en lames droites jusqu'à la cuisine. Contours en mètres, repère du logement traduit (..\\atelya\\lectures-claude\\app-001\\logement.json).",
+ "photos": "../atelya/photos-clients/app-001/photos",
+ "bibliotheque": "../atelya/bibliotheque/matieres",
+ "pieces": {
+  "sejour_1": {
+   "matiere": "point_de_hongrie",
+   "echelle": 1.13,
+   "source": "photos 01 à 04 (couleur mesurée sur la 04 ; la 03 est faussée par le reflet des fenêtres)",
+   "photo": "photo-04.png",
+   "zone_sol": [
+    0.05,
+    0.35,
+    0.86,
+    0.98
+   ],
+   "zone_mur_blanc": [
+    0.52,
+    0.6,
+    0.08,
+    0.28
+   ],
+   "zones": [
+    {
+     "contour": [
+      [
+       8.9,
+       9.3
+      ],
+      [
+       13.54,
+       9.3
+      ],
+      [
+       13.54,
+       11.7
+      ],
+      [
+       8.9,
+       11.7
+      ]
+     ],
+     "matiere": "carreaux_cubes",
+     "source": "photos 05, 06 (limite au milieu de l'îlot, parallèle aux meubles)"
+    },
+    {
+     "contour": [
+      [
+       13.54,
+       4.02
+      ],
+      [
+       21.0,
+       4.02
+      ],
+      [
+       21.0,
+       12.3
+      ],
+      [
+       13.54,
+       12.3
+      ]
+     ],
+     "matiere": "chene_clair_photo",
+     "echelle": 0.32,
+     "source": "photo 07 (entrée et passage jusqu'à la cuisine)",
+     "photo": "photo-07.png",
+     "zone_sol": [
+      0.3,
+      0.7,
+      0.8,
+      0.97
+     ],
+     "zone_mur_blanc": [
+      0.29,
+      0.335,
+      0.12,
+      0.45
+     ]
+    }
+   ]
+  },
+  "chambre_1": {
+   "matiere": "chene_clair_photo",
+   "echelle": 0.32,
+   "source": "photo 08",
+   "photo": "photo-08.png",
+   "zone_sol": [
+    0.1,
+    0.45,
+    0.86,
+    0.97
+   ],
+   "zone_mur_blanc": [
+    0.05,
+    0.25,
+    0.1,
+    0.35
+   ]
+  },
+  "chambre_2": {
+   "matiere": "chene_clair_photo",
+   "echelle": 0.32,
+   "source": "photos 10, 11",
+   "photo": "photo-11.png",
+   "zone_sol": [
+    0.0,
+    0.2,
+    0.86,
+    0.97
+   ],
+   "zone_mur_blanc": [
+    0.36,
+    0.52,
+    0.15,
+    0.35
+   ]
+  },
+  "salle_d_eau_1": {
+   "matiere": "petits_carreaux_clairs",
+   "source": "photo 12"
+  }
+ }
+}
