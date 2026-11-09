@@ -518,3 +518,29 @@ L ≈ 50,5 a ≈ 16 b ≈ 31,5. MESURÉ : la maquette en jour voilé donne au po
 cause = teinte réglée au rendu sous plein soleil depuis UNE vue (regler_teintes) → à régler en jour voilé contre `couleur_visee`.
 Vocabulaire NT : « l'œil de Meta » = DINOv2 (déjà dans Atelya, `oeil.py`, poids sur le PC). Limite dite à NT : app-001 seul = mise
 au point ET examen → note optimiste ; il faudra 2-3 autres logements avec photos jamais regardés pour une note honnête.
+**BRIQUE PHOTOS v1 (09/11/2026, NT : « fais le meilleur pour qu'Atelya soit le plus performant », sans m'influencer).**
+Temps 1 « sol à plat » (`moteur/sol_a_plat.py`) : chaque photo calée → vue de dessus 1 cm/px (grille posée sur le sol, projetée
+par la caméra ; écarté : hors de la pièce de l'appareil, caché par un mur de la pièce (rayon qui sort du contour), derrière,
+hors cadre, finesse < 0,35 px de photo par cm de sol) ; photo prise depuis une embrasure → point de vue juste à l'intérieur ;
+`assembler` = la photo la plus fine par point. App-001 : 80,3 m² vus sur 121,7 (66 %) ; image `..\atelya\b2\app-001\brique-photos\
+sol-a-plat.png` (confirme la jointure de la vérité révisée). Temps 2 « œil » : `moteur/oeil_dinov2.py` (DINOv2 réécrit, poids
+`..\atelya\modeles-externes`), `moteur/reconnaitre_sols.py` : 4 FAMILLES (lames, point_de_hongrie, batons_rompus, carreaux),
+vignettes 1 m → 224 px tous les 25 cm (vues à 85 %), empreinte = CLS + moyenne des carrés, régression logistique (torch, pas de
+scikit-learn sur le PC), votes par cases de 25 cm pondérés par √finesse × confiance ; temps 3 `sols_des_pieces` (famille la plus
+votée + zones d'une autre famille ≥ 1 m², enveloppe convexe) ; temps 4 `couleur_du_sol` (CIELAB médiane robuste) ; `noter`.
+Apprentissage SANS app-001 (`outils/habillage/apprendre_sols.py`) : vignettes de la bibliothèque CC0 abîmées exprès (flou du
+lointain, couleur, reflet, objet) + photos d'essai Blender (`outils/habillage/photos_d_essai.py` : maquettes fr-021…038, sol
+tiré au hasard par pièce, zone d'un autre sol 40 % des grandes pièces, caméras de photographe, 3 éclairages ; 123 photos,
+`..\atelya\b2\brique-photos-essais\`) ; fr-031 et fr-038 = CONTRÔLE jamais appris ; carreaux_cubes et petits_carreaux_clairs
+(dessinés d'après app-001) écartés des exemples. Contrôle (209 m²) : ViT-S biblio seule 93,7 % de la surface juste, + essais
+96,3 % (21/25 pièces ; erreurs = pièces à deux sols où la zone domine ce qui est vu) ; ViT-B 90,3 / 93,2 → retenu ViT-S
+biblio+essais = `moteur/modeles/sols-vits14-v1.pt` (15 Ko, SHA dans pc/MODELES.txt). Commande : `outils/habillage/sols_photos.py
+reconnaitre <cameras> <logement> <modele> <sortie> [--verite logement-avec-sols] [--couleurs sols.json]`.
+**EXAMEN app-001 (une fois, 09/11) : 72 % de la surface juste (74,9 m² jugés)** ; lames 84,8 %, carreaux (cubes) 100 %, point de
+Hongrie 47 % (vu au centre du séjour seulement, ailleurs pris pour des lames) ; pièces 2/3 (séjour décidé « lames » avec une
+zone point de Hongrie) ; fausses zones « carreaux » = lit blanc (chambre 1) et meuble blanc (salle à manger) étirés par la mise
+à plat. Couleurs ΔE : séjour 1,4 (par hasard), chambre 2 10,6, chambre 1 18,3 (le lit compte dans la médiane). CAUSES : photos
+d'essai = pièces VIDES, vraies photos = pièces MEUBLÉES ; point de Hongrie lointain et flou ≈ lames. Toute amélioration conçue
+après avoir vu ces erreurs rend app-001 « examen déjà vu » : le dire à NT à chaque nouvelle note sur app-001 ; il faut d'autres
+logements avec photos jamais regardés. Pistes : meubles dans les photos d'essai (bibliothèque ABO), classe « pas du sol »,
+poids plus fort des vues fines, vignettes plus grandes pour les chevrons.
