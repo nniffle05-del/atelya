@@ -647,3 +647,10 @@ mais pas dans Git) : 64,0 px/m d'après 8 cotes (± 2 %), HSP 2,50 supposée, 12
 chambre 1 → une seule pièce « séjour + chambre 1 (ouverts) » (règle NT) ; porte du WC placée sur son mur ouest (à vérifier) ;
 gaines en murs épais. Piège : une ouverture doit être saisie SUR un mur (porte dans un trou entre deux murs = deux pièces
 fusionnées) ; (2) calage des 15 caméras ; (3) vérités sols et meubles ; (4) passage unique d'Atelya et note.
+**Grande série de photos meublées (09-10/11/2026, NT « Oui »)** : 42 tirages de plus (14 logements d'ENTRAÎNEMENT fr-022…041 dont
+la vérité existe, jamais les plans d'examen ; 3 tirages chacun, ~4 h ; 526 photos d'essai en tout, 0 plantage ; générateur :
+plantage d'un tirage = ligne « PLANTÉ » et la série continue, reprise des tirages faits, masques de catégories dans la même passe,
+`--depart`). Repérage des meubles réappris (122 869 carrés) : contrôle 44/84 retrouvés, 46 en trop (v1 : 44/84, 44) ; app-001
+11/34 (v1 16/34) → AUCUN gain, v1 GARDÉ. LEÇON : la limite n'est pas le nombre de photos fabriquées mais l'écart fabriqué/réel et
+la méthode (classificateur linéaire sur carrés de 25 px). Piste proposée à NT (accord nécessaire, licence à lire) : détecteur
+d'objets déjà entraîné sur de vraies photos (OWLv2, Google, annoncé Apache 2.0). Sols réappris avec ces photos (v4) : en cours.
