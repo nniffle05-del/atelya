@@ -52,3 +52,15 @@ def test_verite_zone_dans_une_piece():
     X, Y = np.array([1.0, 5.0, 1.0, 9.0]), np.array([1.0, 2.0, 5.0, 9.0])
     assert list(matieres_verite(logement, X, Y)) == ["point_de_hongrie", "carreaux_cubes", "", ""]
     assert list(familles_verite(logement, X, Y)) == [FAMILLES.index("point_de_hongrie"), FAMILLES.index("carreaux"), -1, -1]
+
+
+def test_une_case_vue_seulement_comme_meuble_reste_inconnue():
+    from moteur.reconnaitre_sols import CLASSES_AVEC_MEUBLE, CarteDesSols, MEUBLE
+    votes = np.zeros((1, 3, len(CLASSES_AVEC_MEUBLE)))
+    votes[0, 0, FAMILLES.index("carreaux")] = 0.2
+    votes[0, 0, CLASSES_AVEC_MEUBLE.index(MEUBLE)] = 0.9  # surtout un meuble, un peu de carreaux vus
+    votes[0, 1, CLASSES_AVEC_MEUBLE.index(MEUBLE)] = 1.0  # rien que du meuble
+    carte = CarteDesSols(votes, (0.0, 1.0), 0.25, CLASSES_AVEC_MEUBLE)
+    assert carte.famille().tolist() == [[FAMILLES.index("carreaux"), -1, -1]]
+    assert carte.vue().tolist() == [[True, False, False]]
+    assert carte.part_meuble()[0, 1] == 1.0 and carte.part_meuble()[0, 2] == 0.0

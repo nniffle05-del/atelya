@@ -565,3 +565,16 @@ plan de la photo 01, absents de la 05). Maquette meublée : `..\atelya\b2\app-00
 Constats : placement juste dans l'ensemble ; écarts de style (table de repas « ferme » bois au lieu de blanche, tabourets blancs
 au lieu de jaunes, lit superposé métal au lieu de bois, armoire et placards en blocs unis, pas de rideaux ni de coussins).
 Tests : `tests/test_meubles.py` (4), `test_blender.py::test_meubles_sur_mesure_poses_tournes_et_mesures`.
+**BRIQUE PHOTOS v2 : photos d'entraînement MEUBLÉES et 5e réponse « meuble » (09/11/2026, NT « Oui »).** `photos_d_essai.py
+--meubles` : meubles ABO tirés au hasard par pièce (contre un mur ou au milieu, tapis souvent, table + chaises), sans chevauchement
+(grille 5 cm), dimensions réelles du modèle, caméras jamais dans un meuble ; masque des meubles par photo
+(`moteur/blender/masques_meubles.py`, Workbench à plat, blanc = meuble, tapis compris) dans `<tirage>\masques\`. 12 tirages
+meublés (`-m1/-m2`, 6 logements, ~10 min chacun, 2 h en tout). Apprentissage : vignette dont la moitié centrale est couverte à
+> 60 % de meuble (masque mis à plat) → « meuble », < 10 % → sol, entre → écartée ; 4 383 vignettes d'essai dont 844 « meuble ».
+`CarteDesSols` : seules les familles de sol décident (`indices_sol`, `vue`) ; case vue seulement comme meuble = inconnue ;
+couleur mesurée hors des cases à > 50 % « meuble ». CONTRÔLE (fr-031, fr-038) : 4 familles = vides 96,0 % / meublées 83,4 % ;
+avec « meuble » = 93,5 % / 84,5 % (meuble reconnu 71 %) ; erreurs restantes = point de Hongrie ↔ bâtons rompus, petites pièces
+vues de loin. Retenu sur le contrôle meublé : `moteur/modeles/sols-vits14-v2.pt` (SHA dans pc/MODELES.txt). app-001 (PLUS un
+examen propre) : v1 72 % → v2 81,5 % (point de Hongrie 47 → 80 %, cubes 99 %, lames 79 %) ; couleurs ΔE séjour 4,3, chambre 1
+18 → 10,3, chambre 2 10,6 → 3,3 ; reste : séjour décidé « lames » (44 % des votes) avec une zone point de Hongrie de 20 m²,
+fausse zone point de Hongrie de 2,6 m² en chambre 1 (lit), fausse zone carreaux de 1,3 m² en chambre 2.

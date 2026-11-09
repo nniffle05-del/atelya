@@ -21,6 +21,8 @@ import torch.nn.functional as F
 from moteur.matieres import NOMS_SOLS
 
 FAMILLES = ("lames", "point_de_hongrie", "batons_rompus", "carreaux")
+MEUBLE = "meuble"  # 5e réponse apprise (09/11/2026) : « ceci n'est pas du sol » (meuble, tapis étiré par la mise à plat)
+CLASSES_AVEC_MEUBLE = (*FAMILLES, MEUBLE)
 _FAMILLE = {
     "point_de_hongrie": "point_de_hongrie", "hongrie_naturel": "point_de_hongrie", "hongrie_grise": "point_de_hongrie",
     "parquet_batons_rompus": "batons_rompus", "batons_rompus_clair": "batons_rompus", "batons_rompus_tres_clair": "batons_rompus",
@@ -120,13 +122,33 @@ class CarteDesSols:
     case: float
     classes: tuple[str, ...]
 
+    @property
+    def indices_sol(self) -> list[int]:
+        """Les classes qui sont des familles de sol (la classe « meuble », si le classificateur la connaît, n'en est pas une)."""
+        return [i for i, c in enumerate(self.classes) if c in FAMILLES]
+
+    def votes_sol(self) -> np.ndarray:
+        return self.votes[..., self.indices_sol]
+
+    def vue(self) -> np.ndarray:
+        """Cases où le SOL a été vu (une case vue seulement comme « meuble » reste inconnue)."""
+        return self.votes_sol().sum(-1) > 1e-6
+
     def famille(self) -> np.ndarray:
-        """Indice de la famille retenue par case (-1 : case jamais vue)."""
-        return np.where(self.votes.sum(-1) > 0, self.votes.argmax(-1), -1)
+        """Indice (dans `classes`) de la famille retenue par case (-1 : sol jamais vu)."""
+        return np.where(self.vue(), np.array(self.indices_sol)[self.votes_sol().argmax(-1)], -1)
+
+    def part_meuble(self) -> np.ndarray:
+        """Part des avis « meuble » par case (0 si le classificateur ne connaît pas les meubles)."""
+        if MEUBLE not in self.classes:
+            return np.zeros(self.votes.shape[:2])
+        total = self.votes.sum(-1)
+        return np.where(total > 0, self.votes[..., self.classes.index(MEUBLE)] / np.maximum(total, 1e-9), 0.0)
 
     def confiance(self) -> np.ndarray:
-        total = self.votes.sum(-1)
-        return np.where(total > 0, self.votes.max(-1) / np.maximum(total, 1e-9), 0.0)
+        v = self.votes_sol()
+        total = v.sum(-1)
+        return np.where(total > 0, v.max(-1) / np.maximum(total, 1e-9), 0.0)
 
     def centres(self):
         lignes, colonnes = np.meshgrid(np.arange(self.votes.shape[0]), np.arange(self.votes.shape[1]), indexing="ij")
@@ -176,9 +198,10 @@ def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZO
     """Pour chaque pièce assez vue : la famille de son sol (la plus votée) et ses zones d'une autre famille (contours
     convexes en mètres). Les votes sont d'abord lissés sur 3 × 3 cases (75 cm) : une case isolée suit ses voisines."""
     from moteur.sol_a_plat import dans_polygone
-    lisses = np.stack([cv2.blur(carte.votes[..., k].astype(np.float32), (3, 3)) for k in range(carte.votes.shape[-1])], -1)
-    vue = carte.votes.sum(-1) > 0
-    fam = np.where(vue, lisses.argmax(-1), -1)
+    sol = carte.votes_sol()
+    lisses = np.stack([cv2.blur(sol[..., k].astype(np.float32), (3, 3)) for k in range(sol.shape[-1])], -1)
+    vue = carte.vue()
+    fam = np.where(vue, np.array(carte.indices_sol)[lisses.argmax(-1)], -1)
     X, Y = carte.centres()
     case2 = carte.case ** 2
     sorties = {}
@@ -255,7 +278,12 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
     carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes))
     pieces = sols_des_pieces(carte, logement)
     image, finesse, _ = assembler([v for _, _, v in vues])
-    lignes, colonnes = np.nonzero(finesse > 0)
+    # la couleur se mesure là où l'œil voit du SOL : pas dans les cases où il voit surtout des meubles (lit, tapis…)
+    meuble = carte.part_meuble()
+    case_l = np.minimum((np.arange(h) * v0.resolution / CASE_M).astype(int), meuble.shape[0] - 1)
+    case_c = np.minimum((np.arange(w) * v0.resolution / CASE_M).astype(int), meuble.shape[1] - 1)
+    sol_pur = (finesse > 0) & (meuble[case_l][:, case_c] < 0.5)
+    lignes, colonnes = np.nonzero(sol_pur)
     X, Y = v0.vers_sol(lignes, colonnes)
     contours = {p["id"]: p["contour"] for p in logement["pieces"]}
     for pid, s in pieces.items():
@@ -293,7 +321,7 @@ def noter(resultat: dict, logement_verite: dict, couleurs_visees: dict | None = 
     if carte is None:
         return {}
     X, Y = carte.centres()
-    vue = carte.votes.sum(-1) > 0
+    vue = carte.vue()
     verite = familles_verite(logement_verite, X[vue], Y[vue], carte.classes)
     decide = famille_decidee(resultat["pieces"], logement_verite, X[vue], Y[vue], carte.classes)
     jugees = (verite >= 0) & (decide >= 0)

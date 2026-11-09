@@ -19,6 +19,7 @@ import argparse
 import json
 import math
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -31,8 +32,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from moteur.images import lire_image  # noqa: E402
 from moteur.matieres import CALCULEES, NOMS_SOLS  # noqa: E402
 from moteur.oeil_dinov2 import charger, empreintes  # noqa: E402
-from moteur.reconnaitre_sols import (FAMILLES, VIGNETTE_M, VIGNETTE_PX, Classifieur, famille,  # noqa: E402
-                                     matieres_verite, noter, reconnaitre, vignettes)
+from moteur.reconnaitre_sols import (CLASSES_AVEC_MEUBLE, FAMILLES, MEUBLE, VIGNETTE_M, VIGNETTE_PX,  # noqa: E402
+                                     Classifieur, famille, matieres_verite, noter, reconnaitre, vignettes)
 from moteur.sol_a_plat import photos_a_plat  # noqa: E402
 
 RACINE = Path(__file__).resolve().parents[2]
@@ -40,6 +41,7 @@ BIBLIOTHEQUE = RACINE.parent / "atelya" / "bibliotheque" / "matieres"
 DESSINEES_D_APRES_APP001 = {"carreaux_cubes", "petits_carreaux_clairs"}
 LOGEMENTS_CONTROLE = ("fr-031", "fr-038")
 PAR_MATIERE = 160
+SEUIL_MEUBLE, SEUIL_SOL = 0.6, 0.1  # part de meuble dans la moitié centrale d'une vignette
 
 
 # ---------------------------------------------------------------- 1. vignettes de la bibliothèque, abîmées
@@ -114,28 +116,57 @@ def vignettes_bibliotheque(alea: random.Random, par_matiere: int = PAR_MATIERE):
 
 
 # ---------------------------------------------------------------- 2. vignettes des photos d'essai (Blender)
+def nom_du_logement(tirage: str) -> str:
+    """« fr-031-t2 » ou « fr-031-m1 » (meublé) → « fr-031 »."""
+    return re.sub(r"-[tm]\d+$", "", tirage)
+
+
 def vignettes_essais(dossier: Path, journal=lambda *_: None):
     """Vignettes des photos d'essai mises à plat, étiquetées par la matière du sol (vignettes à cheval sur deux familles
-    écartées). Rend (images, matières, logement de chaque vignette, tirage)."""
+    écartées) ou « meuble » : sur les tirages meublés, le masque des meubles (masques\\masque-<photo>.png, blanc = meuble)
+    est mis à plat comme la photo ; plus de SEUIL_MEUBLE de la moitié centrale couverte → « meuble », moins de SEUIL_SOL →
+    sol, entre les deux → écartée. Rend (images, étiquettes, logement de chaque vignette, tirage)."""
+    from moteur.camera_photo import camera_depuis_dict
+    from moteur.sol_a_plat import emprise_du_logement, mettre_a_plat, piece_de_l_appareil
     images, etiquettes, logements, tirages = [], [], [], []
     for t in sorted(p for p in dossier.iterdir() if (p / "cameras-photos.json").is_file()):
         releve = json.loads((t / "cameras-photos.json").read_text(encoding="utf-8"))
         logement = json.loads((t / "logement.json").read_text(encoding="utf-8"))
         if not (t / "rendus").is_dir():
             continue
+        avec_masques = (t / "masques").is_dir()
+        emprise = emprise_du_logement(logement)
         for nom, _, vue in photos_a_plat(releve, logement, RACINE, journal=journal):
-            v, centres, _ = vignettes(vue.image, vue.finesse, vue.resolution, pas_m=0.5)  # moins serré : mémoire
+            masque = None
+            if avec_masques:
+                brut = lire_image(t / "masques" / f"masque-{nom}.png", cv2.IMREAD_GRAYSCALE)
+                if brut is None:
+                    raise FileNotFoundError(t / "masques" / f"masque-{nom}.png")
+                cam = camera_depuis_dict(releve["cameras"][nom]["camera"])
+                piece, point = piece_de_l_appareil(cam, logement["pieces"])
+                masque = mettre_a_plat(np.repeat(brut[..., None], 3, axis=2), cam, piece["contour"], emprise, vue.resolution,
+                                       point_de_vue=point).image[..., 0].astype(np.float32) / 255.0
+            v, centres, _ = vignettes(vue.image, vue.finesse, vue.resolution, pas_m=0.35)  # moins serré qu à la reconnaissance : mémoire
+            d = int(VIGNETTE_M / 4 / vue.resolution)
             for image, (l, c) in zip(v, centres):
-                # la matière aux 9 points de la moitié centrale de la vignette : tous pareils, sinon vignette écartée
-                d = VIGNETTE_M / 4 / vue.resolution
-                ll, cc = np.meshgrid([l - d, l, l + d], [c - d, c, c + d])
-                X, Y = vue.vers_sol(ll.ravel(), cc.ravel())
-                m = set(matieres_verite(logement, X, Y))
-                if len(m) == 1 and "" not in m and not (m & DESSINEES_D_APRES_APP001):
-                    images.append(image)
-                    etiquettes.append(m.pop())
-                    logements.append(t.name.rsplit("-t", 1)[0])
-                    tirages.append(t.name)
+                l, c = int(l), int(c)
+                part = float(masque[l - d:l + d, c - d:c + d].mean()) if masque is not None else 0.0
+                if part > SEUIL_MEUBLE:
+                    etiquette = MEUBLE
+                elif part > SEUIL_SOL:
+                    continue
+                else:
+                    # la matière aux 9 points de la moitié centrale de la vignette : tous pareils, sinon vignette écartée
+                    ll, cc = np.meshgrid([l - d, l, l + d], [c - d, c, c + d])
+                    X, Y = vue.vers_sol(ll.ravel(), cc.ravel())
+                    m = set(matieres_verite(logement, X, Y))
+                    if len(m) != 1 or "" in m or m & DESSINEES_D_APRES_APP001:
+                        continue
+                    etiquette = m.pop()
+                images.append(image)
+                etiquettes.append(etiquette)
+                logements.append(nom_du_logement(t.name))
+                tirages.append(t.name)
     return np.stack(images), np.array(etiquettes), np.array(logements), np.array(tirages)
 
 
@@ -149,11 +180,22 @@ def noter_tirage(t: Path, oeil, clf: Classifieur) -> dict:
             "pieces_justes": note.get("pieces_justes", "0/0")}
 
 
+def resumer(cartes: list[dict]) -> dict:
+    m2 = sum(c["m2"] for c in cartes)
+    pj = [c["pieces_justes"].split("/") for c in cartes]
+    return {"surface_juste": round(sum(c["m2"] * c["juste"] for c in cartes) / max(m2, 1e-9), 3), "m2": round(m2, 1),
+            "pieces_justes": f"{sum(int(a) for a, _ in pj)}/{sum(int(b) for _, b in pj)}"}
+
+
+def etiquette_vers_classe(e: str, classes) -> int:
+    return classes.index(MEUBLE if e == MEUBLE else famille(e))
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Apprendre à l'œil la famille d'un sol mis à plat")
+    ap = argparse.ArgumentParser(description="Apprendre à l'œil la famille d'un sol mis à plat (et « meuble »)")
     ap.add_argument("essais", type=Path)
     ap.add_argument("sortie", type=Path)
-    ap.add_argument("--oeil", nargs="+", default=["vits14", "vitb14"])
+    ap.add_argument("--oeil", nargs="+", default=["vits14"])
     ap.add_argument("--graine", type=int, default=7)
     args = ap.parse_args()
     alea = random.Random(args.graine)
@@ -167,38 +209,37 @@ def main() -> int:
     print("Vignettes des photos d'essai…", flush=True)
     img_e, mat_e, log_e, tir_e = vignettes_essais(args.essais)
     controle = np.isin(log_e, LOGEMENTS_CONTROLE)
-    print(f"  {len(img_e)} vignettes dont {controle.sum()} de contrôle ({time.time() - debut:.0f} s)", flush=True)
-    fam = {f: i for i, f in enumerate(FAMILLES)}
-    y_b = np.array([fam[famille(m)] for m in mat_b])
-    y_e = np.array([fam[famille(m)] for m in mat_e])
+    print(f"  {len(img_e)} vignettes dont {controle.sum()} de contrôle, {(mat_e == MEUBLE).sum()} « meuble » "
+          f"({time.time() - debut:.0f} s)", flush=True)
+    tirages_controle = [t for t in sorted(args.essais.iterdir())
+                        if nom_du_logement(t.name) in LOGEMENTS_CONTROLE and (t / "rendus").is_dir()]
     bilan = {"vignettes_bibliotheque": int(len(img_b)), "vignettes_essais_appris": int((~controle).sum()),
-             "vignettes_controle": int(controle.sum()), "par_famille_controle": {f: int((y_e[controle] == i).sum()) for f, i in fam.items()},
-             "yeux": {}}
+             "vignettes_controle": int(controle.sum()), "vignettes_meuble": int((mat_e == MEUBLE).sum()), "yeux": {}}
     for nom in args.oeil:
         oeil = charger(nom)
         e_b, e_e = empreintes(oeil, img_b), empreintes(oeil, img_e)
         print(f"[{nom}] empreintes faites ({time.time() - debut:.0f} s)", flush=True)
         resultats = {}
-        for sources in ("bibliotheque", "bibliotheque+essais"):
-            X = e_b if sources == "bibliotheque" else np.concatenate([e_b, e_e[~controle]])
-            y = y_b if sources == "bibliotheque" else np.concatenate([y_b, y_e[~controle]])
-            clf = Classifieur(X.shape[1], FAMILLES, nom)
+        for reglage, classes in (("4-familles", FAMILLES), ("avec-meuble", CLASSES_AVEC_MEUBLE)):
+            garde = np.array([e != MEUBLE or MEUBLE in classes for e in mat_e])
+            y_b = np.array([etiquette_vers_classe(m, classes) for m in mat_b])
+            y_e = np.array([etiquette_vers_classe(m, classes) if g else -1 for m, g in zip(mat_e, garde)])
+            appr = ~controle & garde
+            X, y = np.concatenate([e_b, e_e[appr]]), np.concatenate([y_b, y_e[appr]])
+            clf = Classifieur(X.shape[1], classes, nom)
             appris = clf.apprendre(X, y)
-            p = clf.probabilites(e_e[controle]).argmax(1)
-            par_famille = {f: round(float((p[y_e[controle] == i] == i).mean()), 3) if (y_e[controle] == i).any() else None
-                           for f, i in fam.items()}
-            cartes = [noter_tirage(t, oeil, clf) for t in sorted(args.essais.iterdir())
-                      if t.name.rsplit("-t", 1)[0] in LOGEMENTS_CONTROLE and (t / "rendus").is_dir()]
-            m2 = sum(c["m2"] for c in cartes)
-            pj = [c["pieces_justes"].split("/") for c in cartes]
-            r = {"justesse_apprise": round(appris, 3), "vignettes_controle_justes": round(float((p == y_e[controle]).mean()), 3),
-                 "par_famille": par_famille,
-                 "controle_surface_juste": round(sum(c["m2"] * c["juste"] for c in cartes) / max(m2, 1e-9), 3),
-                 "controle_m2": round(m2, 1),
-                 "controle_pieces_justes": f"{sum(int(a) for a, _ in pj)}/{sum(int(b) for _, b in pj)}"}
-            print(f"[{nom}] {sources} : {r}", flush=True)
-            resultats[sources] = r
-            torch.save({**clf.etat(), "sources": sources, "controle": r}, args.sortie / f"sols-{nom}-{sources.replace('+', '-')}.pt")
+            ctl = controle & garde
+            p = clf.probabilites(e_e[ctl]).argmax(1)
+            par_classe = {c: round(float((p[y_e[ctl] == i] == i).mean()), 3) if (y_e[ctl] == i).any() else None
+                          for i, c in enumerate(classes)}
+            vides = resumer([noter_tirage(t, oeil, clf) for t in tirages_controle if "-t" in t.name[-3:]])
+            meubles = resumer([noter_tirage(t, oeil, clf) for t in tirages_controle if "-m" in t.name[-3:]])
+            r = {"justesse_apprise": round(appris, 3), "vignettes_controle_justes": round(float((p == y_e[ctl]).mean()), 3),
+                 "par_classe": par_classe, "controle_pieces_vides": vides, "controle_pieces_meublees": meubles}
+            print(f"[{nom}] {reglage} : {r}", flush=True)
+            resultats[reglage] = r
+            torch.save({**clf.etat(), "sources": "bibliotheque+essais(+meubles)", "controle": r},
+                       args.sortie / f"sols-{nom}-{reglage}.pt")
         bilan["yeux"][nom] = resultats
         del oeil
         torch.cuda.empty_cache()
