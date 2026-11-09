@@ -50,6 +50,7 @@ CATEGORIES: dict[str, tuple[str, tuple[str, ...] | None, tuple[str, ...], tuple[
     "horloge": ("Horloge murale", ("clock", "wall art"), ("clock",), ("alarm", "desk", "table")),
     "plante": ("Plante", ("planter", "artificial plant"), (), ()),
     "coussin": ("Coussin", ("pillow",), (), ("bed pillow", "sleeping")),
+    "vase": ("Vase", ("vase",), (), ()),
     # sur mesure : dessinés en bloc (couleur relevée)
     "meuble_cuisine_bas": ("Meubles bas de cuisine", None, (), ()),
     "meuble_cuisine_haut": ("Meubles hauts de cuisine", None, (), ()),
