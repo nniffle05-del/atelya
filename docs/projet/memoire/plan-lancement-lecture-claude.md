@@ -504,3 +504,17 @@ refaite. `look` de MCP ne capture PAS l'aperçu Cycles (EEVEE / Workbench seulem
 (System.Drawing en PowerShell). CE QUI EST ATELYA ET CE QUI NE L'EST PAS : maquette, scènes d'éclairage, réglages, correctifs =
 code d'Atelya (`moteur/`) ; MCP = outil du copilote pour regarder et essayer en direct, jamais une brique d'Atelya (le client
 n'en a pas besoin) ; tout réglage trouvé par MCP doit être reporté dans le code d'Atelya, sinon il est perdu à la maquette suivante.
+**Éclairages VALIDÉS par NT (09/11/2026 : « Oui, franchement, j'aime bien »).** Puis étape 3 = brique photos.
+**Vérité des sols d'app-001 RÉVISÉE (09/11/2026, accord NT « D'accord »)** avant d'écrire la brique photos (elle sera notée contre
+elle). Méthode : chemin inverse du calage (pixel de la photo → point du sol, en m) ; quadrillage du sol tous les 50 cm dessiné sur
+chaque photo calée ; zones coloriées pixel par pixel sur les photos (jaune cubes, bleu lames, rose point de Hongrie), planche
+`..\atelya\b2\app-001\brique-photos\verite-sols-actuelle-contre-proposee.jpg`. Résultat : bande devant l'îlot (sous les chaises) et
+passage îlot → caisson bleu → entrée en LAMES DROITES (avant : point de Hongrie) ; jointure en biais (frise) vue sur la photo 02, une
+droite (10,6 ; 8,35) → (13,54 ; 4,6) qui respecte tous les points des photos bien calées (±0,3-0,5 m) ; avancée des cubes devant le
+bout de l'îlot à ±0,3 m (photos 05 et 06 en désaccord : limite du calage). Zones découpées en morceaux CONVEXES (règle du format
+`ZoneSol`, sinon refus). Nouveau champ `couleur_visee` (CIELAB L/a/b, médiane des pixels « bois » de chaque photo puis moyenne) :
+point de Hongrie L 52,5 a 12,2 b 27,4 (photos 01, 03, 04) ; lames du séjour L 50,4 a 15,3 b 31,9 (05, 06, 07) ; chambres
+L ≈ 50,5 a ≈ 16 b ≈ 31,5. MESURÉ : la maquette en jour voilé donne au point de Hongrie L ≈ 39 a ≈ 19 (trop foncé, trop rouge) ;
+cause = teinte réglée au rendu sous plein soleil depuis UNE vue (regler_teintes) → à régler en jour voilé contre `couleur_visee`.
+Vocabulaire NT : « l'œil de Meta » = DINOv2 (déjà dans Atelya, `oeil.py`, poids sur le PC). Limite dite à NT : app-001 seul = mise
+au point ET examen → note optimiste ; il faudra 2-3 autres logements avec photos jamais regardés pour une note honnête.
