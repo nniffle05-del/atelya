@@ -45,9 +45,9 @@ TYPE_DE_GROUPE = {"canape": ("canape", (2.1, 0.9, 0.85)), "fauteuil": ("fauteuil
                   "tapis": ("tapis", (1.8, 1.3, 0.02)), "lampe": ("lampadaire", (0.4, 0.4, 1.6)),
                   "plante": ("plante", (0.5, 0.5, 1.0))}
 TACHE_MIN = {"tapis": 12, "chaise": 4, "lampe": 3}  # carrés minimum d'une tache pour compter comme un meuble
-TACHE_MIN_DEFAUT = 6
+TACHE_MIN_DEFAUT = 16  # réglé sur le contrôle (fr-031, fr-038) le 09/11/2026 : moins de détections en trop
 FUSION_M = {"chaise": 0.45, "fauteuil": 0.6}
-FUSION_DEFAUT = 0.9
+FUSION_DEFAUT = 1.8  # réglé sur le contrôle : un grand meuble vu en morceaux ne compte qu une fois
 CONTRE_MUR_M = 0.6
 
 
@@ -206,9 +206,29 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
     return sortie
 
 
-def noter_meubles(trouves: list[dict], verite: list[dict], distance_max: float = 0.8) -> dict:
-    """Comparaison avec les meubles relevés à la main (même groupe, à moins de distance_max) : retrouvés, en trop, écart de place."""
+def vu_sur_une_photo(m: dict, cameras: list, logement: dict, largeur: int = 1206, hauteur: int = 804) -> bool:
+    """Le milieu du meuble (à mi-hauteur) est-il dans le cadre d'une photo prise dans SA pièce, entre 0,5 et 12 m ? Sert à ne
+    pas reprocher à Atelya un meuble qu'aucune photo ne montre."""
+    from moteur.camera_photo import projeter
+    from moteur.sol_a_plat import piece_de, piece_de_l_appareil
+    piece = piece_de(m["position"], logement["pieces"])
+    point = (m["position"][0], m["position"][1], m.get("altitude", 0) + m["dimensions"][2] / 2)
+    for cam in cameras:
+        p_cam, _ = piece_de_l_appareil(cam, logement["pieces"])
+        if piece is None or p_cam is None or p_cam["id"] != piece["id"]:
+            continue
+        u, v, d = projeter(point, cam)
+        if 0.5 < d < 12 and 0 <= u < largeur and 0 <= v < hauteur:
+            return True
+    return False
+
+
+def noter_meubles(trouves: list[dict], verite: list[dict], distance_max: float = 0.8, cameras=None, logement=None) -> dict:
+    """Comparaison avec les meubles relevés à la main (même groupe, à moins de distance_max) : retrouvés, en trop, écart de place.
+    Avec les caméras et le logement, seuls les meubles vus sur au moins une photo sont à trouver."""
     a_trouver = [m for m in verite if groupe(m["categorie"]) and m.get("altitude", 0) < 0.3]
+    if cameras is not None and logement is not None:
+        a_trouver = [m for m in a_trouver if vu_sur_une_photo(m, cameras, logement)]
     libres = list(range(len(trouves)))
     ecarts, par_groupe = [], {}
     for m in a_trouver:

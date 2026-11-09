@@ -630,3 +630,12 @@ la matière dans la famille (prototypes) et à la pose.
 '["canape", …]'` → pixel = n° de catégorie) ; taches → pied (bas de la tache) → sol par la caméra → recul d'une demi-profondeur ;
 fusion entre photos ; dos au mur le plus proche ; note contre la vérité (même groupe, < 0,8 m). Outil
 `outils/habillage/apprendre_meubles.py` (contrôle fr-031/fr-038, `--app001`).
+Repérage des meubles v1 (09/11/2026) : 35 827 carrés appris (photos d'essai meublées hors contrôle ; lampes et plantes trop rares :
+25-27 carrés) ; justesse apprise 95 %. NOTE sur les meubles VUS sur au moins une photo (`vu_sur_une_photo`) : contrôle 44/84
+retrouvés (52 %), 44 en trop, place à 0,2-0,4 m ; réglage SUR LE CONTRÔLE (balayage seuil × taille de tache × fusion) :
+taches ≥ 16 carrés, fusion 1,8 m (chaises 0,45, fauteuils 0,6). app-001 (une fois après réglage) : 16/34 retrouvés (47 %), 24 en
+trop, place à 0,30 m ; canapé 0/1, lits 0/2, fauteuils 1/3, chaises 5/9, rangements 6/11, tapis 2/2. Plan
+`..\atelya\b2\app-001\v3\meubles-reperes.png`. Détections au bon endroit, CATÉGORIES confondues dans le salon (meubles ABO rendus
+≠ vrais meubles). Modèle `moteur/modeles/meubles-vits14-v1.pt`. Pistes : plus de photos d'essai meublées (tous les logements,
+plus de tirages), lampes et plantes plus fréquentes, segmentation plus fine (carrés de 14 px sur 448 px = 25 px de photo),
+orientation lue sur la photo.

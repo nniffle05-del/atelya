@@ -93,7 +93,7 @@ def main() -> int:
     notes = {}
     for t, (logement, photos) in sorted(controle_tirages.items()):
         trouves = reperer(photos, logement, oeil, clf)
-        notes[t.name] = noter_meubles(trouves, logement["meubles"])
+        notes[t.name] = noter_meubles(trouves, logement["meubles"], cameras=[c for _, c in photos], logement=logement)
         print(f"contrôle {t.name} : {notes[t.name]}", flush=True)
     if args.app001:
         releve = json.loads((RACINE / "verites/app-001/cameras-photos.json").read_text(encoding="utf-8"))
@@ -104,9 +104,9 @@ def main() -> int:
             img = lire_image(RACINE / releve["photos"] / f"{nom}.png")
             photos.append((cv2.cvtColor(img, cv2.COLOR_BGR2RGB), camera_depuis_dict(d["camera"])))
         trouves = reperer(photos, logement, oeil, clf)
-        notes["app-001"] = noter_meubles(trouves, verite)
+        notes["app-001"] = noter_meubles(trouves, verite, cameras=[c for _, c in photos], logement=logement)
         print(f"app-001 : {notes['app-001']}", flush=True)
-        (args.sortie.parent / "meubles-trouves-app001.json").write_text(json.dumps(trouves, ensure_ascii=False, indent=1),
+        (RACINE.parent / "atelya" / "b2" / "app-001" / "meubles-trouves-app001.json").write_text(json.dumps(trouves, ensure_ascii=False, indent=1),
                                                                         encoding="utf-8")
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     torch.save({**clf.etat(), "notes": notes}, args.sortie)
