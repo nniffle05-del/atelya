@@ -26,6 +26,9 @@ Pourquoi (décision NT du 08/11/2026, docs/projet/memoire/plan-lancement-lecture
 
 Version 0.1.0 (08/11/2026) : première version (plans vus de face ; photo de biais : envoyer à Claude l'image déjà redressée).
 Version 0.2.0 (08/11/2026) : doutes propres à la lecture de Claude (moteur.doutes_claude 0.1.0).
+Version 0.2.1 (09/11/2026) : bouts de murs coupés droit sur la face du mur qu'ils touchent (fin du filet de lumière aux angles
+   saillants, app-001), bouts libres non prolongés, contour à angles droits refusé s'il mord sur une pièce voisine. 21 vrais
+   plans : bouche-trous 48,4 → 20,9 m², trous 11 → 10, sols superposés 0,072 → 0,027 m².
 """
 from __future__ import annotations
 
@@ -45,12 +48,14 @@ from moteur.lecture_cotes import ECART_MAX, TexteLu
 from moteur.logement import Logement
 from moteur.recalage_murs import affiner_mur
 
-VERSION_TRADUCTEUR_CLAUDE = "0.2.0"
+VERSION_TRADUCTEUR_CLAUDE = "0.2.1"
 MODELE = "claude"
 ACCORD_DEUX_CLES = 0.03  # 3 % : écart maximal entre l'échelle retrouvée par Atelya et celle proposée par Claude
 PORTEE_OUVERTURE_PX = 12.0  # une ouverture appartient à un mur dont l'axe passe à moins de ça (ou de son épaisseur)
 DEBORD_OUVERTURE_M = 0.05  # une ouverture qui dépasse le bout de son mur de plus de 5 cm donne un doute
+JONCTION_PX = 3.0  # px : un bout de mur à moins de 3 px d'un autre mur le touche (le recalage décale parfois un mur de si peu)
 ECART_CONTOUR_PX = 1.5  # px : … et pas plus de 1,5 pixel d'écart en moyenne le long du bord de la zone
+DEBORD_VOISINES_PX = 0.1  # px : … et il ne couvre pas plus de 0,1 pixel des pièces voisines par pixel de bord
 ECART_CONTOUR = 0.03  # le contour à angles droits est gardé s'il épouse la zone à 3 % près (pixels en trop + en moins), sinon le contour libre
 HAUTEUR_SOUS_PLAFOND = 2.50
 HAUTEUR_PORTE, HAUTEUR_PORTE_FENETRE, HAUT_FENETRE = 2.04, 2.15, 2.20  # comme moteur.coloriage
@@ -128,10 +133,12 @@ def _mur_porteur(bords: list[float], murs: list[list[float]], indice_claude: int
     return min(proches)[1] if proches else None
 
 
-def _contour(zone: np.ndarray) -> list[tuple[float, float]] | None:
+def _contour(zone: np.ndarray, voisines: np.ndarray | None = None) -> list[tuple[float, float]] | None:
     """Le contour d'une zone : à angles droits s'il ÉPOUSE la zone (murs droits), sinon le contour libre (murs en biais, plan
     un peu penché). Épouser = pixels de l'un et pas de l'autre ≤ ECART_CONTOUR de la zone (B1, 08/11/2026 : comparer les seules
-    surfaces laissait passer un rectangle droit sur une pièce penchée de 2°, fr-024, avec des pointes vides le long des murs)."""
+    surfaces laissait passer un rectangle droit sur une pièce penchée de 2°, fr-024, avec des pointes vides le long des murs),
+    et presque rien sur les pièces `voisines` (DEBORD_VOISINES_PX par pixel de bord ; fr-022, 09/11/2026 : le rectangle d'un
+    séjour partagé en deux mordait de 0,18 m² sur l'autre moitié, deux sols au même endroit, rendus noirs)."""
     ortho = _contour_orthogonal(zone)
     aire = float(zone.sum())
     if ortho is not None and aire > 0:
@@ -144,7 +151,9 @@ def _contour(zone: np.ndarray) -> list[tuple[float, float]] | None:
         ecart = float(np.logical_xor(dessin > 0, zone).sum())
         # Les deux : une petite pièce tolère 3 % (un rang de pixels), une grande pas plus de 1,5 px en moyenne le long du bord
         # (fr-038 : 3 % d'un séjour de 85 m² laissaient le rectangle droit déborder de 0,7 m² sur la cuisine).
-        if ecart / aire <= ECART_CONTOUR and ecart <= ECART_CONTOUR_PX * max(perimetre, 1.0):
+        debord = float((dessin.astype(bool) & voisines).sum()) if voisines is not None else 0.0
+        if ecart / aire <= ECART_CONTOUR and ecart <= ECART_CONTOUR_PX * max(perimetre, 1.0) \
+                and debord <= DEBORD_VOISINES_PX * max(perimetre, 1.0):
             return ortho
     contours, _ = cv2.findContours(zone.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
@@ -180,6 +189,91 @@ def _partager(zones: list, membres: list[int], zone: np.ndarray, contours: dict[
         masque = np.zeros(zone.shape, bool)
         masque[y0:y1, x0:x1] = z & (proprietaire == rang)
         zones[i] = (pid, ptype, masque, c)
+
+
+def _coupe_du_bout(murs: list, k: int, debut: bool) -> tuple[tuple[float, float], tuple[float, float]]:
+    """La ligne (un point, une direction) où s'arrête un bout du mur k.
+
+    Le bout touche un autre mur (angle, té, même décalé de quelques pixels par le recalage) : il s'arrête sur la FACE LOINTAINE
+    de cet autre mur, celle qu'il atteint après l'avoir traversé ; l'angle est rempli, rien ne dépasse dans la pièce. Bout près
+    d'un autre mur sans le croiser (courbe faite de morceaux décalés d'un pixel, mur continué avec un petit écart : fr-026) :
+    prolongé d'une demi-épaisseur + JONCTION_PX, l'écart se ferme. Bout libre (mur qui s'arrête dans la pièce, aucun mur à
+    moins de cette distance) : coupé net, comme en 3D (fr-022 : un mur de 98 cm prolongé de 50 cm laissait un vide au sol)."""
+    x0, y0, x1, y1, ep = murs[k]
+    L = math.hypot(x1 - x0, y1 - y0) or 1.0
+    ux, uy = (x1 - x0) / L, (y1 - y0) / L
+    (ex, ey), (dx, dy) = ((x0, y0), (-ux, -uy)) if debut else ((x1, y1), (ux, uy))  # le bout, et la direction vers le dehors
+    r = ep / 2 + JONCTION_PX
+    meilleur = None
+    voisin = False  # un autre mur passe tout près du bout (courbe faite de morceaux, mur continué avec un petit écart…)
+    for j, (a0, b0, a1, b1, epj) in enumerate(murs):
+        Lj = math.hypot(a1 - a0, b1 - b0)
+        if j == k or Lj == 0:
+            continue
+        vx, vy = (a1 - a0) / Lj, (b1 - b0) / Lj
+        s = min(max((ex - a0) * vx + (ey - b0) * vy, 0.0), Lj)
+        if math.hypot(ex - a0 - s * vx, ey - b0 - s * vy) - epj / 2 <= r:
+            voisin = True
+        nx, ny = -vy, vx
+        cos = nx * dx + ny * dy
+        if abs(cos) < 0.5:  # moins de 30° entre les deux murs : un prolongement, pas une jonction
+            continue
+        t = (nx * (a0 - ex) + ny * (b0 - ey)) / cos  # distance du bout à l'axe de l'autre mur, le long du mur k
+        demi = epj / 2 / abs(cos)  # demi-épaisseur de l'autre mur, le long du mur k
+        if not -demi - JONCTION_PX <= t <= demi + r:
+            continue
+        s = (ex + t * dx - a0) * vx + (ey + t * dy - b0) * vy  # où le mur k rencontre l'autre mur, le long de celui-ci
+        if not -ep / 2 - epj / 2 - JONCTION_PX <= s <= Lj + ep / 2 + epj / 2 + JONCTION_PX:
+            continue
+        if meilleur is None or abs(t) < meilleur[0]:
+            signe = 1.0 if cos > 0 else -1.0
+            meilleur = (abs(t), (a0 + signe * epj / 2 * nx, b0 + signe * epj / 2 * ny), (vx, vy))
+    if meilleur is not None:
+        return meilleur[1], meilleur[2]
+    if voisin:
+        return (ex + r * dx, ey + r * dy), (-dy, dx)
+    return (ex, ey), (-dy, dx)
+
+
+def _croisement(p, u, q, v) -> tuple[float, float]:
+    """Le point commun des droites (p, direction u) et (q, direction v), supposées non parallèles."""
+    det = u[0] * -v[1] - u[1] * -v[0]
+    lam = ((q[0] - p[0]) * -v[1] - (q[1] - p[1]) * -v[0]) / det
+    return p[0] + lam * u[0], p[1] + lam * u[1]
+
+
+def _bati(murs: list, forme: tuple[int, int]) -> np.ndarray:
+    """Les murs dessinés en pixels (1 = mur), chacun en bande à bouts COUPÉS DROIT sur la face du mur qu'il touche.
+
+    App-001 (09/11/2026) : avant, chaque mur était prolongé d'une demi-épaisseur + 3 px avec des bouts ARRONDIS ; à un angle
+    saillant (un angle de mur qui avance dans la pièce), ce bout dépassait d'environ 25 cm dans la pièce : le contour de la pièce
+    gardait une bosse, son sol et son plafond s'arrêtaient avant le mur, et le bouche-trou laissait un filet de lumière en 3D."""
+    bati = np.zeros(forme, np.uint8)
+    k16 = 1 << 4
+    # Côtés des murs dessinés comme avant (axe arrondi au pixel, trait de t = max(1, round(ep)) px de cv2.line : de l'axe moins
+    # (t + 1) // 2 à l'axe plus (t + 1) // 2, bords compris, 0 pour t = 1) : seuls les bouts changent, le reste de la lecture
+    # (origine, surfaces) ne bouge pas.
+    def _largeur_dessinee(ep: float) -> int:
+        t = max(1, int(round(ep)))
+        return 0 if t == 1 else 2 * ((t + 1) // 2)
+
+    murs = [[int(round(x0)), int(round(y0)), int(round(x1)), int(round(y1)), _largeur_dessinee(ep)] for x0, y0, x1, y1, ep in murs]
+    for k, (x0, y0, x1, y1, ep) in enumerate(murs):
+        L = math.hypot(x1 - x0, y1 - y0)
+        if L == 0:
+            continue
+        u = ((x1 - x0) / L, (y1 - y0) / L)
+        m = (-u[1], u[0])
+        demi = ep / 2
+        (p0, d0), (p1, d1) = _coupe_du_bout(murs, k, True), _coupe_du_bout(murs, k, False)
+        coins = []
+        for cote, (p, d) in ((demi, (p0, d0)), (demi, (p1, d1)), (-demi, (p1, d1)), (-demi, (p0, d0))):
+            coins.append(_croisement((x0 + cote * m[0], y0 + cote * m[1]), u, p, d))
+        cv2.fillPoly(bati, [np.round(np.asarray(coins) * k16).astype(np.int32)], 1, lineType=cv2.LINE_8, shift=4)
+        # L'axe en trait de 1 px par-dessus : un mur fin et penché reste étanche (les zones libres sont prises en 4-connexité).
+        a, b = _croisement((x0, y0), u, p0, d0), _croisement((x0, y0), u, p1, d1)
+        cv2.line(bati, (int(round(a[0])), int(round(a[1]))), (int(round(b[0])), int(round(b[1]))), 1, 1)
+    return bati
 
 
 def _polygone(points, forme: tuple[int, int]) -> np.ndarray:
@@ -224,15 +318,7 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
     indice_mur = {m.id: k for k, m in enumerate(fiche.murs)}
 
     # 2. Le bâti, puis les zones libres : une pièce = la zone fermée par les murs autour du point donné par Claude.
-    bati = np.zeros((H, W), np.uint8)
-    for x0, y0, x1, y1, ep in murs:
-        # Chaque mur est prolongé d'une demi-épaisseur (+ 3 px) à ses bouts : les angles se ferment même quand le recalage a
-        # décalé un mur de quelques pixels par rapport à son voisin (même règle que les vérités).
-        L = math.hypot(x1 - x0, y1 - y0) or 1.0
-        ux, uy = (x1 - x0) / L, (y1 - y0) / L
-        r = ep / 2 + 3
-        cv2.line(bati, (int(round(x0 - r * ux)), int(round(y0 - r * uy))), (int(round(x1 + r * ux)), int(round(y1 + r * uy))),
-                 1, max(1, int(round(ep))))
+    bati = _bati(murs, (H, W))
     n, etiq = cv2.connectedComponents((bati == 0).astype(np.uint8), connectivity=4)
     au_bord = set(np.unique(np.concatenate([etiq[0], etiq[-1], etiq[:, 0], etiq[:, -1]])).tolist())
     zones: list[tuple[str, str, np.ndarray, bool]] = []  # (id Claude, type, masque, contour donné par Claude)
@@ -412,8 +498,11 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
     noms_claude = {p.id: p.nom for p in fiche.pieces}
     ids_pieces: dict[str, str] = {}
     sortie_pieces, types, noms_lus = [], {}, []
+    occupees = np.zeros((H, W), bool)
+    for _, _, zone, _ in zones:
+        occupees |= zone
     for pid, type_, zone, _ in zones:
-        contour = _contour(zone)
+        contour = _contour(zone, occupees & ~zone)
         if contour is None:
             autres.append(_doute("piece_ouverte", f"{noms_claude[pid] or NOM_PIECE[type_]} : contour introuvable", "fort"))
             continue

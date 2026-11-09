@@ -311,3 +311,22 @@ def test_cuisine_ouverte_deux_pieces_cote_a_cote_sans_superposition(plan):
     # 4 m de frontière commune comptés dans les deux pièces sur un rang de cases de 4 mm = 0,016 m² (bruit de la mesure) ;
     # avant B1, c'était toute la cuisine (~7 m² sur fr-031).
     assert r["sols_superposes_m2"] <= 0.02 and r["sol"]["trous"] == 0
+
+
+def test_bouts_de_murs_coupes_sur_la_face_du_voisin():
+    """App-001 (09/11/2026) : à un angle, chaque mur s'arrête sur la face lointaine de l'autre (l'angle est rempli, rien ne
+    dépasse dans la pièce) ; avant, des bouts arrondis prolongés débordaient de ~25 cm dans la pièce à un angle saillant."""
+    from moteur.traduire_claude import _bati
+
+    b = _bati([[20, 50, 100, 50, 10], [100, 50, 100, 120, 10]], (160, 160))  # un L : l'horizontal finit sur le vertical
+    assert b[45:56, 95:106].all()  # l'angle est plein
+    assert not b[45:56, 106:].any() and not b[:45, 95:106].any()  # rien au-delà des faces extérieures du L
+    assert not b[:, :20].any()  # bout libre (x = 20) : coupé net, pas prolongé
+
+
+def test_bouts_de_murs_proches_se_rejoignent():
+    """Une courbe faite de morceaux décalés de 2 px (fr-026) : les bouts voisins sont prolongés, le trait reste continu."""
+    from moteur.traduire_claude import _bati
+
+    b = _bati([[10, 30, 60, 30, 3], [62, 32, 120, 32, 3]], (60, 140))
+    assert cv2.connectedComponents(b)[0] == 2  # le fond + un seul trait

@@ -270,6 +270,10 @@ meubles-abo`, outil `outils/bibliotheque/telecharger_meubles.py`, REPRENABLE ; d
 lire le plan à la main comme une vérité (échelle : 124 m² au total, portes ~80 cm, HSP 3 m ; ne PAS construire palier, escalier,
 ascenseur), 3D par Atelya, puis chaque pièce prend le sol (motif + teinte) de SA photo, comparaison côte à côte avec l'annonce.
 Détail complet : fin de `docs/projet/memoire/plan-lancement-lecture-claude.md`.
+**Temps 2, avancement (09/11)** : étape 1 vérité d'app-001 VALIDÉE par NT (`verites/app-001/` ; RÈGLE NT : ne jamais inventer
+limite, porte ou cloison absente du plan, un espace ouvert = UNE pièce) ; étape 2 3D faite (HSP « HSP 3m » lue, `lecture_cotes`) ;
+défaut des angles saillants corrigé (traducteur de la lecture de Claude 0.2.1 : bouts de murs coupés sur la face du voisin ; 21 plans :
+bouche-trous 48,4 → 20,9 m², trous 11 → 10). Prochaine : étape 3, sol de chaque pièce d'après SA photo.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

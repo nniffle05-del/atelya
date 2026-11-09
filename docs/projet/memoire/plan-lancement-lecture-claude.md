@@ -285,3 +285,54 @@ après, défaut / adapté à la photo d'app-001 / la photo). Le soleil reste cel
 parquet adapté plus petits que ceux d'app-001 (prévoir une échelle du motif par pièce) ; ~1 min 30 par vue de pièce ; pas de faïence
 murale ; portes de placard toujours blanches ; fin trait sombre dans l'embrasure d'une porte-fenêtre de fr-031. Le téléchargement des
 meubles ABO tourne dans cette conversation : s'il s'arrête (fermeture de VS Code, veille), relancer la même commande (il reprend).
+
+**B2 temps 2, étape 1 : vérité d'app-001 (09/11/2026, nouvelle conversation)** — plan seul découpé de la capture :
+`..\atelya\photos-clients\app-001\verite\plan.png` (1100 × 670 px) ; photos découpées sans l'écran du téléphone :
+`app-001\photos\photo-01..12.png` + `planche.png`. Saisie à la main (`faire_verite.py`) : 32 murs, 24 ouvertures, 12 pièces ;
+copie dans le dépôt `verites/app-001/`. ÉCHELLE (plan sans cotes) : 49,4 px/m = la somme des 12 pièces vaut les 124 m² annoncés
+(131,35 m² à 48 px/m) ; contrôle indépendant : les passages de porte font 0,61-0,71 m = portes standard de 63 et 73 cm (et non
+~80 cm comme supposé avant) ; porte d'entrée double 1,23 m ; emprise 17,6 × 11,7 m. Pièces : séjour / salle à manger 46,0 m², cuisine
+ouverte 16,0, entrée 3,2, chambre 1 18,4 (placard le long du mur ouest, photo 08), chambre 2 19,2 (enfant, photos 10-11), salle de
+bains 4,9 (baignoire + double vasque, photo 12), salle d'eau 3,2 (douche, photo 09), WC 1,1, WC 2 1,9, dégagement 7,4, rangement 2,4,
+placard 0,3. Palier, escalier, ascenseur, courettes : non tracés. Incertitudes écrites dans la saisie (`incertain`) : HSP 2,80 dans
+salle de bains / dégagement / cuisine (format à une seule hauteur → 3 m), fenêtres sud posées en portes-fenêtres (2,1 m de large au
+dessin), accès de la salle d'eau supposé par la chambre 1 (mur plus fin), faux murs cuisine/séjour (y 222) et entrée/séjour (x 820),
+porte vers la courette (photo 07), usage du « rangement » inconnu + vide fermé (gaine ?), caisson bleu de la télé = meuble.
+Contrôle : `verite\controle-zoom.png`. En attente de la validation de NT avant la 3D (étape 2).
+**Correction demandée par NT (09/11/2026) : « tu as inventé des portes, relis bien le plan »** : la 1re lecture séparait cuisine /
+séjour / entrée par des faux murs avec un passage de toute la largeur (convention des vérités, retirée plus loin par
+`fiche_depuis_verite`, mais dessinée en VERT = porte sur l'image de contrôle) et posait une porte vers la courette d'après la photo 07.
+Le plan ne montre RIEN de tout cela. RÈGLE (NT) : ne JAMAIS ajouter une limite, une porte ou une cloison absente du plan, même pour
+séparer des sols ; un espace ouvert = UNE pièce ; le plan fait foi, la photo ne crée pas d'élément. Relecture zone par zone (zooms ×5,
+pixels) : trait fin y 222 + pointillé y 241 = bord du plafond plus bas de la cuisine (HSP 2,80, poutre visible photo 02) ; traits fins
+x 370 et x 407 du rangement = meubles (le « vide fermé » n'existait pas) ; triangle bleu du WC = lave-mains d'angle ; porte
+cuisine ↔ sas confirmée par les pixels (trou du mur x 504 de y 177 à 211, battant dessiné ouvert). Vérité corrigée : 30 murs,
+21 ouvertures, 10 pièces, 49,8 px/m (124 m²) : séjour / salle à manger / cuisine ouverte / entrée 65,2 m², chambre 1 18,1,
+chambre 2 18,9, dégagement 7,3, salle de bains 4,8, rangement 3,3, salle d'eau 3,1, WC 2 1,9, WC 1,1, placard 0,3. Sols différents
+dans l'espace ouvert (carreaux de ciment, lames droites, chevrons) : à proposer à NT à l'étape des sols, sans mur inventé.
+**Vérité validée par NT (« Je valide », 09/11/2026).** Étape 2 (3D par Atelya) : `fiche_depuis_verite` → `traduire_fiche traduire`
+(`..\atelya\lectures-claude\app-001\`, plan copié en `app-001.png` pour nommer la sortie) → `python -m moteur.construire` →
+`app-001\3d\` (1 min 56, 0 trou au sol et au plafond, murs superposés 0,18 m²). Images : `..\atelya\b2\app-001\etape2-*.png`.
+CORRIGÉ au passage : la HSP écrite « HSP 3m » (nombre entier) n'était pas lue → 2,50 m par défaut ; `lecture_cotes.FORME_HSP`
+accepte l'entier, et plusieurs HSP différentes → la plus fréquente, à égalité la plus haute (faux plafonds plus bas) ; app-001 → 3,00 m.
+`fiche_depuis_verite` reprend les textes de la saisie (clé `textes` : [texte, genre, x0, y0, x1, y1]) et la source d'échelle
+(`source_echelle_claude`). DÉFAUT TROUVÉ (pas encore corrigé, proposé à NT) : `traduire_claude` dessine chaque mur prolongé de
+½ épaisseur + 3 px à ses bouts, avec des bouts RONDS (cv2.line épais) → à chaque angle SAILLANT le bâti déborde de ~25 cm dans la
+pièce → contour du séjour arrondi autour de l'angle (46 points au lieu des 12 de la fiche), sol et plafond arrêtés avant le mur,
+bouché ensuite par `jours_a_boucher` (19 bouche-trous sur app-001) → filet de lumière en haut de l'angle + trace sur le plafond
+(`etape2-defaut-angle-plafond.png`). Correction proposée : bouts carrés et, quand le bout touche un autre mur, prolonger seulement
+de la ½ épaisseur de cet autre mur ; à mesurer sur les 20 vérités (`pc/b1/mesurer_jours.py`) avant / après.
+**Défaut des angles CORRIGÉ (accord NT « oui t'as raison », 09/11/2026) : traducteur de la lecture de Claude 0.2.1**
+(`moteur/traduire_claude._bati` + `_coupe_du_bout`). Les murs sont dessinés en bandes à bouts COUPÉS DROIT : un bout qui touche un
+autre mur (angle, té, même décalé de 3 px par le recalage) s'arrête sur la FACE LOINTAINE de cet autre mur (angle rempli, rien ne
+dépasse dans la pièce) ; un bout près d'un autre mur sans le croiser (courbe faite de morceaux décalés d'un pixel, fr-026) est
+prolongé de ½ épaisseur + 3 px ; un bout LIBRE (mur qui s'arrête dans la pièce) est coupé net (fr-022 : un mur de 98 cm prolongé de
+50 cm laissait un vide). Les côtés des murs restent dessinés au pixel près comme avant (même largeur que cv2.line) : origine et
+surfaces inchangées. En plus : le contour à angles droits d'une pièce est refusé s'il mord sur une pièce voisine (plus de 0,1 px par
+pixel de bord, `DEBORD_VOISINES_PX`) : fr-022, séjour partagé en deux, 0,18 m² de sols superposés (rendus noirs). Mesure sur les
+20 vérités de Fable + app-001 (script de mesure dans le dossier temporaire, chaîne de `pc/b1/mesurer_jours.py`) : bouche-trous
+607 → 295 morceaux, 48,4 → 20,9 m² ; trous 11 → 10 (aucun plan avec un trou de plus) ; sols superposés 0,072 → 0,027 m² ; points
+des contours de pièces divisés par ~2 ; pièces un peu plus grandes (elles vont jusqu'aux murs ; app-001 120,7 → 121,7 m² pour 124
+annoncés). App-001 : bouche-trous 19 → 8 au plafond, plus de filet ni de trace à l'angle saillant
+(`..\atelya\b2\app-001\angle-avant-apres.png`). RESTE (autre cause, dans la 3D) : un petit trait clair au raccord du mur du poteau
+avec la façade EN BIAIS (≈ 10,5 ; 1,7 m), raccord de deux murs de travers dans `moteur/geometrie.py`. 2 tests ajoutés.

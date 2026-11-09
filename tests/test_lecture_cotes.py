@@ -57,11 +57,22 @@ def test_un_plan_sans_cote_est_signale():
         ("Hauteur sous plafond : 2,50 m", 2.50),
         ("HSP 2.70", 2.70),
         ("H.S.P. = 2,45 m", 2.45),
+        ("HSP 3m", 3.0),
+        ("HSP 2.8M", 2.8),
+        ("HSP 250", None),
         ("Séjour 25,92 m²", None),
     ],
 )
 def test_hauteur_sous_plafond(texte, attendu):
     assert lire_hauteur_sous_plafond([TexteLu(texte, np.zeros((4, 2)), 1.0)]) == attendu
+
+
+def test_hauteur_sous_plafond_la_plus_frequente_puis_la_plus_haute():
+    """app-001 : « HSP 3m » dans les chambres, « HSP 2.8m » sous les faux plafonds : à égalité, la plus haute."""
+    def lus(*textes):
+        return [TexteLu(t, np.zeros((4, 2)), 1.0) for t in textes]
+    assert lire_hauteur_sous_plafond(lus("HSP 2.8m", "HSP 3m", "HSP 2.8m", "HSP 3m")) == 3.0
+    assert lire_hauteur_sous_plafond(lus("HSP 2,50", "HSP 2,50", "HSP 2,80")) == 2.5
 
 
 @pytest.mark.parametrize("nom", ["plan d'origine", "de travers de -3,5° et compressé", "résolution réduite (60 px/m)"])

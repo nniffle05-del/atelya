@@ -90,9 +90,11 @@ def fiche_depuis_verite(dossier: Path, image: Path) -> dict:
             piece["contour"] = [[p(u), p(v)] for u, v in contour]
         pieces.append(piece)
     inconnue = bool(verite.get("echelle_inconnue"))
+    # Les textes que Claude lirait sur le plan, quand la saisie les donne : [texte, genre, x0, y0, x1, y1] (app-001 : « HSP 3m »).
+    textes = [{"texte": t, "genre": g, "cadre": [p(x0), p(y0), p(x1), p(y1)]} for t, g, x0, y0, x1, y1 in saisie.get("textes", [])]
     return {"schema": SCHEMA, "image": {"nom": image.name, "largeur": l2, "hauteur": h2},
-            "murs": murs, "ouvertures": ouvertures, "pieces": pieces,
-            "echelle_proposee": {"px_par_m": round(verite["px_par_m"] * k, 4), "source": "portes" if inconnue else "cotes",
+            "murs": murs, "ouvertures": ouvertures, "pieces": pieces, "textes": textes,
+            "echelle_proposee": {"px_par_m": round(verite["px_par_m"] * k, 4), "source": saisie.get("source_echelle_claude") or ("portes" if inconnue else "cotes"),
                                  "explication": f"échelle de la vérité ({verite.get('echelle_source', '')})"[:300]},
             "doutes": [{"raison": str(t)[:300], "gravite": "faible"} for t in verite.get("incertain", [])]}
 
