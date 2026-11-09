@@ -219,6 +219,7 @@ def main() -> int:
     ap.add_argument("--tirages", type=int, default=2)
     ap.add_argument("--graine", type=int, default=1)
     ap.add_argument("--meubles", action="store_true", help="meubler les pièces au hasard (bibliothèque ABO) + masques des meubles")
+    ap.add_argument("--depart", type=int, default=1, help="numéro du premier tirage (pour ajouter des tirages à une série)")
     args = ap.parse_args()
     from moteur.construire import DOSSIER_SCRIPTS, construire, lancer_blender, trouver_meubles
     from outils.habillage.caler_photos import rendre
@@ -236,21 +237,32 @@ def main() -> int:
             print(f"PLANTÉ : logement introuvable : {chemin}", flush=True)
             return 2
         base = json.loads(chemin.read_text(encoding="utf-8"))
-        for t in range(1, args.tirages + 1):
+        for t in range(args.depart, args.depart + args.tirages):
             debut = time.time()
             dossier = args.sortie / f"{chemin.parent.name}-{'m' if args.meubles else 't'}{t}"
-            dossier.mkdir(parents=True, exist_ok=True)
-            logement, cameras = tirage(base, alea, liste_meubles)
-            (dossier / "logement.json").write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
-            maquette = construire(dossier / "logement.json", dossier / "construction")
-            scene = alea.choice(ECLAIRAGES)
-            releve = {"photos": str((dossier / "rendus").resolve()), "fichier": "vue-{nom}.png", "eclairage": scene,
-                      "cameras": cameras}
-            (dossier / "cameras-photos.json").write_text(json.dumps(releve, ensure_ascii=False, indent=1), encoding="utf-8")
-            rendre(releve, maquette, dossier, ECHANTILLONS, scene)
-            if args.meubles:
-                lancer_blender(str(dossier / "maquette-photos.blend"), "--python", str(DOSSIER_SCRIPTS / "masques_meubles.py"),
-                               "--", str((dossier / "masques").resolve()))
+            if (dossier / "cameras-photos.json").is_file() and (dossier / "rendus").is_dir():
+                print(f"{dossier.name} : déjà fait, sauté", flush=True)  # la série se reprend là où elle s'est arrêtée
+                continue
+            try:
+                dossier.mkdir(parents=True, exist_ok=True)
+                logement, cameras = tirage(base, alea, liste_meubles)
+                (dossier / "logement.json").write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
+                maquette = construire(dossier / "logement.json", dossier / "construction")
+                scene = alea.choice(ECLAIRAGES)
+                releve = {"photos": str((dossier / "rendus").resolve()), "fichier": "vue-{nom}.png", "eclairage": scene,
+                          "cameras": cameras}
+                (dossier / "cameras-photos.json").write_text(json.dumps(releve, ensure_ascii=False, indent=1), encoding="utf-8")
+                rendre(releve, maquette, dossier, ECHANTILLONS, scene)
+                if args.meubles:
+                    from moteur.meubles import NOMS_MEUBLES
+                    copie = str(dossier / "maquette-photos.blend")
+                    lancer_blender(copie, "--python", str(DOSSIER_SCRIPTS / "masques_meubles.py"), "--",
+                                   str((dossier / "masques").resolve()))
+                    lancer_blender(copie, "--python", str(DOSSIER_SCRIPTS / "masques_meubles.py"), "--",
+                                   str((dossier / "categories").resolve()), json.dumps(list(NOMS_MEUBLES)))
+            except Exception as e:  # un logement qui plante n'arrête pas la série (règle 6 : ligne claire, puis on corrige)
+                print(f"PLANTÉ {dossier.name} : {type(e).__name__} : {str(e)[-400:]}", flush=True)
+                continue
             print(f"{dossier.name} : {len(cameras)} photos, {len(logement['meubles'])} meubles ({scene}) "
                   f"en {time.time() - debut:.0f} s", flush=True)
     print("FINI", flush=True)
