@@ -273,7 +273,14 @@ Détail complet : fin de `docs/projet/memoire/plan-lancement-lecture-claude.md`.
 **Temps 2, avancement (09/11)** : étape 1 vérité d'app-001 VALIDÉE par NT (`verites/app-001/` ; RÈGLE NT : ne jamais inventer
 limite, porte ou cloison absente du plan, un espace ouvert = UNE pièce) ; étape 2 3D faite (HSP « HSP 3m » lue, `lecture_cotes`) ;
 défaut des angles saillants corrigé (traducteur de la lecture de Claude 0.2.1 : bouts de murs coupés sur la face du voisin ; 21 plans :
-bouche-trous 48,4 → 20,9 m², trous 11 → 10) ; étape 3 sols : ZONES DE SOL dans une pièce (sans mur ni trait), échelle du motif, carrelages dessinés par Atelya (cubes, petits carreaux), parquets satinés, TEINTE RÉGLÉE AU RENDU automatique (`regler_teintes.py`), CORNICHES pièce par pièce (aucune / simple / moulure, aussi à l'écran) ; vérité des sols d'app-001 faite à la main (`verites/app-001/sols.json`) → la BRIQUE PHOTOS d'Atelya sera notée contre elle. Demandes NT en attente : plusieurs ÉCLAIRAGES dans la maquette Blender (une scène par éclairage, changés DANS Blender), puis brique photos. Prochaine : étape 4, vues côte à côte avec les photos.
+bouche-trous 48,4 → 20,9 m², trous 11 → 10) ; étape 3 sols : ZONES DE SOL dans une pièce (sans mur ni trait), échelle du motif, carrelages dessinés par Atelya (cubes, petits carreaux), parquets satinés, TEINTE RÉGLÉE AU RENDU automatique (`regler_teintes.py`), CORNICHES pièce par pièce (aucune / simple / moulure, aussi à l'écran) ; vérité des sols d'app-001 faite à la main (`verites/app-001/sols.json`) → la BRIQUE PHOTOS d'Atelya sera notée contre elle. Demandes NT en attente : plusieurs ÉCLAIRAGES dans la maquette Blender (une scène par éclairage, changés DANS Blender), puis brique photos. **Étape 4 FAITE (09/11, NT : « on est sur la bonne voie »)** : caméras au même endroit que les photos (`moteur/camera_photo.py`,
+calage sur des arêtes relevées à la main ; relevé `verites/app-001/cameras-photos.json` : 11/12 photos calées, la 09 = montage de
+gros plans, non calable) ; rendus depuis ces caméras dans une COPIE de la maquette (`outils/habillage/caler_photos.py`,
+`moteur/blender/poser_cameras_photos.py`) ; planches `..\atelya\b2\app-001\etape4\`. Constats : forme des pièces juste ; fenêtres
+trop petites, pan coupé du coin repas presque droit en vrai, mur de la porte de la courette plus long, plafond cuisine 2,80 ;
+parquet trop foncé / rouge dans ces vues ; lames droites (et non point de Hongrie / carreaux) autour de l'îlot et dans l'entrée ;
+lumière trop dure (voilages, ciel doux sur les photos) ; murs de couleur absents. Suite (ordre NT) : plusieurs ÉCLAIRAGES dans la
+maquette Blender (une scène par éclairage, murs neutres), puis brique photos (notée contre `verites/app-001/sols.json`).
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

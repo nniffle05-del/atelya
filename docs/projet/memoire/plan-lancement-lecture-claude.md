@@ -410,3 +410,33 @@ de briques de mur). Question NT « pourquoi un effet sur les murs ? » : les mar
 lisse à la taille réelle, vérifié contraste ×4 ; 512 / 1024 passes, seuil adaptatif 0,003, plus de rebonds : aucune différence
 mesurable) ; NT : « c'est bon ». À garder en tête : murs rosés à gauche / bleutés à droite (lumière renvoyée par le parquet ensoleillé
 contre lumière du ciel), physiquement juste mais neutralisé par les photographes → à traiter avec les éclairages.
+**Étape 4 (temps 2 d'app-001) : caméras au même endroit que les photos (09/11/2026, demande NT).** Méthode « camera matching » :
+sur chaque photo, Claude relève des arêtes dont la place est connue dans le logement (angles verticaux, pieds et hauts de murs,
+montants de fenêtres et de portes), en pixels (photos renforcées en contraste, CLAHE d'OpenCV, sinon les jonctions blanches ne se
+voient pas) ; `moteur/camera_photo.py` ajuste la caméra (moindres carrés Levenberg-Marquardt écrits avec numpy : PAS de scipy
+sur le PC, rien installé). Caméra de photographe d'immobilier : DE NIVEAU (verticales droites) + décentrement vertical (u0
+fixé au milieu, v0 libre) ; paramètres x, y, z, cap, tangage, f (px), u0, v0 ; un repère « ligne » = deux points de la photo
+SUR l'arête (pas besoin de ses bouts), plus robuste que des points. Rappels doux (focale, hauteur) quand les repères ne fixent
+pas un paramètre : sans eux le calcul part à l'infini (téléobjectif) ou colle l'appareil à un mur. Relevé d'app-001 :
+`verites/app-001/cameras-photos.json` (caméra, repères décrits, écart, qualité, notes) ; 11 photos calées : 03, 05, 06, 07, 08,
+10, 11, 12 « bonnes » (écart 1 à 10 px), 01 et 04 « moyennes », 02 « approchée » (recul mal fixé : x 9,6-10,4 m pour le même
+écart, x pris à 10,0) ; photo 09 NON calable (montage de deux gros plans, aucune arête de la pièce). Appareils à 0,87-1,37 m du
+sol, champ horizontal 76-105°. Outil : `outils/habillage/caler_photos.py` (dessiner = arêtes de la maquette sur la photo ;
+rendre = caméras posées dans une COPIE `maquette-photos.blend` par `moteur/blender/poser_cameras_photos.py` (caméras d'Atelya
+retirées de la copie) puis `rendre.py` ; planche = photo | maquette | superposées). Tests `tests/test_camera_photo.py` (5).
+Sorties : `..\atelya\b2\app-001\etape4\` (rendus/, cote-a-cote-*.png, planche-ensemble.jpg).
+CE QUE LE CALAGE A APPRIS SUR LE LOGEMENT (faits mesurés sur les photos, rien changé dans la vérité sans NT) : la disposition
+réelle du séjour diffère des meubles dessinés sur le plan (canapé contre le MUR OUEST sous le tableau, caisson bleu au milieu,
+télé tournée vers l'ouest, bibliothèque dans le retour de mur sud, table devant le pan coupé, rangements contre le mur est) ; la
+porte blanche des photos 01, 02, 07 donne sur la courette (absente du plan, non ajoutée) : porte de 73 cm entre y = 6,70 et 7,43
+dans le mur M8, qui va en vrai jusqu'à y ≈ 7,64 (maquette 7,09) ; fenêtre O7 de l'entrée collée à l'angle (maquette : 75 cm
+plus loin) ; coin repas (photo 04) : mur des fenêtres presque à angle droit du mur du fond, fenêtres bien plus grandes que la
+porte-fenêtre de 1,2 m de la maquette ; fenêtres du séjour et des chambres plus hautes et plus larges qu'en maquette ; plafond de
+la cuisine 2,80 m (maquette 3,00 partout).
+CONSTATS DES RENDUS (planche `..\atelya\b2\app-001\etape4\planche-ensemble.jpg`) : géométrie superposée correctement ; parquet
+de la maquette plus foncé et plus rouge que sur les photos dans ces vues (teinte réglée sur la seule vue de référence du séjour) ;
+autour de l'îlot (photos 02, 05, 06) et dans l'entrée (07) le sol est en LAMES DROITES, la maquette y met carreaux / point de
+Hongrie → la vérité des sols est à revoir (brique photos) ; taches de soleil dures alors que les photos ont une lumière douce
+filtrée par les voilages ; murs de couleur absents (gris de l'entrée, rouge de la salle de bains) ; petits carreaux de la salle
+de bains ressemblants. **NT (09/11) : « J'aime beaucoup, on est sur la bonne voie »** = étape 4 validée. Suite : éclairages, puis
+brique photos.
