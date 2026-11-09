@@ -468,3 +468,14 @@ et le mode Rendu une fois la fenêtre ouverte). Aussi : direction du ciel couver
 prudence). PIÈGES pour NT : Blender installé depuis une archive → Windows n'ouvre pas les .blend d'un double-clic (lancer
 blender.exe avec le fichier) ; se déplacer en vue caméra déplace la CAMÉRA ; cliquer sur le TEXTE du nom de scène le renomme
 (cliquer l'icône à gauche). Copie de visite : `..\atelya\b2\app-001\eclairages\maquette-visite-4.blend`.
+**MCP for Blender installé sur le PC (09/11/2026, accord écrit NT : « Oui, tu peux… je t'autorise »).** `mcp-for-blender` 2.2.4
+(MIT, Siddharth Ahuja ; version du 24/10 choisie exprès, la 2.2.7 n'avait que 5 jours), lancé par `uvx` (environnement isolé du
+cache uv, Python 3.13 d'`atelya\.pythons`, ~25 Mo, rien dans `.venv`). Module Blender `blender_mcp.py` (« MCP for Blender »)
+copié dans `%APPDATA%\Blender Foundation\Blender\5.2\scripts\addons\` ; vérifié dans le code : consentement de collecte éteint par
+défaut, intégrations internet (Poly Haven, Sketchfab, Hyper3D, Hunyuan3D — interdit UE —, Tripo, Meshy, Poly Pizza) éteintes,
+serveur en écoute sur localhost:9876, démarrage automatique. Réglage Claude Code : `.mcp.json` à la racine du dépôt (exclu par
+`.git/info/exclude`, jamais poussé), `DISABLE_TELEMETRY=true`. RESTE À FAIRE (Blender doit être FERMÉ, sinon il écrase ses
+préférences en se fermant) : activer le module (`blender -b --python-expr` : `bpy.ops.preferences.addon_enable(module="blender_mcp")`
+puis `bpy.ops.wm.save_userpref()`), relancer Claude Code et accepter le serveur « blender » du projet, ouvrir Blender, vérifier la
+liaison. Règle : n'agir par MCP que sur des COPIES de maquettes. Piège : le classificateur de sécurité a refusé une commande qui
+fermait Blender de force ET installait ; séparer les actions, demander à NT de fermer Blender.
