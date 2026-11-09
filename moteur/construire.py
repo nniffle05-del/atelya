@@ -54,6 +54,45 @@ def trouver_matieres() -> Path | None:
     return None
 
 
+MEUBLES_PC = Path(__file__).resolve().parents[2] / "atelya" / "bibliotheque" / "meubles-abo"
+
+
+def trouver_meubles() -> Path | None:
+    """Le dossier de la bibliothèque de meubles ABO, ou None (Blender pose alors des blocs aux bonnes dimensions)."""
+    for candidat in (os.environ.get("ATELYA_MEUBLES"), MEUBLES_PC):
+        if candidat and (Path(candidat) / "liste.json").is_file():
+            return Path(candidat)
+    return None
+
+
+def choisir_modeles(plan: dict, bibliotheque: Path | None) -> dict:
+    """Pour chaque meuble du commerce du plan : le modèle ABO le plus proche (catégorie, dimensions, couleur) et son fichier.
+    Deux meubles identiques (mêmes catégorie, dimensions et couleur, comme 4 chaises autour d'une table) prennent le même
+    modèle ; deux meubles différents de même catégorie dans le logement évitent de prendre le même."""
+    if bibliotheque is None or not plan.get("meubles"):
+        return plan
+    from moteur.meubles import chemin_modele, charger_liste, choisir
+    liste = charger_liste(bibliotheque)
+    deja: dict[tuple, str] = {}
+    pris: dict[str, set] = {}
+    for m in plan["meubles"]:
+        if m["sur_mesure"]:
+            continue
+        cle = (m["categorie"], tuple(round(d, 2) for d in m["dimensions"]), tuple(m["couleur"] or ()))
+        ident = m.get("modele") or deja.get(cle)
+        if ident is None:
+            e = choisir(m["categorie"], m["dimensions"], m["couleur"], liste, exclure=pris.get(m["categorie"], set()))
+            ident = e["id"] if e else None
+        if ident is None:
+            continue
+        deja[cle] = ident
+        pris.setdefault(m["categorie"], set()).add(ident)
+        fichier = chemin_modele(bibliotheque, ident)
+        if fichier is not None:
+            m["modele"], m["fichier"] = ident, str(fichier.resolve())
+    return plan
+
+
 def lancer_blender(*arguments: str) -> None:
     blender = trouver_blender()
     if blender is None:
@@ -73,7 +112,7 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     dossier.mkdir(parents=True, exist_ok=True)
 
     plan = dossier / "construction.json"
-    plan.write_text(json.dumps(plan_habille(logement), indent=2, ensure_ascii=False),
+    plan.write_text(json.dumps(choisir_modeles(plan_habille(logement), trouver_meubles()), indent=2, ensure_ascii=False),
                     encoding="utf-8")
 
     maquette = dossier / "maquette.blend"

@@ -544,3 +544,24 @@ d'essai = pièces VIDES, vraies photos = pièces MEUBLÉES ; point de Hongrie lo
 après avoir vu ces erreurs rend app-001 « examen déjà vu » : le dire à NT à chaque nouvelle note sur app-001 ; il faut d'autres
 logements avec photos jamais regardés. Pistes : meubles dans les photos d'essai (bibliothèque ABO), classe « pas du sol »,
 poids plus fort des vues fines, vignettes plus grandes pour les chevrons.
+**B4 MEUBLES, première version (09/11/2026, NT : « mets les meubles quand même sur app-001… un bout de rendu final… tu
+apprendras en même temps les meubles à Atelya »).** Format : `Meuble` dans logement.json (`meubles` : categorie, piece,
+position = milieu du pied, face = direction de l'avant en degrés comme le cap des caméras, dimensions largeur/profondeur/hauteur,
+altitude, couleur sRGB, modele ABO imposé facultatif ; statut estime/mesure/ajoute ; id unique AVEC les pièces : « placard_1 »
+était déjà une pièce). Catalogue `moteur/meubles.py` : catégories → types ABO + mots du nom + mots exclus (suspension : pas de
+« flush ») ; sur mesure (cuisine, îlot, caisson, placard, télévision) = blocs. `construire.choisir_modeles` : Atelya choisit le
+modèle ABO le plus proche (écart log des dimensions + couleur du champ « color ») ; meubles identiques = même modèle ; bibliothèque
+`trouver_meubles()` (`..\atelya\bibliotheque\meubles-abo`, 7 641 meubles, 44 Go, FINI). Blender `moteur/blender/poser_meubles.py` :
+modèle ABO importé UNE fois dans sa collection (hors scène, fake user), meubles = instances de collection ; ABO arrive avant
+vers -y, posé au sol, centré, size_metres = [largeur, HAUTEUR, profondeur] (vérifié sur un canapé) ; rotation z = face + 90° ;
+échelle par axe bornée à ±15 % de la médiane ; textures limitées 2048 au rendu (simplify, 8 Go de carte). DÉFAUT CORRIGÉ :
+`regler_teintes` masque la collection Meubles pendant la mesure (sinon tapis et canapé vus à la place du parquet → point de
+Hongrie réglé à 0,22/0,02/0,02, rendu rouge foncé). Vérité des meubles d'app-001 : `verites/app-001/meubles.json` (47 meubles,
+relevés par Claude avec les caméras calées : pieds reportés au sol, objets muraux sur le plan du mur, puis BOÎTES 3D dessinées
+sur les photos et corrigées) ; caisson bleu EN BIAIS (télé vers le nord-ouest, face 135°), le photographe de la photo 07 se tient
+derrière ; les photos se contredisent de 30-50 cm (et des meubles ont été déplacés entre deux prises : fauteuils jaunes au premier
+plan de la photo 01, absents de la 05). Maquette meublée : `..\atelya\b2\app-001\meubles\3d\maquette.blend` (5 éclairages,
+~420 Mo), rendus « jour voilé » depuis les 11 caméras : `..\atelya\b2\app-001\meubles\photos\` (cote-a-cote-photo-XX.png).
+Constats : placement juste dans l'ensemble ; écarts de style (table de repas « ferme » bois au lieu de blanche, tabourets blancs
+au lieu de jaunes, lit superposé métal au lieu de bois, armoire et placards en blocs unis, pas de rideaux ni de coussins).
+Tests : `tests/test_meubles.py` (4), `test_blender.py::test_meubles_sur_mesure_poses_tournes_et_mesures`.

@@ -82,6 +82,11 @@ def main() -> None:
     dossier.mkdir(exist_ok=True)
     murs = {o.name for c in scene.collection.children if c.name == "Murs" for o in c.objects}
     camera_avant, mode_avant = scene.camera, scene.render.image_settings.color_mode
+    # B4 (09/11/2026) : les meubles masqués pendant la mesure. Sinon la caméra de réglage voit le tapis et le canapé à la place
+    # du parquet, le croit trop clair et l'assombrit à chaque tour (app-001 meublé : point de Hongrie réglé à 0,22 ; 0,02 ; 0,02).
+    meubles = [c for c in scene.collection.children if c.name == "Meubles"]
+    for c in meubles:
+        c.hide_render = True
     resultats = []
     for r in plan.get("reglages_teinte", []):
         materiau = bpy.data.materials.get(r["materiau"])
@@ -129,6 +134,8 @@ def main() -> None:
         finally:
             bpy.data.objects.remove(camera)
             bpy.data.cameras.remove(donnees)
+    for c in meubles:
+        c.hide_render = False
     scene.view_settings.exposure = 0.0
     scene.view_settings.use_curve_mapping = False
     scene.render.film_transparent = False

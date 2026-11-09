@@ -118,3 +118,28 @@ def test_une_scene_par_eclairage(resultat, tmp_path):
         assert propres == (["Lampes allumées " + a["nom"]] if a["lampes"] else []), a["nom"]
     allumees = {scenes[a["nom"]]["lampes"] for a in AMBIANCES if a["lampes"]}
     assert len(allumees) == 1  # autant de plafonniers allumés en soirée que la nuit
+
+
+def test_meubles_sur_mesure_poses_tournes_et_mesures(tmp_path):
+    """B4 (09/11/2026) : un îlot (bloc) posé à sa place, tourné selon sa « face », aux bonnes dimensions ; un meuble accroché
+    (meuble haut de cuisine) à son altitude."""
+    logement = json.loads(CAS_TEST_00.read_text(encoding="utf-8"))
+    piece = logement["pieces"][0]
+    xs, ys = [p[0] for p in piece["contour"]], [p[1] for p in piece["contour"]]
+    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    logement["meubles"] = [
+        {"id": "ilot_t", "categorie": "ilot", "piece": piece["id"], "position": [cx, cy], "face": 0,
+         "dimensions": [2.0, 0.6, 0.9], "couleur": [170, 170, 170], "statut": "estime", "source": "test"},
+        {"id": "haut_t", "categorie": "meuble_cuisine_haut", "piece": piece["id"], "position": [cx, cy], "face": 90,
+         "dimensions": [1.2, 0.35, 0.7], "altitude": 1.5, "statut": "estime", "source": "test"},
+    ]
+    chemin = tmp_path / "logement.json"
+    chemin.write_text(json.dumps(logement), encoding="utf-8")
+    mesures = mesurer(construire(chemin, tmp_path / "3d"), tmp_path / "mesures.json")
+    ilot, haut = mesures["Bloc_ilot_t"], mesures["Bloc_haut_t"]
+    assert ilot["collection"] == "Meubles"
+    # face 0 (avant vers +x) : la largeur (2 m) court le long de y, la profondeur (0,6 m) le long de x
+    assert [ilot["max"][i] - ilot["min"][i] for i in range(3)] == pytest.approx([0.6, 2.0, 0.9], abs=0.01)
+    assert [(ilot["max"][i] + ilot["min"][i]) / 2 for i in range(2)] == pytest.approx([cx, cy], abs=0.01)
+    assert haut["min"][2] == pytest.approx(1.5, abs=0.01) and haut["max"][2] == pytest.approx(2.2, abs=0.01)
+    assert [haut["max"][i] - haut["min"][i] for i in range(2)] == pytest.approx([1.2, 0.35], abs=0.01)

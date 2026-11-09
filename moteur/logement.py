@@ -24,6 +24,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from moteur.matieres import NOMS_SOLS
+from moteur.meubles import NOMS_MEUBLES
 
 VERSION_SCHEMA = "logement/0.1"
 
@@ -200,6 +201,24 @@ class Piece(Element):
         return abs(total) / 2
 
 
+class Meuble(Element):
+    """Un meuble (B4, 09/11/2026), voir moteur/meubles.py : du commerce (choisi dans la bibliothèque ABO) ou sur mesure (bloc).
+
+    `statut` : « estime » = vu sur une photo du client, « mesure » = placé à l'écran de vérification, « ajoute » = proposé par
+    Atelya pour meubler (le type de pièce n'impose pas les meubles : règle NT n° 19)."""
+
+    categorie: Literal[*NOMS_MEUBLES]
+    piece: str | None = Field(default=None, description="Identifiant de la pièce où il se trouve")
+    position: Point = Field(description="Milieu du pied du meuble au sol (m)")
+    face: float = Field(default=0.0, description="Direction vers laquelle regarde l'avant (degrés, 0 = +x, 90 = +y)")
+    dimensions: tuple[Longueur, Longueur, Longueur] = Field(description="Largeur (le long de l'avant), profondeur, hauteur (m)")
+    altitude: Annotated[float, Field(ge=0)] = Field(default=0.0, description="Bas du meuble (m) : 0 = posé au sol")
+    couleur: tuple[Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)],
+                   Annotated[int, Field(ge=0, le=255)]] | None = Field(default=None, description="Couleur principale vue (sRGB)")
+    modele: str | None = Field(default=None, description="Modèle ABO imposé ; sinon Atelya choisit le plus proche")
+    description: str | None = None
+
+
 class Logement(BaseModel):
     """Le logement complet, tel qu'il sera transmis à Blender."""
 
@@ -212,6 +231,7 @@ class Logement(BaseModel):
     murs: list[Mur] = Field(min_length=1)
     ouvertures: list[Ouverture] = Field(default_factory=list)
     pieces: list[Piece] = Field(default_factory=list)
+    meubles: list[Meuble] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _coherence(self) -> Logement:
@@ -225,7 +245,7 @@ def verifier_coherence(logement: Logement) -> list[str]:
     """Renvoie la liste des incohérences trouvées (vide si tout va bien)."""
     erreurs: list[str] = []
 
-    tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces]]
+    tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces, *logement.meubles]]
     doublons = sorted({i for i in tous_les_ids if tous_les_ids.count(i) > 1})
     if doublons:
         erreurs.append(f"identifiants en double : {', '.join(doublons)}")
@@ -254,6 +274,13 @@ def verifier_coherence(logement: Logement) -> list[str]:
         for k, z in enumerate(p.zones_sol, start=1):
             if not _convexe(z.contour):
                 erreurs.append(f"la zone de sol n° {k} de la pièce {p.id} n'est pas convexe (découper en rectangles)")
+
+    pieces = {p.id for p in logement.pieces}
+    for m in logement.meubles:
+        if m.piece is not None and m.piece not in pieces:
+            erreurs.append(f"le meuble {m.id} désigne une pièce inconnue : {m.piece}")
+        if m.altitude + m.dimensions[2] > logement.hauteur_sous_plafond + 1e-9:
+            erreurs.append(f"le meuble {m.id} dépasse le plafond")
 
     return erreurs
 

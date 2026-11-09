@@ -153,7 +153,17 @@ def plan_habille(logement: Logement) -> dict:
         "lumieres": lumieres(logement),
         "vues": vues(logement),
         "reglages_teinte": reglages_teinte(logement, briques),
+        "meubles": meubles_du_plan(logement),
     }
+
+
+def meubles_du_plan(logement: Logement) -> list[dict]:
+    """Les meubles du logement pour Blender (B4). Le modèle ABO de chaque meuble du commerce est choisi par
+    moteur.construire.choisir_modeles (il faut la bibliothèque) ; sans lui, Blender pose un bloc aux bonnes dimensions."""
+    from moteur.meubles import SUR_MESURE
+    return [{"id": m.id, "categorie": m.categorie, "position": list(m.position), "face": m.face,
+             "dimensions": list(m.dimensions), "altitude": m.altitude, "couleur": list(m.couleur) if m.couleur else None,
+             "modele": m.modele, "sur_mesure": m.categorie in SUR_MESURE} for m in logement.meubles]
 
 
 # ------------------------------------------------- réglage de la teinte des sols au rendu
