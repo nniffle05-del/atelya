@@ -596,3 +596,19 @@ sols relevés à la main | sols trouvés seuls) : parquet automatique souvent PL
 vérité à la main. REJETÉ : règle « pas de zone là où l'œil voit > 35-50 % de meubles » (+5 points sur le contrôle fabriqué,
 mais app-001 81,5 → 52 % : sur les vraies photos l'œil dit « meuble » bien plus souvent) → LEÇON : un réglage validé seulement
 sur photos fabriquées peut nuire sur les vraies ; `ZONE_MEUBLE_MAX = 1.0` (désactivé). Tests `tests/test_blanc_des_murs.py` (4).
+**MEUBLES PLUS RÉALISTES (09/11/2026, NT « Letsgooo »).** (1) Sur mesure DESSINÉ (`moteur/blender/sur_mesure.py`, appelé par
+`poser_meubles.bloc`) : portes en modules de ~60 cm, joint 4 mm, 18 mm d'épaisseur ; cuisine basse = socle 12 cm en retrait + plan
+de travail 4 cm qui dépasse ; colonne four (verre noir 0,85-1,45 m) ; îlot à façades des deux côtés ; placard à portes ~50 cm,
+poignées verticales, MIROIRS au milieu si la description dit « miroir » (la description passe dans le plan) ; télévision avec
+écran brillant. « Bloc_<id> » reste le corps exact (tests). Corps à 0,9 de la couleur des façades (0,55 : flancs presque marron).
+(2) RIDEAUX : `Rideaux` sur une `Ouverture` (voilage et/ou rideaux, couleur sRGB, statut/source) ; `habillage.rideaux_du_plan`
+(face intérieure du mur = côté où est une pièce ; tringle 12 cm sous le plafond, au moins 30 cm au-dessus de la fenêtre) ;
+`moteur/blender/rideaux.py` : surface plissée (voilage plis 10 cm/2,2 cm, rideaux 16/4 cm), voilage = translucide + transparent
+(laisse passer la lumière diffuse), rideaux = deux pans de 45 cm ouverts. App-001 : voilages blancs O10, O11 ; rideaux beiges O8 ;
+voilage + rideaux mauves O9 (`verites/app-001/meubles.json`, clé « rideaux »). `outils/habillage/meubler.py` ajoute meubles et
+rideaux d'une vérité à un logement. (3) VRAIE COULEUR des meubles ABO : `meubles.couleur_texture` (lecture du .glb à la main :
+textures de couleur, médiane des pixels non noirs × facteur) ; `choisir` garde les 40 modèles aux dimensions les plus proches
+puis départage par la vraie couleur (poids 1,2) ; mémoire `..\atelya\bibliotheque\meubles-abo\couleurs-mesurees.json`. Ex. :
+table « White » = bois (173, 136, 101) → plus choisie ; tabourets maintenant JAUNES, table de repas blanche. Rendus v3 (sols
+trouvés seuls + meubles détaillés + rideaux) : `..\atelya\b2\app-001\v3\` (planche-v3.jpg). Reste : rangement mural de la salle à
+manger (cases ouvertes bois/blanc) rendu en placard à portes ; carreaux cubes → carrelage beige ; caisson visible sur la photo 07.

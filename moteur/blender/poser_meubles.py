@@ -93,6 +93,10 @@ def instancier(scene, m: dict, racine, collection) -> None:
 
 
 def bloc(m: dict, racine, collection) -> None:
+    from sur_mesure import DESSINS  # même dossier (poser_briques.py l'ajoute au chemin de Python)
+    if m["categorie"] in DESSINS:
+        DESSINS[m["categorie"]](m, racine, collection)
+        return
     largeur, profondeur, hauteur = m["dimensions"]
     maillage = bpy.data.meshes.new("Bloc_" + m["id"])
     x, y = largeur / 2, profondeur / 2

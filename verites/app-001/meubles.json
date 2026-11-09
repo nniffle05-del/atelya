@@ -1,5 +1,5 @@
 {
- "note": "Meubles d'app-001 vus sur les photos de l'annonce (B4, 09/11/2026), relevés par Claude à la main avec les caméras calées de l'étape 4 (verites/app-001/cameras-photos.json) : pieds des meubles reportés au sol en mètres, puis boîtes 3D redessinées sur les photos jusqu'à tomber sur les vrais meubles. Format = champ « meubles » de logement.json (moteur/logement.py, Meuble). position = milieu du pied ; face = direction de l'avant (0 = +x/est, 90 = +y/nord) ; dimensions = largeur (le long de l'avant), profondeur, hauteur ; couleur sRGB vue.",
+ "note": "Meubles d'app-001 vus sur les photos de l'annonce (B4, 09/11/2026), relevés par Claude à la main avec les caméras calées de l'étape 4 (verites/app-001/cameras-photos.json) : pieds des meubles reportés au sol en mètres, puis boîtes 3D redessinées sur les photos jusqu'à tomber sur les vrais meubles. Format = champ « meubles » de logement.json (moteur/logement.py, Meuble). position = milieu du pied ; face = direction de l'avant (0 = +x/est, 90 = +y/nord) ; dimensions = largeur (le long de l'avant), profondeur, hauteur ; couleur sRGB vue. Rideaux (09/11/2026) : voilages blancs au séjour (O10, O11), rideaux beiges en chambre 1 (O8), voilage et rideaux mauves en chambre 2 (O9) ; cuisine et entrée sans rideaux.",
  "meubles": [
   {
    "id": "canape",
@@ -889,7 +889,8 @@
     165
    ],
    "statut": "estime",
-   "source": "photo 08"
+   "source": "photo 08",
+   "description": "placard aux portes beiges, poignées verticales (photo 08)"
   },
   {
    "id": "tapis_etoiles",
@@ -950,12 +951,13 @@
     2.3
    ],
    "couleur": [
-    190,
-    150,
-    110
+    205,
+    170,
+    130
    ],
    "statut": "estime",
-   "source": "photos 10, 11"
+   "source": "photos 10, 11",
+   "description": "armoire en bois clair, deux portes miroir au milieu (photo 11)"
   },
   {
    "id": "bureau_2",
@@ -1046,5 +1048,51 @@
    "source": "photos 10, 11",
    "altitude": 2.1
   }
- ]
+ ],
+ "rideaux": {
+  "O10": {
+   "voilage": [
+    245,
+    245,
+    242
+   ],
+   "rideaux": null,
+   "statut": "estime",
+   "source": "photos 01, 02, 03 (voilages blancs tirés)"
+  },
+  "O11": {
+   "voilage": [
+    245,
+    245,
+    242
+   ],
+   "rideaux": null,
+   "statut": "estime",
+   "source": "photo 04 (voilages blancs tirés)"
+  },
+  "O8": {
+   "voilage": null,
+   "rideaux": [
+    190,
+    160,
+    120
+   ],
+   "statut": "estime",
+   "source": "photo 08 (rideaux beiges ouverts)"
+  },
+  "O9": {
+   "voilage": [
+    245,
+    245,
+    242
+   ],
+   "rideaux": [
+    150,
+    105,
+    125
+   ],
+   "statut": "estime",
+   "source": "photo 10 (voilage blanc et rideaux mauves)"
+  }
+ }
 }

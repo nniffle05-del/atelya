@@ -102,28 +102,91 @@ def candidats(categorie: str, liste: list[dict]) -> list[dict]:
     return sortie
 
 
-def ecart(e: dict, dimensions, couleur=None) -> float:
+def ecart(e: dict, dimensions, couleur=None, couleur_mesuree=None) -> float:
     """Distance entre un meuble ABO et ce qui est demandé : dimensions (rapports en logarithme : 10 % trop grand ou trop
     petit coûtent pareil), puis couleur si elle est connue des deux côtés. ABO donne size_metres = [largeur, hauteur,
-    profondeur] (avant tourné vers -y dans Blender)."""
+    profondeur] (avant tourné vers -y dans Blender). `couleur_mesuree` = la vraie couleur de la texture du modèle (si mesurée) :
+    elle compte plus que le nom de couleur du catalogue (souvent faux : table « White » au plateau en bois brut)."""
     l, h, p = e["size_metres"]
     L, P, H = dimensions
     d = abs(math.log(max(l, 1e-3) / L)) + 0.7 * abs(math.log(max(p, 1e-3) / P)) + 0.7 * abs(math.log(max(h, 1e-3) / H))
+    if couleur is None:
+        return d
+    if couleur_mesuree is not None:
+        return d + 1.2 * math.dist(couleur_mesuree, couleur) / 255.0
     c = couleur_abo(e.get("color")) or couleur_abo(e.get("name"))
-    if couleur is not None and c is not None:
-        d += 0.6 * math.dist(c, couleur) / 255.0
-    elif couleur is not None:
-        d += 0.25  # couleur inconnue : un peu moins bon qu'une couleur sûre
-    return d
+    return d + (0.6 * math.dist(c, couleur) / 255.0 if c is not None else 0.25)
 
 
-def choisir(categorie: str, dimensions, couleur, liste: list[dict], exclure=()) -> dict | None:
+def couleur_texture(chemin: str | Path) -> tuple[int, int, int] | None:
+    """La couleur dominante d'un modèle .glb : médiane des pixels (non noirs) de ses textures de couleur, multipliée par le
+    facteur de couleur de la matière. On lit le fichier glb à la main (en-tête, morceau JSON, morceau binaire) : rien à installer."""
+    import struct
+
+    import cv2
+    import numpy as np
+    donnees = Path(chemin).read_bytes()
+    if donnees[:4] != b"glTF":
+        return None
+    n_json = struct.unpack_from("<I", donnees, 12)[0]
+    doc = json.loads(donnees[20:20 + n_json])
+    binaire_debut = 20 + n_json + 8
+    couleurs = []
+    for mat in doc.get("materials", []):
+        pbr = mat.get("pbrMetallicRoughness", {})
+        facteur = np.array(pbr.get("baseColorFactor", [1, 1, 1, 1])[:3], float)
+        tex = pbr.get("baseColorTexture")
+        if tex is None:
+            couleurs.append(facteur)
+            continue
+        image = doc["images"][doc["textures"][tex["index"]]["source"]]
+        if "bufferView" not in image:
+            continue
+        vue = doc["bufferViews"][image["bufferView"]]
+        octets = donnees[binaire_debut + vue.get("byteOffset", 0): binaire_debut + vue.get("byteOffset", 0) + vue["byteLength"]]
+        brut = np.frombuffer(octets, np.uint8)
+        try:  # les textures ABO font 4096 points : lues 8 fois plus petites (assez pour une couleur, et 60 fois plus vite)
+            img = cv2.imdecode(brut, cv2.IMREAD_REDUCED_COLOR_8)
+        except cv2.error:
+            img = None
+        if img is None:
+            img = cv2.imdecode(brut, cv2.IMREAD_COLOR)
+        if img is None:
+            continue
+        px = img.reshape(-1, 3)[:, ::-1].astype(float) / 255.0
+        px = px[px.sum(1) > 0.06]  # les zones noires inutilisées d'une texture
+        if len(px):
+            lin = np.where(px <= 0.04045, px / 12.92, ((px + 0.055) / 1.055) ** 2.4)
+            couleurs.append(np.median(lin, 0) * facteur)
+    if not couleurs:
+        return None
+    lin = np.clip(np.mean(couleurs, 0), 0, 1)
+    srgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * lin ** (1 / 2.4) - 0.055)
+    return tuple(int(round(v * 255)) for v in srgb)
+
+
+PRESELECTION = 40  # modèles gardés sur les dimensions avant de mesurer leur vraie couleur
+
+
+def choisir(categorie: str, dimensions, couleur, liste: list[dict], exclure=(), bibliotheque=None,
+            memoire: dict | None = None) -> dict | None:
     """Le meuble ABO le plus proche (None pour un meuble sur mesure ou une catégorie vide). Le choix est fixe pour une même
-    demande (pas de hasard) ; `exclure` évite de reprendre le même modèle pour deux meubles voisins différents."""
+    demande (pas de hasard) ; `exclure` évite de reprendre le même modèle pour deux meubles voisins différents. Avec la
+    bibliothèque et une couleur demandée : les PRESELECTION modèles aux dimensions les plus proches sont départagés par la vraie
+    couleur de leur texture (mesurée une fois, gardée dans `memoire` : {identifiant: [r, g, b] ou None})."""
     c = [e for e in candidats(categorie, liste) if e["id"] not in exclure]
     if not c:
         return None
-    return min(c, key=lambda e: (ecart(e, dimensions, couleur), e["id"]))
+    if couleur is None or bibliotheque is None:
+        return min(c, key=lambda e: (ecart(e, dimensions, couleur), e["id"]))
+    memoire = {} if memoire is None else memoire
+    garde = sorted(c, key=lambda e: (ecart(e, dimensions), e["id"]))[:PRESELECTION]
+    for e in garde:
+        if e["id"] not in memoire:
+            fichier = chemin_modele(bibliotheque, e["id"])
+            mesure = couleur_texture(fichier) if fichier is not None else None
+            memoire[e["id"]] = list(mesure) if mesure else None
+    return min(garde, key=lambda e: (ecart(e, dimensions, couleur, memoire.get(e["id"])), e["id"]))
 
 
 def charger_liste(bibliotheque: str | Path) -> list[dict]:

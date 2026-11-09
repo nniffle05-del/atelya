@@ -154,7 +154,34 @@ def plan_habille(logement: Logement) -> dict:
         "vues": vues(logement),
         "reglages_teinte": reglages_teinte(logement, briques),
         "meubles": meubles_du_plan(logement),
+        "rideaux": rideaux_du_plan(logement),
     }
+
+
+def rideaux_du_plan(logement: Logement) -> list[dict]:
+    """Voilages et rideaux des fenêtres (B4) : milieu de la fenêtre sur la face INTÉRIEURE du mur (le côté où se trouve une
+    pièce), direction vers l'intérieur, largeur de la fenêtre, hauteur de la tringle (près du plafond, comme dans un ancien :
+    12 cm sous le plafond, au moins 30 cm au-dessus de la fenêtre)."""
+    murs = {m.id: m for m in logement.murs}
+    sortie = []
+    for o in logement.ouvertures:
+        if o.rideaux is None or (o.rideaux.voilage is None and o.rideaux.rideaux is None):
+            continue
+        m = murs[o.mur]
+        (ax, ay), (bx, by) = m.debut, m.fin
+        longueur = math.hypot(bx - ax, by - ay)
+        ux, uy = (bx - ax) / longueur, (by - ay) / longueur
+        cx, cy = ax + ux * (o.position + o.largeur / 2), ay + uy * (o.position + o.largeur / 2)
+        nx, ny = -uy, ux
+        if not any(_dans((cx + nx * (m.epaisseur / 2 + 0.3), cy + ny * (m.epaisseur / 2 + 0.3)), p.contour) for p in logement.pieces):
+            nx, ny = -nx, -ny
+        hsp = m.hauteur or logement.hauteur_sous_plafond
+        sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2],
+                       "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
+                       "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),
+                       "voilage": list(o.rideaux.voilage) if o.rideaux.voilage else None,
+                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None})
+    return sortie
 
 
 def meubles_du_plan(logement: Logement) -> list[dict]:
@@ -163,7 +190,7 @@ def meubles_du_plan(logement: Logement) -> list[dict]:
     from moteur.meubles import SUR_MESURE
     return [{"id": m.id, "categorie": m.categorie, "position": list(m.position), "face": m.face,
              "dimensions": list(m.dimensions), "altitude": m.altitude, "couleur": list(m.couleur) if m.couleur else None,
-             "modele": m.modele, "sur_mesure": m.categorie in SUR_MESURE} for m in logement.meubles]
+             "modele": m.modele, "sur_mesure": m.categorie in SUR_MESURE, "description": m.description} for m in logement.meubles]
 
 
 # ------------------------------------------------- réglage de la teinte des sols au rendu

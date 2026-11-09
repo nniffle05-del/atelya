@@ -53,3 +53,59 @@ def test_un_meuble_dans_le_logement():
         Logement.model_validate({**LOGEMENT, "meubles": [{**meuble, "altitude": 2.0}]})
     with pytest.raises(ValueError, match="en double"):
         Logement.model_validate({**LOGEMENT, "meubles": [{**meuble, "id": "sejour"}]})
+
+
+def _glb_rouge(chemin):
+    """Un modèle .glb minuscule : une matière dont la texture de couleur est une image rouge 4 × 4."""
+    import json as _json
+    import struct
+
+    import cv2
+    import numpy as np
+    ok, png = cv2.imencode(".png", np.dstack([np.zeros((4, 4)), np.zeros((4, 4)), np.full((4, 4), 200)]).astype(np.uint8))
+    binaire = png.tobytes() + b"\0" * (-len(png.tobytes()) % 4)
+    doc = {"asset": {"version": "2.0"}, "buffers": [{"byteLength": len(binaire)}],
+           "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(png.tobytes())}],
+           "images": [{"bufferView": 0, "mimeType": "image/png"}], "textures": [{"source": 0}],
+           "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}]}
+    j = _json.dumps(doc).encode()
+    j += b" " * (-len(j) % 4)
+    contenu = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(j) + 8 + len(binaire))
+    contenu += struct.pack("<I4s", len(j), b"JSON") + j + struct.pack("<I4s", len(binaire), b"BIN\0") + binaire
+    chemin.write_bytes(contenu)
+
+
+def test_vraie_couleur_d_un_modele_et_choix_par_elle(tmp_path):
+    from moteur.meubles import couleur_texture
+    (tmp_path / "R").mkdir()
+    _glb_rouge(tmp_path / "R" / "ROUGE.glb")
+    assert couleur_texture(tmp_path / "R" / "ROUGE.glb") == (200, 0, 0)
+    # le catalogue dit « White » mais la texture est rouge : avec la bibliothèque, la vraie couleur l'emporte
+    liste = [{"id": "ROUGE", "product_type": "sofa", "name": "Sofa", "color": "White", "size_metres": [2.0, 0.85, 0.9]},
+             {"id": "AUTRE", "product_type": "sofa", "name": "Sofa", "color": "Red", "size_metres": [2.0, 0.85, 0.9]}]
+    memoire = {"AUTRE": [240, 240, 240]}
+    assert choisir("canape", [2.0, 0.9, 0.85], (200, 0, 0), liste, bibliotheque=tmp_path, memoire=memoire)["id"] == "ROUGE"
+    assert memoire["ROUGE"] == [200, 0, 0]
+
+
+def test_meubler_ajoute_meubles_et_rideaux():
+    from outils.habillage.meubler import meubler
+    logement = {**LOGEMENT, "ouvertures": [{"id": "F1", "type": "fenetre", "mur": "M1", "position": 1.0, "largeur": 1.0,
+                                            "hauteur": 1.2, "allege": 0.9, "statut": "mesure", "source": "t"}]}
+    meubles = {"meubles": [{"id": "canape", "categorie": "canape", "position": [1, 1], "dimensions": [2, 0.9, 0.8],
+                            "statut": "estime", "source": "t"}],
+               "rideaux": {"F1": {"voilage": [245, 245, 245], "rideaux": None, "statut": "estime", "source": "t"}}}
+    sortie = meubler(logement, meubles)
+    assert sortie["ouvertures"][0]["rideaux"]["voilage"] == [245, 245, 245] and len(sortie["meubles"]) == 1
+    with pytest.raises(KeyError):
+        meubler(logement, {"rideaux": {"F9": meubles["rideaux"]["F1"]}})
+
+
+def test_rideaux_poses_cote_interieur_sous_le_plafond():
+    from moteur.habillage import rideaux_du_plan
+    logement = Logement.model_validate({**LOGEMENT, "ouvertures": [
+        {"id": "F1", "type": "porte_fenetre", "mur": "M1", "position": 1.0, "largeur": 1.2, "hauteur": 2.1, "allege": 0,
+         "statut": "mesure", "source": "t", "rideaux": {"voilage": [245, 245, 245], "statut": "estime", "source": "t"}}]})
+    (r,) = rideaux_du_plan(logement)
+    assert r["centre"] == pytest.approx([1.6, 0.1]) and r["normale_deg"] == pytest.approx(90.0)  # mur sud, pièce au nord
+    assert r["z_tringle"] == pytest.approx(2.4) and r["rideaux"] is None  # 30 cm au-dessus de la fenêtre (plafond bas)

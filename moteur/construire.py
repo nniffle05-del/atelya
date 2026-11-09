@@ -73,6 +73,9 @@ def choisir_modeles(plan: dict, bibliotheque: Path | None) -> dict:
         return plan
     from moteur.meubles import chemin_modele, charger_liste, choisir
     liste = charger_liste(bibliotheque)
+    fichier_memoire = bibliotheque / "couleurs-mesurees.json"  # vraie couleur des textures, mesurée une fois par modèle
+    memoire = json.loads(fichier_memoire.read_text(encoding="utf-8")) if fichier_memoire.is_file() else {}
+    avant = len(memoire)
     deja: dict[tuple, str] = {}
     pris: dict[str, set] = {}
     for m in plan["meubles"]:
@@ -81,7 +84,8 @@ def choisir_modeles(plan: dict, bibliotheque: Path | None) -> dict:
         cle = (m["categorie"], tuple(round(d, 2) for d in m["dimensions"]), tuple(m["couleur"] or ()))
         ident = m.get("modele") or deja.get(cle)
         if ident is None:
-            e = choisir(m["categorie"], m["dimensions"], m["couleur"], liste, exclure=pris.get(m["categorie"], set()))
+            e = choisir(m["categorie"], m["dimensions"], m["couleur"], liste, exclure=pris.get(m["categorie"], set()),
+                        bibliotheque=bibliotheque, memoire=memoire)
             ident = e["id"] if e else None
         if ident is None:
             continue
@@ -90,6 +94,8 @@ def choisir_modeles(plan: dict, bibliotheque: Path | None) -> dict:
         fichier = chemin_modele(bibliotheque, ident)
         if fichier is not None:
             m["modele"], m["fichier"] = ident, str(fichier.resolve())
+    if len(memoire) > avant:
+        fichier_memoire.write_text(json.dumps(memoire), encoding="utf-8")
     return plan
 
 

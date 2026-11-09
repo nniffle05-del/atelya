@@ -133,10 +133,20 @@ def test_meubles_sur_mesure_poses_tournes_et_mesures(tmp_path):
         {"id": "haut_t", "categorie": "meuble_cuisine_haut", "piece": piece["id"], "position": [cx, cy], "face": 90,
          "dimensions": [1.2, 0.35, 0.7], "altitude": 1.5, "statut": "estime", "source": "test"},
     ]
+    for o in logement["ouvertures"]:
+        if o["id"] == "PF_sejour":
+            o["rideaux"] = {"voilage": [245, 245, 242], "rideaux": [150, 105, 125], "statut": "estime", "source": "test"}
     chemin = tmp_path / "logement.json"
     chemin.write_text(json.dumps(logement), encoding="utf-8")
     mesures = mesurer(construire(chemin, tmp_path / "3d"), tmp_path / "mesures.json")
     ilot, haut = mesures["Bloc_ilot_t"], mesures["Bloc_haut_t"]
+    # sur mesure dessiné en détail : portes des deux côtés de l'îlot (modules de ~60 cm), portes du meuble haut
+    assert {"Porte_ilot_t_av1", "Porte_ilot_t_av3", "Porte_ilot_t_ar1", "Porte_haut_t_av2"} <= set(mesures)
+    assert "Porte_ilot_t_av4" not in mesures
+    # voilage de la porte-fenêtre : de 1 cm au-dessus du sol jusqu'à la tringle ; deux pans de rideaux
+    voilage = mesures["Voilage_PF_sejour"]
+    assert voilage["min"][2] == pytest.approx(0.01, abs=1e-3) and voilage["max"][2] > 2.1
+    assert {"Rideau_PF_sejour_g", "Rideau_PF_sejour_d"} <= set(mesures)
     assert ilot["collection"] == "Meubles"
     # face 0 (avant vers +x) : la largeur (2 m) court le long de y, la profondeur (0,6 m) le long de x
     assert [ilot["max"][i] - ilot["min"][i] for i in range(3)] == pytest.approx([0.6, 2.0, 0.9], abs=0.01)

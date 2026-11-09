@@ -24,6 +24,7 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).parent))
 from materiaux import creer_materiaux  # noqa: E402
 from poser_meubles import poser_meubles  # noqa: E402
+from rideaux import poser_rideaux  # noqa: E402
 
 COLLECTIONS = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds", "menuiserie": "Menuiseries"}
 SCHEMAS = ("construction/0.1", "construction/0.2")
@@ -80,6 +81,7 @@ def main() -> None:
             scene.camera = bpy.data.objects["Vue_" + plan["vues"][-1]["id"]]
 
     nb_meubles = poser_meubles(scene, plan.get("meubles", []))
+    poser_rideaux(scene, plan.get("rideaux", []))
     regler_apercu(scene)
     Path(sortie_blend).parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(Path(sortie_blend).resolve()))

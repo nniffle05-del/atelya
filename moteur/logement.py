@@ -73,6 +73,22 @@ class Mur(Element):
         return self
 
 
+Couleur = tuple[Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)]]
+
+
+class Rideaux(BaseModel):
+    """Ce qui habille une fenêtre côté intérieur (B4, 09/11/2026) : un voilage (tissu fin qui laisse passer la lumière, tiré
+    devant la vitre) et/ou des rideaux épais (deux pans ouverts sur les côtés). Couleur sRGB vue sur photo ; None = absent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    voilage: Couleur | None = None
+    rideaux: Couleur | None = None
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
 class Ouverture(Element):
     """Une porte, une porte-fenêtre ou une fenêtre percée dans un mur."""
 
@@ -86,6 +102,7 @@ class Ouverture(Element):
     allege: Annotated[float, Field(ge=0)] = Field(
         default=0, description="Hauteur entre le sol et le bas de l'ouverture"
     )
+    rideaux: Rideaux | None = Field(default=None, description="Voilage et rideaux côté intérieur (fenêtres seulement)")
 
 
 class Plinthes(BaseModel):
