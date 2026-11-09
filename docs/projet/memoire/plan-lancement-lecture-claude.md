@@ -578,3 +578,21 @@ vues de loin. Retenu sur le contrôle meublé : `moteur/modeles/sols-vits14-v2.p
 examen propre) : v1 72 % → v2 81,5 % (point de Hongrie 47 → 80 %, cubes 99 %, lames 79 %) ; couleurs ΔE séjour 4,3, chambre 1
 18 → 10,3, chambre 2 10,6 → 3,3 ; reste : séjour décidé « lames » (44 % des votes) avec une zone point de Hongrie de 20 m²,
 fausse zone point de Hongrie de 2,6 m² en chambre 1 (lit), fausse zone carreaux de 1,3 m² en chambre 2.
+**BRIQUE PHOTOS BRANCHÉE SUR LA 3D (09/11/2026, NT : « prends celle que tu recommandes »).** Chaîne automatique : photos calées +
+logement SANS sols → `sols_photos.py logement <cameras> <logement> moteur/modeles/sols-vits14-v2.pt <sortie>` → logement avec
+les sols trouvés seuls (statut estime, source « brique photos », confiance = part des avis) → construire → maquette.
+Morceaux : (1) `moteur/blanc_des_murs.py` = blanc des murs trouvé SEUL : points sur la face intérieure des murs de la pièce
+(1,3-2,2 m, tous les 15 cm), fenêtres et portes écartées (`ouvertures_sur_le_contour`, ± 15 cm), visibles depuis l'appareil,
+médiane 7 × 7 px, murs entre la médiane et le 9e dixième de clarté ; écart avec les rectangles choisis à la main 2-9 % ; murs
+gris (entrée) et meubles hauts = erreur connue. (2) `albedos_par_region` : couleur visée (couleur_photo) PHOTO PAR PHOTO contre le
+blanc de la même photo, médiane pondérée des photos ; pixels « bois » seulement pour un parquet (a > 4, b > 12) ; pixels proches
+de la couleur dominante (2 écarts médians). App-001 : séjour (lames) 0,59/0,26/0,10 contre vérité 0,60/0,26/0,10 ; chambre 1
+0,51/0,23/0,11 contre 0,51/0,20/0,07 ; chambre 2 0,55/0,21/0,06 contre 0,51/0,22/0,08 ; zone point de Hongrie du séjour trop pâle
+(tapis). (3) `choisir_matiere` : empreinte moyenne de la région contre `prototypes_bibliotheque` (vignettes d'1 m de chaque
+matière, à l'échelle) ; point de Hongrie = matière dessinée par Atelya ; les cubes ne sont pas des références (pas dans
+matieres.json) → cuisine en « carrelage_interieur ». Lames → « chene_noeuds » partout. (4) `sols_vers_logement`. `SolAPlat`
+garde la photo, la caméra, la pièce et le point de vue. Rendus : `..\atelya\b2\app-001\auto\` (planche-sols-auto.jpg : annonce |
+sols relevés à la main | sols trouvés seuls) : parquet automatique souvent PLUS proche des photos (plus clair, plus miel) que la
+vérité à la main. REJETÉ : règle « pas de zone là où l'œil voit > 35-50 % de meubles » (+5 points sur le contrôle fabriqué,
+mais app-001 81,5 → 52 % : sur les vraies photos l'œil dit « meuble » bien plus souvent) → LEÇON : un réglage validé seulement
+sur photos fabriquées peut nuire sur les vraies ; `ZONE_MEUBLE_MAX = 1.0` (désactivé). Tests `tests/test_blanc_des_murs.py` (4).

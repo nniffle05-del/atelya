@@ -38,6 +38,11 @@ class SolAPlat:
     finesse: np.ndarray
     origine: tuple[float, float]
     resolution: float
+    # d'où vient cette image (rempli par photos_a_plat) : la photo d'origine (RGB), sa caméra, la pièce et le point de vue
+    photo: np.ndarray | None = None
+    camera: list | None = None
+    piece: dict | None = None
+    point_de_vue: tuple | None = None
 
     def vers_sol(self, ligne, colonne):
         """(x, y) en mètres du centre d'un pixel de l'image à plat."""
@@ -186,8 +191,9 @@ def photos_a_plat(releve: dict, logement: dict, racine, resolution: float = RESO
         photo = lire_image(dossier / modele.format(nom=nom))
         if photo is None:
             raise FileNotFoundError(dossier / modele.format(nom=nom))
-        vue = mettre_a_plat(cv2.cvtColor(photo, cv2.COLOR_BGR2RGB), cam, piece["contour"], emprise, resolution,
-                            point_de_vue=point)
+        rgb = cv2.cvtColor(photo, cv2.COLOR_BGR2RGB)
+        vue = mettre_a_plat(rgb, cam, piece["contour"], emprise, resolution, point_de_vue=point)
+        vue.photo, vue.camera, vue.piece, vue.point_de_vue = rgb, list(cam), piece, point
         journal(f"  {nom} : pièce {piece['id']}, {(vue.finesse > 0).sum() * resolution ** 2:.1f} m² de sol vus")
         sorties.append((nom, piece["id"], vue))
     return sorties

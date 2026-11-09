@@ -192,6 +192,7 @@ def familles_verite(logement: dict, X: np.ndarray, Y: np.ndarray, classes=FAMILL
 # ---------------------------------------------------------------- temps 3 : le sol de chaque pièce et ses zones
 ZONE_MIN_M2 = 1.0  # en dessous, une tache d'une autre famille est du bruit (un meuble, un reflet), pas une zone de sol
 SURFACE_VUE_MIN_M2 = 1.0  # une pièce dont on voit moins que ça n'est pas jugée
+ZONE_MEUBLE_MAX = 1.0  # DÉSACTIVÉ (09/11/2026) : à 0,35-0,5, +5 points sur le contrôle fabriqué MAIS app-001 81,5 → 52 % (sur vraies photos l'œil dit « meuble » bien plus souvent : la vraie zone de cubes et le point de Hongrie étaient retirés)
 
 
 def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZONE_MIN_M2) -> dict:
@@ -202,6 +203,7 @@ def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZO
     lisses = np.stack([cv2.blur(sol[..., k].astype(np.float32), (3, 3)) for k in range(sol.shape[-1])], -1)
     vue = carte.vue()
     fam = np.where(vue, np.array(carte.indices_sol)[lisses.argmax(-1)], -1)
+    meuble = carte.part_meuble()
     X, Y = carte.centres()
     case2 = carte.case ** 2
     sorties = {}
@@ -218,6 +220,8 @@ def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZO
             morceau = etiquettes == k
             if morceau.sum() * case2 < zone_min_m2:
                 continue
+            if float(meuble[morceau].mean()) > ZONE_MEUBLE_MAX:
+                continue  # l'œil y voit surtout des meubles (un lit, un tapis) : pas une zone de sol
             f = int(np.bincount(fam[morceau], minlength=len(carte.classes)).argmax())
             lignes, colonnes = np.nonzero(morceau)
             coins = np.concatenate([np.stack([colonnes + dc, lignes + dl], 1) for dc in (0, 1) for dl in (0, 1)]).astype(np.float32)
@@ -270,10 +274,14 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
     v0 = vues[0][2]
     h, w = v0.image.shape[:2]
     votes = np.zeros((int(np.ceil(h * v0.resolution / CASE_M)), int(np.ceil(w * v0.resolution / CASE_M)), len(clf.classes)))
+    tuiles_xy, tuiles_e = [], []  # centre (x, y) et empreinte de chaque vignette : pour choisir la matière d'une région
     for nom, _, vue in vues:
         v, centres, finesses = vignettes(vue.image, vue.finesse, vue.resolution)
         if len(v):
-            voter(votes, centres, clf.probabilites(empreintes(oeil, v)), finesses, vue.resolution)
+            e = empreintes(oeil, v)
+            voter(votes, centres, clf.probabilites(e), finesses, vue.resolution)
+            tuiles_xy.append(np.stack(vue.vers_sol(centres[:, 0], centres[:, 1]), 1))
+            tuiles_e.append(e)
         journal(f"  {nom} : {len(v)} vignettes")
     carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes))
     pieces = sols_des_pieces(carte, logement)
@@ -282,7 +290,8 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
     meuble = carte.part_meuble()
     case_l = np.minimum((np.arange(h) * v0.resolution / CASE_M).astype(int), meuble.shape[0] - 1)
     case_c = np.minimum((np.arange(w) * v0.resolution / CASE_M).astype(int), meuble.shape[1] - 1)
-    sol_pur = (finesse > 0) & (meuble[case_l][:, case_c] < 0.5)
+    pas_meuble = meuble[case_l][:, case_c] < 0.5
+    sol_pur = (finesse > 0) & pas_meuble
     lignes, colonnes = np.nonzero(sol_pur)
     X, Y = v0.vers_sol(lignes, colonnes)
     contours = {p["id"]: p["contour"] for p in logement["pieces"]}
@@ -294,8 +303,117 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
             hors_zones &= ~dz
             z["couleur"] = couleur_du_sol(image[lignes[dz], colonnes[dz]])
         s["couleur"] = couleur_du_sol(image[lignes[hors_zones], colonnes[hors_zones]])
+    # couleur pour Blender (part de lumière renvoyée), photo par photo contre le blanc des murs de la même photo
+    albedos_par_region(pieces, vues, logement, pas_meuble, contours)
+    if tuiles_e:
+        txy, te = np.concatenate(tuiles_xy), np.concatenate(tuiles_e)
+        for pid, s in pieces.items():
+            dans_piece = dans_polygone(txy[:, 0], txy[:, 1], contours[pid])
+            hors_zones = dans_piece.copy()
+            for z in s["zones"]:
+                dz = dans_piece & dans_polygone(txy[:, 0], txy[:, 1], z["contour"])
+                hors_zones &= ~dz
+                z["empreinte"] = te[dz].mean(0) if dz.any() else None
+            s["empreinte"] = te[hors_zones].mean(0) if hors_zones.any() else None
     return {"pieces": pieces, "carte": carte, "image": image, "finesse": finesse, "origine": v0.origine,
             "resolution": v0.resolution}
+
+
+def albedos_par_region(pieces: dict, vues, logement: dict, pas_meuble: np.ndarray, contours: dict) -> None:
+    """Pour chaque sol (pièce, zone) : la part de lumière qu'il renvoie (r, g, b), mesurée sur chaque photo qui le voit contre
+    le blanc des murs de LA MÊME photo (moteur/blanc_des_murs.py), puis médiane des photos pondérée par le sol vu. Clé
+    « couleur_photo » (même sens que Sol.couleur_photo du format, que Blender vise au rendu)."""
+    from moteur.blanc_des_murs import blanc_des_murs
+    from moteur.sol_a_plat import dans_polygone
+    from moteur.teinte_photo import BLANC_PEINTURE, lineaire
+    mesures: dict[tuple, list] = {}
+    for _, _, vue in vues:
+        if vue.photo is None:
+            continue
+        blanc = blanc_des_murs(vue.photo, vue.camera, logement, vue.piece, vue.point_de_vue)
+        if blanc is None:
+            continue
+        lignes, colonnes = np.nonzero((vue.finesse > 0) & pas_meuble)
+        if not len(lignes):
+            continue
+        X, Y = vue.vers_sol(lignes, colonnes)
+        for pid, s in pieces.items():
+            dans_piece = dans_polygone(X, Y, contours[pid])
+            regions = [(("piece", pid), dans_piece.copy(), s["famille"])]
+            for k, z in enumerate(s["zones"]):
+                dz = dans_piece & dans_polygone(X, Y, z["contour"])
+                regions[0][1][dz] = False
+                regions.append(((pid, k), dz, z["famille"]))
+            for cle, m, fam in regions:
+                if m.sum() < 2000:  # moins de 0,2 m² vus sur cette photo : pas assez sûr
+                    continue
+                pixels = vue.image[lignes[m], colonnes[m]]
+                L = lab(pixels)
+                if fam != "carreaux":  # un parquet est « bois » : un peu orangé (écarte tapis, linge, meubles blancs ou gris)
+                    bois = (L[:, 1] > 4) & (L[:, 2] > 12) & (L[:, 0] > 20) & (L[:, 0] < 88)
+                    if bois.sum() < 1000:
+                        continue
+                    pixels, L = pixels[bois], L[bois]
+                # pixels proches de la couleur dominante seulement (restes de lit, de tapis, de pied de meuble écartés)
+                ecart = np.linalg.norm(L - np.median(L, 0), axis=1)
+                proches = ecart <= 2.0 * max(float(np.median(ecart)), 1.0)
+                sol = np.median(lineaire(pixels[proches]), axis=0)
+                mesures.setdefault(cle, []).append((sol / max(float(blanc["blanc"].max()), 1e-6) * BLANC_PEINTURE, int(m.sum())))
+    for cle, liste in mesures.items():
+        valeurs = np.array([a for a, _ in liste])
+        poids = np.array([n for _, n in liste], float)
+        ordre = np.argsort(valeurs, axis=0)
+        albedo = []
+        for c in range(3):  # médiane pondérée par canal
+            v, p = valeurs[ordre[:, c], c], poids[ordre[:, c]]
+            albedo.append(float(v[np.searchsorted(np.cumsum(p), p.sum() / 2)]))
+        cible = pieces[cle[1]] if cle[0] == "piece" else pieces[cle[0]]["zones"][cle[1]]
+        cible["couleur_photo"] = [round(min(max(a, 0.0), 1.0), 4) for a in albedo]
+        cible["photos_couleur"] = len(liste)
+
+
+MATIERE_PAR_DEFAUT = {"lames": "chene_naturel_photo", "point_de_hongrie": "point_de_hongrie",
+                      "batons_rompus": "parquet_batons_rompus", "carreaux": "carrelage_interieur"}
+
+
+def choisir_matiere(famille_: str, empreinte, prototypes: dict | None) -> str:
+    """La matière du catalogue de cette famille dont l'aspect (empreinte moyenne de l'œil sur la bibliothèque) est le plus
+    proche de ce que montrent les photos. Le point de Hongrie garde la matière dessinée par Atelya (la plus réaliste au rendu)."""
+    from moteur.matieres import NOMS_SOLS
+    if famille_ == "point_de_hongrie" or empreinte is None or not prototypes:
+        return MATIERE_PAR_DEFAUT[famille_]
+    candidates = [m for m in NOMS_SOLS if famille(m) == famille_ and m in prototypes]
+    if not candidates:
+        return MATIERE_PAR_DEFAUT[famille_]
+    e = np.asarray(empreinte, float)
+    e = e / max(np.linalg.norm(e), 1e-9)
+    return max(candidates, key=lambda m: float(np.asarray(prototypes[m]) @ e))
+
+
+def sols_vers_logement(resultat: dict, logement: dict, bibliotheque, prototypes: dict | None = None) -> dict:
+    """Le logement avec les sols reconnus sur les photos : matière, zones (convexes), teinte et couleur visée au rendu ;
+    statut « estime » (vu sur photo), source « brique photos », confiance = part des avis. Les pièces non vues gardent leur sol."""
+    import json as _json
+    from pathlib import Path
+    from moteur.teinte_photo import albedo_de_la_matiere, teinte_pour
+
+    def sol(s, part):
+        matiere = choisir_matiere(s["famille"], s.get("empreinte"), prototypes)
+        d = {"matiere": matiere, "statut": "estime", "confiance": round(float(min(max(part, 0.05), 1.0)), 2),
+             "source": f"brique photos ({s.get('photos_couleur', 0)} photos pour la couleur)"}
+        if s.get("couleur_photo") and bibliotheque is not None:
+            d["couleur_photo"] = s["couleur_photo"]
+            d["teinte"] = list(teinte_pour(albedo_de_la_matiere(Path(bibliotheque), matiere), s["couleur_photo"]))
+        return d
+
+    sortie = _json.loads(_json.dumps(logement))
+    for p in sortie["pieces"]:
+        s = resultat["pieces"].get(p["id"])
+        if s is None:
+            continue
+        p["sol"] = sol(s, s.get("part", 1.0))
+        p["zones_sol"] = [{"contour": z["contour"], "sol": sol(z, s.get("part", 1.0))} for z in s["zones"]]
+    return sortie
 
 
 def famille_decidee(pieces: dict, logement: dict, X: np.ndarray, Y: np.ndarray, classes=FAMILLES) -> np.ndarray:
@@ -344,3 +462,36 @@ def noter(resultat: dict, logement_verite: dict, couleurs_visees: dict | None = 
             "par_famille": par_famille,
             "pieces_justes": f"{sum(v['trouve'] == v['attendu'] for v in pieces.values())}/{len(pieces)}",
             "pieces": pieces, "ecarts_couleur": couleurs}
+
+
+def prototypes_bibliotheque(oeil, bibliotheque, par_matiere: int = 16, graine: int = 3) -> dict:
+    """L'empreinte moyenne (normée) de chaque matière de la bibliothèque, vue de dessus à sa vraie échelle (vignettes d'1 m,
+    tournées de 0 ou 90°, un peu floutées comme un sol vu sur photo). Les matières dessinées par calcul dans Blender (sans
+    photo) n'en ont pas."""
+    import json as _json
+    from pathlib import Path
+    from moteur.images import lire_image
+    from moteur.matieres import CALCULEES, NOMS_SOLS
+    from moteur.oeil_dinov2 import empreintes
+    alea = np.random.default_rng(graine)
+    bib = Path(bibliotheque)
+    infos = _json.loads((bib / "matieres.json").read_text(encoding="utf-8"))
+    sortie = {}
+    for matiere in NOMS_SOLS:
+        if matiere in CALCULEES or matiere not in infos or not (bib / matiere / "couleur.jpg").is_file():
+            continue
+        tex = lire_image(bib / matiere / "couleur.jpg")
+        tex = cv2.cvtColor(tex, cv2.COLOR_BGR2RGB)
+        grand = np.tile(tex, (2, 2, 1))
+        cote = int(tex.shape[1] / infos[matiere]["taille_image_m"][0] * VIGNETTE_M)
+        vignettes_m = []
+        for _ in range(par_matiere):
+            l0 = int(alea.integers(0, max(1, grand.shape[0] - cote)))
+            c0 = int(alea.integers(0, max(1, grand.shape[1] - cote)))
+            v = cv2.resize(grand[l0:l0 + cote, c0:c0 + cote], (VIGNETTE_PX, VIGNETTE_PX), interpolation=cv2.INTER_AREA)
+            if alea.random() < 0.5:
+                v = np.rot90(v).copy()
+            vignettes_m.append(cv2.GaussianBlur(v, (0, 0), float(alea.uniform(0.5, 2.0))))
+        e = empreintes(oeil, np.stack(vignettes_m)).mean(0)
+        sortie[matiere] = e / max(np.linalg.norm(e), 1e-9)
+    return sortie

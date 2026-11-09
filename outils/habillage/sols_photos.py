@@ -70,7 +70,10 @@ def commande_reconnaitre(args) -> int:
     clf = Classifieur.depuis(torch.load(args.modele, weights_only=False))
     resultat = reconnaitre(releve, logement, RACINE, charger(clf.oeil), clf, journal=print)
     args.sortie.mkdir(parents=True, exist_ok=True)
-    (args.sortie / "sols-reconnus.json").write_text(json.dumps(resultat["pieces"], ensure_ascii=False, indent=1), encoding="utf-8")
+    sans_empreintes = {pid: {k: v for k, v in s.items() if k != "empreinte"} | {"zones": [{k: v for k, v in z.items() if k != "empreinte"}
+                                                                                for z in s["zones"]]}
+                       for pid, s in resultat["pieces"].items()}
+    (args.sortie / "sols-reconnus.json").write_text(json.dumps(sans_empreintes, ensure_ascii=False, indent=1), encoding="utf-8")
     dessiner_reconnaissance(resultat, logement, args.sortie / "sols-reconnus.png")
     for pid, s in resultat["pieces"].items():
         zones = ", ".join(f"{z['famille']} {z['surface_m2']} m²" for z in s["zones"])
@@ -89,6 +92,36 @@ def commande_reconnaitre(args) -> int:
     return 0
 
 
+def commande_logement(args) -> int:
+    """Photos calées + logement SANS sols → logement avec les sols trouvés seuls par Atelya (et, avec --construire, la maquette)."""
+    import torch
+
+    from moteur.construire import trouver_matieres
+    from moteur.logement import Logement
+    from moteur.oeil_dinov2 import charger
+    from moteur.reconnaitre_sols import Classifieur, prototypes_bibliotheque, reconnaitre, sols_vers_logement
+    releve = json.loads(args.releve.read_text(encoding="utf-8"))
+    logement = json.loads(args.logement.read_text(encoding="utf-8"))
+    for p in logement["pieces"]:  # on part d'un logement sans sols : Atelya ne voit pas la bonne réponse
+        p.pop("sol", None)
+        p["zones_sol"] = []
+    clf = Classifieur.depuis(torch.load(args.modele, weights_only=False))
+    oeil = charger(clf.oeil)
+    bibliotheque = trouver_matieres()
+    prototypes = prototypes_bibliotheque(oeil, bibliotheque) if bibliotheque else None
+    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print)
+    sortie = sols_vers_logement(resultat, logement, bibliotheque, prototypes)
+    Logement.model_validate(sortie)
+    args.sortie.parent.mkdir(parents=True, exist_ok=True)
+    args.sortie.write_text(json.dumps(sortie, ensure_ascii=False, indent=1), encoding="utf-8")
+    for p in sortie["pieces"]:
+        if p.get("sol", {}).get("source", "").startswith("brique photos"):
+            zones = ", ".join(z["sol"]["matiere"] for z in p.get("zones_sol", []))
+            print(f"{p['id']} : {p['sol']['matiere']} teinte {p['sol'].get('teinte')}" + (f" ; zones : {zones}" if zones else ""))
+    print(f"Logement avec les sols trouvés par Atelya : {args.sortie}", flush=True)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Brique photos : sol vu de dessus depuis les photos du client")
     sous = ap.add_subparsers(dest="commande", required=True)
@@ -104,6 +137,11 @@ def main() -> int:
     r.add_argument("sortie", type=Path)
     r.add_argument("--verite", type=Path, help="logement dont les pièces ont leur sol et leurs zones (la bonne réponse)")
     r.add_argument("--couleurs", type=Path, help="fichier de choix des sols avec « couleur_visee » (verites/app-001/sols.json)")
+    g = sous.add_parser("logement", help="logement avec les sols trouvés seuls (pour construire la maquette)")
+    g.add_argument("releve", type=Path)
+    g.add_argument("logement", type=Path, help="logement (ses sols éventuels sont retirés avant la reconnaissance)")
+    g.add_argument("modele", type=Path)
+    g.add_argument("sortie", type=Path, help="logement.json écrit")
     args = ap.parse_args()
     for f in (args.releve, args.logement):
         if not f.is_file():
@@ -111,6 +149,8 @@ def main() -> int:
             return 2
     if args.commande == "reconnaitre":
         return commande_reconnaitre(args)
+    if args.commande == "logement":
+        return commande_logement(args)
     releve = json.loads(args.releve.read_text(encoding="utf-8"))
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
     trio = photos_a_plat(releve, logement, RACINE)
