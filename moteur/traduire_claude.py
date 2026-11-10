@@ -48,7 +48,7 @@ from moteur.lecture_cotes import ECART_MAX, TexteLu
 from moteur.logement import Logement
 from moteur.recalage_murs import affiner_mur
 
-VERSION_TRADUCTEUR_CLAUDE = "0.2.1"
+VERSION_TRADUCTEUR_CLAUDE = "0.3.0"  # 10/11/2026 : dimensions de pièces mesurées entre les murs (2e clé)
 MODELE = "claude"
 ACCORD_DEUX_CLES = 0.03  # 3 % : écart maximal entre l'échelle retrouvée par Atelya et celle proposée par Claude
 PORTEE_OUVERTURE_PX = 12.0  # une ouverture appartient à un mur dont l'axe passe à moins de ça (ou de son épaisseur)
@@ -108,6 +108,70 @@ def _echelle_des_cotes(fiche: LectureClaude, f: float) -> tuple[float | None, in
         groupes.append((len(groupe), sum(v for _, v in groupe), groupe))
     _, _, gardees = max(groupes, key=lambda g: (g[0], g[1]))
     return sum(px for px, _ in gardees) / sum(v for _, v in gardees), len(gardees)
+
+
+FACE_SOMBRE = 120  # niveau de gris sous lequel un pixel est « trait de mur »
+FACE_EPAISSEUR_MIN = 3  # px : un trait plus fin est une hachure de sol ou un trait de meuble, pas la face d'un mur
+ECART_MESURE_MAX = 0.08  # la distance mesurée entre les faces ne s'écarte pas de plus de 8 % des bouts donnés par Claude
+COTES_ENTRE_MURS_MIN = 3  # au moins 3 dimensions d'accord pour confirmer l'échelle ainsi
+
+
+def _face_rencontree(gris: np.ndarray, depart, direction, portee: float) -> float | None:
+    """En partant de `depart` dans `direction` (unitaire), la distance (px) jusqu'au premier trait sombre ÉPAIS (au moins
+    FACE_EPAISSEUR_MIN px de suite) : la face d'un mur. None si rien avant `portee`."""
+    H, W = gris.shape
+    suite, premier = 0, None
+    t = 0.0
+    while t <= portee:
+        x, y = int(round(depart[0] + direction[0] * t)), int(round(depart[1] + direction[1] * t))
+        if not (0 <= x < W and 0 <= y < H):
+            return None
+        if gris[y, x] < FACE_SOMBRE:
+            if suite == 0:
+                premier = t
+            suite += 1
+            if suite >= FACE_EPAISSEUR_MIN:
+                return premier
+        else:
+            suite = 0
+        t += 1.0
+    return None
+
+
+def _cotes_entre_murs(gris: np.ndarray, fiche: LectureClaude, f: float) -> tuple[float | None, int, list]:
+    """2e clé pour les plans qui écrivent les DIMENSIONS DANS LES PIÈCES (« 450 X 525 », sans trait de cote, très courant en
+    France ; test de bout en bout app-002, 10/11/2026) : pour chaque cote dont Claude a posé les bouts sur deux murs, Atelya
+    part du milieu, avance des deux côtés jusqu'à la face du mur sur le DESSIN et mesure lui-même la distance. Gardées : les
+    mesures à moins de ECART_MESURE_MAX des bouts de Claude ; puis le plus grand groupe d'accord (ECART_MAX, comme les cotes).
+    Rend (px du plan par m, taille du groupe, détail)."""
+    mesures, detail = [], []
+    for c in fiche.cotes:
+        (ax, ay), (bx, by) = ((x / f, y / f) for x, y in c.bouts)
+        lc = math.hypot(bx - ax, by - ay)
+        if lc < 10:
+            continue
+        u = ((bx - ax) / lc, (by - ay) / lc)
+        m = ((ax + bx) / 2, (ay + by) / 2)
+        da = _face_rencontree(gris, m, (-u[0], -u[1]), lc * 0.6)
+        db = _face_rencontree(gris, m, u, lc * 0.6)
+        if da is None or db is None:
+            detail.append([c.texte, None])
+            continue
+        mesure = da + db
+        if abs(mesure / lc - 1) > ECART_MESURE_MAX:
+            detail.append([c.texte, round(mesure, 1), "trop loin des bouts de Claude"])
+            continue
+        mesures.append((mesure, c.valeur_m))
+        detail.append([c.texte, round(mesure, 1), round(mesure / c.valeur_m, 2)])
+    if not mesures:
+        return None, 0, detail
+    groupes = []
+    for px0, v0 in mesures:
+        e0 = px0 / v0
+        g = [(px, v) for px, v in mesures if abs(px / v - e0) / e0 <= ECART_MAX]
+        groupes.append((len(g), sum(v for _, v in g), g))
+    _, _, gardees = max(groupes, key=lambda x: (x[0], x[1]))
+    return sum(px for px, _ in gardees) / sum(v for _, v in gardees), len(gardees), detail
 
 
 def _sur_le_mur(cx: float, cy: float, mur: list[float]) -> tuple[float, float]:
@@ -394,6 +458,11 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
                               e.barre if e.barre_sure else None, e.surfaces if e.surfaces_sure else None, False,
                               e.approchee, False, e.surfaces, ecrite=e.ecrite, ambigue=e.ambigue, plusieurs_blocs=False)
     cle_atelya = lx or ly  # px du coloriage par m
+    if not cle_atelya:  # pas de trait de cote, de barre ni de surface : les dimensions écrites dans les pièces, mesurées entre les murs
+        entre_murs, n_entre, detail_entre = _cotes_entre_murs(gris, fiche, f)
+        infos["cotes_entre_murs"] = detail_entre
+        if entre_murs and n_entre >= COTES_ENTRE_MURS_MIN and _taille_vraisemblable(entre_murs * rc, e.interieur_px):
+            cle_atelya, origine = entre_murs * rc, f"{n_entre} dimensions de pièces mesurées entre les murs du dessin"
     prop = fiche.echelle_proposee.px_par_m
     cle_claude = prop / f * rc if prop else None
     cotes_claude, cotes_accord = _echelle_des_cotes(fiche, f)

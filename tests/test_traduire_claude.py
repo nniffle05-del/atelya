@@ -330,3 +330,29 @@ def test_bouts_de_murs_proches_se_rejoignent():
 
     b = _bati([[10, 30, 60, 30, 3], [62, 32, 120, 32, 3]], (60, 140))
     assert cv2.connectedComponents(b)[0] == 2  # le fond + un seul trait
+
+
+def test_dimensions_de_pieces_mesurees_entre_les_murs(plan_sans_cotes):
+    """Plan sans trait de cote, dimensions écrites dans les pièces (« 345 X 400 ») : Atelya mesure lui-même chaque dimension
+    entre les faces des murs du dessin ; d'accord entre elles et avec Claude → échelle « lue » (10/11/2026, app-002)."""
+    d = _fiche()
+    d["surfaces"] = []
+    d["cotes"] = [
+        {"texte": "345", "valeur_m": 3.45, "cadre": [X(1), Y(2.2), X(1.5), Y(2)], "bouts": [[X(0), Y(2)], [X(3.5) - 5, Y(2)]]},
+        {"texte": "400", "valeur_m": 4.00, "cadre": [X(1), Y(2.5), X(1.5), Y(2.3)], "bouts": [[X(3), Y(4)], [X(3), Y(0)]]},
+        {"texte": "245", "valeur_m": 2.45, "cadre": [X(4.5), Y(2.2), X(5), Y(2)], "bouts": [[X(3.5) + 5, Y(2)], [X(6), Y(2)]]},
+        {"texte": "400", "valeur_m": 4.00, "cadre": [X(4.5), Y(2.5), X(5), Y(2.3)], "bouts": [[X(5), Y(4)], [X(5), Y(0)]]},
+    ]
+    lu = _lire(plan_sans_cotes, d)
+    e = lu.gardee.echelle
+    assert e["etat"] == "lue" and "entre les murs" in e["source"]
+    assert abs(e["px_par_m_largeur"] / e["detail"]["claude"] - 1) <= 0.03
+    assert "echelle" not in _codes(lu)
+    # une fiche dont les bouts ne tombent pas sur des murs (au milieu des pièces) ne confirme rien
+    d2 = copy.deepcopy(d)
+    for c in d2["cotes"]:
+        (ax, ay), (bx, by) = c["bouts"]
+        c["bouts"] = [[ax + (bx - ax) * 0.3, ay + (by - ay) * 0.3], [ax + (bx - ax) * 0.7, ay + (by - ay) * 0.7]]
+        c["valeur_m"] = round(c["valeur_m"] * 0.4, 3)
+        c["texte"] = str(round(c["valeur_m"] * 100))
+    assert _lire(plan_sans_cotes, d2).gardee.echelle["etat"] == "a_verifier"

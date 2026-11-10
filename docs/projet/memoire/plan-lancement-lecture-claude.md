@@ -795,3 +795,19 @@ verification.js). PIÈGE : jamais de « \n » dans du JS écrit par Python (devi
 Reste proposé (points 2-6) : murs (épaisseur à la poignée, redresser, coller), types « gaine » et « porte de placard », meubles à
 l'écran (déplacer, tourner, taille, type), cote corrigée = tout se recale. Le chronométrage NT (étape 2 du test de bout en bout)
 attend l'écran malléable.
+ÉCRAN MALLÉABLE, suite (10/11/2026, NT : « fais tout, même ce que tu avais mis en haut ») : (1) murs alignés qui se chevauchent
+FUSIONNÉS (`fusionnerMursAlignes` : < 1°, < ½ épaisseur, recouvrement > 1 cm ; portes de l'autre mur reportées à leur vraie place) et
+pièces RECALCULÉES SEULES après chaque changement de mur ET à l'ouverture de l'écran (`apresMurs`, `corrigerMurs` ; noms, types, sols
+gardés ; pièce non fermée gardée et signalée) ; (2) pièces à la souris : coins et milieux des côtés, aimant sur les faces des murs
+(et leur angle), alertes « traverse un mur » / « chevauche », contours faits à la main GARDÉS au recalcul (`v.contours_manuels`,
+bouton « Revenir au contour calculé »), LIMITE INVISIBLE (outil : cloison pour le calcul des pièces seulement, pas de mur en 3D,
+`v.limites`) ; (3) murs : épaisseur à la poignée (rond orange), « Rendre droit » (< 5°, murs accrochés suivent ; vrai biais refusé),
+« Redresser tous les murs presque droits » (pas automatique : de vrais biais existent) ; « coller » = outil Relier existant ;
+(4) doutes 0.3.0 : bloc plein court (longueur ≤ 2,5 × épaisseur) = gaine/poteau (faible), « porte » large donnant sur un placard =
+façade (pas de doute) ; (5) MEUBLES à l'écran : emprise au sol (trait épais = avant), glisser (dos collé au mur à < 15 cm, change de
+pièce), rond violet de rotation (crans 15°, angle droit à < 7°), fiche (type parmi les 35 catégories du moteur — test d'égalité,
+taille, ±90°), outil « Un meuble », suppression (une pièce supprimée emporte ses meubles), cohérence (pièce connue, plafond) ;
+(6) ÉCHELLE des plans à dimensions DANS les pièces : traducteur Claude 0.3.0, `_cotes_entre_murs` = Atelya mesure lui-même chaque
+dimension entre les faces des murs du DESSIN (trait sombre ≥ 3 px, hachures ignorées ; ≤ 8 % des bouts de Claude ; ≥ 3 d'accord à
+3 %) → app-002 : échelle LUE (8 dimensions, 64,9 px/m contre 64,0 vérité, confirmée par Claude) ; doutes forts 6 → 4 (3 « cote contre
+dessin » honnêtes : « 490 » écrit pour 4,69 m dessinés, + séjour/chambre 1). Tests JS 71/71 dans Edge.
