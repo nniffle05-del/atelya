@@ -701,3 +701,18 @@ plantes (182). Proposé à NT comme CHANTIER SUIVANT (après « pas du sol ») :
 Atelya avec vraies matières PBR contre vrais modèles 3D d'une bibliothèque : Poly Haven CC0, Sketchfab par objet, fichiers
 fabricants pour architectes, BlenderKit — licences à LIRE avant de proposer, accord NT avant tout téléchargement) ; NT juge sur
 l'image, puis choix catégorie par catégorie. Pas commencé.
+Étape 2 (10/11/2026) : OWLv2 RÉÉCRIT dans Atelya (`moteur/owlv2.py` : réseau, découpage des mots CLIP, poids safetensors lus à la
+main ; aucune bibliothèque ajoutée) ; contrôle de référence = image d'exemple officielle (deux chats) : 0,614 / 0,665 exactement,
+rectangles à 0,1 px. Banc `outils/habillage/verifier_owlv2.py` (38 phrases → 9 groupes + « autre » : fenêtre, porte, radiateur…) :
+403 photos d'essai meublées anciennes, seuil 0,2 : 70 % des meubles retrouvés sur la photo (lits 76 %, rangements 79 %, tapis 78 %,
+chaises 52 %), 1,7 rectangle en trop par photo ; ~0,25 s/photo. Piège vu : zone de sol en granito prise pour un tapis (« carpet
+0,27 ») → ne pas écarter le sol sur un simple « tapis ». LITERIE : format `Literie` (couette, oreillers 0-4, couleur, plaid) sur un
+Meuble ; Blender `moteur/blender/literie.py` (hauteur du matelas par rayons ; matelas ajouté sur un cadre seul ; couette arrondie à
+deux bruits de plis ; oreillers ; plaid) ; masque : linge = lit. Photos d'essai : chaque chambre reçoit un lit 9 fois sur 10 contre un
+mur + chevets, linge 9 fois sur 10 (couettes blanches/claires ~65 %) ; « loft » exclu des lits simples. Série : contrôle fr-031-m3/m4,
+fr-038-m3/m4 (45 photos) + 18 tirages d'entraînement -m4 (graine 2026, journal `..\atelya\b2\journal-photos-literie.txt`).
+CONTRÔLE AVEC VRAIS LITS (sols-vits14-v2) : 260,6 m² jugés, 70,3 % justes (contre 84,6 % sur l'ancien contrôle) ; sous meubles
+47 % (72 % avant), ailleurs 84 % ; fr-038-m4 chambre 1 prise pour du carrelage (comme app-002 ch. 3) ; nombreuses fausses zones
+dans les chambres → le contrôle reproduit enfin le défaut des vraies photos. OWLv2 sur ce contrôle (seuil 0,2) : lits 18/21 (86 %),
+canapés 6/7, rangements 19/24, tables 17/26, tous 87/119 (73 %) ; lits « en trop » = surtout DOUBLONS (« bed » + « bed with a
+duvet ») → fusionner. Planches `..\atelya\b2\owlv2-verification(-literie)\`.

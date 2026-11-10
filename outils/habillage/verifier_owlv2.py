@@ -120,12 +120,15 @@ def main() -> int:
     ap.add_argument("sortie", type=Path)
     ap.add_argument("--planches", type=int, default=12)
     ap.add_argument("--seuil-planche", type=float, default=0.2)
+    ap.add_argument("--tirages", default=None, help="expression régulière sur le nom des tirages (ex. « -m[34]$ »)")
     args = ap.parse_args()
     args.sortie.mkdir(parents=True, exist_ok=True)
     debut = time.time()
     owl = charger()
     requetes = owl.textes(NOMS)
+    import re
     photos = [(t, p) for t in sorted(args.essais.iterdir()) if (t / "categories").is_dir()
+              and (args.tirages is None or re.search(args.tirages, t.name))
               for p in sorted((t / "rendus").glob("vue-*.png"))]
     print(f"{len(photos)} photos meublées", flush=True)
     total = {s: {g: {"vrais": 0, "retrouves": 0, "en_trop": 0} for g in GROUPES} for s in SEUILS}
