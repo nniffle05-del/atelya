@@ -117,6 +117,19 @@ détaillé correspondant avant d'agir.
   Tailles : base B/16 `model.safetensors` 619,92 Mo ; large L/14 1 750,52 Mo ; + `vocab.json` 1,06 Mo, `merges.txt` 0,52 Mo.
   Route sans installation : code réécrit dans Atelya (comme `oeil.py`), poids lus à la main (safetensors), pas de `transformers`.
   Téléchargement = accord écrit NT.
+- **UNREAL ENGINE 5 — CLUF lu EN ENTIER le 10/11/2026** (PDF de la page officielle fourni par NT, 44 p., rangé dans
+  `..\atelya\licences\unreal-engine-eula-2026-11-10.pdf` ; sites d'Epic bloqués aux robots). Utilisable commercialement :
+  (a) CINÉMATIQUE = « rendered video files » = Non-Engine Product (§4.a.i) : AUCUNE redevance, à quiconque ; (b) VISITE
+  interactive vendue et diffusée au public (fichier ou streaming : « make its functionality available on a network » =
+  Distribute) = très probablement « Royalty Product » (§4.b) : 5 % du revenu directement généré, mais RIEN sur le 1er million $
+  de chaque produit (addendum §4(b)(ii)) ni sur un trimestre < 10 000 $ ; formulaire unrealengine.com/release AVANT diffusion
+  payante ; (c) postes (« seats ») pour le reste SAUF exception indie : société + groupe < 1 000 000 $ de revenu brut sur 12 mois,
+  levées de fonds COMPRISES (§6.b.i) ; prix des postes absent du CLUF ; (d) INTERDIT de mêler au produit Unreal du code ou contenu
+  GPL, LGPL (sauf lien dynamique), CC BY-SA (§6.c) : Blender (GPL) reste un OUTIL à part, ses exports sont à nous ; ABO CC BY 4.0 et
+  CC0 OK ; IfcOpenShell (LGPL) seulement en lien dynamique ; (e) mentions obligatoires au générique si le produit en a (§7.a) ;
+  (f) pas de location d'Unreal lui-même (§6.e) ; contrat avec Epic Games Commerce GmbH, droit de New York, renonciation aux actions
+  de groupe (opt-out possible 30 jours après acceptation). ZONES GRISES à faire confirmer (Epic ou juriste) : chaque visite = un
+  produit distinct ? visite payée par l'agence puis montrée gratuitement aux acheteurs = revenu « direct » (§4.a.ii) ?
 - Toute nouvelle bibliothèque ou donnée : **lire sa licence** (le fichier, pas un résumé) avant de la
   proposer à NT. Détail : `docs/projet/memoire/audit-technologique-2026-10-31.md`.
 
