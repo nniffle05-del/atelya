@@ -28,24 +28,7 @@ from moteur.meubles import NOMS_MEUBLES  # noqa: E402
 from moteur.owlv2 import boites_iou, charger, objets  # noqa: E402
 from moteur.reperer_meubles import GROUPES, groupe  # noqa: E402
 
-# Ce qu'on demande à OWLv2, et le groupe d'Atelya de chaque phrase (« autre » = objets qui ne sont pas des meubles à
-# repérer : on les demande quand même, pour qu'une fenêtre ou une porte ne soit pas prise pour une armoire).
-REQUETES = {
-    "a bed": "lit", "a bed with a duvet": "lit", "a bunk bed": "lit", "a loft bed": "lit",
-    "a sofa": "canape", "a couch": "canape",
-    "an armchair": "fauteuil",
-    "a chair": "chaise", "a stool": "chaise", "an office chair": "chaise",
-    "a dining table": "table", "a table": "table", "a coffee table": "table", "a desk": "table", "a side table": "table",
-    "a chest of drawers": "rangement", "a cabinet": "rangement", "a bookshelf": "rangement", "a shelf": "rangement",
-    "a tv stand": "rangement", "a nightstand": "rangement", "a bench": "rangement", "a wardrobe": "rangement",
-    "a sideboard": "rangement", "kitchen cabinets": "rangement",
-    "a rug": "tapis", "a carpet": "tapis",
-    "a floor lamp": "lampe", "a lamp": "lampe",
-    "a potted plant": "plante",
-    "a window": "autre", "a door": "autre", "a radiator": "autre", "a painting": "autre", "a mirror": "autre",
-    "a television": "autre", "a pillow": "autre", "a ceiling light": "autre",
-}
-NOMS = list(REQUETES)
+from moteur.pas_du_sol import NOMS, REQUETES  # noqa: E402  (une seule liste de phrases)
 SEUILS = (0.1, 0.15, 0.2, 0.25, 0.3, 0.4)
 PART_MIN = 0.005  # une tache plus petite que 0,5 % de la photo n'est pas un meuble « à retrouver »
 

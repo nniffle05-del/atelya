@@ -43,6 +43,8 @@ class SolAPlat:
     camera: list | None = None
     piece: dict | None = None
     point_de_vue: tuple | None = None
+    # points vus mais DOUTEUX (la photo y montre peut-être un meuble : moteur/pas_du_sol.py) : ils votent peu (10/11/2026)
+    douteux: np.ndarray | None = None
 
     def vers_sol(self, ligne, colonne):
         """(x, y) en mètres du centre d'un pixel de l'image à plat."""
@@ -104,11 +106,14 @@ def visibles_depuis(X, Y, point, contour) -> np.ndarray:
 
 
 def mettre_a_plat(photo: np.ndarray, cam, contour_piece, emprise=None, resolution: float = RESOLUTION_M,
-                  finesse_min: float = FINESSE_MIN, point_de_vue=None) -> SolAPlat:
+                  finesse_min: float = FINESSE_MIN, point_de_vue=None, ecarter: np.ndarray | None = None) -> SolAPlat:
     """Met à plat le sol de la pièce `contour_piece` vu sur `photo` (RGB) par la caméra `cam` (8 nombres, camera_photo).
 
     point_de_vue : d'où partent les rayons pour savoir ce que cachent les murs (par défaut l'appareil). Pour une photo prise
-    depuis l'embrasure d'une porte, l'appareil est sur le bord de la pièce : on prend un point juste à l'intérieur."""
+    depuis l'embrasure d'une porte, l'appareil est sur le bord de la pièce : on prend un point juste à l'intérieur.
+    ecarter : masque (taille de la photo, vrai = « pas du sol » : lit, canapé, rangement…, moteur/pas_du_sol.py) ; les
+    points du sol qui tombent dessus restent vus mais sont marqués DOUTEUX (`SolAPlat.douteux`) : ils votent peu et ne
+    servent pas à mesurer la couleur (10/11/2026 ; les effacer faisait jeter aussi les vignettes voisines)."""
     c = np.asarray(contour_piece, float)
     if emprise is None:
         emprise = (c[:, 0].min(), c[:, 1].min(), c[:, 0].max(), c[:, 1].max())
@@ -117,19 +122,26 @@ def mettre_a_plat(photo: np.ndarray, cam, contour_piece, emprise=None, resolutio
     h, w = photo.shape[:2]
     vu = (np.isfinite(u) & (p > 0.3) & (u >= 0) & (u <= w - 1) & (v >= 0) & (v <= h - 1) & (finesse >= finesse_min)
           & dans_polygone(X, Y, c) & visibles_depuis(X, Y, point_de_vue or (float(cam[0]), float(cam[1])), c))
+    douteux = None
+    if ecarter is not None and vu.any():
+        ui = np.clip(np.round(np.where(vu, u, 0)).astype(int), 0, w - 1)
+        vi = np.clip(np.round(np.where(vu, v, 0)).astype(int), 0, h - 1)
+        douteux = vu & ecarter[vi, ui]
     carte_u = np.where(vu, u, -1).astype(np.float32)
     carte_v = np.where(vu, v, -1).astype(np.float32)
     image = cv2.remap(photo, carte_u, carte_v, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
     image[~vu] = 0
-    return SolAPlat(image, np.where(vu, finesse, 0.0).astype(np.float32), origine, resolution)
+    return SolAPlat(image, np.where(vu, finesse, 0.0).astype(np.float32), origine, resolution, douteux=douteux)
 
 
 def assembler(vues: list[SolAPlat]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Une seule image du sol à partir de plusieurs photos à plat de MÊME emprise et résolution : chaque point prend la
     photo qui le voit le plus finement. Rend (image, finesse, n° de la photo retenue ou -1)."""
     finesses = np.stack([v.finesse for v in vues])
-    meilleure = finesses.argmax(axis=0)
-    finesse = finesses.max(axis=0)
+    # une photo qui voit le point PROPRE (pas douteux) passe devant une photo qui le voit derrière un meuble
+    choix = np.stack([v.finesse if v.douteux is None else np.where(v.douteux, 0.01 * v.finesse, v.finesse) for v in vues])
+    meilleure = choix.argmax(axis=0)
+    finesse = np.take_along_axis(finesses, meilleure[None], 0)[0]
     image = np.zeros_like(vues[0].image)
     for k, v in enumerate(vues):
         m = (meilleure == k) & (finesse > 0)
@@ -170,9 +182,10 @@ def emprise_du_logement(logement: dict, marge: float = MARGE_M):
     return (tous[:, 0].min() - marge, tous[:, 1].min() - marge, tous[:, 0].max() + marge, tous[:, 1].max() + marge)
 
 
-def photos_a_plat(releve: dict, logement: dict, racine, resolution: float = RESOLUTION_M, journal=print):
+def photos_a_plat(releve: dict, logement: dict, racine, resolution: float = RESOLUTION_M, journal=print, pas_du_sol=None):
     """Toutes les photos calées d'un relevé (format cameras-photos.json ; clé « fichier » facultative, « {nom}.png » par
-    défaut) mises à plat sur l'emprise du logement entier. Rend [(nom, id de la pièce, SolAPlat)]."""
+    défaut) mises à plat sur l'emprise du logement entier. Rend [(nom, id de la pièce, SolAPlat)].
+    pas_du_sol : fonction (nom, photo RGB) → masque « pas du sol » (ou None), écarté avant la mise à plat."""
     from pathlib import Path
 
     from moteur.camera_photo import camera_depuis_dict
@@ -192,7 +205,8 @@ def photos_a_plat(releve: dict, logement: dict, racine, resolution: float = RESO
         if photo is None:
             raise FileNotFoundError(dossier / modele.format(nom=nom))
         rgb = cv2.cvtColor(photo, cv2.COLOR_BGR2RGB)
-        vue = mettre_a_plat(rgb, cam, piece["contour"], emprise, resolution, point_de_vue=point)
+        ecarter = pas_du_sol(nom, rgb) if pas_du_sol is not None else None
+        vue = mettre_a_plat(rgb, cam, piece["contour"], emprise, resolution, point_de_vue=point, ecarter=ecarter)
         vue.photo, vue.camera, vue.piece, vue.point_de_vue = rgb, list(cam), piece, point
         journal(f"  {nom} : pièce {piece['id']}, {(vue.finesse > 0).sum() * resolution ** 2:.1f} m² de sol vus")
         sorties.append((nom, piece["id"], vue))

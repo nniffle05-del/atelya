@@ -31,6 +31,8 @@ VIGNETTE_M = 1.0  # côté d'une vignette de sol (m) : quelques lames ou deux à
 VIGNETTE_PX = 224  # taille donnée à l'œil (16 carrés de 14 px) : 0,45 cm par pixel
 PAS_M = 0.25  # écart entre deux vignettes voisines
 COUVERTURE_MIN = 0.85  # part de la vignette réellement vue sur la photo
+DOUTEUX_REMPLI_MAX = 0.35  # vignette douteuse (meuble possible) à moins de 35 % : ces points sont remplacés par le sol propre
+POIDS_DOUTEUX = 0.05  # au-delà : la vignette vote quand même, mais à 5 % (une pièce vue seulement derrière un lit reste jugée)
 CASE_M = 0.25  # côté d'une case de la carte des sols
 
 
@@ -46,15 +48,18 @@ assert all(famille(m) in FAMILLES for m in NOMS_SOLS)
 
 
 def vignettes(image: np.ndarray, finesse: np.ndarray, resolution: float, taille_m: float = VIGNETTE_M,
-              pas_m: float = PAS_M, couverture_min: float = COUVERTURE_MIN, sortie_px: int = VIGNETTE_PX):
+              pas_m: float = PAS_M, couverture_min: float = COUVERTURE_MIN, sortie_px: int = VIGNETTE_PX, douteux=None):
     """Découpe une image à plat en vignettes. Rend (vignettes N × sortie_px × sortie_px × 3, centres (N, 2) en pixels de
     l'image à plat (ligne, colonne), finesse moyenne (N,)). Le peu qui n'est pas vu dans une vignette est rempli par la
-    couleur moyenne de ce qui est vu (sinon l'œil verrait un bord noir)."""
+    couleur moyenne de ce qui est vu (sinon l'œil verrait un bord noir).
+    douteux (facultatif, points vus derrière un meuble possible) : rend en plus le FACTEUR de vote de chaque vignette
+    (1 − part douteuse, les points douteux remplacés par le sol propre, si elle est ≤ DOUTEUX_REMPLI_MAX ; POIDS_DOUTEUX
+    au-delà)."""
     cote, pas = int(round(taille_m / resolution)), max(1, int(round(pas_m / resolution)))
     vu = finesse > 0
     integrale = cv2.integral(vu.astype(np.uint8))
     h, w = vu.shape
-    images, centres, finesses = [], [], []
+    images, centres, finesses, facteurs = [], [], [], []
     for l0 in range(0, h - cote + 1, pas):
         for c0 in range(0, w - cote + 1, pas):
             n = integrale[l0 + cote, c0 + cote] - integrale[l0, c0 + cote] - integrale[l0 + cote, c0] + integrale[l0, c0]
@@ -62,13 +67,26 @@ def vignettes(image: np.ndarray, finesse: np.ndarray, resolution: float, taille_
                 continue
             morceau = image[l0:l0 + cote, c0:c0 + cote].copy()
             m = vu[l0:l0 + cote, c0:c0 + cote]
+            facteur = 1.0
+            if douteux is not None:
+                d = douteux[l0:l0 + cote, c0:c0 + cote] & m
+                part = float(d.sum()) / max(int(m.sum()), 1)
+                if 0 < part <= DOUTEUX_REMPLI_MAX:
+                    m = m & ~d
+                    facteur = 1.0 - part
+                elif part > DOUTEUX_REMPLI_MAX:
+                    facteur = POIDS_DOUTEUX
             morceau[~m] = morceau[m].mean(axis=0).astype(np.uint8)
+            facteurs.append(facteur)
             images.append(cv2.resize(morceau, (sortie_px, sortie_px), interpolation=cv2.INTER_AREA if cote > sortie_px
                                      else cv2.INTER_LINEAR))
             centres.append((l0 + cote / 2, c0 + cote / 2))
             finesses.append(float(finesse[l0:l0 + cote, c0:c0 + cote][m].mean()))
     if not images:
-        return np.zeros((0, sortie_px, sortie_px, 3), np.uint8), np.zeros((0, 2)), np.zeros(0)
+        vide = (np.zeros((0, sortie_px, sortie_px, 3), np.uint8), np.zeros((0, 2)), np.zeros(0))
+        return (*vide, np.zeros(0)) if douteux is not None else vide
+    if douteux is not None:
+        return np.stack(images), np.array(centres), np.array(finesses), np.array(facteurs)
     return np.stack(images), np.array(centres), np.array(finesses)
 
 
@@ -121,6 +139,8 @@ class CarteDesSols:
     origine: tuple[float, float]
     case: float
     classes: tuple[str, ...]
+    # les avis des seules vignettes PROPRES (pas vues derrière un meuble possible) ; None = tout est propre (10/11/2026)
+    votes_propres: np.ndarray | None = None
 
     @property
     def indices_sol(self) -> list[int]:
@@ -156,10 +176,13 @@ class CarteDesSols:
 
 
 def voter(carte_votes: np.ndarray, centres_px: np.ndarray, probabilites: np.ndarray, finesses: np.ndarray, resolution: float,
-          case: float = CASE_M, taille_m: float = VIGNETTE_M) -> None:
-    """Ajoute les avis des vignettes aux cases qu'elles couvrent (leur moitié centrale, pour rester précis aux limites)."""
+          case: float = CASE_M, taille_m: float = VIGNETTE_M, facteurs: np.ndarray | None = None) -> None:
+    """Ajoute les avis des vignettes aux cases qu'elles couvrent (leur moitié centrale, pour rester précis aux limites).
+    facteurs : poids en plus de chaque vignette (vignettes douteuses : peut-être un meuble)."""
     demi = int(round(taille_m / 4 / case))  # la moitié centrale de la vignette, en cases
     poids = np.sqrt(np.clip(finesses, 0, 4)) * probabilites.max(1)  # photo fine + avis tranché = plus de poids
+    if facteurs is not None:
+        poids = poids * facteurs
     for (l, c), p, w in zip(centres_px, probabilites, poids):
         lc, cc = int(l * resolution / case), int(c * resolution / case)
         l0, l1 = max(0, lc - demi), min(carte_votes.shape[0], lc + demi + 1)
@@ -195,20 +218,31 @@ SURFACE_VUE_MIN_M2 = 1.0  # une pièce dont on voit moins que ça n'est pas jug�
 ZONE_MEUBLE_MAX = 1.0  # DÉSACTIVÉ (09/11/2026) : à 0,35-0,5, +5 points sur le contrôle fabriqué MAIS app-001 81,5 → 52 % (sur vraies photos l'œil dit « meuble » bien plus souvent : la vraie zone de cubes et le point de Hongrie étaient retirés)
 
 
+def _familles(carte: CarteDesSols, votes: np.ndarray):
+    sol = votes[..., carte.indices_sol]
+    lisses = np.stack([cv2.blur(sol[..., k].astype(np.float32), (3, 3)) for k in range(sol.shape[-1])], -1)
+    vue = sol.sum(-1) > 1e-6
+    return vue, np.where(vue, np.array(carte.indices_sol)[lisses.argmax(-1)], -1)
+
+
 def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZONE_MIN_M2) -> dict:
     """Pour chaque pièce assez vue : la famille de son sol (la plus votée) et ses zones d'une autre famille (contours
-    convexes en mètres). Les votes sont d'abord lissés sur 3 × 3 cases (75 cm) : une case isolée suit ses voisines."""
+    convexes en mètres). Les votes sont d'abord lissés sur 3 × 3 cases (75 cm) : une case isolée suit ses voisines.
+    Si la pièce est assez vue PROPREMENT (pas derrière un meuble possible), seules les cases propres décident ; sinon
+    toutes (une pièce vue seulement derrière un lit reste jugée)."""
     from moteur.sol_a_plat import dans_polygone
-    sol = carte.votes_sol()
-    lisses = np.stack([cv2.blur(sol[..., k].astype(np.float32), (3, 3)) for k in range(sol.shape[-1])], -1)
-    vue = carte.vue()
-    fam = np.where(vue, np.array(carte.indices_sol)[lisses.argmax(-1)], -1)
+    vue_tout, fam_tout = _familles(carte, carte.votes)
+    vue_propre, fam_propre = _familles(carte, carte.votes_propres) if carte.votes_propres is not None else (vue_tout, fam_tout)
     meuble = carte.part_meuble()
     X, Y = carte.centres()
     case2 = carte.case ** 2
     sorties = {}
     for p in logement["pieces"]:
-        dedans = dans_polygone(X, Y, p["contour"]) & vue
+        dans = dans_polygone(X, Y, p["contour"])
+        if (dans & vue_propre).sum() * case2 >= SURFACE_VUE_MIN_M2:
+            dedans, fam = dans & vue_propre, fam_propre
+        else:
+            dedans, fam = dans & vue_tout, fam_tout
         if dedans.sum() * case2 < SURFACE_VUE_MIN_M2:
             continue
         compte = np.bincount(fam[dedans], minlength=len(carte.classes))
@@ -264,34 +298,49 @@ def ecart_lab(c1: dict, c2: dict) -> float:
 
 
 # ---------------------------------------------------------------- tout l'enchaînement, et sa note
-def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, journal=lambda *_: None) -> dict:
-    """Photos calées du client → sol de chaque pièce (famille, zones, couleur). Rend aussi la carte et le sol assemblé."""
+def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, journal=lambda *_: None, pas_du_sol=None) -> dict:
+    """Photos calées du client → sol de chaque pièce (famille, zones, couleur). Rend aussi la carte et le sol assemblé.
+    pas_du_sol : fonction (nom, photo RGB) → masque de ce qui n'est pas du sol (lits, canapés…), écarté avant la mise à plat
+    (moteur/pas_du_sol.py) ; None = rien d'écarté (comme avant le 10/11/2026)."""
     from moteur.sol_a_plat import assembler, dans_polygone, photos_a_plat
     from moteur.oeil_dinov2 import empreintes
-    vues = photos_a_plat(releve, logement, racine, journal=journal)
+    vues = photos_a_plat(releve, logement, racine, journal=journal, pas_du_sol=pas_du_sol)
     if not vues:
         return {"pieces": {}, "carte": None, "image": None, "finesse": None}
     v0 = vues[0][2]
     h, w = v0.image.shape[:2]
     votes = np.zeros((int(np.ceil(h * v0.resolution / CASE_M)), int(np.ceil(w * v0.resolution / CASE_M)), len(clf.classes)))
+    propres = np.zeros_like(votes) if any(v.douteux is not None for _, _, v in vues) else None
     tuiles_xy, tuiles_e = [], []  # centre (x, y) et empreinte de chaque vignette : pour choisir la matière d'une région
     for nom, _, vue in vues:
-        v, centres, finesses = vignettes(vue.image, vue.finesse, vue.resolution)
+        if vue.douteux is not None:
+            v, centres, finesses, facteurs = vignettes(vue.image, vue.finesse, vue.resolution, douteux=vue.douteux)
+        else:
+            (v, centres, finesses), facteurs = vignettes(vue.image, vue.finesse, vue.resolution), None
         if len(v):
             e = empreintes(oeil, v)
-            voter(votes, centres, clf.probabilites(e), finesses, vue.resolution)
+            pr = clf.probabilites(e)
+            voter(votes, centres, pr, finesses, vue.resolution, facteurs=facteurs)
+            if propres is not None:
+                ok = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
+                voter(propres, centres[ok], pr[ok], finesses[ok], vue.resolution,
+                      facteurs=None if facteurs is None else facteurs[ok])
             tuiles_xy.append(np.stack(vue.vers_sol(centres[:, 0], centres[:, 1]), 1))
             tuiles_e.append(e)
         journal(f"  {nom} : {len(v)} vignettes")
-    carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes))
+    carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes), votes_propres=propres)
     pieces = sols_des_pieces(carte, logement)
-    image, finesse, _ = assembler([v for _, _, v in vues])
+    image, finesse, choisie = assembler([v for _, _, v in vues])
+    douteux = np.zeros(finesse.shape, bool)  # le point retenu est vu derrière un meuble possible
+    for k, (_, _, v) in enumerate(vues):
+        if v.douteux is not None:
+            douteux |= (choisie == k) & v.douteux
     # la couleur se mesure là où l'œil voit du SOL : pas dans les cases où il voit surtout des meubles (lit, tapis…)
     meuble = carte.part_meuble()
     case_l = np.minimum((np.arange(h) * v0.resolution / CASE_M).astype(int), meuble.shape[0] - 1)
     case_c = np.minimum((np.arange(w) * v0.resolution / CASE_M).astype(int), meuble.shape[1] - 1)
     pas_meuble = meuble[case_l][:, case_c] < 0.5
-    sol_pur = (finesse > 0) & pas_meuble
+    sol_pur = (finesse > 0) & pas_meuble & ~douteux
     lignes, colonnes = np.nonzero(sol_pur)
     X, Y = v0.vers_sol(lignes, colonnes)
     contours = {p["id"]: p["contour"] for p in logement["pieces"]}

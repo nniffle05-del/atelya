@@ -60,6 +60,16 @@ def dessiner_reconnaissance(resultat: dict, logement: dict, sortie: Path) -> Non
     ecrire_image(sortie, dessin)
 
 
+def fonction_pas_du_sol(args):
+    """Avec --pas-du-sol : les lits, canapés et rangements repérés par OWLv2 sur chaque photo sont écartés (douteux) avant le
+    vote du sol (moteur/pas_du_sol.py)."""
+    if not getattr(args, "pas_du_sol", False):
+        return None
+    from moteur.pas_du_sol import charger as charger_pds
+    pds = charger_pds(avec_dino=False)
+    return lambda nom, rgb: pds.masque(nom, rgb)
+
+
 def commande_reconnaitre(args) -> int:
     import torch
 
@@ -68,7 +78,7 @@ def commande_reconnaitre(args) -> int:
     releve = json.loads(args.releve.read_text(encoding="utf-8"))
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
     clf = Classifieur.depuis(torch.load(args.modele, weights_only=False))
-    resultat = reconnaitre(releve, logement, RACINE, charger(clf.oeil), clf, journal=print)
+    resultat = reconnaitre(releve, logement, RACINE, charger(clf.oeil), clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
     args.sortie.mkdir(parents=True, exist_ok=True)
     sans_empreintes = {pid: {k: v for k, v in s.items() if k != "empreinte"} | {"zones": [{k: v for k, v in z.items() if k != "empreinte"}
                                                                                 for z in s["zones"]]}
@@ -109,7 +119,7 @@ def commande_logement(args) -> int:
     oeil = charger(clf.oeil)
     bibliotheque = trouver_matieres()
     prototypes = prototypes_bibliotheque(oeil, bibliotheque) if bibliotheque else None
-    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print)
+    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
     sortie = sols_vers_logement(resultat, logement, bibliotheque, prototypes)
     Logement.model_validate(sortie)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
@@ -137,11 +147,13 @@ def main() -> int:
     r.add_argument("sortie", type=Path)
     r.add_argument("--verite", type=Path, help="logement dont les pièces ont leur sol et leurs zones (la bonne réponse)")
     r.add_argument("--couleurs", type=Path, help="fichier de choix des sols avec « couleur_visee » (verites/app-001/sols.json)")
+    r.add_argument("--pas-du-sol", action="store_true", help="écarter lits, canapés, rangements (OWLv2) avant le vote")
     g = sous.add_parser("logement", help="logement avec les sols trouvés seuls (pour construire la maquette)")
     g.add_argument("releve", type=Path)
     g.add_argument("logement", type=Path, help="logement (ses sols éventuels sont retirés avant la reconnaissance)")
     g.add_argument("modele", type=Path)
     g.add_argument("sortie", type=Path, help="logement.json écrit")
+    g.add_argument("--pas-du-sol", action="store_true", help="écarter lits, canapés, rangements (OWLv2) avant le vote")
     args = ap.parse_args()
     for f in (args.releve, args.logement):
         if not f.is_file():

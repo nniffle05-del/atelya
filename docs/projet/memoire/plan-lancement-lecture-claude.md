@@ -716,3 +716,23 @@ CONTRÔLE AVEC VRAIS LITS (sols-vits14-v2) : 260,6 m² jugés, 70,3 % justes (co
 dans les chambres → le contrôle reproduit enfin le défaut des vraies photos. OWLv2 sur ce contrôle (seuil 0,2) : lits 18/21 (86 %),
 canapés 6/7, rangements 19/24, tables 17/26, tous 87/119 (73 %) ; lits « en trop » = surtout DOUBLONS (« bed » + « bed with a
 duvet ») → fusionner. Planches `..\atelya\b2\owlv2-verification(-literie)\`.
+DÉFAUT À RÉPARER (vu le 10/11/2026) : `verites/fr-026/logement.json` (relu, commit 0b93a86) ne se construit plus : porte O20 de
+2,94 m sur le mur M9 (3,10 m, épaisseur 3,8 cm) à 7,9 cm du début → « chevauche une autre ouverture ou l'angle du mur M9 »
+(moteur/geometrie.py). Les anciens tirages fr-026-m1/m2 venaient de la version d'avant. Le tirage fr-026-m4 de la série literie a
+donc planté (série continuée sans lui). À reprendre dans le chantier des vérités, pas dans « pas du sol ».
+Série literie FINIE (10/11/2026) : contrôle fr-031-m3/m4, fr-038-m3/m4 + 17 tirages d'entraînement -m4 (fr-026-m4 PLANTÉ : défaut de
+sa vérité, voir plus haut). Leçon PC : OWLv2/DINOv2 sur la carte PENDANT un rendu Blender → « CUDA illegal memory access » :
+calculs sur le processeur (CUDA_VISIBLE_DEVICES="") tant que Blender rend.
+ÉTAPE 3 FAITE (10/11/2026) : « PAS DU SOL ». `moteur/pas_du_sol.py` : masque des rectangles OWLv2 (lits, canapés, RANGEMENTS ;
+note ≥ 0,25 ; jamais les tapis) ; `sol_a_plat.mettre_a_plat(ecarter=…)` → points DOUTEUX (pas effacés : effacer faisait jeter les
+vignettes voisines à cause de COUVERTURE_MIN 85 % → un tiers du vrai sol perdu, pièces non jugées) ; `vignettes(douteux=…)` :
+douteux ≤ 35 % remplacé par le sol propre (poids 1 − part), au-delà poids 0,05 ; `CarteDesSols.votes_propres` : une pièce vue
+proprement sur ≥ 1 m² n'est décidée (famille + zones) que par ses cases propres ; `assembler` préfère la photo qui voit le point
+propre ; couleur mesurée hors points douteux. Banc `outils/habillage/essayer_pas_du_sol.py` (tout compté sur la surface et les
+pièces jugées SANS écartement : ce qui n'est plus jugé = raté). Essai 3/4 (sols-vits14-v2) : RETENU OWLv2 lits+canapés+rangements :
+vrais lits 70,3 → 84,1 % (sous meubles 47 → 82 %), anciens meublés 84,6 → 84,9 %, vides 93,5 = 93,5 %, pièces justes identiques
+(18, 15, 21 / 25). Rejetés : + tables/chaises ou + fauteuils (−1 pièce juste), DINOv2 seul (change des pièces VIDES : retire du
+vrai sol), OWLv2+DINOv2 (moins bon). Clé 3 « parallaxe » PAS faite (gain déjà obtenu ; peu de photos qui se recouvrent dans les
+chambres ; couette blanche = même couleur des deux côtés). Option `--pas-du-sol` de `outils/habillage/sols_photos.py`
+(reconnaitre, logement) ; PAS encore en service par défaut (étape 5 : non-recul app-001/app-002 une fois). Planche
+`..\atelya\b2\pas-du-sol\planche-fr-038-m4.jpg` (chambre 1 : carreaux faux → lames juste ; tirage 67 → 84 %). 803 tests.
