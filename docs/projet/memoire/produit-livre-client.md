@@ -17,3 +17,10 @@ Soleil réel (proposé 2026-11-01 23h37Z) : adresse/ville au dépôt (latitude) 
 État code : habillage.py pose un soleil FIXE (ouest-sud-ouest, 50° de haut), provisoire. Vrais plans : fr-003 et fr-017 ont une rose des vents, fr-012 « SUD-OUEST », fr-014 « 3ème étage ». Conseil donné : lumière fidèle à la réalité (moment flatteur oui, soleil inventé non).
 2026-11-01 23h45Z : à la demande de NT, section « Rendu et produit livré au client » ajoutée à la Feuille de route (étapes R1 comparatif, R2 réalisateur caméra, R3 soleil réel, R4 visite Unreal ; colonne État).
 R5 vue par les fenêtres : PAR DÉFAUT tout auto IGN (adresse+étage+orientation → volumes BD TOPO + ciel + monuments modélisés, rendu « maquette » + flou) ; option : vue remarquable détectée → proposer au client une photo de la vue. Pas de Google 3D/Street View. V2 : vraies façades par photos de rue libres (Panoramax, Mapillary CC BY-SA) projetées sur volumes IGN.
+**RECADRAGE NT (10/11/2026)** : « tu perds l'objectif de vue » → le produit, c'est le LOGEMENT ENTIER EN 3D, visité en cinématique
+(caméra qui se déplace proprement, bonnes lumières) puis visite libre sur Unreal ; les photos d'annonce ne sont qu'un sous-produit.
+Conséquences : (1) ne jamais juger une brique sur une seule image fixe : juger en mouvement, sous tous les angles, de près, sous
+chaque éclairage ; (2) les photos du client servent à MESURER (dimensions, découpage, couleur, type de matière), jamais de texture
+projetée (ombres et reflets figés, faces cachées fausses, étirement) ; (3) vraie géométrie + vraies matières PBR partout, objets
+assez légers pour le temps réel (ABO = textures 4K → versions allégées pour Unreal) ; (4) sur mesure : mesuré sur photos calées,
+construit module par module, habillé de vraies matières, jugé en vidéo tournante côte à côte avec les photos.
