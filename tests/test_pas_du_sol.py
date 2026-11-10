@@ -47,3 +47,26 @@ def test_piece_decidee_par_ses_cases_propres():
     # sans les cases propres, le lit (carreaux) l'emporte : pièce décidée en carreaux, les lames réduites à une zone
     assert sans["ch"]["famille"] == "carreaux" and [z["famille"] for z in sans["ch"]["zones"]] == ["lames"]
     assert avec["ch"]["famille"] == "lames" and avec["ch"]["zones"] == []
+
+
+def test_lit_colle_au_mur_le_plus_proche():
+    from moteur.reperer_meubles import coller_au_mur
+    piece = {"contour": [[0, 0], [4, 0], [4, 4], [0, 4]]}
+    lit = coller_au_mur({"groupe": "lit", "position": [2.3, 1.6]}, piece)
+    assert lit["position"] == [2.3, 1.055]  # tête au mur du bas : milieu à 2,05 / 2 + 3 cm, sans bouger le long du mur
+    grande = {"contour": [[0, 0], [6, 0], [6, 6], [0, 6]]}
+    loin = {"groupe": "lit", "position": [3.0, 3.0]}  # à 3 m de tout mur (> 1,025 + 1 m) : il ne bouge pas
+    assert coller_au_mur(loin, grande) == loin
+    assert coller_au_mur({"groupe": "table", "position": [2.3, 1.6]}, piece)["position"] == [2.3, 1.6]  # une table reste
+
+
+def test_meuble_pose_au_sol_depuis_un_rectangle():
+    from moteur.reperer_meubles import meubles_owl_d_une_photo, vers_le_sol
+    cam = [0.0, 0.0, 1.5, 0.0, -15.0, 800.0, 600.0, 400.0]  # appareil à 1,5 m, regarde vers +x, un peu vers le bas
+    piece = {"contour": [[-1, -3], [8, -3], [8, 3], [-1, 3]]}
+    objets = [{"nom": "a bed", "note": 0.6, "boite": [500, 300, 700, 600]},
+              {"nom": "a bed", "note": 0.2, "boite": [100, 300, 200, 600]}]  # note trop faible
+    (m,) = meubles_owl_d_une_photo(objets, {"a bed": "lit"}, cam, 1200, 800, piece, seuils={"lit": 0.4})
+    pied = vers_le_sol(600, 600, cam)
+    assert m["groupe"] == "lit" and m["position"][0] > pied[0] + 0.9  # le milieu est une demi-longueur derrière le pied
+    assert abs(m["position"][1] - pied[1]) < 1e-6 and m["largeur_vue"] > 0

@@ -736,3 +736,14 @@ vrai sol), OWLv2+DINOv2 (moins bon). Clé 3 « parallaxe » PAS faite (gain déj
 chambres ; couette blanche = même couleur des deux côtés). Option `--pas-du-sol` de `outils/habillage/sols_photos.py`
 (reconnaitre, logement) ; PAS encore en service par défaut (étape 5 : non-recul app-001/app-002 une fois). Planche
 `..\atelya\b2\pas-du-sol\planche-fr-038-m4.jpg` (chambre 1 : carreaux faux → lames juste ; tirage 67 → 84 %). 803 tests.
+ÉTAPE 4 FAITE (10/11/2026, NT : « si OWL est meilleur que DINO, prends ce qu'il y a de mieux ») : REPÉRAGE DES MEUBLES PAR OWLv2.
+`moteur/reperer_meubles.py` : `meubles_owl_d_une_photo` (bas du rectangle = pied, reporté au sol par la caméra calée, milieu une
+demi-profondeur plus loin ; tapis = milieu entre haut et bas reportés ; rectangle coupé par le bas de la photo = poids 0,1 dans la
+fusion) ; `coller_au_mur` (lit tête au mur, canapé et rangement dos au mur, si le mur est à ≤ demi-profondeur + 1 m : corrige la
+profondeur, peu sûre sur une photo) ; `reperer_owl` (fusion entre photos ET entre phrases « bed » / « bed with a duvet ») ;
+`reperer_depuis_releve(releve, logement, racine)` ; SEUILS_OWL par groupe réglés sur les tirages d'ENTRAÎNEMENT (OWLv2 n'apprend
+rien), notés sur le CONTRÔLE (outil `outils/habillage/reperer_meubles_owl.py`, cache `..\atelya\b2\meubles-owl\objets-owl.json`).
+CONTRÔLE : anciens m1/m2 45/84 retrouvés, 33 en trop (DINOv2 v1, pourtant réglé sur ce contrôle : 44/84, 44) ; vrais lits m3/m4
+56/99, 26 en trop (DINOv2 : 36/99, 57) ; lits 8/11 (2/11), tables 13/23 (8/23), chaises 8/12 (3/12). Entraînement lits 32 → 44/68
+grâce au collage au mur (16/68 lits étaient vus mais placés à 0,8-1,5 m). Plante : 0/44 à l'entraînement → seuil 0,5, presque
+éteinte. Plan `..\atelya\b2\meubles-owl\plan-fr-038-m4.png`. PAS encore en service (étape 5 : non-recul app-001/app-002).

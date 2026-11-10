@@ -244,3 +244,122 @@ def noter_meubles(trouves: list[dict], verite: list[dict], distance_max: float =
             n[0] += 1
     return {"retrouves": f"{len(ecarts)}/{len(a_trouver)}", "en_trop": len(libres), "ecart_moyen_m": round(float(np.mean(ecarts)), 2)
             if ecarts else None, "par_groupe": {g: f"{a}/{b}" for g, (a, b) in sorted(par_groupe.items())}}
+
+
+# ---------------------------------------------------------------- repérage par OWLv2 (10/11/2026)
+# Repérage par OWLv2 (10/11/2026, NT : « prends ce qu'il y a de mieux ») : note minimale par groupe, réglée sur les tirages
+# d'ENTRAÎNEMENT (meilleur F1, outils/habillage/reperer_meubles_owl.py), notée sur le CONTRÔLE fr-031/fr-038 :
+# anciens tirages 45/84 retrouvés, 33 en trop (DINOv2 : 44/84, 44) ; tirages à vrais lits 56/99, 26 en trop (DINOv2 : 36/99,
+# 57) ; lits 8/11 (2/11), tables 13/23 (8/23). Remplace le repérage DINOv2 (meubles-vits14-v1.pt, gardé pour comparaison).
+SEUILS_OWL = {"canape": 0.5, "fauteuil": 0.5, "chaise": 0.3, "table": 0.3, "lit": 0.4, "rangement": 0.25, "tapis": 0.5,
+              "lampe": 0.25, "plante": 0.5}  # plante : jamais retrouvée à l'entraînement (0/44) → seuil haut, presque éteinte
+SEUIL_OWL_DEFAUT = 0.25
+POIDS_COUPE = 0.1  # poids dans la fusion d'un meuble coupé par le bas de la photo
+
+
+def meubles_owl_d_une_photo(objets: list[dict], groupe_de: dict, cam, largeur: int, hauteur: int, piece: dict | None,
+                            seuils: dict | None = None, seuil_defaut: float = SEUIL_OWL_DEFAUT) -> list[dict]:
+    """Meubles vus sur une photo d'après les rectangles d'OWLv2 (moteur/owlv2.py, objets()) : le BAS du rectangle est le pied
+    du meuble (son bord avant, côté appareil) ; la caméra calée le reporte au sol ; le milieu est une demi-profondeur plus loin.
+    Un tapis est à plat : son milieu est entre le haut et le bas du rectangle reportés au sol. Rend groupe, place, largeur vue."""
+    from moteur.sol_a_plat import dans_polygone
+    seuils = SEUILS_OWL if seuils is None else seuils
+    sortie = []
+    for o in objets:
+        g = groupe_de.get(o["nom"])
+        if g not in TYPE_DE_GROUPE or o["note"] < seuils.get(g, seuil_defaut):
+            continue
+        x0, y0, x1, y1 = o["boite"]
+        um = (x0 + x1) / 2
+        bas = min(y1, hauteur - 1)
+        pied = vers_le_sol(um, bas, cam)
+        gauche, droite = vers_le_sol(x0, bas, cam), vers_le_sol(x1, bas, cam)
+        if pied is None or math.dist(pied, cam[:2]) > 12:
+            continue
+        _, (l, p, h) = TYPE_DE_GROUPE[g]
+        if g == "tapis":
+            haut = vers_le_sol(um, max(y0, 0), cam)
+            centre = np.asarray(pied) if haut is None or math.dist(haut, cam[:2]) > 12 else (np.asarray(pied) + np.asarray(haut)) / 2
+        else:
+            direction = np.asarray(pied, float) - np.asarray(cam[:2], float)
+            direction /= max(np.linalg.norm(direction), 1e-9)
+            centre = np.asarray(pied, float) + direction * p / 2
+        if piece is not None and not dans_polygone(np.array([centre[0]]), np.array([centre[1]]), piece["contour"])[0]:
+            continue
+        etendue = math.dist(gauche, droite) if gauche is not None and droite is not None else 0.0
+        poids = float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100)
+        if y1 >= hauteur - 3 and g != "tapis":
+            poids *= POIDS_COUPE  # coupé par le bas de la photo : son vrai pied est plus près, la place est peu sûre
+        sortie.append({"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": etendue,
+                       "confiance": float(o["note"]), "poids": poids})
+    return sortie
+
+
+CONTRE_LE_MUR = ("lit", "canape", "rangement")  # meubles presque toujours dos (tête) au mur
+COLLER_MAX_M = 1.0  # le mur le plus proche à au plus une demi-profondeur + 1 m : on y colle le meuble
+
+
+def coller_au_mur(meuble: dict, piece: dict) -> dict:
+    """Un lit (tête), un canapé, un rangement (dos) : collé au mur le plus proche s'il en est assez près — son milieu est mis à
+    une demi-profondeur (+ 3 cm) de ce mur, sans bouger le long du mur. La place lue sur la photo est sûre en travers de la vue,
+    peu sûre en profondeur : le mur la corrige."""
+    if meuble["groupe"] not in CONTRE_LE_MUR or piece is None:
+        return meuble
+    c = np.asarray(piece["contour"], float)
+    p = np.asarray(meuble["position"], float)
+    _, (l, pr, h) = TYPE_DE_GROUPE[meuble["groupe"]]
+    meilleur, q_mur, normale = math.inf, None, None
+    for a, b in zip(c, np.roll(c, -1, axis=0)):
+        ab = b - a
+        t = float(np.clip((p - a) @ ab / max(ab @ ab, 1e-12), 0, 1))
+        q = a + t * ab
+        d = float(np.linalg.norm(p - q))
+        if d < meilleur and d > 1e-6 and 0.0 < t < 1.0:
+            meilleur, q_mur, normale = d, q, (p - q) / d
+    if q_mur is None or meilleur > pr / 2 + COLLER_MAX_M:
+        return meuble
+    nouveau = q_mur + normale * (pr / 2 + 0.03)
+    return {**meuble, "position": [round(float(nouveau[0]), 3), round(float(nouveau[1]), 3)]}
+
+
+def reperer_owl(photos: list, logement: dict, objets_par_photo: list[list[dict]], groupe_de: dict,
+                seuils: dict | None = None, coller: bool = True) -> list[dict]:
+    """photos : [(largeur, hauteur, caméra 8 nombres)] ; objets_par_photo : rectangles d'OWLv2 de chaque photo → meubles
+    trouvés (fusionnés entre photos ET entre phrases : « a bed » et « a bed with a duvet » sur le même lit ne font qu'un)."""
+    from moteur.sol_a_plat import piece_de_l_appareil
+    vus = []
+    for (largeur, hauteur, cam), objets in zip(photos, objets_par_photo):
+        piece, _ = piece_de_l_appareil(cam, logement["pieces"])
+        vus += meubles_owl_d_une_photo(objets, groupe_de, cam, largeur, hauteur, piece, seuils)
+    trouves = fusionner(vus)
+    if coller:
+        from moteur.sol_a_plat import piece_de
+        trouves = [coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
+    return trouves
+
+
+def reperer_depuis_releve(releve: dict, logement: dict, racine, owl=None, journal=lambda *_: None) -> list[dict]:
+    """Photos calées du client (cameras-photos.json) → meubles trouvés par OWLv2 (groupe, place, vues, confiance). Pour les
+    poser dans le logement : vers_meubles_du_logement()."""
+    from pathlib import Path
+
+    from moteur.camera_photo import camera_depuis_dict
+    from moteur.images import lire_image
+    from moteur.owlv2 import charger as charger_owl, objets
+    from moteur.pas_du_sol import NOMS, REQUETES
+    owl = owl or charger_owl()
+    requetes = owl.textes(NOMS)
+    groupe_de = {n: g for n, g in REQUETES.items() if g in TYPE_DE_GROUPE}
+    dossier = Path(racine) / releve["photos"]
+    modele = releve.get("fichier", "{nom}.png")
+    photos, objs = [], []
+    for nom, d in releve["cameras"].items():
+        img = lire_image(dossier / modele.format(nom=nom))
+        if img is None:
+            raise FileNotFoundError(dossier / modele.format(nom=nom))
+        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        o = objets(owl.detecter(rgb, requetes), NOMS, seuil=0.1)
+        photos.append((rgb.shape[1], rgb.shape[0], camera_depuis_dict(d["camera"])))
+        objs.append(o)
+        journal(f"  {nom} : {sum(1 for x in o if x['nom'] in groupe_de and x['note'] >= SEUILS_OWL.get(groupe_de[x['nom']], 1))} meuble(s) vu(s)")
+    return reperer_owl(photos, logement, objs, groupe_de)
