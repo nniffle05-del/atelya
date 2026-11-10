@@ -677,3 +677,19 @@ point de Hongrie sur les lits (ch. 2 : 3,4 m² ; ch. 3 : 1,1 m²) ; entrée non 
 2,1, chambre 3 4,5, cuisine 5,4, chambre 2 9,7. MEUBLES (meubles-vits14-v1) : **10/30 retrouvés (33 %)**, 9 en trop, place à
 0,44 m ; canapés 1/2, chaises 3/8, rangements 6/14, lits 0/2, tables 0/4 (app-001 : 47 %). MÊME CAUSE qu'app-001 : les LITS (et
 grands meubles blancs) trompent les sols et ne sont pas reconnus comme lits. Après cette note, app-002 = « examen déjà vu ».
+**« PAS DU SOL » + LITS ET TABLES (10/11/2026, NT : « fais ce qu'il y a de mieux et de plus performant »).** But : écarter lits,
+couettes, canapés, gros meubles blancs AVANT le vote du sol, et mieux repérer lits et tables. app-001 et app-002 = examens DÉJÀ VUS :
+rien n'y est réglé (non-recul seulement, une fois à la fin) ; mise au point sur le contrôle fabriqué fr-031/fr-038 ; vraie note =
+nouveau logement fourni par NT. Plan validé : (1) diagnostic, (2) OWLv2 dans Atelya vérifié sur photos fabriquées, (3) « pas du sol »
+sur la PHOTO avant la mise à plat (OWLv2 + DINOv2 sol/pas sol + parallaxe entre photos), (4) lits/tables par OWLv2, (5) mise en
+service si mieux sans recul. OWLv2 : licence lue (Apache 2.0 code ET poids, voir CLAUDE.md § 3) ; accord NT (« fais ce qu'il y a de
+mieux ») → base B/16 téléchargée dans `..\atelya\modeles-externes\owlv2-base\` (model.safetensors 619 918 824 octets, SHA256
+e1e130b9e404cf91a75ad45644c1da9d7fa5284085eecc864266a6923efb99e7, révision HF cfd3195b ; vocab.json, merges.txt, config ;
+LICENSE-scenic-Apache-2.0.txt). Aucune bibliothèque installée : code à réécrire dans Atelya (comme oeil.py), poids lus à la main.
+Étape 1 FAITE (diagnostic, contrôle meublé fr-031-m1/m2, fr-038-m1/m2, sols-vits14-v2) : 229,2 m² jugés, 84,6 % justes ; 61,0 m²
+(27 %) sont sous un meuble (masque mis à plat, tapis compris) : justes à 72,3 % contre 89,0 % ailleurs ; 16,9 des 35,4 m² faux sont
+sous un meuble (≈ la moitié des erreurs) ; l'autre moitié = confusions de familles (point de Hongrie / bâtons rompus / lames).
+CONSTAT : les « lits » des photos fabriquées ne ressemblent pas aux vrais : blocs blancs LISSES (ni couette plissée, ni oreillers,
+ni plaid), dont des lits mezzanine en métal noir (catégorie « lit » sans exclure « loft »), posés au hasard (cuisine, séjour,
+dégagement) ; contrôle meublé = 2 lits seulement. Le contrôle SOUS-ESTIME donc le défaut des vrais lits (app-002 : chambre 3
+entière fausse). Script : scratchpad `diag_etape1.py` (non gardé).

@@ -103,6 +103,14 @@ détaillé correspondant avant d'agir.
   utiliser les marques ; préférer la source officielle au réenvoi `codepawl/abo-glb`, qui ne cite pas sa source). Sand3D =
   code Apache 2.0, objets CC BY 4.0 ; le lot `sand3d-objaverse` garde la licence d'origine de chaque objet (`source_license`,
   `attribution`) : filtrer objet par objet et lire la section Licence avant tout téléchargement. Téléchargement = accord NT.
+- **OWLv2 (Google, détecteur d'objets « on lui dit quoi chercher »), lu le 10/11/2026** : OK commercial. README officiel
+  `scenic/projects/owl_vit` § License : « Both the code and the model checkpoints are licensed under the Apache 2.0 license » ;
+  fichier LICENSE de scenic lu en entier = Apache 2.0 standard (+ BSD pour `projects/must3r/utils/colmap_lib`, non utilisé).
+  Fiche Hugging Face `google/owlv2-base-patch16-ensemble` : apache-2.0 (« intended use : research » = souhait, pas une clause).
+  Entraîné sur COCO/LVIS/Objects365/VG/WebLI : même règle que DINOv2 et SAM 2 (c'est la licence des POIDS qui compte).
+  Tailles : base B/16 `model.safetensors` 619,92 Mo ; large L/14 1 750,52 Mo ; + `vocab.json` 1,06 Mo, `merges.txt` 0,52 Mo.
+  Route sans installation : code réécrit dans Atelya (comme `oeil.py`), poids lus à la main (safetensors), pas de `transformers`.
+  Téléchargement = accord écrit NT.
 - Toute nouvelle bibliothèque ou donnée : **lire sa licence** (le fichier, pas un résumé) avant de la
   proposer à NT. Détail : `docs/projet/memoire/audit-technologique-2026-10-31.md`.
 
