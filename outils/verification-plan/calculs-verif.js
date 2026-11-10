@@ -1694,7 +1694,9 @@
       } else if (nb === 1) {
         const d = ds.find((x) => x.element);
         const t = trouver(lg, d.element);
-        texte = d.code === "epaisseur" ? `L'épaisseur de ${nomSimple(lg, d.element)} paraît inhabituelle.` : `Atelya n'est pas sûr de ${nomSimple(lg, d.element)}. Existe-t-il vraiment sur le plan ?`;
+        texte = d.code === "epaisseur" ? `L'épaisseur de ${nomSimple(lg, d.element)} paraît inhabituelle.`
+          : d.code === "bloc" ? `${nomSimple(lg, d.element)} est un bloc plein : sans doute une gaine technique ou un poteau. C'est bien ça ?`
+          : `Atelya n'est pas sûr de ${nomSimple(lg, d.element)}. Existe-t-il vraiment sur le plan ?`;
         if (t && t.genre === "mur" && longueur(t.e.debut, t.e.fin) < MUR_COURT) texte = "Ce mur est très court : vrai mur, ou simple tache ?";
         actions = [{ libelle: "C'est juste", action: { type: "regler" } }, { libelle: "Le supprimer", action: { type: "supprimer_tout" }, danger: true }];
       } else {
