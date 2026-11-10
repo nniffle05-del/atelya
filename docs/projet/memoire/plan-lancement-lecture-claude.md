@@ -755,3 +755,13 @@ fausse zone de la chambre 1 disparue ; chambre 2 toujours « carreaux » au lieu
 app-002 10/30 → 22/30, en trop 9 = 9 (lits 0/2 → 2/2, tables 0/4 → 3/4, chaises 3/8 → 8/8, canapés 1/2 → 2/2). MIS EN SERVICE :
 « pas du sol » par défaut dans `sols_photos.py` (`--sans-pas-du-sol` = ancien) ; meubles par `outils/habillage/reperer_meubles_photos.py`
 (OWLv2). meubles-vits14-v1.pt gardé en réserve (comparaison). Reste : vidéo avant/après d'une chambre d'app-002 (durée à annoncer à NT).
+Correctif (10/11/2026, vu en préparant la vidéo) : avec « pas du sol », la MATIÈRE et la TEINTE d'une pièce se mesuraient encore sur
+les points douteux (chambre d'app-002 → « parquet diagonal » teinte verdâtre 0,39/0,44/0,30) : `albedos_par_region` ignore les points
+douteux, le choix de la matière ne prend que les vignettes propres → « chêne à nœuds » 0,29/0,22/0,10 (familles inchangées : le
+non-recul tient). Lits trouvés par photos : linge par défaut (couette blanc cassé, 2 oreillers, `LITERIE_PAR_DEFAUT`).
+PREMIER PLAN VIDÉO : `moteur/blender/video_trajet.py` (caméra qui glisse entre des points [x, y, z, cap, tangage], Bézier ;
+exposition/balance réglées UNE fois ; graine figée ; clamp) + `outils/habillage/video_piece.py` (--chrono = une image ; .mp4 par
+OpenCV). App-002 chambre « 2 » (chambre_1) : `..\atelya\b2\app-002\video\` (avant = sols sans pas du sol + meubles DINOv2 ; après =
+pas du sol + OWLv2 ; trajet-chambre.json, 96 images 1280×720, 18 mm, « 2 Jour voilé »). Chrono : 22 s l'image à 128 échantillons
+(chargement compris) ; murs TACHÉS par le débruiteur à 128 (risque de scintillement) ; parquet TROP FONCÉ (photo L ≈ 52) = défaut
+de teinte au rendu, à reprendre à part.

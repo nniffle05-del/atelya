@@ -325,8 +325,10 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
                 ok = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
                 voter(propres, centres[ok], pr[ok], finesses[ok], vue.resolution,
                       facteurs=None if facteurs is None else facteurs[ok])
-            tuiles_xy.append(np.stack(vue.vers_sol(centres[:, 0], centres[:, 1]), 1))
-            tuiles_e.append(e)
+            garde = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
+            # le choix de la matière ne regarde que les vignettes propres (pas le lit vu à la place du parquet)
+            tuiles_xy.append(np.stack(vue.vers_sol(centres[garde, 0], centres[garde, 1]), 1))
+            tuiles_e.append(e[garde])
         journal(f"  {nom} : {len(v)} vignettes")
     carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes), votes_propres=propres)
     pieces = sols_des_pieces(carte, logement)
@@ -382,7 +384,10 @@ def albedos_par_region(pieces: dict, vues, logement: dict, pas_meuble: np.ndarra
         blanc = blanc_des_murs(vue.photo, vue.camera, logement, vue.piece, vue.point_de_vue)
         if blanc is None:
             continue
-        lignes, colonnes = np.nonzero((vue.finesse > 0) & pas_meuble)
+        propre = (vue.finesse > 0) & pas_meuble
+        if vue.douteux is not None:  # pas les points vus derrière un lit, un canapé, un rangement (10/11/2026)
+            propre &= ~vue.douteux
+        lignes, colonnes = np.nonzero(propre)
         if not len(lignes):
             continue
         X, Y = vue.vers_sol(lignes, colonnes)

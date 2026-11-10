@@ -191,6 +191,9 @@ def orienter(meuble: dict, piece: dict) -> float:
     return math.degrees(math.atan2(centre[1], centre[0]))
 
 
+LITERIE_PAR_DEFAUT = {"couette": [242, 241, 236], "oreillers": 2}
+
+
 def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
     """Meubles trouvés → champ « meubles » du logement (statut « estime », source « repérage photos »)."""
     from moteur.sol_a_plat import piece_de
@@ -200,9 +203,12 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
         if piece is None:
             continue
         categorie, dims = TYPE_DE_GROUPE[m["groupe"]]
-        sortie.append({"id": f"reperage_{k}", "categorie": categorie, "piece": piece["id"], "position": m["position"],
-                       "face": round(orienter(m, piece), 1), "dimensions": list(dims), "statut": "estime",
-                       "source": f"repérage photos ({m['vues']} photo(s))", "confiance": min(1.0, m["confiance"])})
+        meuble = {"id": f"reperage_{k}", "categorie": categorie, "piece": piece["id"], "position": m["position"],
+                  "face": round(orienter(m, piece), 1), "dimensions": list(dims), "statut": "estime",
+                  "source": f"repérage photos ({m['vues']} photo(s))", "confiance": min(1.0, m["confiance"])}
+        if categorie == "lit":  # linge par défaut (le plus courant sur les photos d'annonce), modifiable à l'écran de vérification
+            meuble["literie"] = dict(LITERIE_PAR_DEFAUT)
+        sortie.append(meuble)
     return sortie
 
 
