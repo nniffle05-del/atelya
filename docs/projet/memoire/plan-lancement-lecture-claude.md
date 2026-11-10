@@ -654,3 +654,13 @@ plantage d'un tirage = ligne « PLANTÉ » et la série continue, reprise des ti
 11/34 (v1 16/34) → AUCUN gain, v1 GARDÉ. LEÇON : la limite n'est pas le nombre de photos fabriquées mais l'écart fabriqué/réel et
 la méthode (classificateur linéaire sur carrés de 25 px). Piste proposée à NT (accord nécessaire, licence à lire) : détecteur
 d'objets déjà entraîné sur de vraies photos (OWLv2, Google, annoncé Apache 2.0). Sols réappris avec ces photos (v4) : en cours.
+App-002 : relevé du plan VALIDÉ par NT (10/11/2026 : « C'est bon t'as mon accord ») : séjour + chambre 1 ouverts, porte du WC côté
+dégagement, HSP 2,50 ; porte-fenêtre O10 vers le petit balcon (pas une fenêtre : même bleu sur le dessin de contrôle, source de
+confusion) ; placards A (entrée) et B (près de la chambre 1) AVEC portes de placard (la « porte » saisie devant un placard
+devient des portes de placard en 3D). Étape suivante : calage des 15 caméras.
+App-002, calage des caméras FAIT (10/11/2026, `verites/app-002/cameras-photos.json`, commit 0d38265) : 11/15 photos calées
+(01, 03, 04, 05, 07, 10, 14, 15 bonnes ; 02 moyenne ; 08 et 09 cuisine approchées, ±30 cm) ; mises de côté avec leur raison :
+06 (repères sur un seul mur, plan peut-être inexact vers la baie O14), 11 (chambre 2, un seul mur visible), 12 et 13 (salle d'eau,
+coins cachés, sol presque invisible). Chambres : photos 10/11 = chambre 2 (radiateur à droite de la baie), 14/15 = chambre 3.
+Repères relevés à la main par Claude ; caméra calculée et traits de contrôle dessinés par le code d'Atelya (`moteur/camera_photo.py`).
+Étape suivante (après accord NT) : vérités des sols et des meubles d'app-002, AVANT de lancer Atelya une seule fois.
