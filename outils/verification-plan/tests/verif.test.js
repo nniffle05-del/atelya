@@ -590,3 +590,86 @@ test("deux ouvertures l'une sur l'autre : incohérence pour le moteur, et un poi
   assert.deepEqual(C.verifierCoherence(w.logement), []);
   assert.ok(!C.pointsAVerifier(w).some((p) => p.genre === "recouvrement"));
 });
+
+// ---------- Portes et fenêtres malléables (10/11/2026) ----------
+// Une pièce de 4 × 3 m : M1 au sud (0,0)→(4,0), M2 à l'est, M3 au nord, M4 à l'ouest ; un mur intérieur M5 s'appuie sur M1 à x = 2.
+const salle = () => ({
+  schema: "verification/0.1",
+  calage: { px_par_m: 100, origine_px: [210, 760] },
+  logement: {
+    schema: "logement/0.1", projet_id: "T", unites: "m", hauteur_sous_plafond: 2.5,
+    murs: [
+      { id: "M1", debut: [0, 0], fin: [4, 0], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M2", debut: [4, 0], fin: [4, 3], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M3", debut: [4, 3], fin: [0, 3], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M4", debut: [0, 3], fin: [0, 0], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M5", debut: [2, 0], fin: [2, 3], epaisseur: 0.1, statut: "estime", source: "atelya" },
+    ],
+    ouvertures: [
+      { id: "P1", type: "porte", mur: "M1", position: 0.5, largeur: 0.8, hauteur: 2.04, allege: 0, statut: "estime", source: "atelya" },
+      { id: "F1", type: "fenetre", mur: "M3", position: 1.0, largeur: 1.0, hauteur: 1.25, allege: 0.95, statut: "estime", source: "atelya" },
+    ],
+    pieces: [],
+  },
+});
+
+test("morceaux libres d'un mur : sans ses angles, sans l'appui d'un autre mur", () => {
+  const lg = salle().logement;
+  const libres = C.morceauxLibres(lg, lg.murs[0], "P1");
+  assert.equal(libres.length, 2);
+  procheP(libres[0], [0.1, 1.95]); // angle ouest (demi-épaisseur de M4) puis l'appui de M5 (5 cm de chaque côté)
+  procheP(libres[1], [2.05, 3.9]);
+});
+
+test("glisser une porte : elle suit la souris le long du mur, sans déborder dans un angle", () => {
+  let v = C.deplacerOuverture(salle(), "P1", [1.2, 0.05]);
+  let p = v.logement.ouvertures.find((o) => o.id === "P1");
+  proche(p.position, 0.8); // centrée sous la souris
+  v = C.deplacerOuverture(salle(), "P1", [0.2, 0]);
+  p = v.logement.ouvertures.find((o) => o.id === "P1");
+  proche(p.position, 0.1); // calée contre l'angle, pas dedans
+  v = C.deplacerOuverture(salle(), "P1", [1.9, 0]);
+  p = v.logement.ouvertures.find((o) => o.id === "P1");
+  proche(p.position + p.largeur, 1.95); // arrêtée contre le mur intérieur M5
+  assert.equal(p.mur, "M1");
+  assert.ok(v.verifies.includes("P1"));
+});
+
+test("aimant : un bord à moins de 8 cm d'un angle s'y colle", () => {
+  const v = C.deplacerOuverture(salle(), "P1", [0.65, 0]); // bord à 0,25 m : loin de l'angle, pas d'aimant
+  proche(v.logement.ouvertures[0].position, 0.25);
+  const w = C.deplacerOuverture(salle(), "P1", [0.56, 0]); // bord à 0,16 m : à 6 cm de l'angle (0,1) → collé
+  proche(w.logement.ouvertures[0].position, 0.1);
+});
+
+test("glisser une porte jusqu'à un autre mur : elle change de mur", () => {
+  const v = C.deplacerOuverture(salle(), "P1", [4.0, 1.5], 0.3);
+  const p = v.logement.ouvertures.find((o) => o.id === "P1");
+  assert.equal(p.mur, "M2");
+  proche(p.position, 1.1); // centrée à 1,5 m le long de M2
+});
+
+test("une porte ne passe pas sur une autre ouverture", () => {
+  const v = C.deplacerOuverture(salle(), "P1", [1.5, 3.0], 0.3); // vers M3, sur la fenêtre F1 (de x = 3 à x = 2 le long de M3)
+  const p = v.logement.ouvertures.find((o) => o.id === "P1");
+  const f = v.logement.ouvertures.find((o) => o.id === "F1");
+  assert.equal(p.mur, "M3");
+  assert.ok(p.position + p.largeur <= f.position + 1e-6 || p.position >= f.position + f.largeur - 1e-6);
+});
+
+test("tirer un bord : la largeur change, l'autre bord ne bouge pas, jamais moins de 40 cm ni dans l'angle", () => {
+  let v = C.etirerOuverture(salle(), "P1", 1, [1.6, 0]);
+  let p = v.logement.ouvertures[0];
+  proche(p.position, 0.5); proche(p.largeur, 1.1);
+  v = C.etirerOuverture(salle(), "P1", 0, [-1, 0]);
+  p = v.logement.ouvertures[0];
+  proche(p.position, 0.1); proche(p.largeur, 1.2); // arrêté à l'angle
+  v = C.etirerOuverture(salle(), "P1", 1, [0.6, 0]);
+  proche(v.logement.ouvertures[0].largeur, C.LARGEUR_MIN);
+});
+
+test("le logement reste cohérent après les gestes", () => {
+  let v = C.deplacerOuverture(salle(), "P1", [3, 0]);
+  v = C.etirerOuverture(v, "P1", 0, [2.2, 0]);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+});

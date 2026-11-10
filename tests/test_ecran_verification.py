@@ -32,3 +32,18 @@ def test_le_logement_corrige_est_lu_par_le_moteur():
     assert len(portes_sdb) == 1  # la porte oubliée a été ajoutée
     assert all(e.confiance == 1 for e in [*logement.murs, *logement.ouvertures, *logement.pieces]
                if "verification" in e.source)
+
+
+def test_calculs_de_l_ecran_dans_edge():
+    """Les tests JavaScript de l'écran (outils/verification-plan/tests/verif.test.js) lancés dans Edge (sans Node.js)."""
+    import importlib.util
+    chemin = Path(__file__).resolve().parent.parent / "outils" / "verification-plan" / "tests" / "lancer_dans_edge.py"
+    spec = importlib.util.spec_from_file_location("lancer_dans_edge", chemin)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    res = module.lancer()
+    if res is None:
+        pytest.skip("Microsoft Edge absent")
+    lignes, echecs = res
+    assert echecs == 0, "\n".join(l for l in lignes if not l.startswith("OK"))
+    assert len(lignes) >= 57

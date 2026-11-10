@@ -536,6 +536,11 @@
     };
     const murChoisi = etat.outil === "choisir" && etat.choisi && v.logement.murs.find((m) => m.id === etat.choisi);
     if (murChoisi) { rond(murChoisi.debut, COULEURS.choisi); rond(murChoisi.fin, COULEURS.choisi); }
+    const ouvertureChoisie = etat.outil === "choisir" && etat.choisi && (v.logement.ouvertures || []).find((o) => o.id === etat.choisi);
+    if (ouvertureChoisie) { // ses deux bords : à tirer pour changer la largeur
+      const bords = C.bordsOuverture(v.logement, ouvertureChoisie);
+      if (bords) { rond(bords[0], COULEURS.choisi, 5); rond(bords[1], COULEURS.choisi, 5); }
+    }
     if (etat.outil === "relier") {
       for (const m of v.logement.murs) { rond(m.debut, "#94a3b8", 4); rond(m.fin, "#94a3b8", 4); }
       if (etat.relier) rond(etat.relier.point, COULEURS.choisi, 7);
@@ -1034,7 +1039,9 @@
         corriger((x) => C.modifierOuverture(x, e.id, { largeur: l, position: p }), "Mesures corrigées.");
       };
       for (const champ of [larg, pos]) champ.addEventListener("keydown", (ev) => ev.key === "Enter" && appliquer());
-      fiche.append(el("label", { texte: "C'est…" }), type,
+      fiche.append(el("p", { class: "info", texte: "À la souris : faites-la glisser le long du mur (ou jusqu'à un autre mur) ; "
+          + "tirez un des ronds à ses bords pour changer sa largeur. Elle se colle seule contre un angle à moins de 8 cm." }),
+        el("label", { texte: "C'est…" }), type,
         el("label", { texte: "Largeur en mètres, puis Entrée" }), larg,
         el("details", {}, el("summary", { texte: "La déplacer le long du mur" }), el("label", { texte: "Distance depuis le bout du mur (m), puis Entrée" }), pos),
         el("div", { class: "ligne" }, supprimerBouton("Supprimer")));
@@ -1204,10 +1211,22 @@
         }
       }
     }
+    const ouvertureOuverte = etat.choisi && (lg.ouvertures || []).find((o) => o.id === etat.choisi);
+    if (ouvertureOuverte) {
+      const bords = C.bordsOuverture(lg, ouvertureOuverte);
+      const rayon = metresPour(VISEE * 1.2, p);
+      for (const bord of [0, 1]) {
+        if (bords && C.longueur(p, bords[bord]) <= rayon) {
+          etat.glisse = { genre: "bord", id: ouvertureOuverte.id, bord, bouge: false };
+          return;
+        }
+      }
+    }
     const sous = C.elementSous(lg, p, tol);
     if (sous) {
       etat.choisi = sous.id;
       if (sous.genre === "mur") etat.glisse = { genre: "mur", id: sous.id, depart: p, bouge: false };
+      if (sous.genre === "ouverture") etat.glisse = { genre: "ouverture", id: sous.id, depart: p, bouge: false };
       rafraichir();
     } else {
       etat.choisi = null;
@@ -1236,6 +1255,16 @@
       } catch (e) {
         g.erreur = e.message; // on garde l'aperçu précédent
       }
+    } else if (g && (g.genre === "ouverture" || g.genre === "bord")) {
+      if (g.genre === "bord" || C.longueur(p, g.depart) > metresPour(3, p)) g.bouge = true;
+      if (g.bouge) {
+        try {
+          etat.apercu = g.genre === "bord" ? C.etirerOuverture(etat.v, g.id, g.bord, p)
+            : C.deplacerOuverture(etat.v, g.id, p, metresPour(VISEE * 2, p));
+          g.point = p;
+          g.erreur = null;
+        } catch (e) { g.erreur = e.message; } // on garde l'aperçu précédent
+      }
     } else if (g && g.genre === "mur") {
       const delta = [p[0] - g.depart[0], p[1] - g.depart[1]];
       if (Math.hypot(...delta) > metresPour(3, p)) g.bouge = true;
@@ -1255,6 +1284,12 @@
       if (g.erreur) message(g.erreur, true);
       if (g.point) corriger((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
       else dessiner();
+    } else if (g && g.genre === "ouverture" && g.bouge && g.point) {
+      if (g.erreur) message(g.erreur, true);
+      corriger((x) => C.deplacerOuverture(x, g.id, g.point, metresPour(VISEE * 2, g.point)),
+        "Ouverture déplacée (elle reste dans le mur, sans déborder dans un angle).");
+    } else if (g && g.genre === "bord" && g.bouge && g.point) {
+      corriger((x) => C.etirerOuverture(x, g.id, g.bord, g.point), "Largeur de l'ouverture changée.");
     } else if (g && g.genre === "mur" && g.bouge && g.delta) {
       corriger((x) => C.deplacerMur(x, g.id, g.delta), "Mur déplacé (les murs et pièces qui le touchent ont suivi).");
     } else dessiner();

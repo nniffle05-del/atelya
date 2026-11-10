@@ -362,6 +362,114 @@
     return v;
   }
 
+  // ---------- Portes et fenêtres malléables à la souris (10/11/2026, demande NT : « rendre quelque chose de malléable ») ----------
+
+  const LARGEUR_MIN = 0.4; // m : une ouverture plus étroite n'est plus une porte
+  const AIMANT_OUVERTURE = 0.08; // m : un bord à moins de 8 cm d'un angle ou d'une autre ouverture s'y colle
+
+  /**
+   * Les morceaux LIBRES d'un mur, en mètres depuis son début : tout le mur sauf ses angles (la demi-épaisseur des murs qui
+   * s'y accrochent), l'endroit où un autre mur vient s'appuyer sur lui, et les autres ouvertures (sauf `sauf`).
+   */
+  function morceauxLibres(lg, mur, sauf) {
+    const { l } = axes(mur);
+    const pris = [];
+    for (const m of lg.murs) {
+      if (m.id === mur.id) continue;
+      for (const b of [m.debut, m.fin]) {
+        const pr = projection(b, mur.debut, mur.fin);
+        if (pr.dist <= mur.epaisseur / 2 + m.epaisseur / 2 + 0.02 && pr.t >= -m.epaisseur && pr.t <= l + m.epaisseur) {
+          pris.push([pr.t - m.epaisseur / 2, pr.t + m.epaisseur / 2]);
+        }
+      }
+    }
+    for (const o of lg.ouvertures || []) {
+      if (o.mur === mur.id && o.id !== sauf) pris.push([o.position, o.position + o.largeur]);
+    }
+    pris.sort((a, b) => a[0] - b[0]);
+    const libres = [];
+    let curseur = 0;
+    for (const [a, b] of pris) {
+      if (a > curseur + 1e-6) libres.push([curseur, Math.min(a, l)]);
+      curseur = Math.max(curseur, b);
+    }
+    if (curseur < l - 1e-6) libres.push([curseur, l]);
+    return libres.filter(([a, b]) => b - a > 1e-6);
+  }
+
+  /** Pose l'ouverture `o` (largeur fixée) au plus près de `debutVoulu` dans un morceau libre de `mur`, bords aimantés. */
+  function poserDansLibre(lg, mur, o, debutVoulu) {
+    const libres = morceauxLibres(lg, mur, o.id).filter(([a, b]) => b - a >= o.largeur - 1e-6);
+    if (!libres.length) throw new Error("pas assez de place libre sur ce mur pour cette ouverture");
+    const centre = debutVoulu + o.largeur / 2;
+    const distance = ([a, b]) => (centre < a ? a - centre : centre > b ? centre - b : 0);
+    const [a, b] = libres.reduce((x, y) => (distance(y) < distance(x) ? y : x));
+    let debut = Math.max(a, Math.min(b - o.largeur, debutVoulu));
+    if (debut - a < AIMANT_OUVERTURE) debut = a;
+    else if (b - (debut + o.largeur) < AIMANT_OUVERTURE) debut = b - o.largeur;
+    o.position = arrondi(debut, 3);
+  }
+
+  /**
+   * Fait glisser une ouverture jusqu'au point `p` (en m) : le long de son mur, ou sur un autre mur si le point en est
+   * nettement plus près (à moins de `tolerance` de ce mur et plus loin du sien). Elle ne déborde jamais dans un angle ni sur
+   * une autre ouverture ; ses bords s'aimantent aux angles et aux ouvertures voisines.
+   */
+  function deplacerOuverture(v0, id, p, tolerance = 0.3) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const o = (lg.ouvertures || []).find((x) => x.id === id);
+    if (!o) throw new Error(`ouverture inconnue : ${id}`);
+    let mur = lg.murs.find((m) => m.id === o.mur);
+    const surLeSien = projection(p, mur.debut, mur.fin).dist - mur.epaisseur / 2;
+    const proche = murLePlusProche(lg, p, tolerance);
+    if (proche && proche.id !== o.mur && surLeSien > tolerance) {
+      mur = lg.murs.find((m) => m.id === proche.id);
+      o.mur = mur.id;
+      o.largeur = arrondi(Math.min(o.largeur, Math.max(...morceauxLibres(lg, mur, o.id).map(([a, b]) => b - a), 0)), 3);
+      if (o.largeur < LARGEUR_MIN) throw new Error("pas assez de place libre sur ce mur pour cette ouverture");
+    }
+    poserDansLibre(lg, mur, o, projection(p, mur.debut, mur.fin).t - o.largeur / 2);
+    marquer(v, o);
+    return v;
+  }
+
+  /**
+   * Tire un bord d'une ouverture (bord 0 = côté début du mur, 1 = côté fin) jusqu'au point `p` : l'autre bord ne bouge pas,
+   * la largeur reste ≥ LARGEUR_MIN et l'ouverture dans son morceau libre ; le bord tiré s'aimante à l'angle ou à la voisine.
+   */
+  function etirerOuverture(v0, id, bord, p) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const o = (lg.ouvertures || []).find((x) => x.id === id);
+    if (!o) throw new Error(`ouverture inconnue : ${id}`);
+    const mur = lg.murs.find((m) => m.id === o.mur);
+    const libre = morceauxLibres(lg, mur, o.id).find(([a, b]) => a <= o.position + 1e-6 && o.position + o.largeur <= b + 1e-6)
+      || [o.position, o.position + o.largeur];
+    const t = projection(p, mur.debut, mur.fin).t;
+    let debut = o.position, fin = o.position + o.largeur;
+    if (bord === 0) {
+      debut = Math.max(libre[0], Math.min(fin - LARGEUR_MIN, t));
+      if (debut - libre[0] < AIMANT_OUVERTURE) debut = libre[0];
+    } else {
+      fin = Math.min(libre[1], Math.max(debut + LARGEUR_MIN, t));
+      if (libre[1] - fin < AIMANT_OUVERTURE) fin = libre[1];
+    }
+    o.position = arrondi(debut, 3);
+    o.largeur = arrondi(fin - debut, 3);
+    marquer(v, o);
+    return v;
+  }
+
+  /** Les deux bords d'une ouverture, en mètres (pour dessiner ses poignées). */
+  function bordsOuverture(lg, o) {
+    const mur = lg.murs.find((m) => m.id === o.mur);
+    if (!mur) return null;
+    const { d } = axes(mur);
+    const a = [mur.debut[0] + d[0] * o.position, mur.debut[1] + d[1] * o.position];
+    return [a, [a[0] + d[0] * o.largeur, a[1] + d[1] * o.largeur]];
+  }
+
   function modifierMur(v0, id, champs) {
     const v = copie(v0);
     const m = v.logement.murs.find((x) => x.id === id);
@@ -1550,6 +1658,11 @@
     ajouterMur,
     ajouterOuverture,
     modifierOuverture,
+    deplacerOuverture,
+    etirerOuverture,
+    bordsOuverture,
+    morceauxLibres,
+    LARGEUR_MIN,
     modifierMur,
     renommerPiece,
     reglerPlinthes,

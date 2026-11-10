@@ -783,3 +783,15 @@ ouest du séjour lue « fenêtre » (vérité : porte-fenêtre). TROUS révélé
 de cote, absents sur ce style de plan (dimensions « L X l » écrites DANS les pièces, très courant en France) → Atelya doit vérifier
 ces dimensions en mesurant lui-même la pièce entre ses murs ; (2) gaines lues comme murs de 74-78 cm (doute juste) ; (3) le format
 n'a pas de type « porte de placard » (façades de placard = portes de 1,93 et 2,72 m, doutes forts). Écran : `ecran.html`.
+**ÉCRAN DE VÉRIFICATION MALLÉABLE (10/11/2026, NT : « il manque plein de paramètres exploitables… rendre quelque chose de
+malléable »).** Point 1 FAIT : portes et fenêtres à la souris (`outils/verification-plan/calculs-verif.js` : `morceauxLibres` = mur
+sans ses angles ni l'appui d'un autre mur ni les autres ouvertures ; `deplacerOuverture` = glisser le long du mur ou jusqu'à un autre
+mur, jamais dans un angle ni sur une autre ouverture, aimant 8 cm ; `etirerOuverture` = tirer un bord, largeur ≥ 40 cm ;
+`verification.js` : poignées aux deux bords de l'ouverture choisie). Interprétation retenue de NT (« si je déplace une porte, le mur
+ne va pas se déplacer avec ») : (a) la porte reste accrochée à son mur — à confirmer. Sens d'ouverture d'une porte : ABSENT du format
+(champ à ajouter avant de pouvoir l'inverser). TESTS JS SANS NODE : `outils/verification-plan/tests/lancer_dans_edge.py` les lance
+dans Microsoft Edge (déjà sur Windows, --headless), branché sur pytest (`test_ecran_verification.py`) ; 57/57 (dont syntaxe de
+verification.js). PIÈGE : jamais de « \n » dans du JS écrit par Python (devient un vrai retour à la ligne) → String.fromCharCode(10).
+Reste proposé (points 2-6) : murs (épaisseur à la poignée, redresser, coller), types « gaine » et « porte de placard », meubles à
+l'écran (déplacer, tourner, taille, type), cote corrigée = tout se recale. Le chronométrage NT (étape 2 du test de bout en bout)
+attend l'écran malléable.
