@@ -33,9 +33,12 @@ détaillé correspondant avant d'agir.
   d'habillage (pas de photogrammétrie) ; **Blender d'abord**, Unreal plus tard ; format intermédiaire JSON
   avec statut mesuré / estimé / ajouté. NT travaillera **en France** : ne pas biaiser le moteur vers les
   plans suisses.
-- Produit livré (01/11/2026) : cinématique + visite libre → Unreal (une seule scène, plus tard) ; photos
-  fixes d'annonce → Blender Cycles ; démos EEVEE en attendant. Visite web séparée REPORTÉE « bien plus
-  tard » : ne pas la reproposer. Comparatif Cycles / EEVEE / Unreal prévu avant de choisir.
+- **PRODUIT (recadrage NT du 10/11/2026, PRIME sur tout le reste)** : le cœur d'Atelya est le TEMPS RÉEL : une
+  CINÉMATIQUE pour le client et une VISITE LIBRE du logement. AUCUNE photo fixe à produire : le client a déjà ses
+  photos (elles servent seulement à Atelya pour reconnaître sols, meubles, couleurs). Moteur visé : Unreal Engine 5
+  (Lumen, Sequencer) ; Blender = atelier automatique qui construit et exporte. Ne plus investir dans ce qui ne sert
+  qu'aux images fixes Cycles. (Avant, 01/11 : « photos fixes d'annonce → Blender Cycles » — ABANDONNÉ.) Visite web
+  séparée REPORTÉE « bien plus tard » : ne pas la reproposer.
 
 ## 2. Règles de NT (toutes obligatoires)
 

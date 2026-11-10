@@ -33,3 +33,11 @@ d'ABO) n'est PAS prioritaire tant qu'on fait la cinématique.
 (aucune retouche à la main). Piste proposée (non essayée) : une maquette de référence pleine qualité (film 4K Cycles) ; Atelya en
 dérive SEUL une version allégée (textures réduites selon la taille de l'objet à l'écran, objets simplifiés au loin, lumière
 précalculée « cuite ») ; réglages choisis sur mesures (temps, fluidité, réalisme) au comparatif R1 Cycles/EEVEE/Unreal.
+**RECADRAGE NT n° 2 (10/11/2026, soir) : PAS DE PHOTOS FIXES.** « Le cœur de mon projet c'est le temps réel : une cinématique pour le
+client et la possibilité de visiter le logement ; à aucun moment il a besoin de photo fixe, ils ont déjà des photos. » → Les photos du
+client = SOURCE pour Atelya (sols, meubles, couleurs), jamais un livrable. Moteur visé : UNREAL ENGINE 5 (temps réel, Lumen, Sequencer
+pour la cinématique, visite libre) ; Blender = atelier automatique (construire, exporter glTF/FBX/USD). Arrêter d'investir dans le
+rendu fixe Cycles (512 échantillons, réglage « photographe », heures de rendu). Le réalisateur automatique se pense pour Unreal.
+Proposé à NT : (1) lire la LICENCE d'Unreal (texte officiel Epic) + taille d'installation + capacités du PC, accord écrit avant toute
+installation ; (2) passage automatique Atelya → Unreal ; (3) essai app-002 (cinématique + visite) contre la vidéo Blender.
+ERREUR À NE PLUS FAIRE : ramener la discussion aux photos d'annonce (deux recadrages le même jour).
