@@ -41,3 +41,11 @@ rendu fixe Cycles (512 échantillons, réglage « photographe », heures de rend
 Proposé à NT : (1) lire la LICENCE d'Unreal (texte officiel Epic) + taille d'installation + capacités du PC, accord écrit avant toute
 installation ; (2) passage automatique Atelya → Unreal ; (3) essai app-002 (cinématique + visite) contre la vidéo Blender.
 ERREUR À NE PLUS FAIRE : ramener la discussion aux photos d'annonce (deux recadrages le même jour).
+**CINÉMATIQUE : Blender ou Unreal ? (10/11/2026, NT « réfléchis concrètement »).** MESURÉ sur le PC (RTX 2070), chambre d'app-002,
+1280 × 720 : Cycles 256 échantillons ~27 s/image (le plus réaliste, marbrures légères) ; EEVEE (Blender 5.2, réglages de base,
+raytracing activé) 1,7 s/image après 30 s de préparation, rendu « maquette » (murs brûlés, pas d'ombres douces, lumière plate,
+vitre granuleuse) — image `scratchpad eevee-48.png`. Projection film 90 s Full HD (2 700 images) : Cycles ~45 h (invendable), EEVEE
+2-3 h (réalisme insuffisant), Unreal 5 Lumen + Movie Render Queue 1-4 h (HYPOTHÈSE, non mesuré). RECOMMANDATION donnée à NT :
+UNREAL 5 pour la cinématique (réalisme proche de Cycles à des temps vendables, MÊME scène pour film et visite libre, Sequencer
+pour le réalisateur automatique, vidéo sans redevance) ; Blender = atelier qui construit et exporte. À confirmer par le comparatif
+mesuré (même plan 10 s : Cycles / EEVEE / Unreal) après installation d'Unreal (accord écrit NT, compte Epic de NT).
