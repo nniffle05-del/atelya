@@ -293,7 +293,7 @@ lumière trop dure (voilages, ciel doux sur les photos) ; murs de couleur absent
 brique photos (Atelya reconnaît seul les sols sur les photos, notée contre `verites/app-001/sols.json`).
 
 **« PAS DU SOL » + MEUBLES PAR OWLv2 (10/11/2026, EN SERVICE, branche `etape-ecran-lecture-claude`)** : OWLv2 (Google, Apache 2.0,
-réécrit dans `moteur/owlv2.py`, poids `..telya\modeles-externes\owlv2-base`) repère sur les vraies photos lits, canapés, rangements… ;
+réécrit dans `moteur/owlv2.py`, poids `..\atelya\modeles-externes\owlv2-base`) repère sur les vraies photos lits, canapés, rangements… ;
 `moteur/pas_du_sol.py` les rend « douteux » avant le vote du sol (défaut de `sols_photos.py`, `--sans-pas-du-sol` = ancien) ;
 `moteur/reperer_meubles.reperer_depuis_releve` + `outils/habillage/reperer_meubles_photos.py` posent les meubles trouvés (remplace le
 repérage DINOv2). Literie des lits (couette, oreillers, plaid) dans le format et dans Blender. Non-recul (examens DÉJÀ VUS) : sols
