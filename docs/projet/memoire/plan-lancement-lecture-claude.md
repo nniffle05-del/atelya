@@ -747,3 +747,12 @@ CONTRÔLE : anciens m1/m2 45/84 retrouvés, 33 en trop (DINOv2 v1, pourtant rég
 56/99, 26 en trop (DINOv2 : 36/99, 57) ; lits 8/11 (2/11), tables 13/23 (8/23), chaises 8/12 (3/12). Entraînement lits 32 → 44/68
 grâce au collage au mur (16/68 lits étaient vus mais placés à 0,8-1,5 m). Plante : 0/44 à l'entraînement → seuil 0,5, presque
 éteinte. Plan `..\atelya\b2\meubles-owl\plan-fr-038-m4.png`. PAS encore en service (étape 5 : non-recul app-001/app-002).
+ÉTAPE 5 FAITE (10/11/2026) : NON-RECUL sur les examens DÉJÀ VUS, une seule fois, aucun réglage (`outils/habillage/non_recul_examens.py`,
+sorties `..telya2
+on-recul-2026-11-10\`). Passages « avant » = notes connues exactement (rien changé par accident). SOLS :
+app-001 81,5 → 83,6 % (pièces 2/3 = 2/3 ; séjour toujours « lames » au lieu de point de Hongrie) ; app-002 79,2 → 87,9 % (3/4 = 3/4 ;
+fausse zone de la chambre 1 disparue ; chambre 2 toujours « carreaux » au lieu de lames). MEUBLES (OWLv2 contre DINOv2) : app-001
+16/34 → 25/34, en trop 24 → 18 (lits 0/2 → 2/2, chaises 5/9 → 9/9, fauteuils 1/3 → 3/3, tables 2/5 → 3/5, rangements 6/11 → 5/11) ;
+app-002 10/30 → 22/30, en trop 9 = 9 (lits 0/2 → 2/2, tables 0/4 → 3/4, chaises 3/8 → 8/8, canapés 1/2 → 2/2). MIS EN SERVICE :
+« pas du sol » par défaut dans `sols_photos.py` (`--sans-pas-du-sol` = ancien) ; meubles par `outils/habillage/reperer_meubles_photos.py`
+(OWLv2). meubles-vits14-v1.pt gardé en réserve (comparaison). Reste : vidéo avant/après d'une chambre d'app-002 (durée à annoncer à NT).

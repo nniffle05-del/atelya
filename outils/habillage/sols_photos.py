@@ -61,9 +61,10 @@ def dessiner_reconnaissance(resultat: dict, logement: dict, sortie: Path) -> Non
 
 
 def fonction_pas_du_sol(args):
-    """Avec --pas-du-sol : les lits, canapés et rangements repérés par OWLv2 sur chaque photo sont écartés (douteux) avant le
-    vote du sol (moteur/pas_du_sol.py)."""
-    if not getattr(args, "pas_du_sol", False):
+    """EN SERVICE par défaut depuis le 10/11/2026 (non-recul app-001 81,5 → 83,6 %, app-002 79,2 → 87,9 %) : les lits, canapés et
+    rangements repérés par OWLv2 sur chaque photo sont écartés (douteux) avant le vote du sol (moteur/pas_du_sol.py).
+    --sans-pas-du-sol : l'ancien comportement."""
+    if getattr(args, "sans_pas_du_sol", False):
         return None
     from moteur.pas_du_sol import charger as charger_pds
     pds = charger_pds(avec_dino=False)
@@ -147,13 +148,13 @@ def main() -> int:
     r.add_argument("sortie", type=Path)
     r.add_argument("--verite", type=Path, help="logement dont les pièces ont leur sol et leurs zones (la bonne réponse)")
     r.add_argument("--couleurs", type=Path, help="fichier de choix des sols avec « couleur_visee » (verites/app-001/sols.json)")
-    r.add_argument("--pas-du-sol", action="store_true", help="écarter lits, canapés, rangements (OWLv2) avant le vote")
+    r.add_argument("--sans-pas-du-sol", action="store_true", help="ne PAS écarter lits, canapés, rangements (ancien comportement)")
     g = sous.add_parser("logement", help="logement avec les sols trouvés seuls (pour construire la maquette)")
     g.add_argument("releve", type=Path)
     g.add_argument("logement", type=Path, help="logement (ses sols éventuels sont retirés avant la reconnaissance)")
     g.add_argument("modele", type=Path)
     g.add_argument("sortie", type=Path, help="logement.json écrit")
-    g.add_argument("--pas-du-sol", action="store_true", help="écarter lits, canapés, rangements (OWLv2) avant le vote")
+    g.add_argument("--sans-pas-du-sol", action="store_true", help="ne PAS écarter lits, canapés, rangements (ancien comportement)")
     args = ap.parse_args()
     for f in (args.releve, args.logement):
         if not f.is_file():
