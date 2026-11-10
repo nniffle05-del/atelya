@@ -670,3 +670,10 @@ salle d'eau ; aucune zone d'un autre sol ; couleur visée mesurée sur les photo
 caché ; chambres sur zones choisies à la main) et `verites/app-002/meubles.json` (41 objets : table + 7 chaises, buffet, commode,
 bureau, 2 canapés, meuble télé, bibliothèque, chambres, cuisine à ±30 cm ; aucun rideau). Logement de vérité avec sols :
 `..\atelya\b2\app-002\examen\logement-verite-sols.json` (poser_sols.py). Attente : accord NT avant le passage unique d'Atelya.
+**EXAMEN app-002 PASSÉ (une seule fois, 10/11/2026, modèles en service, aucun réglage)** — sorties `..\atelya\b2\app-002\examen\`.
+SOLS (sols-vits14-v2) : **79,2 % de la surface juste** (43,9 m² jugés) ; pièces 3/4 justes (cuisine carreaux, séjour lames 98 %
+des votes, chambre 2 lames) ; chambre 3 FAUSSE (carreaux : le lit blanc étiré par la mise à plat, 59 % des votes) ; fausses zones
+point de Hongrie sur les lits (ch. 2 : 3,4 m² ; ch. 3 : 1,1 m²) ; entrée non jugée (1,1 m² vus, 0 vignette). Couleurs ΔE : séjour
+2,1, chambre 3 4,5, cuisine 5,4, chambre 2 9,7. MEUBLES (meubles-vits14-v1) : **10/30 retrouvés (33 %)**, 9 en trop, place à
+0,44 m ; canapés 1/2, chaises 3/8, rangements 6/14, lits 0/2, tables 0/4 (app-001 : 47 %). MÊME CAUSE qu'app-001 : les LITS (et
+grands meubles blancs) trompent les sols et ne sont pas reconnus comme lits. Après cette note, app-002 = « examen déjà vu ».
