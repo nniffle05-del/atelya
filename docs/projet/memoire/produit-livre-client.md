@@ -24,3 +24,8 @@ chaque éclairage ; (2) les photos du client servent à MESURER (dimensions, dé
 projetée (ombres et reflets figés, faces cachées fausses, étirement) ; (3) vraie géométrie + vraies matières PBR partout, objets
 assez légers pour le temps réel (ABO = textures 4K → versions allégées pour Unreal) ; (4) sur mesure : mesuré sur photos calées,
 construit module par module, habillé de vraies matières, jugé en vidéo tournante côte à côte avec les photos.
+**ORDRE NT (10/11/2026)** : « avant de se projeter sur la visite, il faut d'abord penser CINÉMATIQUE ». Priorité = le film du
+logement rendu par Blender (caméra qui parcourt proprement, bonnes lumières) ; visite libre Unreal PLUS TARD. Critère de jugement
+d'une brique = un court plan vidéo en mouvement (pas de scintillement d'une image à l'autre, géométrie juste sur tout le trajet,
+sols et meubles crédibles au passage, lumière cohérente entre pièces). L'allègement des objets pour le temps réel (textures 4K
+d'ABO) n'est PAS prioritaire tant qu'on fait la cinématique.
