@@ -664,3 +664,9 @@ App-002, calage des caméras FAIT (10/11/2026, `verites/app-002/cameras-photos.j
 coins cachés, sol presque invisible). Chambres : photos 10/11 = chambre 2 (radiateur à droite de la baie), 14/15 = chambre 3.
 Repères relevés à la main par Claude ; caméra calculée et traits de contrôle dessinés par le code d'Atelya (`moteur/camera_photo.py`).
 Étape suivante (après accord NT) : vérités des sols et des meubles d'app-002, AVANT de lancer Atelya une seule fois.
+App-002, vérités de l'examen écrites AVANT tout passage d'Atelya (10/11/2026) : `verites/app-002/sols.json` (parquet chêne en lames
+`chene_naturel_photo` au séjour + ancienne chambre 1, entrée, chambres 2 et 3 ; grands carreaux beiges `pierre_beige` en cuisine et
+salle d'eau ; aucune zone d'un autre sol ; couleur visée mesurée sur les photos calées, points du sol projetés, hors meubles et sol
+caché ; chambres sur zones choisies à la main) et `verites/app-002/meubles.json` (41 objets : table + 7 chaises, buffet, commode,
+bureau, 2 canapés, meuble télé, bibliothèque, chambres, cuisine à ±30 cm ; aucun rideau). Logement de vérité avec sols :
+`..\atelya\b2\app-002\examen\logement-verite-sols.json` (poser_sols.py). Attente : accord NT avant le passage unique d'Atelya.

@@ -1453,7 +1453,7 @@
    "hauteur": 777,
    "qualite": "approchée",
    "ecart_moyen_px": 2.0,
-   "note": "Cuisine, depuis le coin de l évier, vers la porte de l entrée (mur est) ; plan de travail supposé à 90 cm et 62 cm du mur. Écart faible mais repères surtout sur un mur ; la gaine du coin nord-est (plan) ne tombe pas sur la colonne du four : place à ±30 cm.",
+   "note": "Cuisine, depuis le coin de l évier, vers la porte de l entrée (mur est) ; plan de travail supposé à 90 cm et 62 cm du mur ; repères surtout sur un mur, angle de la gaine pris 18 cm plus au sud que le contour (sinon l appareil sort de la cuisine) : place à ±30 cm.",
    "reperes": [
     {
      "type": "ligne",
@@ -1475,7 +1475,7 @@
       972,
       545
      ],
-     "quoi": "angle de la gaine et du mur est"
+     "quoi": "angle de la gaine et du mur est (gaine du plan à ±20 cm)"
     },
     {
      "type": "ligne",
