@@ -291,6 +291,17 @@
    * Une correction qui touche aux MURS : ensuite, sans rien demander, les murs alignés qui se chevauchent sont fusionnés et
    * les pièces recalculées depuis les murs (noms, types, sols gardés). Si une pièce n'est plus fermée, on le dit.
    */
+  /** « Rendre droit » : pour un mur à moins de 5° de l'horizontale ou de la verticale, et pour tous ceux-là d'un coup. */
+  function boutonsRedresser(mur) {
+    const e = C.ecartDroit(mur);
+    if (e < 0.05 || e > C.PRESQUE_DROIT_DEG) return [];
+    const un = el("button", { class: "bouton", texte: `Rendre droit (il penche de ${formatM(e, 1)}°)` });
+    un.addEventListener("click", () => corrigerMurs((x) => C.redresserMur(x, mur.id), "Mur redressé ; les murs qui s'y accrochaient ont suivi."));
+    const tous = el("button", { class: "bouton", texte: "Redresser tous les murs presque droits" });
+    tous.addEventListener("click", () => corrigerMurs((x) => C.redresserTousLesMurs(x), "Murs presque droits redressés (les vrais murs en biais n'ont pas bougé)."));
+    return [el("div", { class: "ligne" }, un), el("div", { class: "ligne" }, tous)];
+  }
+
   function corrigerMurs(correction, texte) {
     let suite = "";
     const ok = corriger((x) => {
@@ -563,7 +574,11 @@
       ctx.stroke();
     };
     const murChoisi = etat.outil === "choisir" && etat.choisi && v.logement.murs.find((m) => m.id === etat.choisi);
-    if (murChoisi) { rond(murChoisi.debut, COULEURS.choisi); rond(murChoisi.fin, COULEURS.choisi); }
+    if (murChoisi) {
+      rond(murChoisi.debut, COULEURS.choisi);
+      rond(murChoisi.fin, COULEURS.choisi);
+      rond(C.poigneeEpaisseur(murChoisi), "#f59e0b", 4); // à tirer pour changer l'épaisseur
+    }
     // Les limites invisibles (pas des murs) : pointillés violets.
     for (const lim of v.limites || []) {
       const [la, lb] = [lim.debut, lim.fin].map(px);
@@ -1132,7 +1147,9 @@
         el("div", { class: "reglage" },
           el("button", { class: "bouton", id: "f-ep-moins", texte: "−", title: "1 cm de moins", onclick: () => pasEpaisseur(-0.01) }), ep,
           el("button", { class: "bouton", id: "f-ep-plus", texte: "+", title: "1 cm de plus", onclick: () => pasEpaisseur(0.01) })),
-        el("p", { class: "info", texte: "Pour le rallonger : tirez un des ronds à ses bouts. Pour le déplacer : faites-le glisser." }),
+        el("p", { class: "info", texte: "Pour le rallonger : tirez un des ronds à ses bouts. Pour le déplacer : faites-le glisser. "
+          + "Pour changer son épaisseur : tirez le petit rond orange au milieu de sa face." }),
+        ...boutonsRedresser(e),
         el("div", { class: "ligne" },
           el("button", { class: "bouton", texte: "Le couper", onclick: () => changerOutil("couper") }),
           el("button", { class: "bouton", texte: "Enlever un morceau", onclick: () => changerOutil("morceau") })),
@@ -1261,6 +1278,10 @@
       return;
     }
     const murOuvert = etat.choisi && lg.murs.find((m) => m.id === etat.choisi);
+    if (murOuvert && etat.outil === "choisir" && C.longueur(p, C.poigneeEpaisseur(murOuvert)) <= metresPour(VISEE, p)) {
+      etat.glisse = { genre: "epaisseur", id: murOuvert.id, bouge: false };
+      return;
+    }
     if (murOuvert) {
       const rayon = metresPour(VISEE * 1.5, p);
       for (const bout of ["debut", "fin"]) {
@@ -1335,6 +1356,12 @@
       } catch (e) {
         g.erreur = e.message; // on garde l'aperçu précédent
       }
+    } else if (g && g.genre === "epaisseur") {
+      g.bouge = true;
+      const mur = etat.v.logement.murs.find((m) => m.id === g.id);
+      g.epaisseur = C.epaisseurDepuisPoignee(mur, p);
+      try { etat.apercu = C.modifierMur(etat.v, g.id, { epaisseur: g.epaisseur }); } catch (e) { /* aperçu précédent */ }
+      message(`Épaisseur : ${Math.round(g.epaisseur * 100)} cm`);
     } else if (g && (g.genre === "coin" || g.genre === "cote")) {
       g.bouge = true;
       try {
@@ -1372,6 +1399,8 @@
       if (g.erreur) message(g.erreur, true);
       if (g.point) corrigerMurs((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
       else dessiner();
+    } else if (g && g.genre === "epaisseur" && g.bouge && g.epaisseur) {
+      corrigerMurs((x) => C.modifierMur(x, g.id, { epaisseur: g.epaisseur }), `Épaisseur du mur : ${Math.round(g.epaisseur * 100)} cm.`);
     } else if (g && (g.genre === "coin" || g.genre === "cote") && g.bouge && g.point) {
       const faire = g.genre === "coin" ? (x) => C.deplacerCoinPiece(x, g.id, g.k, g.point, g.rayon) : (x) => C.deplacerCotePiece(x, g.id, g.k, g.point, g.rayon);
       if (corriger(faire, "Pièce redimensionnée à la main (ce contour sera gardé).")) {

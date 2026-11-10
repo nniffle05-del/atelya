@@ -663,6 +663,72 @@
     return apresMurs(v).v;
   }
 
+  // ---------- Murs : redresser, épaisseur à la poignée (10/11/2026) ----------
+
+  const PRESQUE_DROIT_DEG = 5; // un mur à moins de 5° de l'horizontale ou de la verticale peut être redressé
+
+  /** L'écart (degrés) d'un mur à l'horizontale ou à la verticale la plus proche. */
+  function ecartDroit(mur) {
+    const a = (Math.atan2(mur.fin[1] - mur.debut[1], mur.fin[0] - mur.debut[0]) * 180) / Math.PI;
+    const r = ((a % 90) + 90) % 90;
+    return Math.min(r, 90 - r);
+  }
+
+  /**
+   * Rend un mur presque droit exactement horizontal ou vertical, en le tournant autour de son milieu ; les bouts des murs qui
+   * s'y accrochaient suivent ; ses portes gardent leur place le long du mur.
+   */
+  function redresserMur(v0, id) {
+    const mur = v0.logement.murs.find((m) => m.id === id);
+    if (!mur) throw new Error(`mur inconnu : ${id}`);
+    const e = ecartDroit(mur);
+    if (e < 1e-6) return v0;
+    if (e > PRESQUE_DROIT_DEG) throw new Error(`ce mur penche de ${arrondi(e, 1)}° : c'est sans doute un vrai mur en biais`);
+    const v = copie(v0);
+    const m = v.logement.murs.find((x) => x.id === id);
+    const milieu = [(m.debut[0] + m.fin[0]) / 2, (m.debut[1] + m.fin[1]) / 2];
+    const l = longueur(m.debut, m.fin) / 2;
+    const horizontal = Math.abs(m.fin[0] - m.debut[0]) >= Math.abs(m.fin[1] - m.debut[1]);
+    const s = horizontal ? Math.sign(m.fin[0] - m.debut[0]) || 1 : Math.sign(m.fin[1] - m.debut[1]) || 1;
+    const nouveau = {
+      debut: horizontal ? [milieu[0] - s * l, milieu[1]] : [milieu[0], milieu[1] - s * l],
+      fin: horizontal ? [milieu[0] + s * l, milieu[1]] : [milieu[0], milieu[1] + s * l],
+    };
+    for (const bout of ["debut", "fin"]) {
+      const ancien = m[bout];
+      for (const autre of v.logement.murs) {
+        if (autre.id === id) continue;
+        for (const b2 of ["debut", "fin"]) if (longueur(autre[b2], ancien) < Math.max(0.03, m.epaisseur / 2)) autre[b2] = ar(nouveau[bout]);
+      }
+      m[bout] = ar(nouveau[bout]);
+    }
+    marquer(v, m);
+    return v;
+  }
+
+  /** Redresse tous les murs presque droits (moins de PRESQUE_DROIT_DEG) ; les vrais murs en biais ne bougent pas. */
+  function redresserTousLesMurs(v0) {
+    let v = v0;
+    for (const m of v0.logement.murs) {
+      const e = ecartDroit(m);
+      if (e > 1e-6 && e <= PRESQUE_DROIT_DEG) v = redresserMur(v, m.id);
+    }
+    return v;
+  }
+
+  /** La poignée d'épaisseur d'un mur : au milieu d'une de ses faces. */
+  function poigneeEpaisseur(mur) {
+    const { l, d, n } = axes(mur);
+    return [mur.debut[0] + d[0] * l / 2 + n[0] * mur.epaisseur / 2, mur.debut[1] + d[1] * l / 2 + n[1] * mur.epaisseur / 2];
+  }
+
+  /** Épaisseur réglée en tirant la poignée jusqu'au point p : deux fois la distance de p à l'axe (de 3 à 80 cm, au cm). */
+  function epaisseurDepuisPoignee(mur, p) {
+    const { n } = axes(mur);
+    const s = Math.abs((p[0] - mur.debut[0]) * n[0] + (p[1] - mur.debut[1]) * n[1]);
+    return arrondi(Math.min(0.8, Math.max(0.03, 2 * s)), 2);
+  }
+
   /** La pièce reprend le contour calculé depuis les murs (on oublie la retouche à la main). */
   function oublierContourManuel(v0, id) {
     const v = copie(v0);
@@ -1917,6 +1983,12 @@
     supprimerLimite,
     limiteSous,
     oublierContourManuel,
+    redresserMur,
+    redresserTousLesMurs,
+    ecartDroit,
+    poigneeEpaisseur,
+    epaisseurDepuisPoignee,
+    PRESQUE_DROIT_DEG,
     aimanterCoin,
     LARGEUR_MIN,
     modifierMur,

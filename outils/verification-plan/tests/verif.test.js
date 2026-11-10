@@ -767,3 +767,27 @@ test("limite invisible : un espace ouvert devient deux pièces, sans aucun mur a
   const w = C.supprimerLimite(v, 0);
   assert.equal(w.logement.pieces.length, 1);
 });
+
+// ---------- Murs : redresser, épaisseur (10/11/2026) ----------
+test("rendre droit un mur qui penche de 1° : les murs accrochés suivent, un vrai biais est refusé", () => {
+  const v0 = salle();
+  v0.logement.murs[2].fin = [0, 3.07]; // M3 (4,3)→(0,3,07) : penche de ~1°
+  v0.logement.murs[3].debut = [0, 3.07]; // M4 accroché à ce bout
+  const v = C.redresserMur(v0, "M3");
+  const m3 = v.logement.murs[2], m4 = v.logement.murs[3];
+  proche(m3.debut[1], m3.fin[1]);
+  procheP(m4.debut, m3.fin);
+  proche(C.ecartDroit(m3), 0);
+  const v1 = salle();
+  v1.logement.murs[2].fin = [0, 3.8]; // 11° : un vrai biais
+  assert.throws(() => C.redresserMur(v1, "M3"));
+  assert.equal(C.redresserTousLesMurs(v1), v1);
+});
+
+test("poignée d'épaisseur : deux fois la distance à l'axe, bornée de 3 à 80 cm", () => {
+  const m = salle().logement.murs[0];
+  procheP(C.poigneeEpaisseur(m), [2, 0.1]);
+  proche(C.epaisseurDepuisPoignee(m, [2, 0.12]), 0.24);
+  proche(C.epaisseurDepuisPoignee(m, [2, 2]), 0.8);
+  proche(C.epaisseurDepuisPoignee(m, [2, 0.001]), 0.03);
+});
