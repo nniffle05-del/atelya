@@ -461,6 +461,75 @@
     return v;
   }
 
+  // ---------- Murs alignés qui se chevauchent (10/11/2026) ----------
+
+  /**
+   * Deux murs presque PARALLÈLES (moins d'1°), presque sur la même ligne (moins d'une demi-épaisseur) et qui se RECOUVRENT
+   * (plus d'1 cm) ne sont qu'un : une lecture qui dessine deux fois le même mur, ou un mur rallongé par-dessus un autre. Il
+   * en reste un seul (le premier), couvrant les deux, de l'épaisseur la plus grande ; les ouvertures de l'autre passent dessus
+   * à leur vraie place. Deux murs alignés qui se touchent seulement bout à bout ne sont pas touchés.
+   */
+  function fusionnerMursAlignes(v0) {
+    let v = v0;
+    for (let tour = 0; tour < 200; tour++) {
+      const lg = v.logement;
+      let paire = null;
+      for (let i = 0; i < lg.murs.length && !paire; i++) {
+        const a = lg.murs[i], A = axes(a);
+        for (let j = i + 1; j < lg.murs.length; j++) {
+          const b = lg.murs[j], B = axes(b);
+          if (Math.abs(A.d[0] * B.d[1] - A.d[1] * B.d[0]) > Math.sin(Math.PI / 180)) continue;
+          const pb0 = projection(b.debut, a.debut, a.fin), pb1 = projection(b.fin, a.debut, a.fin);
+          const ecart = (q) => Math.abs((q[0] - a.debut[0]) * A.n[0] + (q[1] - a.debut[1]) * A.n[1]);
+          if (Math.max(ecart(b.debut), ecart(b.fin)) > Math.max(a.epaisseur, b.epaisseur) / 2) continue;
+          const tMin = Math.min(pb0.t, pb1.t), tMax = Math.max(pb0.t, pb1.t);
+          if (Math.min(A.l, tMax) - Math.max(0, tMin) <= 0.01) continue;
+          paire = { a, b, tMin, tMax, A };
+          break;
+        }
+      }
+      if (!paire) return v;
+      v = v === v0 ? copie(v0) : v;
+      const lg2 = v.logement;
+      const a = lg2.murs.find((m) => m.id === paire.a.id), b = lg2.murs.find((m) => m.id === paire.b.id);
+      const { A } = paire;
+      const de = Math.min(0, paire.tMin), a_ = Math.max(A.l, paire.tMax);
+      const point = (t) => [a.debut[0] + A.d[0] * t, a.debut[1] + A.d[1] * t];
+      // les ouvertures : positions réelles (bords en mètres) avant de toucher aux murs
+      const bordsAvant = new Map((lg2.ouvertures || []).filter((o) => o.mur === a.id || o.mur === b.id)
+        .map((o) => [o.id, bordsOuverture(lg2, o)]));
+      const nouveauDebut = point(de), nouvelleFin = point(a_);
+      a.debut = ar(nouveauDebut);
+      a.fin = ar(nouvelleFin);
+      a.epaisseur = Math.max(a.epaisseur, b.epaisseur);
+      lg2.murs = lg2.murs.filter((m) => m.id !== b.id);
+      for (const o of lg2.ouvertures || []) {
+        if (!bordsAvant.has(o.id)) continue;
+        const [p0, p1] = bordsAvant.get(o.id);
+        const t0 = projection(p0, a.debut, a.fin).t, t1 = projection(p1, a.debut, a.fin).t;
+        o.mur = a.id;
+        o.position = arrondi(Math.max(0, Math.min(t0, t1)), 3);
+      }
+      marquer(v, a);
+      v.verifies = (v.verifies || []).filter((id) => id !== b.id);
+    }
+    return v;
+  }
+
+  /**
+   * Ce que l'écran fait SEUL après chaque changement de murs (règle NT n° 21 : le bon résultat sans bouton à penser) :
+   * murs alignés qui se chevauchent fusionnés, puis pièces recalculées depuis les murs (noms, types, sols, plinthes gardés ;
+   * une pièce qui n'est plus fermée est gardée telle quelle et signalée). Rend {v, ouvertes, reunies, nouvelles}.
+   * Les pièces recalculées ne sont PAS marquées « vérifiées » : ce n'est pas une personne qui les a regardées.
+   */
+  function apresMurs(v0) {
+    const f = fusionnerMursAlignes(v0);
+    const r = piecesDepuisMurs(f.logement);
+    const v = f === v0 ? copie(v0) : f;
+    v.logement.pieces = r.pieces;
+    return { v, ouvertes: r.ouvertes, reunies: r.reunies, nouvelles: r.nouvelles };
+  }
+
   /** Les deux bords d'une ouverture, en mètres (pour dessiner ses poignées). */
   function bordsOuverture(lg, o) {
     const mur = lg.murs.find((m) => m.id === o.mur);
@@ -1662,6 +1731,8 @@
     etirerOuverture,
     bordsOuverture,
     morceauxLibres,
+    fusionnerMursAlignes,
+    apresMurs,
     LARGEUR_MIN,
     modifierMur,
     renommerPiece,

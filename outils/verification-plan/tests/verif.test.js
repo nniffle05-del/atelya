@@ -673,3 +673,41 @@ test("le logement reste cohérent après les gestes", () => {
   v = C.etirerOuverture(v, "P1", 0, [2.2, 0]);
   assert.deepEqual(C.verifierCoherence(v.logement), []);
 });
+
+// ---------- Murs alignés qui se chevauchent, pièces recalculées seules (10/11/2026) ----------
+
+test("deux murs alignés qui se chevauchent n'en font qu'un ; la porte de l'autre garde sa vraie place", () => {
+  const v0 = salle();
+  // M1 lu deux fois : un second morceau de 3 à 5 m, 3 cm plus haut, qui porte une fenêtre de 4 à 4,5 m
+  v0.logement.murs.push({ id: "M1b", debut: [3, 0.03], fin: [5, 0.03], epaisseur: 0.2, statut: "estime", source: "atelya" });
+  v0.logement.ouvertures.push({ id: "F2", type: "fenetre", mur: "M1b", position: 1.0, largeur: 0.5, hauteur: 1.25, allege: 0.95, statut: "estime", source: "atelya" });
+  const v = C.fusionnerMursAlignes(v0);
+  assert.equal(v.logement.murs.filter((m) => m.id.startsWith("M1")).length, 1);
+  const m1 = v.logement.murs.find((m) => m.id === "M1");
+  procheP(m1.debut, [0, 0]); procheP(m1.fin, [5, 0]);
+  const f2 = v.logement.ouvertures.find((o) => o.id === "F2");
+  assert.equal(f2.mur, "M1"); proche(f2.position, 4.0, 1e-3);
+  proche(v.logement.ouvertures.find((o) => o.id === "P1").position, 0.5);
+  assert.equal(v0.logement.murs.length, 6); // l'original n'est pas touché
+});
+
+test("deux murs alignés bout à bout, ou parallèles mais éloignés, ne sont pas fusionnés", () => {
+  const v0 = salle();
+  v0.logement.murs.push({ id: "M6", debut: [4, 0], fin: [6, 0], epaisseur: 0.2, statut: "estime", source: "atelya" }); // bout à bout
+  v0.logement.murs.push({ id: "M7", debut: [0, 0.5], fin: [4, 0.5], epaisseur: 0.1, statut: "estime", source: "atelya" }); // 50 cm plus haut
+  assert.equal(C.fusionnerMursAlignes(v0), v0);
+});
+
+test("après un changement de murs, les pièces sont recalculées seules et gardent leur nom", () => {
+  const v0 = salle();
+  v0.logement.pieces = [
+    { id: "A", nom: "Chambre", contour: [[0.1, 0.1], [1.9, 0.1], [1.9, 2.9], [0.1, 2.9]], statut: "estime", source: "atelya", sol: { matiere: "chene_naturel_photo", statut: "ajoute", source: "t" } },
+    { id: "B", nom: "Bureau", contour: [[3, 1], [3.5, 1], [3.5, 1.5], [3, 1.5]], statut: "estime", source: "atelya" }, // zone coloriée mal placée
+  ];
+  const r = C.apresMurs(v0);
+  const a = r.v.logement.pieces.find((p) => p.id === "A"), b = r.v.logement.pieces.find((p) => p.id === "B");
+  proche(C.surfacePolygone(a.contour), 1.85 * 2.8, 0.05); // collée aux faces des murs
+  proche(C.surfacePolygone(b.contour), 1.85 * 2.8, 0.05); // la zone mal placée remplit maintenant SA pièce
+  assert.equal(a.sol.matiere, "chene_naturel_photo"); // ce qui avait été réglé est gardé
+  assert.deepEqual(r.ouvertes, []);
+});
