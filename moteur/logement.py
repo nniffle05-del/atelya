@@ -89,6 +89,17 @@ class Rideaux(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class SensPorte(BaseModel):
+    """Comment s'ouvre une porte (10/11/2026, écran de vérification malléable) : le bord où sont les GONDS (« debut » = le bord
+    le plus proche du début du mur) et le côté du mur vers lequel le battant s'OUVRE (« gauche » / « droite » en regardant du
+    début vers la fin du mur). Sans lui : gonds au début, battant au milieu du mur (comme avant)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    charniere: Literal["debut", "fin"] = "debut"
+    ouvre_vers: Literal["gauche", "droite"] = "gauche"
+
+
 class Ouverture(Element):
     """Une porte, une porte-fenêtre ou une fenêtre percée dans un mur."""
 
@@ -103,6 +114,7 @@ class Ouverture(Element):
         default=0, description="Hauteur entre le sol et le bas de l'ouverture"
     )
     rideaux: Rideaux | None = Field(default=None, description="Voilage et rideaux côté intérieur (fenêtres seulement)")
+    sens: SensPorte | None = Field(default=None, description="Gonds et côté d'ouverture (portes) ; sinon, réglage par défaut")
 
 
 class Plinthes(BaseModel):

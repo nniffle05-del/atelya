@@ -811,3 +811,10 @@ taille, ±90°), outil « Un meuble », suppression (une pièce supprimée empor
 dimension entre les faces des murs du DESSIN (trait sombre ≥ 3 px, hachures ignorées ; ≤ 8 % des bouts de Claude ; ≥ 3 d'accord à
 3 %) → app-002 : échelle LUE (8 dimensions, 64,9 px/m contre 64,0 vérité, confirmée par Claude) ; doutes forts 6 → 4 (3 « cote contre
 dessin » honnêtes : « 490 » écrit pour 4,69 m dessinés, + séjour/chambre 1). Tests JS 71/71 dans Edge.
+(7) SENS D'OUVERTURE DES PORTES (10/11/2026) : format `SensPorte` sur `Ouverture.sens` (charniere debut/fin, ouvre_vers
+gauche/droite du mur ; None = comme avant) ; 3D (`habillage._porte`) : poignée opposée aux gonds, battant affleurant la face vers
+laquelle la porte s'ouvre ; écran : arc vert de chaque porte (POINTILLÉS tant que personne ne l'a réglé), boutons « Gonds de l'autre
+côté » / « S'ouvre de l'autre côté » ; défaut à l'écran = la porte s'ouvre VERS LA PIÈCE (pas vers entrée/dégagement/couloir,
+puis séjour) ; pas d'arc au-delà de 1,30 m (façades de placard, baies). App-002 : écran régénéré avec 30 meubles trouvés par OWLv2
+reportés du repère de la vérité (u = 118 + 64 x, v = 651 − 64 y) dans celui de la lecture (calage 64,9 px/m) — capture Edge vérifiée.
+Tests JS 73/73. ÉCRAN MALLÉABLE : les 7 points FAITS. Suite du test de bout en bout : étape 2 = NT chronomètre l'écran.

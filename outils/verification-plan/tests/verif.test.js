@@ -841,3 +841,31 @@ test("modifier, ajouter, supprimer un meuble ; une pièce supprimée emporte ses
   assert.deepEqual(v.logement.meubles.map((m) => m.id), ["lit1"]);
   assert.deepEqual(C.verifierCoherence(v.logement), []);
 });
+
+// ---------- Sens d'ouverture des portes (10/11/2026) ----------
+test("sens d'une porte : par défaut gonds au début et ouverture à gauche ; inverser l'un ou l'autre", () => {
+  const v0 = salle();
+  let a = C.arcPorte(v0.logement, v0.logement.ouvertures[0]); // P1 sur M1 (0,0)→(4,0) : gauche = vers +y (dans la pièce)
+  procheP(a.pivot, [0.5, 0.1]); procheP(a.ferme, [1.3, 0.1]); procheP(a.ouvert, [0.5, 0.9]);
+  assert.equal(a.regle, false);
+  let v = C.inverserSens(v0, "P1", "charniere");
+  a = C.arcPorte(v.logement, v.logement.ouvertures[0]);
+  procheP(a.pivot, [1.3, 0.1]);
+  assert.deepEqual(v.logement.ouvertures[0].sens, { charniere: "fin", ouvre_vers: "gauche" });
+  v = C.inverserSens(v, "P1", "ouvre_vers");
+  a = C.arcPorte(v.logement, v.logement.ouvertures[0]);
+  procheP(a.pivot, [1.3, -0.1]); procheP(a.ouvert, [1.3, -0.9]);
+  assert.equal(a.regle, true);
+});
+
+test("sens par défaut : la porte s'ouvre vers la pièce, pas vers l'entrée ; une façade de placard n'a pas d'arc", () => {
+  const v = sallePieces();
+  v.logement.pieces[0].nom = "Entrée"; // A : x de 0,1 à 1,95 ; B « Bureau » : de 2,05 à 3,9
+  v.logement.ouvertures.push({ id: "P2", type: "porte", mur: "M5", position: 1.0, largeur: 0.8, hauteur: 2.04, allege: 0, statut: "estime", source: "atelya" });
+  // M5 (2,0)→(2,3) : sa gauche est vers −x (l'entrée), sa droite vers +x (le bureau) → s'ouvre à droite, vers le bureau
+  assert.equal(C.sensPorte(v.logement.ouvertures[2], v.logement).ouvre_vers, "droite");
+  const a = C.arcPorte(v.logement, v.logement.ouvertures[2]);
+  assert.ok(a.ouvert[0] > 2.0);
+  v.logement.ouvertures[2].largeur = 2.0;
+  assert.equal(C.arcPorte(v.logement, v.logement.ouvertures[2]), null);
+});

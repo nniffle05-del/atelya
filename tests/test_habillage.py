@@ -437,3 +437,21 @@ def test_un_portail_devant_chaque_fenetre_qui_donne_dehors():
     assert f["position"][0] > 4.2 and f["direction"] == [-1.0, 0.0, 0.0]
     assert f["taille"] == [1.2, 1.3] and f["position"][2] == pytest.approx(0.9 + 1.3 / 2)
     assert portails["Portail_pf"]["direction"] == [0.0, -1.0, 0.0]  # mur nord : vers le sud
+
+
+def test_sens_d_ouverture_d_une_porte():
+    """10/11/2026 : gonds et côté d'ouverture réglables (écran de vérification) : la poignée passe du côté opposé aux gonds,
+    le battant affleure la face du mur vers laquelle la porte s'ouvre ; sans réglage, rien ne change."""
+    from moteur.logement import Logement
+    lg = _piece_simple().model_dump(by_alias=True, mode="json")
+    porte = next(o for o in lg["ouvertures"] if o["id"] == "porte")
+    avant = {b["id"]: b for b in plan_habille(_piece_simple())["briques"]}
+    porte["sens"] = {"charniere": "fin", "ouvre_vers": "droite"}
+    apres = {b["id"]: b for b in plan_habille(Logement.model_validate(lg))["briques"]}
+    centre = lambda b: [sum(q[i] for q in b["contour"]) / len(b["contour"]) for i in (0, 1)]  # noqa: E731
+    # poignée : de l'autre côté de la porte le long du mur
+    assert centre(apres["porte__poignee_1"]) != pytest.approx(centre(avant["porte__poignee_1"]), abs=0.05)
+    # battant : décalé du milieu du mur vers une face
+    assert centre(apres["porte__battant"]) != pytest.approx(centre(avant["porte__battant"]), abs=0.02)
+    porte["sens"] = None
+    assert {b["id"]: b["contour"] for b in plan_habille(Logement.model_validate(lg))["briques"]} == {i: b["contour"] for i, b in avant.items()}

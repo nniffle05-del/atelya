@@ -512,6 +512,27 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+    // Le sens d'ouverture des portes : le battant ouvert et son arc (pointillés tant que personne ne l'a réglé).
+    for (const o of v.logement.ouvertures || []) {
+      if (o.type !== "porte") continue;
+      const a = C.arcPorte(v.logement, o);
+      if (!a) continue;
+      const [pv, pf, po] = [a.pivot, a.ferme, a.ouvert].map(px);
+      const r = Math.hypot(pf[0] - pv[0], pf[1] - pv[1]);
+      const a1 = Math.atan2(pf[1] - pv[1], pf[0] - pv[0]), a2 = Math.atan2(po[1] - pv[1], po[0] - pv[0]);
+      let delta = a2 - a1;
+      while (delta > Math.PI) delta -= 2 * Math.PI;
+      while (delta < -Math.PI) delta += 2 * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(pv[0], pv[1]);
+      ctx.lineTo(po[0], po[1]);
+      ctx.arc(pv[0], pv[1], r, a2, a1, delta > 0);
+      ctx.lineWidth = 1.2 * trait;
+      ctx.strokeStyle = COULEURS.porte;
+      ctx.setLineDash(a.regle ? [] : [4 * trait, 3 * trait]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     // Les meubles : leur emprise au sol, l'avant en trait épais.
     for (const m of v.logement.meubles || []) {
       const coins = C.empreinteMeuble(m).map(px);
@@ -1173,6 +1194,11 @@
       fiche.append(el("p", { class: "info", texte: "À la souris : faites-la glisser le long du mur (ou jusqu'à un autre mur) ; "
           + "tirez un des ronds à ses bords pour changer sa largeur. Elle se colle seule contre un angle à moins de 8 cm." }),
         el("label", { texte: "C'est…" }), type,
+        ...(e.type === "porte" ? [el("label", { texte: "Sens d'ouverture (l'arc vert sur le plan)" }), el("div", { class: "ligne" },
+          el("button", { class: "bouton", texte: "⇆ Gonds de l'autre côté",
+            onclick: () => corriger((x) => C.inverserSens(x, e.id, "charniere"), "Gonds passés de l'autre côté.") }),
+          el("button", { class: "bouton", texte: "⇅ S'ouvre de l'autre côté",
+            onclick: () => corriger((x) => C.inverserSens(x, e.id, "ouvre_vers"), "La porte s'ouvre maintenant de l'autre côté.") }))] : []),
         el("label", { texte: "Largeur en mètres, puis Entrée" }), larg,
         el("details", {}, el("summary", { texte: "La déplacer le long du mur" }), el("label", { texte: "Distance depuis le bout du mur (m), puis Entrée" }), pos),
         el("div", { class: "ligne" }, supprimerBouton("Supprimer")));

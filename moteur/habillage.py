@@ -485,16 +485,21 @@ def _porte(o: Ouverture, mur: Mur, entree: bool, hsp: float = 99.0,
     m = "menuiserie_blanche"
     battant = "porte_entree" if entree else "porte_interieure"
     demi = EPAISSEUR_PORTE / 2
-    # La poignée est du côté opposé aux gonds : on la met côté fin du mur.
-    poignee = (l - p - 0.13, l - p - 0.03)
+    # La poignée est du côté opposé aux gonds (gonds au début du mur par défaut, ou selon o.sens) ; le battant affleure la face
+    # du mur vers laquelle la porte s'ouvre (o.sens.ouvre_vers), sinon il reste au milieu du mur.
+    gonds_au_debut = o.sens is None or o.sens.charniere == "debut"
+    poignee = (l - p - 0.13, l - p - 0.03) if gonds_au_debut else (p + 0.03, p + 0.13)
+    decalage = 0.0
+    if o.sens is not None:
+        decalage = (1 if o.sens.ouvre_vers == "gauche" else -1) * max(0.0, mur.epaisseur / 2 - demi - 0.005)
     z_poignee = (HAUTEUR_POIGNEE - 0.01, HAUTEUR_POIGNEE + 0.01)
     briques = [
         _boite(o, mur, "montant_1", (0, p), (-e, e), (0, haut), m),
         _boite(o, mur, "montant_2", (l - p, l), (-e, e), (0, haut), m),
         _boite(o, mur, "traverse_haut", (p, l - p), (-e, e), (haut - p, haut), m),
-        _boite(o, mur, "battant", (p, l - p), (-demi, demi), (JEU_SOL, haut - p), battant),
-        _boite(o, mur, "poignee_1", poignee, (demi, demi + 0.05), z_poignee, "metal"),
-        _boite(o, mur, "poignee_2", poignee, (-demi - 0.05, -demi), z_poignee, "metal"),
+        _boite(o, mur, "battant", (p, l - p), (decalage - demi, decalage + demi), (JEU_SOL, haut - p), battant),
+        _boite(o, mur, "poignee_1", poignee, (decalage + demi, decalage + demi + 0.05), z_poignee, "metal"),
+        _boite(o, mur, "poignee_2", poignee, (decalage - demi - 0.05, decalage - demi), z_poignee, "metal"),
     ]
     # Chambranle : deux montants et une traverse posés SUR chaque face du mur, qui recouvrent le joint du dormant d'un cm.
     # Les trois morceaux ne se recouvrent pas (deux faces au même endroit scintillent au rendu). Coupés au bout du mur.

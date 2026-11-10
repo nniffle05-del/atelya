@@ -910,6 +910,67 @@
     return r;
   }
 
+  // ---------- Sens d'ouverture des portes (10/11/2026) ----------
+
+  const LARGEUR_PORTE_ARC = 1.3; // m : au-delà, c'est une façade de placard ou une baie, pas une porte qui pivote
+
+  /** Plus une pièce est « de passage » (entrée, dégagement), moins une porte s'ouvre vers elle. */
+  function intimite(nom) {
+    const n = sansAccents(nom || "").toLowerCase();
+    if (/entree|degagement|deg\b|couloir|palier|hall|circulation/.test(n)) return 0;
+    if (/sejour|salon|living|salle a manger/.test(n)) return 1;
+    return 2;
+  }
+
+  /**
+   * Le sens d'une porte : celui réglé ; sinon le défaut le plus courant en France : gonds au début du mur, et la porte s'ouvre
+   * VERS LA PIÈCE (pas vers l'entrée ni le dégagement). `regle` dit si une personne l'a choisi.
+   */
+  function sensPorte(o, lg) {
+    let defaut = "gauche";
+    const mur = lg && lg.murs.find((m) => m.id === o.mur);
+    if (mur && !(o.sens && o.sens.ouvre_vers)) {
+      const { d, n } = axes(mur);
+      const t = o.position + o.largeur / 2;
+      const cote = (signe) => {
+        const q = [mur.debut[0] + d[0] * t + n[0] * signe * (mur.epaisseur / 2 + 0.3), mur.debut[1] + d[1] * t + n[1] * signe * (mur.epaisseur / 2 + 0.3)];
+        const piece = (lg.pieces || []).find((x) => dansPolygone(q, x.contour));
+        return piece ? intimite(piece.nom) : -1;
+      };
+      if (cote(-1) > cote(1)) defaut = "droite";
+    }
+    return { charniere: (o.sens && o.sens.charniere) || "debut", ouvre_vers: (o.sens && o.sens.ouvre_vers) || defaut, regle: !!o.sens };
+  }
+
+  /** Inverse les gonds (« charniere ») ou le côté d'ouverture (« ouvre_vers ») d'une porte. */
+  function inverserSens(v0, id, quoi) {
+    const v = copie(v0);
+    const o = (v.logement.ouvertures || []).find((x) => x.id === id);
+    if (!o) throw new Error(`ouverture inconnue : ${id}`);
+    const s = sensPorte(o, v.logement);
+    if (quoi === "charniere") s.charniere = s.charniere === "debut" ? "fin" : "debut";
+    else s.ouvre_vers = s.ouvre_vers === "gauche" ? "droite" : "gauche";
+    o.sens = { charniere: s.charniere, ouvre_vers: s.ouvre_vers };
+    marquer(v, o);
+    return v;
+  }
+
+  /** L'arc d'ouverture d'une porte (en m) : le pivot (gonds), le bout du battant fermé et le bout du battant ouvert. */
+  function arcPorte(lg, o) {
+    const mur = lg.murs.find((m) => m.id === o.mur);
+    if (!mur) return null;
+    if (o.largeur > LARGEUR_PORTE_ARC) return null; // façade de placard, baie : pas d'arc
+    const { d, n } = axes(mur);
+    const s = sensPorte(o, lg);
+    const cote = s.ouvre_vers === "gauche" ? 1 : -1;
+    const face = (t) => [mur.debut[0] + d[0] * t + n[0] * cote * mur.epaisseur / 2,
+      mur.debut[1] + d[1] * t + n[1] * cote * mur.epaisseur / 2];
+    const tGonds = s.charniere === "debut" ? o.position : o.position + o.largeur;
+    const tBout = s.charniere === "debut" ? o.position + o.largeur : o.position;
+    const pivot = face(tGonds);
+    return { pivot, ferme: face(tBout), ouvert: [pivot[0] + n[0] * cote * o.largeur, pivot[1] + n[1] * cote * o.largeur], regle: s.regle };
+  }
+
   /** Les deux bords d'une ouverture, en mètres (pour dessiner ses poignées). */
   function bordsOuverture(lg, o) {
     const mur = lg.murs.find((m) => m.id === o.mur);
@@ -2123,6 +2184,9 @@
     deplacerOuverture,
     etirerOuverture,
     bordsOuverture,
+    sensPorte,
+    inverserSens,
+    arcPorte,
     morceauxLibres,
     fusionnerMursAlignes,
     apresMurs,
