@@ -152,7 +152,7 @@
       doutes.push(doute);
     };
 
-    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id));
+    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || []), ...(lg.meubles || [])].map((e) => e.id));
     for (const d of verification.doutes || []) {
       if (d.element != null && !ids.has(d.element)) continue; // élément supprimé entre-temps
       ajouter(d.element ?? null, d.raison || "à vérifier", d.zone_px ?? null, d.propositions || null, d);
@@ -219,7 +219,7 @@
   }
 
   function trouver(lg, id) {
-    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []]]) {
+    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []], ["meuble", lg.meubles || []]]) {
       const e = liste.find((x) => x.id === id);
       if (e) return { genre, e };
     }
@@ -227,7 +227,7 @@
   }
 
   function nouvelId(lg, prefixe) {
-    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id));
+    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || []), ...(lg.meubles || [])].map((e) => e.id));
     let k = 1;
     while (ids.has(`${prefixe}${k}`)) k++;
     return `${prefixe}${k}`;
@@ -663,6 +663,144 @@
     return apresMurs(v).v;
   }
 
+  // ---------- Meubles à l'écran (10/11/2026) : voir, déplacer, tourner, taille, type, ajouter, supprimer ----------
+
+  // Les catégories de moteur/meubles.py (CATEGORIES), dans le même ordre (test : tests/test_ecran_verification.py).
+  const MEUBLES = {
+    canape: "Canapé", fauteuil: "Fauteuil", chaise: "Chaise", tabouret_haut: "Tabouret haut", table_basse: "Table basse",
+    table_d_appoint: "Table d'appoint", table: "Table de repas", bureau: "Bureau", chaise_de_bureau: "Chaise de bureau",
+    lit: "Lit", lit_superpose: "Lit superposé ou mezzanine", table_de_chevet: "Table de chevet", commode: "Commode",
+    rangement: "Meuble de rangement", etagere_cubes: "Étagère à cases", bibliotheque: "Bibliothèque", meuble_tv: "Meuble télé",
+    banc: "Banc", tapis: "Tapis", lampadaire: "Lampadaire", lampe: "Lampe à poser", suspension: "Suspension",
+    tableau: "Tableau", miroir: "Miroir", horloge: "Horloge murale", plante: "Plante", coussin: "Coussin", vase: "Vase",
+    meuble_cuisine_bas: "Meubles bas de cuisine", meuble_cuisine_haut: "Meubles hauts de cuisine",
+    colonne_cuisine: "Colonne de cuisine (four, frigo)", ilot: "Îlot de cuisine", caisson: "Caisson, cloison meuble",
+    placard: "Placard, dressing", television: "Télévision",
+  };
+  // Taille d'un meuble courant (largeur, profondeur, hauteur en m) et hauteur du bas pour ceux qui sont au mur ou au plafond.
+  const TAILLES_MEUBLES = {
+    canape: [2.1, 0.9, 0.85], fauteuil: [0.75, 0.8, 0.85], chaise: [0.45, 0.5, 0.85], table: [1.4, 0.8, 0.75],
+    table_basse: [1.0, 0.6, 0.4], bureau: [1.2, 0.6, 0.75], lit: [1.6, 2.05, 1.0], table_de_chevet: [0.45, 0.4, 0.55],
+    commode: [1.0, 0.5, 0.85], rangement: [1.2, 0.45, 0.9], bibliotheque: [0.9, 0.35, 1.9], meuble_tv: [1.6, 0.4, 0.5],
+    tapis: [2.0, 1.4, 0.02], meuble_cuisine_bas: [2.4, 0.6, 0.9], meuble_cuisine_haut: [2.4, 0.35, 0.7],
+    colonne_cuisine: [0.6, 0.6, 2.1], ilot: [1.8, 0.9, 0.9], placard: [1.8, 0.6, 2.4], television: [1.2, 0.08, 0.7],
+    tableau: [0.8, 0.04, 0.6], miroir: [0.6, 0.04, 0.9],
+  };
+  const ALTITUDES_MEUBLES = { tableau: 1.3, miroir: 1.1, horloge: 1.6, meuble_cuisine_haut: 1.45, television: 0.6 };
+
+  /** L'emprise au sol d'un meuble : rectangle tourné ; « face » = la direction de son avant (0° = +x, 90° = +y). */
+  function empreinteMeuble(m) {
+    const a = (m.face * Math.PI) / 180;
+    const av = [Math.cos(a), Math.sin(a)], cote = [-Math.sin(a), Math.cos(a)];
+    const [l, p] = m.dimensions;
+    return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sl, sp]) => [
+      m.position[0] + (sl * l) / 2 * cote[0] + (sp * p) / 2 * av[0],
+      m.position[1] + (sl * l) / 2 * cote[1] + (sp * p) / 2 * av[1],
+    ]);
+  }
+
+  /** Le meuble sous le point (le plus petit d'abord : une chaise posée sur un tapis se choisit). */
+  function meubleSous(lg, p) {
+    const sous = (lg.meubles || []).filter((m) => dansPolygone(p, empreinteMeuble(m)));
+    sous.sort((a, b) => a.dimensions[0] * a.dimensions[1] - b.dimensions[0] * b.dimensions[1]);
+    return sous.length ? sous[0] : null;
+  }
+
+  function pieceDuPoint(lg, p) {
+    return (lg.pieces || []).find((x) => dansPolygone(p, x.contour)) || null;
+  }
+
+  /**
+   * Fait glisser un meuble de `delta` (m). S'il arrive dos contre un mur (moins de `rayon`), il s'y colle ; il change de pièce
+   * s'il passe dans une autre.
+   */
+  function deplacerMeuble(v0, id, delta, rayon = 0.15) {
+    const v = copie(v0);
+    const m = (v.logement.meubles || []).find((x) => x.id === id);
+    if (!m) throw new Error(`meuble inconnu : ${id}`);
+    const pos = [m.position[0] + delta[0], m.position[1] + delta[1]];
+    const a = (m.face * Math.PI) / 180, av = [Math.cos(a), Math.sin(a)];
+    const dos = [pos[0] - av[0] * m.dimensions[1] / 2, pos[1] - av[1] * m.dimensions[1] / 2];
+    let meilleur = rayon, decalage = null;
+    for (const f of facesDesMurs(v.logement)) {
+      if (Math.abs(av[0] * f.d[0] + av[1] * f.d[1]) > Math.sin((5 * Math.PI) / 180)) continue; // face parallèle au dos
+      const pr = projection(dos, f.a, f.b);
+      if (pr.dist < meilleur && pr.t >= 0 && pr.t <= longueur(f.a, f.b)) {
+        const s = (f.a[0] - dos[0]) * av[0] + (f.a[1] - dos[1]) * av[1];
+        meilleur = pr.dist;
+        decalage = s;
+      }
+    }
+    if (decalage !== null) { pos[0] += av[0] * decalage; pos[1] += av[1] * decalage; }
+    m.position = ar(pos);
+    const piece = pieceDuPoint(v.logement, m.position);
+    if (piece) m.piece = piece.id;
+    marquer(v, m);
+    m.statut = "mesure";
+    return v;
+  }
+
+  /** La poignée de rotation : devant le meuble, à 30 cm de son avant. */
+  function poigneeRotation(m) {
+    const a = (m.face * Math.PI) / 180;
+    const d = m.dimensions[1] / 2 + 0.3;
+    return [m.position[0] + Math.cos(a) * d, m.position[1] + Math.sin(a) * d];
+  }
+
+  /** Tourne un meuble pour que son avant regarde le point p : par crans de 15°, et pile à l'angle droit à moins de 7°. */
+  function tournerMeuble(v0, id, p) {
+    const v = copie(v0);
+    const m = (v.logement.meubles || []).find((x) => x.id === id);
+    if (!m) throw new Error(`meuble inconnu : ${id}`);
+    let face = (Math.atan2(p[1] - m.position[1], p[0] - m.position[0]) * 180) / Math.PI;
+    const droit = Math.round(face / 90) * 90;
+    face = Math.abs(face - droit) <= 7 ? droit : Math.round(face / 15) * 15;
+    m.face = arrondi(((face + 540) % 360) - 180, 1);
+    marquer(v, m);
+    m.statut = "mesure";
+    return v;
+  }
+
+  /** Change la catégorie, les dimensions [largeur, profondeur, hauteur], la face ou l'altitude d'un meuble. */
+  function modifierMeuble(v0, id, champs) {
+    const v = copie(v0);
+    const m = (v.logement.meubles || []).find((x) => x.id === id);
+    if (!m) throw new Error(`meuble inconnu : ${id}`);
+    if (champs.categorie && champs.categorie !== m.categorie) {
+      if (!MEUBLES[champs.categorie]) throw new Error(`catégorie inconnue : ${champs.categorie}`);
+      m.categorie = champs.categorie;
+      delete m.modele; // un autre meuble : Atelya rechoisira le modèle 3D
+      if (champs.categorie !== "lit") delete m.literie;
+    }
+    if (champs.dimensions) {
+      if (champs.dimensions.some((x) => !(x > 0))) throw new Error("les dimensions doivent être des nombres positifs");
+      m.dimensions = champs.dimensions.map((x) => arrondi(x, 3));
+    }
+    if (champs.face != null) m.face = arrondi(champs.face, 1);
+    if (champs.altitude != null) m.altitude = arrondi(Math.max(0, champs.altitude), 3);
+    if (m.altitude + m.dimensions[2] > v.logement.hauteur_sous_plafond + 1e-6) throw new Error("le meuble dépasserait le plafond");
+    marquer(v, m);
+    m.statut = "mesure";
+    return v;
+  }
+
+  /** Ajoute un meuble de taille courante au point p (dans une pièce), l'avant vers le milieu de la pièce. */
+  function ajouterMeuble(v0, categorie, p) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const piece = pieceDuPoint(lg, p);
+    if (!piece) throw new Error("cliquez à l'intérieur d'une pièce");
+    if (!MEUBLES[categorie]) throw new Error(`catégorie inconnue : ${categorie}`);
+    const c = centrePolygone(piece.contour);
+    const face = longueur(c, p) > 0.05 ? arrondi((Math.atan2(c[1] - p[1], c[0] - p[0]) * 180) / Math.PI, 1) : 0;
+    const m = { id: nouvelId(lg, "meuble_v"), categorie, piece: piece.id, position: ar(p), face,
+      dimensions: (TAILLES_MEUBLES[categorie] || [0.8, 0.5, 0.8]).slice(), altitude: ALTITUDES_MEUBLES[categorie] || 0,
+      statut: "mesure", source: "verification", confiance: 1 };
+    lg.meubles = [...(lg.meubles || []), m];
+    v.verifies = [...(v.verifies || []), m.id];
+    return v;
+  }
+
   // ---------- Murs : redresser, épaisseur à la poignée (10/11/2026) ----------
 
   const PRESQUE_DROIT_DEG = 5; // un mur à moins de 5° de l'horizontale ou de la verticale peut être redressé
@@ -941,7 +1079,10 @@
       lg.ouvertures = (lg.ouvertures || []).filter((o) => o.mur !== id);
     } else if (t.genre === "ouverture") {
       lg.ouvertures = lg.ouvertures.filter((o) => o.id !== id);
+    } else if (t.genre === "meuble") {
+      lg.meubles = lg.meubles.filter((m) => m.id !== id);
     } else {
+      lg.meubles = (lg.meubles || []).filter((m) => m.piece !== id); // une pièce supprimée emporte ses meubles
       lg.pieces = lg.pieces.filter((p) => p.id !== id);
     }
     return v;
@@ -1821,6 +1962,8 @@
         if (projection(p, a, b).dist <= tolerance) return { genre: "ouverture", id: o.id };
       }
     }
+    const meuble = meubleSous(lg, p);
+    if (meuble) return { genre: "meuble", id: meuble.id };
     let meilleur = null;
     for (const m of lg.murs) {
       const dist = projection(p, m.debut, m.fin).dist - m.epaisseur / 2;
@@ -1864,7 +2007,7 @@
   /** Les incohérences qui empêcheraient le moteur de lire le logement.json (vide si tout va bien). */
   function verifierCoherence(lg) {
     const erreurs = [];
-    const tous = [...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id);
+    const tous = [...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || []), ...(lg.meubles || [])].map((e) => e.id);
     const doublons = [...new Set(tous.filter((id, i) => tous.indexOf(id) !== i))].sort();
     if (doublons.length) erreurs.push(`identifiants en double : ${doublons.join(", ")}`);
     if (!lg.murs.length) erreurs.push("aucun mur");
@@ -1902,6 +2045,11 @@
       if (p.surface != null && Math.abs(p.surface - surfacePolygone(p.contour)) > 0.01) {
         erreurs.push(`la pièce ${p.id} annonce ${p.surface.toFixed(2)} m² mais son contour mesure ${surfacePolygone(p.contour).toFixed(2)} m²`);
       }
+    }
+    const pieces = new Set((lg.pieces || []).map((p) => p.id));
+    for (const m of lg.meubles || []) { // mêmes règles que Meuble dans moteur/logement.py
+      if (m.piece != null && !pieces.has(m.piece)) erreurs.push(`le meuble ${m.id} est dans une pièce inconnue : ${m.piece}`);
+      if ((m.altitude || 0) + m.dimensions[2] > lg.hauteur_sous_plafond + 1e-9) erreurs.push(`le meuble ${m.id} dépasse le plafond`);
     }
     return erreurs;
   }
@@ -1986,6 +2134,15 @@
     limiteSous,
     oublierContourManuel,
     redresserMur,
+    MEUBLES,
+    TAILLES_MEUBLES,
+    empreinteMeuble,
+    meubleSous,
+    deplacerMeuble,
+    poigneeRotation,
+    tournerMeuble,
+    modifierMeuble,
+    ajouterMeuble,
     redresserTousLesMurs,
     ecartDroit,
     poigneeEpaisseur,

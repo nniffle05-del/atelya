@@ -791,3 +791,53 @@ test("poignée d'épaisseur : deux fois la distance à l'axe, bornée de 3 à 80
   proche(C.epaisseurDepuisPoignee(m, [2, 2]), 0.8);
   proche(C.epaisseurDepuisPoignee(m, [2, 0.001]), 0.03);
 });
+
+// ---------- Meubles à l'écran (10/11/2026) ----------
+const salleMeublee = () => {
+  const v = sallePieces();
+  v.logement.meubles = [
+    { id: "lit1", categorie: "lit", piece: "A", position: [1.0, 1.5], face: 0, dimensions: [1.6, 2.05, 1.0], altitude: 0, statut: "estime", source: "repérage photos" },
+    { id: "tapis1", categorie: "tapis", piece: "B", position: [3.0, 1.5], face: 0, dimensions: [1.4, 1.0, 0.02], altitude: 0, statut: "estime", source: "repérage photos" },
+    { id: "chaise1", categorie: "chaise", piece: "B", position: [3.0, 1.5], face: 90, dimensions: [0.45, 0.5, 0.85], altitude: 0, statut: "estime", source: "repérage photos" },
+  ];
+  return v;
+};
+
+test("meubles : l'emprise suit la face ; la souris prend la chaise posée sur le tapis", () => {
+  const lg = salleMeublee().logement;
+  const e = C.empreinteMeuble(lg.meubles[0]); // face 0 : l'avant vers +x, la largeur (1,6) le long de y
+  procheP(e[0], [1.0 - 1.025, 1.5 - 0.8]); // coin arrière droit (vu de face)
+  assert.equal(C.elementSous(lg, [3.0, 1.5], 0.05).id, "chaise1");
+  assert.equal(C.elementSous(lg, [3.4, 2.0], 0.05).id, "tapis1");
+});
+
+test("glisser un meuble : il se colle dos au mur, et change de pièce s'il y passe", () => {
+  // le lit (avant vers +x) recule vers le mur ouest : son dos (à 1,025 m derrière son milieu) se colle à la face x = 0,1
+  let v = C.deplacerMeuble(salleMeublee(), "lit1", [0.05, 0], 0.15);
+  proche(v.logement.meubles[0].position[0], 0.1 + 1.025);
+  v = C.deplacerMeuble(salleMeublee(), "chaise1", [-2.0, 0], 0.01);
+  assert.equal(v.logement.meubles.find((m) => m.id === "chaise1").piece, "A");
+  assert.equal(v.logement.meubles.find((m) => m.id === "chaise1").statut, "mesure");
+});
+
+test("tourner un meuble : crans de 15°, pile à l'angle droit à moins de 7°", () => {
+  let v = C.tournerMeuble(salleMeublee(), "lit1", [1.1, 3.5]); // presque plein nord
+  proche(v.logement.meubles[0].face, 90);
+  v = C.tournerMeuble(salleMeublee(), "lit1", [2.0, 2.0]); // 26,6° → 30°
+  proche(v.logement.meubles[0].face, 30);
+});
+
+test("modifier, ajouter, supprimer un meuble ; une pièce supprimée emporte ses meubles", () => {
+  let v = C.modifierMeuble(salleMeublee(), "tapis1", { categorie: "canape", dimensions: [2.1, 0.9, 0.85] });
+  assert.equal(v.logement.meubles[1].categorie, "canape");
+  assert.throws(() => C.modifierMeuble(salleMeublee(), "lit1", { dimensions: [1.6, 2, 3.0] })); // dépasse le plafond
+  v = C.ajouterMeuble(salleMeublee(), "table", [0.8, 0.8]);
+  const t = v.logement.meubles[v.logement.meubles.length - 1];
+  assert.equal(t.piece, "A"); assert.deepEqual(t.dimensions, [1.4, 0.8, 0.75]);
+  assert.throws(() => C.ajouterMeuble(salleMeublee(), "table", [9, 9]));
+  v = C.supprimer(v, t.id);
+  assert.equal(v.logement.meubles.length, 3);
+  v = C.supprimer(v, "B");
+  assert.deepEqual(v.logement.meubles.map((m) => m.id), ["lit1"]);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+});

@@ -24,6 +24,8 @@
     doute: "#ea580c",
     douteFond: "rgba(234, 88, 12, 0.22)",
     choisi: "#7c3aed",
+    meuble: "#92400e",
+    meubleFond: "rgba(180, 120, 60, 0.30)",
   };
   const NOMS_OUVERTURES = { porte: "Porte", fenetre: "Fenêtre", porte_fenetre: "Porte-fenêtre" };
   const CONSIGNES = {
@@ -34,6 +36,7 @@
     couper: "Cliquez sur un mur, là où il faut le couper. Vous pourrez ajuster au centimètre.",
     morceau: "Cliquez sur un mur au début du morceau à enlever, puis à sa fin. Vous pourrez ajuster au centimètre.",
     relier: "Cliquez sur le bout d'un mur, puis sur le bout de l'autre.",
+    meuble: "Cliquez dans une pièce pour y poser un meuble, puis choisissez ce que c'est dans sa fiche.",
     limite: "Une limite SANS mur entre deux pièces d'un même espace : cliquez ses deux bouts (ils se collent aux murs). Cliquez sur une limite existante pour l'enlever.",
   };
   const VISEE = 8; // pixels d'écran : à quelle distance un clic « touche » un élément
@@ -438,7 +441,7 @@
 
   function trouverElement(id) {
     const lg = etat.v.logement;
-    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []]]) {
+    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []], ["meuble", lg.meubles || []]]) {
       const e = liste.find((x) => x.id === id);
       if (e) return { genre, e };
     }
@@ -509,6 +512,21 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+    // Les meubles : leur emprise au sol, l'avant en trait épais.
+    for (const m of v.logement.meubles || []) {
+      const coins = C.empreinteMeuble(m).map(px);
+      chemin(coins);
+      ctx.fillStyle = COULEURS.meubleFond;
+      ctx.fill();
+      ctx.lineWidth = (etat.choisi === m.id ? 2.5 : 1.2) * trait;
+      ctx.strokeStyle = etat.choisi === m.id ? COULEURS.choisi : COULEURS.meuble;
+      ctx.stroke();
+      ctx.beginPath(); // l'avant : le côté entre les coins 2 et 3 (vers « face »)
+      ctx.moveTo(coins[2][0], coins[2][1]);
+      ctx.lineTo(coins[3][0], coins[3][1]);
+      ctx.lineWidth = 3 * trait;
+      ctx.stroke();
+    }
 
     // Le point en cours : ses éléments entourés d'orange, et sa zone s'il n'est lié à aucun élément.
     for (const e of [...f.murs, ...f.ouvertures, ...f.pieces]) {
@@ -592,6 +610,17 @@
       ctx.setLineDash([]);
     }
     if (etat.outil === "limite" && etat.depart) rond(etat.depart, "#7c3aed", 6);
+    const meubleChoisi = etat.outil === "choisir" && etat.choisi && (v.logement.meubles || []).find((q) => q.id === etat.choisi);
+    if (meubleChoisi) { // le rond devant le meuble : à tourner autour de lui
+      const [mc, pr] = [meubleChoisi.position, C.poigneeRotation(meubleChoisi)].map(px);
+      ctx.beginPath();
+      ctx.moveTo(mc[0], mc[1]);
+      ctx.lineTo(pr[0], pr[1]);
+      ctx.lineWidth = 1.5 * trait;
+      ctx.strokeStyle = COULEURS.choisi;
+      ctx.stroke();
+      rond(C.poigneeRotation(meubleChoisi), COULEURS.choisi, 6);
+    }
     const pieceChoisie = etat.outil === "choisir" && etat.choisi && (v.logement.pieces || []).find((q) => q.id === etat.choisi);
     if (pieceChoisie) { // coins (gros ronds) et milieux des côtés (petits ronds) : à tirer pour redimensionner la pièce
       const c = pieceChoisie.contour;
@@ -785,6 +814,7 @@
     if (!t) return "Élément";
     if (t.genre === "piece") return `La pièce « ${t.e.nom} »`;
     if (t.genre === "ouverture") return `${NOMS_OUVERTURES[t.e.type]}`;
+    if (t.genre === "meuble") return C.MEUBLES[t.e.categorie] || "Le meuble";
     return "Le mur";
   }
 
@@ -1099,6 +1129,34 @@
         el("label", { texte: "Corniche (la moulure autour du plafond)" }), corniche, el("p", { class: "aide", texte: origineDe(e.corniche) }),
         el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
         el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));
+    } else if (genre === "meuble") {
+      $("choix-titre").textContent = C.MEUBLES[e.categorie] || "Meuble";
+      const cat = el("select", { id: "f-categorie" }, ...Object.entries(C.MEUBLES).map(([k, n]) => el("option", { value: k, texte: n })));
+      cat.value = e.categorie;
+      cat.addEventListener("change", () => {
+        etat.categorieNouveau = cat.value;
+        const taille = C.TAILLES_MEUBLES[cat.value];
+        corriger((x) => C.modifierMeuble(x, e.id, { categorie: cat.value, ...(taille ? { dimensions: taille.slice() } : {}) }),
+          `C'est : ${C.MEUBLES[cat.value]}.`);
+      });
+      const champs = ["Largeur", "Profondeur", "Hauteur"].map((nom, i) => {
+        const c = el("input", { type: "text", value: formatM(e.dimensions[i]) });
+        c.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter") return;
+          const d = e.dimensions.slice();
+          d[i] = lireNombre(c.value);
+          corriger((x) => C.modifierMeuble(x, e.id, { dimensions: d }), `${nom} : ${formatM(d[i])} m.`);
+        });
+        return [el("label", { texte: `${nom} (m), puis Entrée` }), c];
+      }).flat();
+      const tourner = (pas) => corriger((x) => C.modifierMeuble(x, e.id, { face: ((e.face + pas + 540) % 360) - 180 }), "Meuble tourné.");
+      fiche.append(el("p", { class: "info", texte: "À la souris : faites-le glisser (dos contre un mur, il s'y colle) ; "
+          + "tournez-le avec le rond violet devant lui. Le trait épais est son avant." }),
+        el("label", { texte: "C'est…" }), cat, ...champs,
+        el("div", { class: "ligne" },
+          el("button", { class: "bouton", texte: "↺ 90°", onclick: () => tourner(90) }),
+          el("button", { class: "bouton", texte: "↻ 90°", onclick: () => tourner(-90) })),
+        el("div", { class: "ligne" }, supprimerBouton("Supprimer ce meuble")));
     } else if (genre === "ouverture") {
       $("choix-titre").textContent = `${NOMS_OUVERTURES[e.type]} de ${formatM(e.largeur)} m`;
       const type = el("select", { id: "f-type" }, ...Object.entries(NOMS_OUVERTURES).map(([k, n]) => el("option", { value: k, texte: n })));
@@ -1291,6 +1349,20 @@
         }
       }
     }
+    if (etat.outil === "meuble") {
+      if (corriger((x) => C.ajouterMeuble(x, etat.categorieNouveau || "commode", p), "Meuble posé : choisissez ce que c'est dans sa fiche.")) {
+        const ms = etat.v.logement.meubles;
+        changerOutil("choisir");
+        etat.choisi = ms[ms.length - 1].id;
+        rafraichir();
+      }
+      return;
+    }
+    const meubleOuvert = etat.choisi && (lg.meubles || []).find((q) => q.id === etat.choisi);
+    if (meubleOuvert && etat.outil === "choisir" && C.longueur(p, C.poigneeRotation(meubleOuvert)) <= metresPour(VISEE * 1.3, p)) {
+      etat.glisse = { genre: "rotation", id: meubleOuvert.id, bouge: false };
+      return;
+    }
     if (etat.outil === "limite") {
       const k = C.limiteSous(etat.v, p, tol);
       if (k >= 0 && !etat.depart) {
@@ -1328,6 +1400,7 @@
       etat.choisi = sous.id;
       if (sous.genre === "mur") etat.glisse = { genre: "mur", id: sous.id, depart: p, bouge: false };
       if (sous.genre === "ouverture") etat.glisse = { genre: "ouverture", id: sous.id, depart: p, bouge: false };
+      if (sous.genre === "meuble") etat.glisse = { genre: "meuble", id: sous.id, depart: p, bouge: false };
       rafraichir();
     } else {
       etat.choisi = null;
@@ -1356,6 +1429,18 @@
       } catch (e) {
         g.erreur = e.message; // on garde l'aperçu précédent
       }
+    } else if (g && g.genre === "meuble") {
+      const delta = [p[0] - g.depart[0], p[1] - g.depart[1]];
+      if (Math.hypot(...delta) > metresPour(3, p)) g.bouge = true;
+      if (g.bouge) {
+        g.delta = delta;
+        g.rayon = metresPour(VISEE * 1.5, p);
+        try { etat.apercu = C.deplacerMeuble(etat.v, g.id, delta, g.rayon); } catch (e) { /* aperçu précédent */ }
+      }
+    } else if (g && g.genre === "rotation") {
+      g.bouge = true;
+      g.point = p;
+      try { etat.apercu = C.tournerMeuble(etat.v, g.id, p); } catch (e) { /* aperçu précédent */ }
     } else if (g && g.genre === "epaisseur") {
       g.bouge = true;
       const mur = etat.v.logement.murs.find((m) => m.id === g.id);
@@ -1399,6 +1484,10 @@
       if (g.erreur) message(g.erreur, true);
       if (g.point) corrigerMurs((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
       else dessiner();
+    } else if (g && g.genre === "meuble" && g.bouge && g.delta) {
+      corriger((x) => C.deplacerMeuble(x, g.id, g.delta, g.rayon), "Meuble déplacé (il se colle dos au mur s'il en est tout près).");
+    } else if (g && g.genre === "rotation" && g.bouge && g.point) {
+      corriger((x) => C.tournerMeuble(x, g.id, g.point), "Meuble tourné.");
     } else if (g && g.genre === "epaisseur" && g.bouge && g.epaisseur) {
       corrigerMurs((x) => C.modifierMur(x, g.id, { epaisseur: g.epaisseur }), `Épaisseur du mur : ${Math.round(g.epaisseur * 100)} cm.`);
     } else if (g && (g.genre === "coin" || g.genre === "cote") && g.bouge && g.point) {

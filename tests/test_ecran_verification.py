@@ -47,3 +47,16 @@ def test_calculs_de_l_ecran_dans_edge():
     lignes, echecs = res
     assert echecs == 0, "\n".join(l for l in lignes if not l.startswith("OK"))
     assert len(lignes) >= 57
+
+
+def test_meubles_de_l_ecran_comme_le_moteur():
+    """L'écran propose exactement les catégories de meubles du moteur (moteur/meubles.py), dans le même ordre."""
+    import re
+
+    from moteur.meubles import CATEGORIES
+    js = (Path(__file__).resolve().parent.parent / "outils" / "verification-plan" / "calculs-verif.js").read_text(encoding="utf-8")
+    bloc = js[js.index("const MEUBLES = {"):]
+    bloc = bloc[:bloc.index("};")]
+    ecran = dict(re.findall(r'(\w+): "([^"]+)"', bloc))
+    assert ecran == {k: v[0] for k, v in CATEGORIES.items()}
+    assert list(ecran) == list(CATEGORIES)
