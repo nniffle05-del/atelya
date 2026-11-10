@@ -29,3 +29,7 @@ logement rendu par Blender (caméra qui parcourt proprement, bonnes lumières) ;
 d'une brique = un court plan vidéo en mouvement (pas de scintillement d'une image à l'autre, géométrie juste sur tout le trajet,
 sols et meubles crédibles au passage, lumière cohérente entre pièces). L'allègement des objets pour le temps réel (textures 4K
 d'ABO) n'est PAS prioritaire tant qu'on fait la cinématique.
+**NT (10/11/2026)** : trouver le meilleur milieu entre beau rendu 4K et visite fluide, toujours réaliste, et TOUT fait par Atelya
+(aucune retouche à la main). Piste proposée (non essayée) : une maquette de référence pleine qualité (film 4K Cycles) ; Atelya en
+dérive SEUL une version allégée (textures réduites selon la taille de l'objet à l'écran, objets simplifiés au loin, lumière
+précalculée « cuite ») ; réglages choisis sur mesures (temps, fluidité, réalisme) au comparatif R1 Cycles/EEVEE/Unreal.
