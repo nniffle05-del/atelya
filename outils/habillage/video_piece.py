@@ -1,7 +1,7 @@
 r"""Un plan vidéo dans une maquette d'Atelya (moteur/blender/video_trajet.py), puis la vidéo .mp4 (10/11/2026).
 
     ..\atelya\.venv\Scripts\python.exe outils\habillage\video_piece.py maquette.blend trajet.json dossier ^
-        [--echantillons 128] [--chrono]
+        [--echantillons 256] [--chrono]
 
 --chrono : ne rend que l'image du milieu, pour annoncer la durée totale avant de lancer le plan entier.
 """
@@ -19,13 +19,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from moteur.construire import DOSSIER_SCRIPTS, lancer_blender  # noqa: E402
 from moteur.images import lire_image  # noqa: E402
 
+# Réglage PAR DÉFAUT (10/11/2026) : à 128 échantillons, le débruiteur tache les murs blancs (risque de scintillement) ; 256 = murs
+# propres, ~25 s l'image 1280 × 720 sur la RTX 2070. Règle NT : le bon réglage est le défaut, jamais une correction à refaire.
+ECHANTILLONS_VIDEO = 256
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Plan vidéo dans une maquette d'Atelya")
     ap.add_argument("maquette", type=Path)
     ap.add_argument("trajet", type=Path)
     ap.add_argument("dossier", type=Path)
-    ap.add_argument("--echantillons", type=int, default=128)
+    ap.add_argument("--echantillons", type=int, default=ECHANTILLONS_VIDEO)
     ap.add_argument("--chrono", action="store_true")
     args = ap.parse_args()
     for f in (args.maquette, args.trajet):

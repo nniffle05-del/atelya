@@ -86,6 +86,9 @@ détaillé correspondant avant d'agir.
 19. Ameublement : le type de pièce n'impose pas les meubles (maisons atypiques). Le type est une
     proposition, modifiable à l'écran de vérification.
 20. Rendu : lumière fidèle à la réalité (moment flatteur oui, soleil inventé non).
+21. **Réglages PAR DÉFAUT** (NT, 10/11/2026) : « si à chaque fois tu dois passer par une correction, ce n'est pas correct ».
+    Une correction faite à la main une fois (option, réglage, retouche d'un logement) devient le comportement par défaut
+    d'Atelya, ou un chantier pour l'automatiser ; le bon résultat doit sortir SEUL de la chaîne, sans option à ajouter.
 
 ## 3. Licences (vendre Atelya exige des licences commerciales)
 
