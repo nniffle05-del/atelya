@@ -772,3 +772,14 @@ un tapis ; après : lit trouvé seul avec son linge par défaut, sol en lames sa
 Note ~73/100 prêt client (était ~71). Chantier suivant proposé à NT : RÉALISATEUR AUTOMATIQUE (trajet calculé depuis le plan,
 garde-fous, ordre de visite) + UNE commande photos → maquette meublée → film + teinte des parquets au rendu (règle n° 21 : tout
 par défaut). Ensuite : « tout ce qui n'est ni mur ni sol ». Vraie note : nouveau logement avec photos (NT).
+**TEST DE BOUT EN BOUT ATELYA + CLAUDE sur app-002 (10/11/2026, NT « on teste tout le processus »)** : NT a renvoyé le plan et les
+photos d'app-002 (14/15 photos identiques au pixel, + 1 photo de la salle à manger un autre jour) → PAS une note neuve (examen
+déjà vu), mais banc de bout en bout (toutes les vérités existent). Sorties `..\atelya\b2\app-002\bout-en-bout\plan-capture\`.
+ÉTAPE 1 (lecture du plan par Claude, au format lecture-claude/0.1, à l'œil sur des agrandissements quadrillés, SANS ouvrir la
+vérité ; limite : plan déjà vu) : `fiche-claude.json` (26 murs, 20 ouvertures, 12 pièces, 20 cotes = chaque « 500 X 215 » coupé
+en deux cotes « 500 » / « 215 » bornées aux faces intérieures, échelle proposée 64,0 px/m, 7 doutes). Traduction Atelya : 12 pièces,
+93,3 m² contre 93,6 m² pour la vérité ; pièces à ±5 % sauf WC 1,17 contre 0,77 m², salle de bains 5,29 contre 4,64 m² ; fenêtre
+ouest du séjour lue « fenêtre » (vérité : porte-fenêtre). TROUS révélés : (1) ÉCHELLE « à vérifier » : la 2e clé cherche des TRAITS
+de cote, absents sur ce style de plan (dimensions « L X l » écrites DANS les pièces, très courant en France) → Atelya doit vérifier
+ces dimensions en mesurant lui-même la pièce entre ses murs ; (2) gaines lues comme murs de 74-78 cm (doute juste) ; (3) le format
+n'a pas de type « porte de placard » (façades de placard = portes de 1,93 et 2,72 m, doutes forts). Écran : `ecran.html`.
