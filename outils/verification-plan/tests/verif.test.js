@@ -711,3 +711,59 @@ test("après un changement de murs, les pièces sont recalculées seules et gard
   assert.equal(a.sol.matiere, "chene_naturel_photo"); // ce qui avait été réglé est gardé
   assert.deepEqual(r.ouvertes, []);
 });
+
+// ---------- Pièces malléables et limites invisibles (10/11/2026) ----------
+const sallePieces = () => {
+  const v = salle();
+  v.logement.pieces = [
+    { id: "A", nom: "Chambre", contour: [[0.1, 0.1], [1.95, 0.1], [1.95, 2.9], [0.1, 2.9]], statut: "estime", source: "atelya" },
+    { id: "B", nom: "Bureau", contour: [[2.05, 0.1], [3.9, 0.1], [3.9, 2.9], [2.05, 2.9]], statut: "estime", source: "atelya" },
+  ];
+  return v;
+};
+
+test("tirer un coin de pièce : il se colle dans l'angle des faces des murs", () => {
+  const v = C.deplacerCoinPiece(sallePieces(), "A", 2, [1.88, 2.84], 0.15);
+  procheP(v.logement.pieces[0].contour[2], [1.95, 2.9]);
+  assert.ok(v.contours_manuels.includes("A"));
+});
+
+test("pousser un côté de pièce : il reste parallèle et se colle à la face d'un mur", () => {
+  const v0 = sallePieces();
+  v0.logement.pieces[0].contour = [[0.1, 0.1], [1.5, 0.1], [1.5, 2.9], [0.1, 2.9]]; // côté est trop court de 45 cm
+  const v = C.deplacerCotePiece(v0, "A", 1, [1.9, 1.5], 0.15);
+  const c = v.logement.pieces[0].contour;
+  proche(c[1][0], 1.95); proche(c[2][0], 1.95); proche(c[1][1], 0.1); proche(c[2][1], 2.9);
+});
+
+test("alertes : une pièce qui passe à travers un mur ou chevauche une autre est signalée", () => {
+  const v0 = sallePieces();
+  v0.logement.pieces[0].contour = [[0.1, 0.1], [3.0, 0.1], [3.0, 2.9], [0.1, 2.9]];
+  const a = C.alertesPiece(v0.logement, "A");
+  assert.ok(a.some((x) => x.includes("à travers un mur")));
+  assert.ok(a.some((x) => x.includes("Bureau")));
+  assert.deepEqual(C.alertesPiece(sallePieces().logement, "A"), []);
+});
+
+test("un contour fait à la main est gardé quand les pièces se recalculent après un changement de mur", () => {
+  let v = C.deplacerCoinPiece(sallePieces(), "A", 2, [1.5, 2.5], 0.01);
+  const voulu = v.logement.pieces[0].contour.map((q) => q.slice());
+  v = C.apresMurs(C.modifierMur(v, "M3", { epaisseur: 0.25 })).v;
+  assert.deepEqual(v.logement.pieces.find((p) => p.id === "A").contour, voulu);
+  v = C.oublierContourManuel(v, "A");
+  proche(C.surfacePolygone(v.logement.pieces.find((p) => p.id === "A").contour), 1.85 * 2.775, 0.2); // calcul sur grille : quelques cm rognés
+});
+
+test("limite invisible : un espace ouvert devient deux pièces, sans aucun mur ajouté ; l'enlever les réunit", () => {
+  const v0 = salle();
+  v0.logement.murs = v0.logement.murs.filter((m) => m.id !== "M5"); // un seul espace de 4 × 3 m
+  v0.logement.pieces = [{ id: "S", nom: "Séjour", contour: [[0.1, 0.1], [3.9, 0.1], [3.9, 2.9], [0.1, 2.9]], statut: "estime", source: "atelya" }];
+  const v = C.ajouterLimite(v0, [2.5, 0.12], [2.5, 2.88], 0.15);
+  assert.equal(v.logement.murs.length, 4);
+  assert.equal(v.logement.pieces.length, 2);
+  assert.ok(v.logement.pieces.some((p) => p.nom === "Séjour"));
+  const total = v.logement.pieces.reduce((s, p) => s + C.surfacePolygone(p.contour), 0);
+  proche(total, 3.8 * 2.8, 0.3); // la limite occupe une bande de 3 cm, et le calcul sur grille rogne un peu
+  const w = C.supprimerLimite(v, 0);
+  assert.equal(w.logement.pieces.length, 1);
+});

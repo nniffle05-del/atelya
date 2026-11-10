@@ -516,6 +516,165 @@
     return v;
   }
 
+  // ---------- Pièces malléables et limites invisibles (10/11/2026, NT : « redimensionner la pièce à la souris ») ----------
+
+  /** Les deux faces de chaque mur (segments en m), rallongées d'une demi-épaisseur pour rejoindre les angles. */
+  function facesDesMurs(lg) {
+    const faces = [];
+    for (const m of lg.murs) {
+      const { l, d, n } = axes(m);
+      const h = m.epaisseur / 2;
+      for (const s of [-1, 1]) {
+        const p = (t) => [m.debut[0] + d[0] * t + n[0] * s * h, m.debut[1] + d[1] * t + n[1] * s * h];
+        faces.push({ a: p(-h), b: p(l + h), d });
+      }
+    }
+    return faces;
+  }
+
+  function intersectionDroites(p, d1, q, d2) {
+    const det = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(det) < 1e-9) return null;
+    const t = ((q[0] - p[0]) * d2[1] - (q[1] - p[1]) * d2[0]) / det;
+    return [p[0] + d1[0] * t, p[1] + d1[1] * t];
+  }
+
+  /**
+   * Aimante un coin de pièce : sur un coin d'une autre pièce s'il est tout près, sinon sur la face intérieure d'un mur, et
+   * dans l'angle de deux faces s'il est près des deux.
+   */
+  function aimanterCoin(lg, p, rayon, saufPiece) {
+    let best = null;
+    for (const piece of lg.pieces || []) {
+      if (piece.id === saufPiece) continue;
+      for (const q of piece.contour) {
+        const dd = longueur(p, q);
+        if (dd < rayon && (!best || dd < best.d)) best = { d: dd, q };
+      }
+    }
+    if (best && best.d < rayon / 2) return ar(best.q);
+    const faces = facesDesMurs(lg).map((f) => ({ ...f, pr: projection(p, f.a, f.b) })).filter((f) => f.pr.dist < rayon)
+      .sort((x, y) => x.pr.dist - y.pr.dist);
+    if (!faces.length) return best ? ar(best.q) : ar(p);
+    const f1 = faces[0];
+    const sur = [f1.a[0] + f1.d[0] * f1.pr.tt, f1.a[1] + f1.d[1] * f1.pr.tt];
+    for (const f2 of faces.slice(1)) {
+      if (Math.abs(f1.d[0] * f2.d[1] - f1.d[1] * f2.d[0]) < Math.sin((10 * Math.PI) / 180)) continue;
+      const coin = intersectionDroites(f1.a, f1.d, f2.a, f2.d);
+      if (coin && longueur(coin, p) < rayon * 1.5) return ar(coin);
+    }
+    return ar(sur);
+  }
+
+  function pieceManuelle(v, id) {
+    v.contours_manuels = [...new Set([...(v.contours_manuels || []), id])];
+  }
+
+  /** Tire le coin n° k d'une pièce jusqu'au point p (aimanté). Le contour devient « fait à la main » : gardé au recalcul. */
+  function deplacerCoinPiece(v0, id, k, p, rayon = 0.15) {
+    const v = copie(v0);
+    const piece = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!piece) throw new Error(`pièce inconnue : ${id}`);
+    piece.contour[k] = aimanterCoin(v.logement, p, rayon, id);
+    if (surfacePolygone(piece.contour) < 0.2) throw new Error("la pièce deviendrait trop petite");
+    pieceManuelle(v, id);
+    marquer(v, piece);
+    return v;
+  }
+
+  /**
+   * Pousse le côté n° k d'une pièce (du coin k au coin k+1) parallèlement à lui-même jusqu'au point p ; il se colle sur la face
+   * d'un mur parallèle à moins de `rayon`.
+   */
+  function deplacerCotePiece(v0, id, k, p, rayon = 0.15) {
+    const v = copie(v0);
+    const piece = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!piece) throw new Error(`pièce inconnue : ${id}`);
+    const c = piece.contour, a = c[k], b = c[(k + 1) % c.length];
+    const l = longueur(a, b);
+    if (l < 1e-6) return v0;
+    const d = [(b[0] - a[0]) / l, (b[1] - a[1]) / l], n = [-d[1], d[0]];
+    let s = (p[0] - a[0]) * n[0] + (p[1] - a[1]) * n[1];
+    let meilleur = rayon;
+    for (const f of facesDesMurs(v.logement)) {
+      if (Math.abs(d[0] * f.d[1] - d[1] * f.d[0]) > Math.sin((2 * Math.PI) / 180)) continue;
+      const sf = (f.a[0] - a[0]) * n[0] + (f.a[1] - a[1]) * n[1];
+      if (Math.abs(sf - s) < meilleur) { meilleur = Math.abs(sf - s); s = sf; }
+    }
+    c[k] = ar([a[0] + n[0] * s, a[1] + n[1] * s]);
+    c[(k + 1) % c.length] = ar([b[0] + n[0] * s, b[1] + n[1] * s]);
+    if (surfacePolygone(c) < 0.2) throw new Error("la pièce deviendrait trop petite");
+    pieceManuelle(v, id);
+    marquer(v, piece);
+    return v;
+  }
+
+  function distanceAuContour(p, contour) {
+    let d = Infinity;
+    for (let i = 0; i < contour.length; i++) d = Math.min(d, projection(p, contour[i], contour[(i + 1) % contour.length]).dist);
+    return d;
+  }
+
+  /** Ce qui cloche dans le contour d'une pièce : un mur qui la traverse, une autre pièce qu'elle chevauche. */
+  function alertesPiece(lg, id) {
+    const piece = (lg.pieces || []).find((x) => x.id === id);
+    if (!piece) return [];
+    const alertes = [];
+    for (const m of lg.murs) {
+      const { l, d } = axes(m);
+      for (let t = m.epaisseur; t <= l - m.epaisseur; t += 0.1) {
+        const q = [m.debut[0] + d[0] * t, m.debut[1] + d[1] * t];
+        if (dansPolygone(q, piece.contour) && distanceAuContour(q, piece.contour) > m.epaisseur / 2 + 0.03) {
+          alertes.push("elle passe à travers un mur");
+          break;
+        }
+      }
+      if (alertes.length) break;
+    }
+    const xs = piece.contour.map((q) => q[0]), ys = piece.contour.map((q) => q[1]);
+    for (const autre of lg.pieces || []) {
+      if (autre.id === id) continue;
+      let n = 0;
+      for (let x = Math.min(...xs) + 0.05; x < Math.max(...xs); x += 0.1) {
+        for (let y = Math.min(...ys) + 0.05; y < Math.max(...ys); y += 0.1) {
+          if (dansPolygone([x, y], piece.contour) && dansPolygone([x, y], autre.contour)) n++;
+        }
+      }
+      if (n * 0.01 >= 0.1) alertes.push(`elle chevauche « ${autre.nom} » sur ${arrondi(n * 0.01, 1)} m²`);
+    }
+    return alertes;
+  }
+
+  /**
+   * Une LIMITE INVISIBLE entre deux pièces d'un même espace ouvert (séjour et coin nuit sans cloison) : elle compte comme une
+   * cloison pour le calcul des pièces, mais n'est pas un mur (rien n'est construit en 3D). Bouts aimantés aux murs.
+   */
+  function ajouterLimite(v0, a, b, rayon = 0.15) {
+    const v = copie(v0);
+    const p = aimanterCoin(v.logement, a, rayon), q = aimanterCoin(v.logement, b, rayon);
+    if (longueur(p, q) < 0.3) throw new Error("limite trop courte");
+    v.limites = [...(v.limites || []), { debut: p, fin: q }];
+    return apresMurs(v).v;
+  }
+
+  function supprimerLimite(v0, k) {
+    const v = copie(v0);
+    v.limites = (v.limites || []).filter((_, i) => i !== k);
+    return apresMurs(v).v;
+  }
+
+  /** La pièce reprend le contour calculé depuis les murs (on oublie la retouche à la main). */
+  function oublierContourManuel(v0, id) {
+    const v = copie(v0);
+    v.contours_manuels = (v.contours_manuels || []).filter((x) => x !== id);
+    return apresMurs(v).v;
+  }
+
+  /** La limite sous le point p (n°), ou -1. */
+  function limiteSous(v, p, tolerance) {
+    return (v.limites || []).findIndex((lim) => projection(p, lim.debut, lim.fin).dist <= tolerance);
+  }
+
   /**
    * Ce que l'écran fait SEUL après chaque changement de murs (règle NT n° 21 : le bon résultat sans bouton à penser) :
    * murs alignés qui se chevauchent fusionnés, puis pièces recalculées depuis les murs (noms, types, sols, plinthes gardés ;
@@ -524,10 +683,27 @@
    */
   function apresMurs(v0) {
     const f = fusionnerMursAlignes(v0);
-    const r = piecesDepuisMurs(f.logement);
+    const r = piecesRecalculees(f);
     const v = f === v0 ? copie(v0) : f;
     v.logement.pieces = r.pieces;
     return { v, ouvertes: r.ouvertes, reunies: r.reunies, nouvelles: r.nouvelles };
+  }
+
+  /** Les pièces recalculées depuis les murs ET les limites invisibles ; une pièce retouchée à la main garde son contour. */
+  function piecesRecalculees(v) {
+    const r = piecesDepuisMurs(v.logement, v.limites || []);
+    const manuels = new Set(v.contours_manuels || []);
+    if (manuels.size) {
+      const avant = new Map((v.logement.pieces || []).map((p) => [p.id, p]));
+      for (const id of manuels) {
+        const ancienne = avant.get(id);
+        if (!ancienne) continue;
+        const i = r.pieces.findIndex((p) => p.id === id);
+        if (i >= 0) r.pieces[i] = { ...r.pieces[i], contour: ancienne.contour.map((q) => q.slice()) };
+        else r.pieces.push(copie(ancienne));
+      }
+    }
+    return r;
   }
 
   /** Les deux bords d'une ouverture, en mètres (pour dessiner ses poignées). */
@@ -1079,7 +1255,7 @@
    * la pièce qu'elle recouvre le plus. Une ancienne pièce qui n'est plus fermée (il manque un mur) reste telle quelle et
    * est signalée dans `ouvertes`. Rend {pieces, ouvertes, reunies, nouvelles}.
    */
-  function piecesDepuisMurs(lg) {
+  function piecesDepuisMurs(lg, limites = []) {
     const tous = lg.murs.flatMap((m) => polygoneMur(m));
     const x0 = Math.min(...tous.map((q) => q[0])), y0 = Math.min(...tous.map((q) => q[1]));
     const x1 = Math.max(...tous.map((q) => q[0])), y1 = Math.max(...tous.map((q) => q[1]));
@@ -1105,6 +1281,7 @@
     };
     let murs = new Uint8Array(l * h);
     for (const m of lg.murs) remplir(murs, polygoneMur(m));
+    for (const lim of limites) remplir(murs, polygoneMur({ debut: lim.debut, fin: lim.fin, epaisseur: Math.max(0.03, c * 1.5) }));
     murs = voisinageGrille(murs, l, h, 1); // bouche les jours minuscules entre deux murs qui se touchent presque
 
     // Numérote les espaces vides ; celui qui touche le bord de la grille est l'extérieur.
@@ -1228,7 +1405,7 @@
   /** Remplace les pièces par celles que dessinent les murs. Le détail reste calculable par piecesDepuisMurs. */
   function recalculerPieces(v0) {
     const v = copie(v0);
-    const r = piecesDepuisMurs(v.logement);
+    const r = piecesRecalculees(v);
     const ids = new Set(r.pieces.map((p) => p.id));
     v.logement.pieces = r.pieces;
     v.verifies = [...new Set([...(v.verifies || []), ...ids])];
@@ -1327,7 +1504,7 @@
     doutes = doutes.filter((x) => x.code !== "plusieurs_niveaux");
     if (options.fermeture) {
       // Après un recalcul des pièces : ce qui n'est pas fermé, montré à son endroit exact, avant tout le reste.
-      for (const f of piecesDepuisMurs(lg).fuites) {
+      for (const f of piecesDepuisMurs(lg, v.limites || []).fuites) {
         const cle = `fuite|${f.piece}`;
         if (resolus.has(cle)) continue;
         const situe = f.a !== null;
@@ -1733,6 +1910,14 @@
     morceauxLibres,
     fusionnerMursAlignes,
     apresMurs,
+    deplacerCoinPiece,
+    deplacerCotePiece,
+    alertesPiece,
+    ajouterLimite,
+    supprimerLimite,
+    limiteSous,
+    oublierContourManuel,
+    aimanterCoin,
     LARGEUR_MIN,
     modifierMur,
     renommerPiece,

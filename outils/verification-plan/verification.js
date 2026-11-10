@@ -34,6 +34,7 @@
     couper: "Cliquez sur un mur, là où il faut le couper. Vous pourrez ajuster au centimètre.",
     morceau: "Cliquez sur un mur au début du morceau à enlever, puis à sa fin. Vous pourrez ajuster au centimètre.",
     relier: "Cliquez sur le bout d'un mur, puis sur le bout de l'autre.",
+    limite: "Une limite SANS mur entre deux pièces d'un même espace : cliquez ses deux bouts (ils se collent aux murs). Cliquez sur une limite existante pour l'enlever.",
   };
   const VISEE = 8; // pixels d'écran : à quelle distance un clic « touche » un élément
 
@@ -563,6 +564,28 @@
     };
     const murChoisi = etat.outil === "choisir" && etat.choisi && v.logement.murs.find((m) => m.id === etat.choisi);
     if (murChoisi) { rond(murChoisi.debut, COULEURS.choisi); rond(murChoisi.fin, COULEURS.choisi); }
+    // Les limites invisibles (pas des murs) : pointillés violets.
+    for (const lim of v.limites || []) {
+      const [la, lb] = [lim.debut, lim.fin].map(px);
+      ctx.beginPath();
+      ctx.moveTo(la[0], la[1]);
+      ctx.lineTo(lb[0], lb[1]);
+      ctx.lineWidth = 3 * trait;
+      ctx.strokeStyle = "#7c3aed";
+      ctx.setLineDash([8 * trait, 6 * trait]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (etat.outil === "limite" && etat.depart) rond(etat.depart, "#7c3aed", 6);
+    const pieceChoisie = etat.outil === "choisir" && etat.choisi && (v.logement.pieces || []).find((q) => q.id === etat.choisi);
+    if (pieceChoisie) { // coins (gros ronds) et milieux des côtés (petits ronds) : à tirer pour redimensionner la pièce
+      const c = pieceChoisie.contour;
+      c.forEach((q, k) => {
+        const r2 = c[(k + 1) % c.length];
+        rond([(q[0] + r2[0]) / 2, (q[1] + r2[1]) / 2], "#93c5fd", 4);
+      });
+      for (const q of c) rond(q, COULEURS.choisi, 5);
+    }
     const ouvertureChoisie = etat.outil === "choisir" && etat.choisi && (v.logement.ouvertures || []).find((o) => o.id === etat.choisi);
     if (ouvertureChoisie) { // ses deux bords : à tirer pour changer la largeur
       const bords = C.bordsOuverture(v.logement, ouvertureChoisie);
@@ -1047,6 +1070,14 @@
       sol.addEventListener("change", () => {
         if (sol.value) corriger((x) => C.reglerSol(x, e.id, sol.value), `Sol : ${C.SOLS[sol.value]}.`);
       });
+      const manuelle = (etat.v.contours_manuels || []).includes(e.id);
+      const alertesP = C.alertesPiece(etat.v.logement, e.id);
+      const contourBouton = el("button", { class: "bouton", texte: "Revenir au contour calculé depuis les murs" });
+      contourBouton.addEventListener("click", () => corriger((x) => C.oublierContourManuel(x, e.id), "Contour recalculé depuis les murs."));
+      fiche.append(el("p", { class: "info", texte: "À la souris : tirez un coin (gros rond) ou poussez un côté (petit rond au milieu) ; "
+          + "ils se collent contre les murs. Pour couper un espace ouvert en deux pièces sans mur : ✎ Outils → Une limite." }),
+        ...(alertesP.length ? [el("p", { class: "erreur", texte: "Attention : " + alertesP.join(" ; ") + "." })] : []),
+        ...(manuelle ? [el("div", { class: "ligne" }, contourBouton)] : []));
       fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre,
         el("label", { texte: "Sol" }), sol, el("p", { class: "aide", texte: origineDe(e.sol) }),
         el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }), ...placard,
@@ -1239,6 +1270,27 @@
         }
       }
     }
+    if (etat.outil === "limite") {
+      const k = C.limiteSous(etat.v, p, tol);
+      if (k >= 0 && !etat.depart) {
+        corriger((x) => C.supprimerLimite(x, k), "Limite enlevée : les deux pièces n'en font plus qu'une.");
+        return;
+      }
+      if (!etat.depart) { etat.depart = C.aimanterCoin(lg, p, metresPour(VISEE * 1.5, p)); dessiner(); return; }
+      const a = etat.depart;
+      etat.depart = null;
+      if (corriger((x) => C.ajouterLimite(x, a, p, metresPour(VISEE * 1.5, p)),
+        "Limite ajoutée : l'espace est partagé en deux pièces (sans mur). Donnez un nom à la nouvelle pièce.")) changerOutil("choisir");
+      return;
+    }
+    const pieceOuverte = etat.choisi && (lg.pieces || []).find((q) => q.id === etat.choisi);
+    if (pieceOuverte && etat.outil === "choisir") {
+      const c = pieceOuverte.contour, rayon = metresPour(VISEE * 1.2, p);
+      const k = c.findIndex((q) => C.longueur(p, q) <= rayon);
+      if (k >= 0) { etat.glisse = { genre: "coin", id: pieceOuverte.id, k, bouge: false }; return; }
+      const m = c.findIndex((q, i) => { const r2 = c[(i + 1) % c.length]; return C.longueur(p, [(q[0] + r2[0]) / 2, (q[1] + r2[1]) / 2]) <= rayon; });
+      if (m >= 0) { etat.glisse = { genre: "cote", id: pieceOuverte.id, k: m, bouge: false }; return; }
+    }
     const ouvertureOuverte = etat.choisi && (lg.ouvertures || []).find((o) => o.id === etat.choisi);
     if (ouvertureOuverte) {
       const bords = C.bordsOuverture(lg, ouvertureOuverte);
@@ -1283,6 +1335,14 @@
       } catch (e) {
         g.erreur = e.message; // on garde l'aperçu précédent
       }
+    } else if (g && (g.genre === "coin" || g.genre === "cote")) {
+      g.bouge = true;
+      try {
+        const rayon = metresPour(VISEE * 1.5, p);
+        etat.apercu = g.genre === "coin" ? C.deplacerCoinPiece(etat.v, g.id, g.k, p, rayon) : C.deplacerCotePiece(etat.v, g.id, g.k, p, rayon);
+        g.point = p;
+        g.rayon = rayon;
+      } catch (e) { /* on garde l'aperçu précédent */ }
     } else if (g && (g.genre === "ouverture" || g.genre === "bord")) {
       if (g.genre === "bord" || C.longueur(p, g.depart) > metresPour(3, p)) g.bouge = true;
       if (g.bouge) {
@@ -1312,6 +1372,12 @@
       if (g.erreur) message(g.erreur, true);
       if (g.point) corrigerMurs((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
       else dessiner();
+    } else if (g && (g.genre === "coin" || g.genre === "cote") && g.bouge && g.point) {
+      const faire = g.genre === "coin" ? (x) => C.deplacerCoinPiece(x, g.id, g.k, g.point, g.rayon) : (x) => C.deplacerCotePiece(x, g.id, g.k, g.point, g.rayon);
+      if (corriger(faire, "Pièce redimensionnée à la main (ce contour sera gardé).")) {
+        const alertes = C.alertesPiece(etat.v.logement, g.id);
+        if (alertes.length) message("Attention : " + alertes.join(" ; ") + ".", true);
+      }
     } else if (g && g.genre === "ouverture" && g.bouge && g.point) {
       if (g.erreur) message(g.erreur, true);
       corriger((x) => C.deplacerOuverture(x, g.id, g.point, metresPour(VISEE * 2, g.point)),
@@ -1407,7 +1473,7 @@
   }));
   function refairePieces() {
     if (!etat.v) return;
-    const r = C.piecesDepuisMurs(etat.v.logement);
+    const r = C.piecesDepuisMurs(etat.v.logement, etat.v.limites || []);
     const parties = [`${r.pieces.length} pièce(s)`];
     if (r.reunies) parties.push(`${r.reunies} réunie(s) à une voisine`);
     if (r.nouvelles) parties.push(`${r.nouvelles} nouvelle(s)`);
