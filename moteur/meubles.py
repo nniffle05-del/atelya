@@ -32,7 +32,7 @@ CATEGORIES: dict[str, tuple[str, tuple[str, ...] | None, tuple[str, ...], tuple[
     "table": ("Table de repas", ("table",), ("dining", "kitchen table"), ("outdoor", "coffee", "side", "end table")),
     "bureau": ("Bureau", ("desk",), (), ("standing", "gaming", "laptop", "pedestal")),
     "chaise_de_bureau": ("Chaise de bureau", ("chair",), ("office", "desk chair", "task chair"), ("gaming",)),
-    "lit": ("Lit", ("bed", "bed frame"), ("bed",), ("air", "airbed", "luchtbed", "inflatable", "kids", "bunk", "daybed", "dog", "pet")),
+    "lit": ("Lit", ("bed", "bed frame"), ("bed",), ("air", "airbed", "luchtbed", "inflatable", "kids", "bunk", "loft", "daybed", "dog", "pet")),
     "lit_superpose": ("Lit superposé ou mezzanine", ("bed", "bed frame"), ("bunk", "loft"), ()),
     "table_de_chevet": ("Table de chevet", ("cabinet", "home furniture and decor", "table", "dresser"), ("nightstand", "bedside"), ()),
     "commode": ("Commode", ("dresser", "cabinet"), ("dresser", "chest of drawers", "drawer"), ("nightstand",)),

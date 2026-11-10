@@ -39,6 +39,9 @@ def poser_meubles(scene, meubles: list[dict]) -> int:
             bloc(m, racine, collection)
         racine.location = (m["position"][0], m["position"][1], m.get("altitude", 0.0))
         racine.rotation_euler = (0.0, 0.0, math.radians(m.get("face", 0.0) + 90.0))  # avant du modèle : -y → direction « face »
+        if m.get("literie"):  # couette, oreillers, plaid sur le matelas (10/11/2026)
+            from literie import habiller
+            habiller(scene, m, racine, collection)
     limiter_textures(scene)
     return len(meubles)
 

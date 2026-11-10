@@ -218,6 +218,18 @@ class Piece(Element):
         return abs(total) / 2
 
 
+class Literie(BaseModel):
+    """Le linge d'un lit (10/11/2026) : sur une vraie photo, un lit c'est surtout une couette (souvent blanche, plissée), des
+    oreillers et parfois un plaid. Blender les pose sur le matelas du lit (moteur/blender/literie.py)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    couette: Couleur = Field(description="Couleur de la couette (sRGB)")
+    oreillers: Annotated[int, Field(ge=0, le=4)] = 2
+    couleur_oreillers: Couleur | None = Field(default=None, description="Par défaut, celle de la couette")
+    plaid: Couleur | None = Field(default=None, description="Plaid replié au pied du lit, s'il y en a un")
+
+
 class Meuble(Element):
     """Un meuble (B4, 09/11/2026), voir moteur/meubles.py : du commerce (choisi dans la bibliothèque ABO) ou sur mesure (bloc).
 
@@ -234,6 +246,7 @@ class Meuble(Element):
                    Annotated[int, Field(ge=0, le=255)]] | None = Field(default=None, description="Couleur principale vue (sRGB)")
     modele: str | None = Field(default=None, description="Modèle ABO imposé ; sinon Atelya choisit le plus proche")
     description: str | None = None
+    literie: Literie | None = Field(default=None, description="Couette, oreillers, plaid (lits seulement)")
 
 
 class Logement(BaseModel):

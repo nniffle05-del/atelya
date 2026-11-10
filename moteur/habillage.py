@@ -193,7 +193,8 @@ def meubles_du_plan(logement: Logement) -> list[dict]:
     from moteur.meubles import SUR_MESURE
     return [{"id": m.id, "categorie": m.categorie, "position": list(m.position), "face": m.face,
              "dimensions": list(m.dimensions), "altitude": m.altitude, "couleur": list(m.couleur) if m.couleur else None,
-             "modele": m.modele, "sur_mesure": m.categorie in SUR_MESURE, "description": m.description} for m in logement.meubles]
+             "modele": m.modele, "sur_mesure": m.categorie in SUR_MESURE, "description": m.description,
+             "literie": m.literie.model_dump() if m.literie else None} for m in logement.meubles]
 
 
 # ------------------------------------------------- réglage de la teinte des sols au rendu

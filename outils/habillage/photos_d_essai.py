@@ -111,9 +111,32 @@ def _dedans(point, contour) -> bool:
     return bool(dans_polygone(np.array([point[0]]), np.array([point[1]]), contour)[0])
 
 
+TEINTES_COUETTE = [((246, 246, 243), 0.45), ((236, 236, 232), 0.12), ((222, 220, 214), 0.08), ((214, 205, 190), 0.08),
+                   ((190, 195, 200), 0.07), ((150, 160, 170), 0.05), ((200, 180, 170), 0.05), ((120, 135, 120), 0.04),
+                   ((90, 100, 125), 0.03), ((60, 60, 65), 0.03)]
+
+
+def literie_au_hasard(alea: random.Random) -> dict:
+    """Linge d'un lit comme sur les vraies photos d'annonce : couette surtout blanche ou claire, 1 à 4 oreillers, plaid une
+    fois sur deux (10/11/2026)."""
+    def teinte():
+        r, cumul = alea.random(), 0.0
+        for c, p in TEINTES_COUETTE:
+            cumul += p
+            if r <= cumul:
+                return [int(min(255, max(0, v + alea.gauss(0, 4)))) for v in c]
+        return list(TEINTES_COUETTE[0][0])
+    couette = teinte()
+    oreillers = teinte() if alea.random() < 0.3 else None
+    plaid = ([alea.randrange(40, 230) for _ in range(3)] if alea.random() < 0.5 else None)
+    return {"couette": couette, "oreillers": alea.choice([1, 2, 2, 2, 3, 4]), "couleur_oreillers": oreillers, "plaid": plaid}
+
+
 def meubles_au_hasard(alea: random.Random, logement: dict, liste: list[dict]) -> list[dict]:
     """Des meubles ABO tirés au hasard dans chaque pièce (contre un mur ou au milieu ; souvent un tapis ; une table avec ses
-    chaises), sans chevauchement (grille de 5 cm), aux dimensions réelles du modèle tiré. Le type de pièce n'impose rien."""
+    chaises), sans chevauchement (grille de 5 cm), aux dimensions réelles du modèle tiré. Le type de pièce n'impose rien pour
+    Atelya ; mais pour ressembler aux vraies photos, une CHAMBRE reçoit d'abord un lit (9 fois sur 10) contre un mur, avec ses
+    tables de chevet, et tout lit reçoit du linge (couette, oreillers, plaid) 9 fois sur 10 (10/11/2026)."""
     from moteur.meubles import candidats
     par_categorie = {c: candidats(c, liste) for c in (*CONTRE_UN_MUR, *AU_MILIEU, "tapis")}
     hsp = logement["hauteur_sous_plafond"]
@@ -145,10 +168,45 @@ def meubles_au_hasard(alea: random.Random, logement: dict, liste: list[dict]) ->
                 return False
             if occupe:
                 libre[dedans] = False
-            sortie.append({"id": f"{piece['id']}__m{len(sortie) + 1}", "categorie": cat, "piece": piece["id"],
-                           "position": [round(float(v), 3) for v in position], "face": round(float(face), 1),
-                           "dimensions": list(dims), "modele": e["id"], "statut": "ajoute", "source": "photos d'essai (hasard)"})
+            meuble = {"id": f"{piece['id']}__m{len(sortie) + 1}", "categorie": cat, "piece": piece["id"],
+                      "position": [round(float(v), 3) for v in position], "face": round(float(face), 1),
+                      "dimensions": list(dims), "modele": e["id"], "statut": "ajoute", "source": "photos d'essai (hasard)"}
+            if cat == "lit" and alea.random() < 0.9:
+                meuble["literie"] = literie_au_hasard(alea)
+            sortie.append(meuble)
             return True
+
+        def contre_un_mur(cat, m, chevets=False):
+            """Pose le meuble m contre un mur tiré au hasard ; avec chevets, une table de chevet de chaque côté (souvent)."""
+            i = alea.randrange(len(c))
+            A, B = c[i], c[(i + 1) % len(c)]
+            long = float(np.linalg.norm(B - A))
+            if long < m[1][0] + 0.2:
+                return False
+            u = (B - A) / long
+            n = np.array([-u[1], u[0]])
+            le_long = alea.uniform(m[1][0] / 2 + 0.05, long - m[1][0] / 2 - 0.05)
+            milieu = A + u * le_long
+            if not _dedans(milieu + 0.1 * n, c):
+                n = -n
+            face = math.degrees(math.atan2(n[1], n[0]))
+            if not poser(cat, *m, milieu + n * (m[1][1] / 2 + 0.03), face):
+                return False
+            if chevets:
+                for sens in (-1, 1):
+                    if alea.random() < 0.7:
+                        mc = modele("table_de_chevet", 0.7)
+                        if mc:
+                            q = milieu + sens * u * (m[1][0] / 2 + mc[1][0] / 2 + 0.04) + n * (mc[1][1] / 2 + 0.03)
+                            poser("table_de_chevet", *mc, q, face)
+            return True
+
+        if piece["id"].startswith("chambre") and alea.random() < 0.9:
+            m = modele("lit", 2.4)
+            if m:
+                for _essai in range(25):
+                    if contre_un_mur("lit", m, chevets=True):
+                        break
 
         if alea.random() < 0.6:  # un tapis au milieu (les autres meubles peuvent le chevaucher)
             m = modele("tapis", min(x1 - x0, y1 - y0) - 0.6)
@@ -163,17 +221,7 @@ def meubles_au_hasard(alea: random.Random, logement: dict, liste: list[dict]) ->
                     m = modele(cat, 3.2)
                     if not m:
                         break
-                    i = alea.randrange(len(c))
-                    A, B = c[i], c[(i + 1) % len(c)]
-                    long = float(np.linalg.norm(B - A))
-                    if long < m[1][0] + 0.2:
-                        continue
-                    u = (B - A) / long
-                    n = np.array([-u[1], u[0]])
-                    milieu = A + u * alea.uniform(m[1][0] / 2 + 0.05, long - m[1][0] / 2 - 0.05)
-                    if not _dedans(milieu + 0.1 * n, c):
-                        n = -n
-                    if poser(cat, *m, milieu + n * (m[1][1] / 2 + 0.03), math.degrees(math.atan2(n[1], n[0]))):
+                    if contre_un_mur(cat, m):
                         break
                 else:
                     cat = alea.choice(AU_MILIEU)

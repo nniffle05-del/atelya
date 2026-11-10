@@ -109,3 +109,32 @@ def test_rideaux_poses_cote_interieur_sous_le_plafond():
     (r,) = rideaux_du_plan(logement)
     assert r["centre"] == pytest.approx([1.6, 0.1]) and r["normale_deg"] == pytest.approx(90.0)  # mur sud, pièce au nord
     assert r["z_tringle"] == pytest.approx(2.4) and r["rideaux"] is None  # 30 cm au-dessus de la fenêtre (plafond bas)
+
+
+def test_literie_d_un_lit_jusqu_a_blender():
+    """Un lit peut porter son linge (couette, oreillers, plaid) ; il passe tel quel dans le plan donné à Blender (10/11/2026)."""
+    from moteur.habillage import meubles_du_plan
+    lit = {"id": "lit", "categorie": "lit", "piece": "sejour", "position": [2, 1.5], "face": 90, "dimensions": [1.6, 2.05, 1.0],
+           "statut": "ajoute", "source": "t", "literie": {"couette": [246, 246, 243], "oreillers": 2, "plaid": [120, 60, 60]}}
+    log = Logement.model_validate({**LOGEMENT, "meubles": [lit]})
+    (m,) = meubles_du_plan(log)
+    assert m["literie"] == {"couette": (246, 246, 243), "oreillers": 2, "couleur_oreillers": None, "plaid": (120, 60, 60)}
+    with pytest.raises(ValueError):
+        Logement.model_validate({**LOGEMENT, "meubles": [{**lit, "literie": {"couette": [246, 246, 243], "oreillers": 9}}]})
+
+
+def test_un_lit_mezzanine_n_est_pas_un_lit():
+    liste = [{"id": "L1", "product_type": "bed", "name": "Metal Twin Loft Bed, Black", "color": "Black", "size_metres": [1.4, 1.3, 2.0]},
+             {"id": "L2", "product_type": "bed", "name": "Queen Bed with Headboard", "color": "Grey", "size_metres": [1.7, 1.4, 2.3]}]
+    assert [e["id"] for e in candidats("lit", liste)] == ["L2"]
+    assert [e["id"] for e in candidats("lit_superpose", liste)] == ["L1"]
+
+
+def test_literie_au_hasard_surtout_claire():
+    import random
+    from outils.habillage.photos_d_essai import literie_au_hasard
+    alea = random.Random(3)
+    tirages = [literie_au_hasard(alea) for _ in range(400)]
+    claires = sum(min(t["couette"]) >= 200 for t in tirages)
+    assert 0.55 < claires / 400 < 0.85  # comme sur les vraies photos d'annonce : couettes blanches ou claires surtout
+    assert all(1 <= t["oreillers"] <= 4 for t in tirages) and 0.35 < sum(t["plaid"] is not None for t in tirages) / 400 < 0.65
