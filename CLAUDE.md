@@ -301,7 +301,7 @@ réécrit dans `moteur/owlv2.py`, poids `..\atelya\modeles-externes\owlv2-base`)
 `moteur/reperer_meubles.reperer_depuis_releve` + `outils/habillage/reperer_meubles_photos.py` posent les meubles trouvés (remplace le
 repérage DINOv2). Literie des lits (couette, oreillers, plaid) dans le format et dans Blender. Non-recul (examens DÉJÀ VUS) : sols
 app-001 81,5 → 83,6 %, app-002 79,2 → 87,9 % ; meubles app-001 16/34 → 25/34, app-002 10/30 → 22/30 (lits 0/2 → 2/2 sur les deux).
-Contrôle fabriqué à vrais lits : sols 70,3 → 84,1 %. Vraie note = un NOUVEAU logement avec photos (NT). Détail : fin de
+Contrôle fabriqué à vrais lits : sols 70,3 → 84,1 %. Premier plan vidéo avant/après (`moteur/blender/video_trajet.py`, `outils/habillage/video_piece.py`, 256 échantillons par défaut) : `..telya2pp-002ideovant-apres.mp4`. Note ~73/100 client. Vraie note = un NOUVEAU logement avec photos (NT). Détail : fin de
 `plan-lancement-lecture-claude.md`. Chantier suivant proposé : « tout ce qui n'est ni mur ni sol » (sur mesure, sanitaires…),
 jugé en vidéo ; NT : la CINÉMATIQUE avant la visite Unreal (`produit-livre-client.md`).
 

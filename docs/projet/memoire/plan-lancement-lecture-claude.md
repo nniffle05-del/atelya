@@ -765,3 +765,10 @@ OpenCV). App-002 chambre « 2 » (chambre_1) : `..\atelya\b2\app-002\video\` (av
 pas du sol + OWLv2 ; trajet-chambre.json, 96 images 1280×720, 18 mm, « 2 Jour voilé »). Chrono : 22 s l'image à 128 échantillons
 (chargement compris) ; murs TACHÉS par le débruiteur à 128 (risque de scintillement) ; parquet TROP FONCÉ (photo L ≈ 52) = défaut
 de teinte au rendu, à reprendre à part.
+VIDÉO AVANT/APRÈS FAITE (10/11/2026) : `..\atelya\b2\app-002\video\avant-apres.mp4` (côte à côte, 96 images, 256 échantillons ; avant
+42 min, après 46 min ; GPU à 85 °C) + `avant-apres-planche.jpg`. Avant : pas de lit, fausse bande de point de Hongrie (la couette),
+un tapis ; après : lit trouvé seul avec son linge par défaut, sol en lames sans fausse zone. Restent visibles : parquet trop foncé
+(teinte au rendu), légères marbrures sur les murs blancs, trajet écrit à la main. CHANTIER « PAS DU SOL » TERMINÉ (étapes 1-5).
+Note ~73/100 prêt client (était ~71). Chantier suivant proposé à NT : RÉALISATEUR AUTOMATIQUE (trajet calculé depuis le plan,
+garde-fous, ordre de visite) + UNE commande photos → maquette meublée → film + teinte des parquets au rendu (règle n° 21 : tout
+par défaut). Ensuite : « tout ce qui n'est ni mur ni sol ». Vraie note : nouveau logement avec photos (NT).
