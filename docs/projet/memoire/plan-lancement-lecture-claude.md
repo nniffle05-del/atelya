@@ -693,3 +693,11 @@ CONSTAT : les « lits » des photos fabriquées ne ressemblent pas aux vrais : b
 ni plaid), dont des lits mezzanine en métal noir (catégorie « lit » sans exclure « loft »), posés au hasard (cuisine, séjour,
 dégagement) ; contrôle meublé = 2 lits seulement. Le contrôle SOUS-ESTIME donc le défaut des vrais lits (app-002 : chambre 3
 entière fausse). Script : scratchpad `diag_etape1.py` (non gardé).
+**NT (10/11/2026) : « meubles » = TOUT ce qui n'est ni mur ni sol** (cuisine, placards, sanitaires, électroménager, radiateurs,
+luminaires, déco…). NT doute qu'Atelya sache DESSINER du sur mesure réaliste. Vérifié dans liste.json d'ABO : 0 sanitaire (évier,
+WC, douche, baignoire, robinet), 0 électroménager (frigo, plaque, hotte, lave-vaisselle, micro-ondes), 0 radiateur, pas de cuisine
+intégrée ; OK pour meubles libres, lampes (345), suspensions/lustres (~140), tableaux (599), miroirs (109), coussins (275),
+plantes (182). Proposé à NT comme CHANTIER SUIVANT (après « pas du sol ») : essai côte à côte sur la cuisine d'app-001 (dessiné par
+Atelya avec vraies matières PBR contre vrais modèles 3D d'une bibliothèque : Poly Haven CC0, Sketchfab par objet, fichiers
+fabricants pour architectes, BlenderKit — licences à LIRE avant de proposer, accord NT avant tout téléchargement) ; NT juge sur
+l'image, puis choix catégorie par catégorie. Pas commencé.
