@@ -321,7 +321,7 @@ Contrôle fabriqué à vrais lits : sols 70,3 → 84,1 %. Premier plan vidéo av
 `plan-lancement-lecture-claude.md`. Chantier suivant proposé : « tout ce qui n'est ni mur ni sol » (sur mesure, sanitaires…),
 jugé en vidéo ; NT : la CINÉMATIQUE avant la visite Unreal (`produit-livre-client.md`).
 
-**ATELYA → UNREAL, LE PAQUET (11/11/2026)** : `outils/unreal/exporter_pour_unreal.py <dossier 3d> <sortie> [--verifier]` = forme glTF (`moteur/blender/exporter_gltf.py` : placage UV « monde » calculé, verre lisible, brillances cuites) + fiche de scène `scene-atelya.json` (`moteur/export_unreal.py`) + photos des matières. Vérifié sur app-002 : maquette relue depuis le glTF = originale (séjour 1,86/255). Perdu : motifs dessinés (point de Hongrie, carreaux de ciment). Unreal pas encore installé (NT, chez lui). Détail : fin de `produit-livre-client.md`.
+**ATELYA → UNREAL, LE PAQUET (11/11/2026)** : `outils/unreal/exporter_pour_unreal.py <dossier 3d> <sortie> [--verifier]` = forme glTF (`moteur/blender/exporter_gltf.py` : placage UV « monde » calculé, verre lisible, brillances cuites) + fiche de scène `scene-atelya.json` (`moteur/export_unreal.py`) + photos des matières. Vérifié sur app-002 : maquette relue depuis le glTF = originale (séjour 1,86/255). Perdu : motifs dessinés (point de Hongrie, carreaux de ciment). **Unreal Engine 5.8.4 INSTALLÉ le 11/11/2026** dans `D:\Epic Games\UE_5.8` (5.9 = Preview, écartée ; pièges d'installation du lanceur dans la mémoire). Détail : fin de `produit-livre-client.md`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
