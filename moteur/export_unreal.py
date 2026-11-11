@@ -25,6 +25,7 @@ import shutil
 from datetime import date
 from pathlib import Path
 
+from moteur.geometrie import rectangles
 from moteur.matieres import CALCULEES, echelle_du_nom, matiere_et_teinte
 
 SCHEMA = "scene-unreal/0.1"
@@ -132,6 +133,20 @@ def fiche_materiau(nom: str, fiches_bibliotheque: dict, teintes: dict, orientati
     return {"genre": "meuble", "note": "matériau d'un meuble ABO : ses images sont dans le glTF (couleur, brillance, relief)"}
 
 
+def dalles(construction: dict) -> dict:
+    """Les DALLES de l'immeuble autour du logement (11/11/2026) : au-dessus de chaque plafond et sous chaque sol. Dans la maquette,
+    plafonds et sols sont des surfaces SANS épaisseur, posées pile sur le haut des murs : le calcul de lumière d'Unreal (Lumen)
+    y voyait des fentes (bande de ciel bleutée à la jonction murs / plafond, trait de soleil sur une porte, vus dans l'entrée
+    d'app-002). Un vrai logement a un étage au-dessus et un en dessous : la lumière n'entre que par les fenêtres."""
+    briques = construction.get("briques") or []
+    if any(b.get("id", "").startswith("dalle_") for b in briques):
+        return {}  # maquette récente : les dalles sont déjà dans la forme (moteur/geometrie.dalles_de_l_immeuble)
+    haut = max((b.get("z_haut", 2.5) for b in briques if b.get("categorie") == "mur"), default=2.5)
+    return {"plafonds": [r for b in briques if b.get("categorie") == "plafond" and b.get("contour") for r in rectangles(b["contour"])],
+            "sols": [r for b in briques if b.get("categorie") == "sol" and b.get("contour") for r in rectangles(b["contour"])],
+            "haut_m": haut, "bas_m": 0.0}
+
+
 def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gltf: str = "maquette.gltf") -> dict:
     """La fiche de scène d'une maquette (dossier_3d : construction.json, eclairages.json, reglages_teinte.json)."""
     construction = _lire(dossier_3d / "construction.json", {})
@@ -169,7 +184,7 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
     # Les murs et plafonds (collections « Murs » et « Plafonds » de Blender) : le « photographe » règle l'exposition et la
     # balance des blancs sur eux (moteur/photographe.py). Leurs noms sont ceux des objets glTF, donc des acteurs Unreal.
     blancs = sorted(b["id"] for b in construction.get("briques") or [] if b.get("categorie") in ("mur", "plafond")
-                    and b.get("id"))
+                    and b.get("id") and not b["id"].startswith("dalle_"))
 
     mobilier = [{"id": m["id"], "noeud_gltf": f"Meuble_{m['id']}", "categorie": m.get("categorie"), "modele": m.get("modele"),
                  "position": m.get("position"), "altitude": m.get("altitude", 0.0), "face_deg": m.get("face"),
@@ -198,6 +213,7 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
         "lumieres": lumieres,
         "eclairages": ambiances,
         "surfaces_blanches": blancs,
+        "dalles": dalles(construction),
         "meubles": mobilier,
         "vues": construction.get("vues") or [],
         "credits": credits,

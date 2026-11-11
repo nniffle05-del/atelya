@@ -29,12 +29,28 @@ import numpy as np
 CLARTE_MURS = 0.55
 EXPOSITION_MIN, EXPOSITION_MAX = -12.0, 6.0
 FORCE_BALANCE = 0.7
+# Clarté visée des murs DANS UNREAL, par éclairage : celle des images de Blender que NT préfère (« Blender a un truc plus
+# réaliste », 11/11/2026), MESURÉE sur ces images (masque des murs, AgX à l'envers) : le photographe de Blender vise
+# `clarte_murs` (moteur/eclairages.py) mais, de jour, son essai granuleux (16 rayons, sans débruiteur) le fait exposer plus clair :
+# soleil 0,91 au lieu de 0,55 (séjour), voilé 0,54 au lieu de 0,47 (chambre, image 1), fin de journée 1,30 au lieu de 0,50 ; soirée
+# et nuit justes (0,47 et 0,37). Le style « photo d'annonce » (murs presque blancs, pièce aérée) vient de là : on le garde.
+CLARTE_UNREAL = {"jour_soleil": 0.90, "jour_voile": 0.55, "fin_de_journee": 1.30, "soiree": 0.45, "nuit": 0.35}
+
+
+def clarte_visee(ambiance: dict) -> float:
+    """Clarté visée des murs pour cet éclairage dans Unreal (CLARTE_UNREAL ; à défaut, celle de la fiche)."""
+    return float(CLARTE_UNREAL.get(ambiance.get("id"), ambiance.get("clarte_murs", CLARTE_MURS)))
+
+
 POIDS = np.array([0.2126, 0.7152, 0.0722])  # clarté d'une couleur linéaire (Rec. 709)
 MINIMUM_PIXELS = 20
 
 # Réglages de la courbe filmique d'Unreal qui imitent AgX (Blender 5.2) sur les gris : pente, pied, épaule, coupure des noirs,
 # coupure des blancs (noms d'Unreal : film_slope, film_toe, film_shoulder, film_black_clip, film_white_clip).
 PELLICULE = {"film_slope": 0.514, "film_toe": 0.650, "film_shoulder": 0.545, "film_black_clip": 0.0, "film_white_clip": 0.0642}
+# Réglages des couleurs (nuancier de 163 couleurs passé dans AgX, moteur/pellicule_unreal.py) : pas d'« expansion de gamme »,
+# correction des bleus entière, saturation +4 % (noms d'Unreal : expand_gamut, blue_correction, color_saturation).
+PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.04}
 PELLICULE_USINE = {"film_slope": 0.88, "film_toe": 0.55, "film_shoulder": 0.26, "film_black_clip": 0.0, "film_white_clip": 0.04}
 # AgX de Blender 5.2 mesuré le 11/11/2026 (rampe de gris, image.save_render) : clarté linéaire -> valeur affichée (sur 255).
 AGX_MESURES = {0.003: 4.6, 0.01: 18.3, 0.03: 42.0, 0.1: 86.1, 0.18: 117.3, 0.3: 145.2, 0.55: 174.3, 1.0: 196.9, 2.0: 217.0,
@@ -112,11 +128,20 @@ def prochaine_exposition(historique: list[tuple[float, float]]) -> float:
     valeurs plafonnées ; vu au soleil le 11/11/2026)."""
     b, e = historique[-1]
     if len(historique) < 2:
-        return b + e
+        return _borner(b + e)
     b0, e0 = historique[-2]
     pente = (e0 - e) / (b - b0) if b != b0 else 1.0  # crans de clarté gagnés par cran d'exposition
     pente = min(max(pente, 0.3), 1.5)
-    return b + e / pente
+    return _borner(b + e / pente)
+
+
+# Exposition d'Unreal raisonnable pour un intérieur (app-002, 5 éclairages : de -6 à -12,6). Au-delà, la pièce n'a pas de lumière
+# (vu le 11/11/2026 : entrée sans fenêtre, portes fermées, de jour : le photographe partait à +22) : on s'arrête aux bornes.
+EXPOSITION_UNREAL_BORNES = (-16.0, -3.0)
+
+
+def _borner(biais: float) -> float:
+    return min(max(biais, EXPOSITION_UNREAL_BORNES[0]), EXPOSITION_UNREAL_BORNES[1])
 
 
 def lineaire_affiche(valeur_affichee, pellicule=None):

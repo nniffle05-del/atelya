@@ -60,3 +60,33 @@ def test_images_d_essai_appariees(tmp_path):
     images, masques = cu.images_d_essai(tmp_path)
     assert [p.name for p in images] == ["FinalImage.0001.png", "FinalImage.0009.png", "FinalImage.0017.png"]
     assert [p.name for p in masques] == [f"FinalImageM_MasqueBlancs.{f:04d}.png" for f in (1, 9, 17)]
+
+
+def test_scintillement(tmp_path):
+    """Un film calme (fondu régulier) ne scintille pas ; le même avec du grain qui change à chaque image scintille."""
+    import juger_film as jf
+    rng = np.random.default_rng(0)
+    calme, grain = tmp_path / "calme", tmp_path / "grain"
+    calme.mkdir()
+    grain.mkdir()
+    for k in range(1, 7):
+        base = np.full((40, 64, 3), 60 + 10 * k, dtype=float)
+        cv2.imencode(".png", base.astype(np.uint8))[1].tofile(str(calme / f"image-{k:04d}.png"))
+        bruit = np.clip(base + rng.normal(0, 12, base.shape), 0, 255)
+        cv2.imencode(".png", bruit.astype(np.uint8))[1].tofile(str(grain / f"image-{k:04d}.png"))
+    assert jf.juger(calme)["scintillement_255"] < 0.6
+    assert jf.juger(grain)["scintillement_255"] > 3
+
+
+def test_monter_film(tmp_path):
+    """Deux plans de 10 images, fondu de 2 images : 18 images, dont 2 mélangées."""
+    import monter_film as mf
+    plans = []
+    for k, v in enumerate((40, 200)):
+        d = tmp_path / f"p{k}"
+        d.mkdir()
+        for f in range(1, 11):
+            _ecrire(d / f"image-{f:04d}.png", v)
+        plans.append(d)
+    b = mf.monter(tmp_path / "film.mp4", plans, fondu_s=2 / 24, ips=24)
+    assert b["images"] == 18 and (tmp_path / "film.mp4").is_file()

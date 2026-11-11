@@ -90,3 +90,41 @@ def test_prochaine_exposition():
     b = ph.prochaine_exposition([(-6.69, -1.52), (-8.21, -0.69)])
     assert b == pytest.approx(-8.21 - 0.69 / (0.83 / 1.52), abs=0.01)
     assert ph.prochaine_exposition([(-7.0, -1.0), (-8.0, -1.0)]) == pytest.approx(-8.0 - 1.0 / 0.3)  # pente bornée
+
+
+def test_couleurs_de_la_pellicule():
+    """Le modèle des couleurs d'Unreal retombe sur la courbe des gris, et les réglages de couleur rapprochent du nuancier AgX."""
+    import json
+
+    from moteur import pellicule_unreal as pu
+    gris = np.array([0.01, 0.1, 0.18, 0.55, 2.0])
+    sur_gris = pu.affiche(np.stack([gris] * 3, 1), ph.PELLICULE)[:, 1]
+    assert sur_gris == pytest.approx(ph.courbe_unreal(gris, **ph.PELLICULE), abs=1e-3)
+    d = json.loads((RACINE / "tests" / "donnees" / "nuancier_agx_blender52.json").read_text(encoding="utf-8"))
+    L, A = np.array(d["lineaire"]), np.array(d["affiche"])
+
+    def ecart(**c):
+        return float(np.sqrt(((pu.affiche(L, ph.PELLICULE, **c) - A) ** 2).mean()) * 255)
+    c = ph.PELLICULE_COULEURS
+    assert ecart(saturation=c["saturation"], expand_gamut=c["expand_gamut"], blue_correction=c["blue_correction"]) < 6.0
+    assert ecart() > 8.0  # réglages d'usine d'Unreal
+    texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
+    ligne = next(l for l in texte.splitlines() if l.startswith("PELLICULE_COULEURS = "))
+    assert ast.literal_eval(ligne.split("=", 1)[1].strip()) == ph.PELLICULE_COULEURS
+
+
+def test_clarte_visee_comme_les_images_de_blender():
+    assert ph.clarte_visee({"id": "jour_soleil", "clarte_murs": 0.55}) == 0.90  # ce que Blender rend vraiment (mesuré)
+    assert ph.clarte_visee({"id": "nuit", "clarte_murs": 0.35}) == 0.35
+    assert ph.clarte_visee({"id": "autre", "clarte_murs": 0.4}) == 0.4
+    texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
+    assert "FORCE_CIEL_PHYSIQUE = 3.3" in texte  # lumière du ciel recalée sur la part du ciel de Blender
+
+
+def test_exposition_bornee():
+    """Une pièce sans lumière ne fait plus partir l'exposition dans l'absurde (entrée d'app-002 : +22 crans, 11/11/2026)."""
+    b = ph.prochaine_exposition([(-8.0, 3.6), (-4.4, 2.5)])
+    assert b <= ph.EXPOSITION_UNREAL_BORNES[1]
+    assert ph.prochaine_exposition([(-15.5, -3.0)]) == ph.EXPOSITION_UNREAL_BORNES[0]
+    texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
+    assert 'reglage.get("lampes_pieces")' in texte  # plafonnier allumé dans une pièce sans fenêtre filmée de jour

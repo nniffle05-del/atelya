@@ -336,6 +336,22 @@ AgX, fin du sol trop foncé ; préchauffe calculée, fin du mur sombre de l'imag
 (contrôle seulement) : voilé 12,0/255, soirée 10,6, nuit 7,8, ensoleillé 38,7, fin de journée 48,9. Étapes suivantes (ordre NT) :
 2 soleil réel « Jour ensoleillé » (sol noir dehors, fin de journée trop orangée), 3 réalisateur automatique (film 60-90 s Full HD de
 tout app-002), 4 motifs dessinés cuits. Une étape à la fois, validation NT.
+**LUMIÈRE RÉALISTE (11/11/2026 soir, NT préfère la lumière de Cycles ; « optimisé CINÉMATIQUE »)** : ciel d'Unreal ×3,3 (part du ciel
+mesurée contre Blender), clarté visée = celle des images Blender (`photographe.CLARTE_UNREAL`), couleurs de la pellicule réglées sur
+un nuancier AgX (`moteur/pellicule_unreal.py`), sol extérieur 20 km. Séjour au soleil, écart à Cycles : path tracer 24,1 → 6,7/255,
+Lumen 29,8 → 13,0. Film : LUMEN « intérieur » (`lumen_max`, défaut) = aussi calme que Cycles, ~0,2-0,4 s/image ; path tracer = option
+« qualité maximale » (grain, heures). Débruiteur temporel NFOR écarté (sillages). Éditeur + rendu ensemble = plantage GPU : éditeur
+fermé pendant les rendus. Soleil encore PROVISOIRE (pas de nord sur app-002) : règle proposée à NT (orientation à l'écran de
+vérification, sinon « Jour voilé »), en attente. Détail : fin de `produit-livre-client.md`.
+**SOLEIL RÉEL + RÉALISATEUR (11/11/2026)** : `moteur/soleil.py` (NOAA ; app-002 façade sud d'après NT, lieu/date supposés,
+`outils/atelya/soleil_reel.py`) ; `moteur/realisateur.py` choisit SEUL pièces, ordre, points de vue et travellings ;
+`outils/unreal/film_unreal.py` = film complet en une commande (app-002 : 8 plans de 6 s, Lumen Full HD 0,52 s/image).
+**PREMIER FILM D'ATELYA SEUL (12/11/2026, 0 h 50)** : `..\atelya\b2\app-002\unreal\film\film.mp4` (28 s, 5 plans : séjour ×2,
+cuisine, chambres ×2 ; 41 min de calcul). Corrigés à la source cette nuit : portes fermées (réalisateur), plafonnier allumé dans une
+pièce sans fenêtre, pièces vides et sans fenêtre non filmées (`rien_a_montrer`), exposition bornée, DALLES de l'immeuble au-dessus des
+plafonds et sous les sols (`geometrie.dalles_de_l_immeuble`, catégorie « dalle » : plus de fuites de lumière). Apprentissage par les
+AVIS de NT : `outils/atelya/noter_film.py` → `moteur/realisateur_appris.json`. À faire : sanitaires et meubles de cuisine (salles d'eau
+vides), reconstruire app-002 avec ses dalles, la visite libre plus tard.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

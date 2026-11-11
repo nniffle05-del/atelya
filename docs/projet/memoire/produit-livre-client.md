@@ -127,3 +127,67 @@ quand l'exposition était CALÉE sur Cycles), soirée 10,6, nuit 7,8, ensoleill�
 RESTE pour l'ÉTAPE 2 (soleil) : dehors, le sol de la planète d'Unreal sort NOIR dans les fenêtres (Blender : sol gris vu par la
 caméra) ; fin de journée nettement plus orangée que Blender (atmosphère d'Unreal à 7°) ; ensoleillé et fin de journée ~0,7-1 cran
 plus sombres que Cycles hors murs. Commande : `outils/unreal/cinematique_unreal.py <paquet> <nom> <trajet> --eclairages tous`.
+**LUMIÈRE RÉALISTE DANS UNREAL (11/11/2026 soir, NT : « je préfère nettement la lumière de Blender/Cycles », « fais tout et donne-moi
+un rendu », « optimisé pour la CINÉMATIQUE, pas la photo », « bon mélange résultat / légèreté »)**. Scène d'essai : séjour d'app-002
+au soleil (vue sejour_1, repère Cycles `..\atelya\b2\app-002\unreal\lumiere\cycles\`), zones fixes mesurées + planches.
+(1) CAUSES de l'écart avec Cycles, MESURÉES : (a) la lumière du CIEL d'Unreal (Sky Light capturant l'atmosphère) éclaire ~3 fois trop
+peu par rapport au soleil : part du ciel dans la lumière d'un mur 26 % (Unreal) contre 59 % (Blender, cohérent avec un vrai ciel bleu),
+canapé 53 % contre 79 % (rendus avec / sans le ciel, exposition fixe) → `FORCE_CIEL_PHYSIQUE = 3,3` (médiane de 7 zones), ciel couvert
+inchangé ; (b) le photographe de BLENDER expose de jour PLUS CLAIR que sa visée (essai granuleux 16 rayons sans débruiteur) : murs
+réels soleil 0,91 au lieu de 0,55, voilé 0,54 au lieu de 0,47, fin de journée 1,30 au lieu de 0,50 ; soirée / nuit justes. C'est ce
+style « photo d'annonce » que NT préfère → `photographe.CLARTE_UNREAL` (0,90 / 0,55 / 1,30 / 0,45 / 0,35) ; (c) couleurs : modèle
+complet des couleurs de la pellicule d'Unreal recopié des shaders (`moteur/pellicule_unreal.py`), nuancier de 163 couleurs passé dans
+AgX (`tests/donnees/nuancier_agx_blender52.json`) → `PELLICULE_COULEURS` (expand_gamut 0, blue_correction 1, saturation 1,04) :
+8,6 → 5,7/255, gris inchangés. ÉCARTÉS (mesurés sans effet) : garde-fou du path tracer (max path intensity), ombres par rayons.
+Résultat séjour : écart moyen à Cycles Path Tracer 24,1 → 6,7/255, Lumen 29,8 → 13,4 (réglages « intérieur » `lumen_max` : pas de
+short range AO, cache plus fin, accumulation 32 images : 13,0). Le soleil sur l'embrasure de la porte-fenêtre O10 n'est PAS une fuite
+(vérifié au rayon près dans Blender : embrasure de droite au soleil, celle de gauche en lumière renvoyée).
+(2) CINÉMATIQUE (trajet chambre, 96 images 720p, critère « film ») : Lumen 0,17 s/image, scintillement 1,74 (= Cycles 1,75, bruit de
+fond d'une caméra qui bouge) ; path tracer 16 rayons 2,55 s/image, 2,66 (grain qui grouille), 32 rayons 5,1 s, 2,52 ; débruiteur
+TEMPOREL NFOR (`r.PathTracing.TemporalDenoiser`) : 0,18 mais SILLAGES FANTÔMES sur les objets → écarté. CHOIX : LUMEN « intérieur »
+(`lumen_max`, défaut de `cinematique_unreal.py`) pour le film ; path tracer en option « qualité maximale » (calcul de nuit).
+Outils : `outils/unreal/juger_film.py` (scintillement, écart, temps pour 90 s), `outils/unreal/monter_film.py` (plans + fondus).
+(3) DEHORS : sol gris 20 km à 6 m sous le logement (`DEHORS_*`, logement supposé au 2e étage, statut « ajouté ») : plus de sol noir dans
+les fenêtres ; avec 2 km, trait sombre à l'horizon. (4) ÉDITEUR OUVERT : la chaîne prépare alors la scène DANS l'éditeur
+(`outils/unreal/editeur_python.js`, Remote Execution 127.0.0.1) car il verrouille les fichiers (erreur Windows 32) ; mais éditeur +
+rendu = carte graphique pleine (7,7/8 Go, 86 °C) → PLANTAGE GPU (« device reset ») vu à 21h44 : pour les rendus lourds, ÉDITEUR FERMÉ.
+MCP runreal : adresse rendue réglable (`UE_PYTHON_BIND=127.0.0.1` dans `.mcp.json` ; `dist/index.js` modifié, original
+`index.js.origine`, dans `D:\Atelya-Unreal\outils\mcp-unreal`) ; relancer le MCP (/mcp → unreal → Reconnect) pour qu'il le prenne.
+(5) PIÈGES : pilote NVIDIA 555.97 plante à la compilation de Lumen « hit lighting » (`r.Lumen.HardwareRayTracing.LightingMode 2`) →
+une mise à jour du pilote (accord NT) le débloquerait (et OptiX dans Blender) ; passe du path tracer nommée « PathTracer » ; débruiteur
+du path tracer : greffon OpenImageDenoise activé (fourni avec Unreal, Intel, Apache 2.0, lu). (6) SOLEIL : direction PROVISOIRE
+(habillage.SOLEIL_AZIMUT 200°) ; app-002 n'a PAS de flèche du nord (NT). Proposé à NT (en attente) : orientation donnée en un geste à
+l'écran de vérification, sinon « Jour voilé » par défaut (règle 20) ; lieu = ville / code postal ; date et heure au choix. Idée gardée :
+ciels photographiés HDRI Poly Haven (CC0) — téléchargement = accord NT. Outil de lumière de Karim Yasser (CG Foundry) écarté
+(réglage manuel, trucage de la lumière : contraire aux règles 20 et 21).
+**SOLEIL RÉEL (11/11/2026, NT : « on m'a dit que le soleil venait du sud », pour simuler)** : `moteur/soleil.py` (formules NOAA,
+vérifiées : Paris midi solstice 64,6°, équinoxe 41°) : azimut / hauteur d'après orientation (nord_deg sur le plan), lieu (latitude,
+longitude ; ville, jamais l'adresse), date et heure légale (heure d'été France) ; moments : « Jour ensoleillé » 15 h, « Fin de
+journée » soleil à 7°, « Soirée » -3°. `outils/atelya/soleil_reel.py <scene-atelya.json> --nord 0 --source …` les inscrit dans la
+fiche (bloc « soleil » avec statuts : orientation « estime », lieu centre de la France et 21 avril « ajoute »). App-002 : façade des
+baies séjour + chambres (bas du plan) = SUD (lecture de Claude, à confirmer par NT) → 15 h : azimut 209°, 52° ; 19 h 58 : 280°, 7°.
+**RÉALISATEUR AUTOMATIQUE (11/11/2026, NT : « il faut qu'Atelya sache faire un plan cinéma tout seul »)** : `moteur/realisateur.py`
+d'après logement.json (murs + épaisseur, ouvertures, pièces, meubles) : pièces dans l'ordre d'une visite (entrée, séjour, cuisine,
+chambres, salles d'eau ; pas placards / WC / dégagements ; 2 plans si > 28 m²) ; points de vue candidats tous les 0,25 m (≥ 0,45 m
+des murs, 0,3 m en pièce étroite, ≥ 0,3 m des meubles), 180 rayons 2D (portes = passages, fenêtres = lumière, meubles hauts cachent),
+note = part de la pièce vue + fenêtre dans le champ (4-35 %) + meubles + profondeur − mur proche ; mouvement : travelling avant
+0,5-1 m (finit sur le point choisi) avec ±6° de panoramique, sinon latéral, sinon panoramique (malus 0,6) ; 18 mm, 1,5 m, −5°, 6 s.
+App-002 : 8 plans (entrée, séjour ×2, cuisine, chambres ×2, salles d'eau ×2), tous en travelling, ~95 s de calcul ; vue de dessus
+`realisateur.dessiner` (plans.png). Commande : `outils/unreal/film_unreal.py <paquet> <nom> <logement.json> --eclairage jour_soleil`
+(réalisateur → rendu plan par plan, photographe PIÈCE PAR PIÈCE → montage avec fondus 0,5 s ; film.json, plans.json, plans.png).
+Full HD mesuré : Lumen 0,52 s/image (film de 90 s ≈ 19 min), path tracer 16 rayons 4,2 s (≈ 2 h 30).
+**PREMIER FILM D'ATELYA SEUL (nuit du 11 au 12/11/2026) — défauts trouvés et corrigés À LA SOURCE** : (1) le réalisateur croyait les
+PORTES intérieures ouvertes (il visait le séjour « à travers ») alors qu'elles sont FERMÉES dans la maquette → `PORTES_FERMEES` (une
+porte cache la vue) ; (2) pièce SANS FENÊTRE filmée de jour (entrée, salles d'eau d'app-002) = noire, le photographe partait à +22
+crans → le plan dit `lumiere_du_jour` (`Scene2D.a_une_fenetre`) et le film ALLUME LE PLAFONNIER de cette pièce (`lampes_pieces` du
+réglage, comme un photographe d'immobilier) ; exposition d'Unreal bornée à [-16 ; -3] (`photographe.EXPOSITION_UNREAL_BORNES`) ;
+(3) FUITES DE LUMIÈRE (NT : « qu'Atelya empêche ces petites fuites dans les maquettes ») : plafonds et sols sans épaisseur posés pile
+sur le haut des murs → Lumen voyait le ciel aux jonctions (bande bleutée au plafond, trait de soleil sur une porte). CORRECTION À LA
+SOURCE : `geometrie.dalles_de_l_immeuble` = une dalle de 30 cm au-dessus de chaque plafond et sous chaque sol, débordant de 20 cm
+sur les murs (catégorie « dalle », collection Blender « Dalles », cachée dans la vue de dessus) : toute nouvelle maquette est
+étanche ; pour les maquettes déjà exportées (app-002), la fiche donne les mêmes dalles (`export_unreal.dalles`) et Unreal les pose
+(`preparer_cinematique.poser_dalles`). Vérifié sur l'entrée : plus de bande ni de trait. (4) APPRENTISSAGE PAR LES AVIS DE NT (« il
+doit l'apprendre tout seul », voie choisie par NT) : `realisateur.savoir_faire()` (réglages de départ + appris), `realisateur.AVIS`
+(bien, trop_pres, ennuyeux, trop_rapide, pas_assez_de_lumiere, contre_jour, piece_mal_montree, trop_haut, trop_plongeant, deforme…),
+chaque avis corrige un peu (pas bornés, `BORNES`) ; gardé dans `moteur/realisateur_appris.json` (+ historique) ; commande
+`outils/atelya/noter_film.py <dossier du film> "3:trop_pres,ennuyeux" "tous:bien"`.

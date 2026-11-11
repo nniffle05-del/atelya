@@ -39,7 +39,7 @@ def test_une_brique_un_objet(resultat):
 def test_cotes_au_millimetre(resultat):
     _, plan, mesures = resultat
     collections = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds",
-                   "menuiserie": "Menuiseries"}
+                   "menuiserie": "Menuiseries", "dalle": "Dalles"}
     for brique in plan["briques"]:
         mesure = mesures[brique["id"]]
         xs = [p[0] for p in brique["contour"]]
@@ -57,7 +57,7 @@ def test_faces_bien_orientees(resultat):
     _, plan, mesures = resultat
     for brique in plan["briques"]:
         mesure = mesures[brique["id"]]
-        if brique["categorie"] in ("mur", "menuiserie"):
+        if brique["categorie"] in ("mur", "menuiserie", "dalle"):  # dalle de l'immeuble (12/11/2026) : une boîte épaisse
             assert mesure["faces"] == 6
         elif brique["categorie"] == "sol":
             assert mesure["normales"] == [pytest.approx([0, 0, 1])]

@@ -125,7 +125,7 @@ def test_plan_lisible_en_json(logement):
     plan = json.loads(json.dumps(plan_de_construction(logement)))
     assert plan["schema"] == "construction/0.1"
     assert plan["projet_id"] == "CAS-TEST-00"
-    assert len(plan["briques"]) == 36
+    assert len(plan["briques"]) == 36 + 8  # + (12/11/2026) une dalle au-dessus du plafond et une sous le sol des 4 pièces
 
 
 def _donnees():
@@ -320,3 +320,24 @@ def test_ouverture_reste_en_place_quand_le_debut_du_mur_bouge():
     briques = calculer_briques(_b1_logement(murs, ouvertures=[o]))
     linteau = next(boite(b) for b in briques if b.id == "S__linteau_P")
     assert linteau[0][0] == pytest.approx(0.90, abs=1e-6)  # -0,12 + 1,02 : la porte n'a pas bougé dans la pièce
+
+
+def test_dalles_de_l_immeuble(logement):
+    """Chaque pièce a une dalle épaisse au-dessus de son plafond et sous son sol, qui déborde sur le haut des murs (plus de
+    fente de lumière aux jonctions murs / plafond, vue dans Unreal le 11/11/2026)."""
+    from moteur.geometrie import DALLE_DEBORD, DALLE_EPAISSEUR, calculer_briques, rectangles
+    briques = calculer_briques(logement)
+    dalles = [b for b in briques if b.categorie == "dalle"]
+    hsp = logement.hauteur_sous_plafond
+    hautes = [b for b in dalles if b.z_bas > hsp]
+    basses = [b for b in dalles if b.z_haut < 0]
+    assert len(hautes) == len(basses) == len(logement.pieces)
+    assert all(abs(b.z_haut - b.z_bas - DALLE_EPAISSEUR) < 1e-9 for b in dalles)
+    for b in hautes:  # chaque dalle déborde le plafond de sa pièce de DALLE_DEBORD de chaque côté
+        plafond = next(p for p in briques if p.id == f"plafond__{b.element}")
+        xs, ys = [p[0] for p in plafond.contour], [p[1] for p in plafond.contour]
+        assert min(p[0] for p in b.contour) <= min(xs) - DALLE_DEBORD + 1e-6
+        assert max(p[1] for p in b.contour) >= max(ys) + DALLE_DEBORD - 1e-6
+    # un séjour en L est découpé en rectangles qui le couvrent exactement
+    L = [[1.234, 6.953], [1.234, 2.672], [6.453, 2.672], [6.453, 0.0], [9.75, 0.0], [9.75, 4.688], [6.398, 4.688], [6.398, 6.953]]
+    assert rectangles(L) == [[6.453, 9.75, 0.0, 2.672], [1.234, 9.75, 2.672, 4.688], [1.234, 6.398, 4.688, 6.953]]

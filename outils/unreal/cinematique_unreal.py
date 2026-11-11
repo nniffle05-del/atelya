@@ -34,18 +34,36 @@ STUDIO = Path(r"D:\Atelya-Unreal")
 PROJET = STUDIO / "AtelyaStudio" / "AtelyaStudio.uproject"
 MOTEUR_UE = Path(r"D:\Epic Games\UE_5.8\Engine\Binaries\Win64")
 SCRIPTS_UE = RACINE_CODE / "moteur" / "unreal"
-PASSE_IMAGE, PASSE_MASQUE = "FinalImage", "M_MasqueBlancs"
+PASSES_IMAGE, PASSE_MASQUE = ("FinalImage", "PathTracer"), "M_MasqueBlancs"  # Lumen, path tracer
+
+
+NODE = STUDIO / "outils" / "node" / "node.exe"
+EDITEUR_PYTHON = Path(__file__).resolve().parent / "editeur_python.js"
+
+
+def editeur_ouvert() -> bool:
+    """L'éditeur Unreal est-il ouvert sur le studio (fenêtre, pas un rendu « -game » ni une ligne de commande) ?"""
+    r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                        "Get-CimInstance Win32_Process -Filter \"Name='UnrealEditor.exe'\" | ForEach-Object { $_.CommandLine }"],
+                       capture_output=True, text=True, errors="replace")
+    return any("AtelyaStudio" in l and "-game" not in l.lower() and "-run=" not in l.lower() for l in r.stdout.splitlines())
 
 
 def _python_unreal(script: Path, *arguments: str) -> None:
-    """Lance un script Python dans Unreal, sans écran ; s'arrête net (« PLANTÉ ») si le script échoue."""
+    """Lance un script Python dans Unreal ; s'arrête net (« PLANTÉ ») si le script échoue. Éditeur ouvert (NT regarde) : le
+    script tourne DANS l'éditeur (outils/unreal/editeur_python.js), qui tient les fichiers du projet ; sinon : sans écran."""
     copie = PROJET.parent / "Scripts" / script.name
     copie.parent.mkdir(exist_ok=True)
     shutil.copy2(script, copie)
-    ligne = " ".join([copie.as_posix(), *arguments])
-    r = subprocess.run([str(MOTEUR_UE / "UnrealEditor-Cmd.exe"), str(PROJET), "-run=pythonscript", f"-script={ligne}",
-                        "-unattended", "-nop4", "-nosplash", "-nullrhi"], capture_output=True, text=True, errors="replace")
-    journal = (PROJET.parent / "Saved" / "Logs" / "AtelyaStudio.log").read_text(encoding="utf-8", errors="replace")
+    if editeur_ouvert():
+        r = subprocess.run([str(NODE), str(EDITEUR_PYTHON), str(copie), *arguments], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
+        journal = r.stdout + r.stderr
+    else:
+        ligne = " ".join([copie.as_posix(), *arguments])
+        r = subprocess.run([str(MOTEUR_UE / "UnrealEditor-Cmd.exe"), str(PROJET), "-run=pythonscript", f"-script={ligne}",
+                            "-unattended", "-nop4", "-nosplash", "-nullrhi"], capture_output=True, text=True, errors="replace")
+        journal = (PROJET.parent / "Saved" / "Logs" / "AtelyaStudio.log").read_text(encoding="utf-8", errors="replace")
     erreurs = [l for l in journal.splitlines() if "LogPython: Error" in l]
     for l in journal.splitlines():
         if "ATELYA" in l:
@@ -100,8 +118,8 @@ def ecart_d_exposition(dossier: Path, reference: Path, images=(1, 48, 96)) -> fl
 
 def images_d_essai(dossier: Path) -> tuple[list[Path], list[Path]]:
     """Les paires (image, masque des murs et plafonds) d'un rendu d'essai, appariées par numéro d'image. Movie Render Queue
-    nomme la passe du masque « FinalImage » + nom du matériau (vu le 11/11/2026)."""
-    images = {p.name.rsplit(".", 2)[-2]: p for p in dossier.glob(f"{PASSE_IMAGE}.*.png")}
+    nomme la passe du masque « FinalImage » (ou « PathTracer ») + nom du matériau (vu le 11/11/2026)."""
+    images = {p.name.rsplit(".", 2)[-2]: p for passe in PASSES_IMAGE for p in dossier.glob(f"{passe}.*.png")}
     masques = {p.name.rsplit(".", 2)[-2]: p for p in dossier.glob(f"*{PASSE_MASQUE}.*.png")}
     communs = sorted(set(images) & set(masques))
     if not communs:
@@ -109,24 +127,41 @@ def images_d_essai(dossier: Path) -> tuple[list[Path], list[Path]]:
     return [images[k] for k in communs], [masques[k] for k in communs]
 
 
-def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict) -> dict:
+def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict, moteur: str = "lumen",
+                 echantillons: int | None = None, intensite_max: float | None = None, exposition_fixe: float | None = None,
+                 force_ciel: float | None = None, suffixe: str = "", temporel: bool = False,
+                 lampes_pieces: list[str] | None = None) -> dict:
     """Le photographe règle l'exposition et la balance sur de petits essais, puis le film est rendu et contrôlé."""
     ident = ambiance["id"]
-    sortie = STUDIO / "Paquets" / "rendus" / nom / ident
+    dossier = ident if moteur == "lumen" else f"{ident}-{moteur}" + (f"-{echantillons}" if echantillons else "")
+    dossier += (f"-max{intensite_max:g}" if intensite_max is not None else "") + suffixe
+    sortie = STUDIO / "Paquets" / "rendus" / nom / dossier
     essai = sortie / "essai"
     print(f"== {ambiance.get('nom', ident)}")
     debut = time.time()
-    clarte = float(ambiance.get("clarte_murs", photographe.CLARTE_MURS))
+    clarte = photographe.clarte_visee(ambiance)
     balance = float(ambiance.get("balance", photographe.FORCE_BALANCE))
-    reglage = sortie.parent / f"reglage-{ident}.json"
+    reglage = sortie.parent / f"reglage-{dossier}.json"
     reglage.parent.mkdir(parents=True, exist_ok=True)
 
     def preparer(biais, gain):
-        reglage.write_text(json.dumps({"eclairage": ident, "exposition": biais, "gain": list(gain)}, indent=1), encoding="utf-8")
+        reglage.write_text(json.dumps({"eclairage": ident, "exposition": biais, "gain": list(gain), "moteur": moteur,
+                                      "dossier": dossier, **({"echantillons": echantillons} if echantillons else {}),
+                                      **({"intensite_max": intensite_max} if intensite_max is not None else {}),
+                                      **({"force_ciel": force_ciel} if force_ciel is not None else {}),
+                                      "debruiteur_temporel": temporel,
+                                      **({"lampes_pieces": lampes_pieces} if lampes_pieces else {})}, indent=1), encoding="utf-8")
         _python_unreal(SCRIPTS_UE / "preparer_cinematique.py", paquet.as_posix(), nom, trajet.as_posix(), reglage.as_posix())
 
     # a-b. ESSAIS : petites images du film, mesurées ; exposition corrigée (pente apprise) jusqu'à tomber juste.
     biais, gain, essais = photographe.PREMIER_ESSAI, [1.0, 1.0, 1.0], []
+    if exposition_fixe is not None:  # mesures de calage (pas un film) : exposition imposée, ni essais ni contrôle
+        preparer(exposition_fixe, gain)
+        for ancienne in sortie.glob("image-*.png"):
+            ancienne.unlink()
+        duree = rendre(nom, "Rendu")
+        print(f"  rendu à exposition imposée {exposition_fixe:+.2f} en {duree:.0f} s : {sortie}")
+        return {"eclairage": ident, "dossier": str(sortie), "exposition_fixe": exposition_fixe, "rendu_s": round(duree, 1)}
     for k in range(photographe.ESSAIS_MAX):
         preparer(biais, gain)
         if essai.exists():
@@ -168,7 +203,7 @@ def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict) -> dict:
         print(f"  ATTENTION : film encore à {controles[-1]['correction']:+.2f} cran de la clarté visée (gardé, à regarder)")
     n = len(list(sortie.glob("image-*.png")))
     film = video(sortie, int(json.loads(trajet.read_text(encoding="utf-8")).get("ips", 24)))
-    bilan = {"eclairage": ident, "images": n, "rendu_s": round(duree, 1), "essais": essais, "controles": controles,
+    bilan = {"eclairage": ident, "moteur": moteur, "images": n, "rendu_s": round(duree, 1), "essais": essais, "controles": controles,
              "total_s": round(time.time() - debut, 1), "video": str(film)}
     (sortie / "rendu-unreal.json").write_text(json.dumps(bilan, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"  {n} images en {duree / 60:.1f} min ({duree / max(n, 1):.2f} s par image, chauffe et chargement compris) ; "
@@ -184,6 +219,14 @@ def main() -> None:
     p.add_argument("--eclairages", default="", help="« tous », ou des identifiants séparés par des virgules (défaut : celui du "
                                                     "trajet)")
     p.add_argument("--sans-import", action="store_true", help="garder la maquette déjà importée")
+    p.add_argument("--moteur", default="lumen_max", choices=["lumen", "lumen_max", "path_tracer"],
+                   help="calcul de la lumière : lumen (temps réel), lumen_max, path_tracer (comme Cycles, plus lent)")
+    p.add_argument("--echantillons", type=int, help="path tracer : rayons par pixel du film (défaut 256)")
+    p.add_argument("--intensite-max", type=float, help="path tracer : garde-fou des chemins trop forts (défaut d'Unreal)")
+    p.add_argument("--exposition-fixe", type=float, help="mesures de calage : exposition Unreal imposée, sans essais")
+    p.add_argument("--force-ciel", type=float, help="force de la lumière du ciel (Sky Light), 1 par défaut")
+    p.add_argument("--suffixe", default="", help="ajouté au nom du dossier de sortie")
+    p.add_argument("--temporel", action="store_true", help="path tracer : débruiteur temporel (NFOR) en plus")
     a = p.parse_args()
     paquet = STUDIO / "Paquets" / a.nom
     if Path(a.paquet).resolve() != paquet.resolve():
@@ -205,7 +248,8 @@ def main() -> None:
     if not a.sans_import:
         print("1. Import de la maquette dans Unreal")
         _python_unreal(SCRIPTS_UE / "importer_maquette.py", paquet.as_posix(), a.nom)
-    bilans = [un_eclairage(paquet, a.nom, trajet, x) for x in choisies]
+    bilans = [un_eclairage(paquet, a.nom, trajet, x, a.moteur, a.echantillons, a.intensite_max, a.exposition_fixe, a.force_ciel,
+                           a.suffixe, a.temporel) for x in choisies]
     (STUDIO / "Paquets" / "rendus" / a.nom / "bilan.json").write_text(json.dumps(bilans, indent=1, ensure_ascii=False),
                                                                       encoding="utf-8")
 

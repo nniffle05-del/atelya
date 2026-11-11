@@ -26,7 +26,7 @@ from materiaux import creer_materiaux  # noqa: E402
 from poser_meubles import poser_meubles  # noqa: E402
 from rideaux import poser_rideaux  # noqa: E402
 
-COLLECTIONS = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds", "menuiserie": "Menuiseries"}
+COLLECTIONS = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds", "menuiserie": "Menuiseries", "dalle": "Dalles"}
 SCHEMAS = ("construction/0.1", "construction/0.2")
 
 

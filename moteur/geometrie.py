@@ -56,6 +56,14 @@ TOLERANCE_NOEUD = 0.03  # m : deux bouts de murs plus proches sont le même poin
 ZONE_SOL_Z = 0.0005  # m : une zone de sol (autre revêtement dans la pièce) est posée un demi-millimètre au-dessus du sol de la
 # pièce : à la même hauteur, les deux surfaces se disputeraient chaque point au rendu (taches noires)
 CALAGE_SOL = 0.10  # m : un côté de pièce à moins de ça de la face d'un mur (parallèle) est posé dessus
+# Les DALLES de l'immeuble (12/11/2026, NT : « qu'Atelya empêche ces petites fuites dans les maquettes ») : plafonds et sols sont
+# des surfaces sans épaisseur posées pile sur le haut et le bas des murs ; le calcul de lumière d'Unreal (Lumen) voyait le ciel
+# par ces jonctions (bande bleutée au plafond, trait de soleil sur une porte, entrée d'app-002). Chaque pièce reçoit donc une
+# dalle épaisse au-dessus de son plafond et une sous son sol, qui déborde sur le dessus des murs : comme les étages d'un vrai
+# immeuble, la lumière n'entre plus que par les fenêtres. Invisibles de l'intérieur (au-dessus du plafond, sous le sol).
+DALLE_EPAISSEUR = 0.30  # m
+DALLE_DEBORD = 0.20  # m : recouvre le dessus des murs (14 à 20 cm d'épaisseur)
+DALLE_JEU = 0.002  # m : au-dessus du plafond / sous le sol (pas de surfaces confondues : taches au rendu)
 DEPASSEMENT_MAX = 0.50  # m : un bout qui traverse un autre mur et dépasse de moins que ça est coupé (angle lu croisé)
 ALIGNES_T = math.cos(math.radians(10.0))  # deux murs d'un même nœud à moins de 10° l'un de l'autre se prolongent (T)
 
@@ -65,7 +73,7 @@ Point = tuple[float, float]
 @dataclass(frozen=True)
 class Brique:
     id: str
-    categorie: Literal["mur", "sol", "plafond", "menuiserie"]
+    categorie: Literal["mur", "sol", "plafond", "menuiserie", "dalle"]
     element: str  # identifiant de l'élément du logement d'où vient la brique
     contour: list[Point]  # sens inverse des aiguilles d'une montre, vu de dessus
     z_bas: float
@@ -119,7 +127,48 @@ def calculer_briques(logement: Logement) -> list[Brique]:
 
     from moteur.controle_maquette import jours_a_boucher  # importé ici : il importe Brique de ce module
 
-    return briques + jours_a_boucher(briques, hsp)
+    briques = briques + jours_a_boucher(briques, hsp)
+    return briques + dalles_de_l_immeuble(briques, hsp)
+
+
+def rectangles(contour) -> list[list[float]]:
+    """Un contour de pièce découpé en rectangles [xmin, xmax, ymin, ymax] (bandes horizontales entre les y des sommets, chaque
+    bande coupée là où elle est dans le contour). Exact pour les contours à angles droits ; un contour biais est approché (la
+    marge des dalles le couvre)."""
+    pts = [tuple(map(float, q)) for q in contour]
+    ys = sorted({round(y, 4) for _, y in pts})
+    sortie = []
+    for y0, y1 in zip(ys, ys[1:]):
+        ym = (y0 + y1) / 2
+        xs = []
+        for (xa, ya), (xb, yb) in zip(pts, pts[1:] + pts[:1]):
+            if (ya > ym) != (yb > ym):
+                xs.append(xa + (ym - ya) * (xb - xa) / (yb - ya))
+        xs.sort()
+        for xg, xd in zip(xs[0::2], xs[1::2]):
+            if xd - xg > 1e-3:
+                sortie.append([round(xg, 4), round(xd, 4), y0, y1])
+    return sortie
+
+
+def dalles_de_l_immeuble(briques: list[Brique], hsp: float) -> list[Brique]:
+    """Une dalle épaisse au-dessus de chaque plafond et sous chaque sol de pièce (voir DALLE_EPAISSEUR)."""
+    sortie = []
+    for b in briques:
+        if b.id.startswith("plafond__"):
+            z = (hsp + DALLE_JEU, hsp + DALLE_JEU + DALLE_EPAISSEUR)
+            prefixe = "dalle_haut__"
+        elif b.id.startswith("sol__"):
+            z = (-DALLE_JEU - DALLE_EPAISSEUR, -DALLE_JEU)
+            prefixe = "dalle_bas__"
+        else:
+            continue
+        for k, (x0, x1, y0, y1) in enumerate(rectangles(b.contour), start=1):
+            d = DALLE_DEBORD
+            contour = [(round(x0 - d, 4), round(y0 - d, 4)), (round(x1 + d, 4), round(y0 - d, 4)),
+                       (round(x1 + d, 4), round(y1 + d, 4)), (round(x0 - d, 4), round(y1 + d, 4))]
+            sortie.append(Brique(f"{prefixe}{b.element}__{k}", "dalle", b.element, contour, *z))
+    return sortie
 
 
 Ajustement = tuple[tuple[float, float], tuple[float, float]]

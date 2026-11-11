@@ -27,7 +27,7 @@ NOM = "AtelyaStudio"
 VERSION_MOTEUR = "5.8"
 
 GREFFONS = ["PythonScriptPlugin", "EditorScriptingUtilities", "SequencerScripting", "MovieRenderPipeline", "Interchange",
-            "InterchangeEditor", "InterchangeAssets"]
+            "InterchangeEditor", "InterchangeAssets", "OpenImageDenoise"]  # débruiteur du path tracer (Intel, Apache 2.0)
 
 DEFAULT_ENGINE = """[/Script/WindowsTargetPlatform.WindowsTargetSettings]
 DefaultGraphicsRHI=DefaultGraphicsRHI_DX12

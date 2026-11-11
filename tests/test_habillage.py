@@ -44,7 +44,8 @@ def test_plan_habille_lisible(plan):
     assert plan["schema"] == "construction/0.2"
     # les briques de l'étape 2 + les menuiseries + (B2-1) 24 chambranles, 4 appuis et 24 morceaux de plinthes
     # + (B2-3) une copie sous le sol de chacune des 4 pièces
-    assert len(plan["briques"]) == 36 + 45 + 24 + 4 + 24 + 4
+    # + (12/11/2026) les dalles de l'immeuble : une au-dessus du plafond et une sous le sol de chacune des 4 pièces
+    assert len(plan["briques"]) == 36 + 45 + 24 + 4 + 24 + 4 + 8
     assert all(b["materiau"] for b in plan["briques"])
 
 

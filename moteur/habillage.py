@@ -372,7 +372,7 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
     """Le matériau d'une brique des murs, sols et plafonds."""
     if brique.categorie == "mur":
         return "mur_blanc"
-    if brique.categorie == "plafond":
+    if brique.categorie in ("plafond", "dalle"):  # dalle : au-dessus du plafond ou sous le sol, jamais vue
         return "plafond_blanc"
     pieces = {p.id: p for p in logement.pieces}
     if brique.element in pieces:
@@ -1066,7 +1066,7 @@ def vue_de_dessus(logement: Logement) -> dict:
         "id": "dessus", "projection": "orthographique",
         "position": _arrondi3(position), "cible": _arrondi3(cible),
         "echelle": round(max(largeur, hauteur * rapport) * MARGE_CADRAGE, 3),
-        "masquer": ["Plafonds"], "format": list(FORMAT),
+        "masquer": ["Plafonds", "Dalles"], "format": list(FORMAT),
     }
 
 
