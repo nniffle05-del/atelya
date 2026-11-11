@@ -49,3 +49,21 @@ vitre granuleuse) — image `scratchpad eevee-48.png`. Projection film 90 s Full
 UNREAL 5 pour la cinématique (réalisme proche de Cycles à des temps vendables, MÊME scène pour film et visite libre, Sequencer
 pour le réalisateur automatique, vidéo sans redevance) ; Blender = atelier qui construit et exporte. À confirmer par le comparatif
 mesuré (même plan 10 s : Cycles / EEVEE / Unreal) après installation d'Unreal (accord écrit NT, compte Epic de NT).
+
+**ATELYA → UNREAL : LE PAQUET (11/11/2026, NT « oui » pour l'export ; Unreal pas encore installé).** NT a résumé, confirmé :
+Blender = ATELIER (murs, sols, plafonds, menuiseries, sur-mesure, linge, meubles ABO posés) ; Unreal = STUDIO (lumière, ombres,
+matières natives, caméra, cinématique, puis visite). Une commande : `python outils/unreal/exporter_pour_unreal.py <dossier 3d>
+<sortie> [--verifier]` → `maquette.gltf` (+ .bin, textures/), `scene-atelya.json` (fiche de scène, `moteur/export_unreal.py`
+schéma scene-unreal/0.1 : matières avec photos, taille réelle, teinte RÉGLÉE au rendu, rotation, brillance ; lumières (soleil,
+plafonniers W, fenêtres) ; 5 éclairages + équivalent Unreal ; meubles (nœud glTF `Meuble_<id>`) ; vues ; crédits ABO
+« Amazon.com » CC BY 4.0 + matières CC0 ; liste « pertes »), `matieres/` (photos CC0 utilisées). app-002 : 45 s, 192 Mo.
+Défauts trouvés et CORRIGÉS à l'export (`moteur/blender/exporter_gltf.py`) : (1) photos des sols/murs plaquées « par position »
+→ parties SANS repères (texCoord -1) : carte UV `atelya_monde` calculée comme Blender au rendu ; (2) verre « transparent +
+reflet » → parti VIDE donc opaque, pièces NOIRES : verre alpha 0,06 (le verre « transmission » essayé bloquait le soleil au rendu,
+plus de taches de soleil) ; (3) brillance « satinée » (calcul) perdue → parquet miroir : images de brillance CUITES déjà réglées.
+VÉRIFICATION « toutes choses égales » (`moteur/blender/verifier_gltf.py` + `outils/unreal/comparer_export.py` : même lumière,
+mêmes caméras, maquette remplacée par le glTF relu) : séjour écart moyen 1,86/255 (0,31 % de pixels nettement changés, surtout
+la vue dehors par la fenêtre), dessus 0,33/255 (0,02 %). Avant corrections : séjour 167/255 (noir). Planches
+`..\atelya\b2\app-002\unreal\verification\`. PERDU encore : motifs DESSINÉS (point de Hongrie, carreaux de ciment) → partent en
+photo de base (à cuire en image répétable, chantier à part) ; lampes/ciel/caméras/exposition (refaits dans Unreal, par choix).
+Repère Unreal (cm, axes) à vérifier au premier import. Suite : installation UE 5.9 par NT (chez lui), import + comparatif mesuré.
