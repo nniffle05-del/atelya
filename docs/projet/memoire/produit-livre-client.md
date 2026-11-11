@@ -79,3 +79,14 @@ administrateur puis un REDÉMARRAGE du lanceur qui PERD l'installation (2 fois) 
 qu'administrateur » ; le chemin proposé par défaut est C:\Program Files\Epic Games (à changer) ; (2) blocage à 62 % sans écriture
 pendant ~25 min → Pause puis Reprendre dans Téléchargements a relancé ; vérification finale ~45 min. LauncherInstalled.dat
 (ProgramData) restait vide : se fier à l'écran « Installés » ou à Engine\Build\Build.version.
+**STUDIO UNREAL (11/11/2026, NT « fait tout »)** : projet `D:\Atelya-Unreal\AtelyaStudio` (chemin SANS accent ; créé par
+`outils/unreal/creer_projet.py` : Lumen, ombres virtuelles, DX12, pas d'éclairage statique, exposition fixe, Remote Execution
+Python locale). Pilotage SANS écran par le Python intégré d'Unreal (`UnrealEditor-Cmd.exe -run=pythonscript -script="… args"` ;
+les messages `LogPython` sont dans `Saved\Logs\AtelyaStudio.log`, pas sur la sortie). Import du paquet app-002 :
+`moteur/unreal/importer_maquette.py` (Interchange `import_scene`) : 562 acteurs dont 469 formes en 54 s ; REPÈRE VÉRIFIÉ :
+Unreal X = 100 x, Y = −100 y, Z = 100 z (meuble reperage_1 (3,445 ; 4,668) → (344,5 ; −466,8) cm) ; lacet = −cap.
+Plan : `moteur/unreal/preparer_cinematique.py` (ciel couvert = dôme émissif « is sky » + Sky Light temps réel ; ciel physique =
+Sky Atmosphere + soleil de la fiche ; vitres sans ombre ; Post Process exposition manuelle, Lumen qualité 2 ; caméra de cinéma
+POSÉE dans le niveau puis « possédée » par la séquence (le modèle d'une caméra « spawnable » est inaccessible en Python) ;
+Movie Render Queue : PNG, 8 sous-images, 64 images de chauffe). Rendu en ligne de commande : `UnrealEditor.exe projet carte -game
+-LevelSequence=… -MoviePipelineConfig=… -RenderOffscreen`. Commande unique : `outils/unreal/cinematique_unreal.py`.

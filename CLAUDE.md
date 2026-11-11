@@ -130,6 +130,11 @@ détaillé correspondant avant d'agir.
   (f) pas de location d'Unreal lui-même (§6.e) ; contrat avec Epic Games Commerce GmbH, droit de New York, renonciation aux actions
   de groupe (opt-out possible 30 jours après acceptation). ZONES GRISES à faire confirmer (Epic ou juriste) : chaque visite = un
   produit distinct ? visite payée par l'agence puis montrée gratuitement aux acheteurs = revenu « direct » (§4.a.ii) ?
+- **OUTILS DE DÉVELOPPEMENT pour Unreal (accord écrit NT « Oui je suis d'accord », 11/11/2026), jamais dans le produit** :
+  Node.js 26.13.0 LTS PORTABLE (MIT ; zip nodejs.org, SHA256 vérifié ; `D:\Atelya-Unreal\outils\node`, 112 Mo, sans droits
+  administrateur ni changement de Windows) ; MCP `@runreal/unreal-mcp` 0.1.4 (MIT, fichier LICENSE lu ; 97 modules npm, tous
+  MIT / MIT-0 / ISC / BSD, 21 Mo, `D:\Atelya-Unreal\outils\mcp-unreal`), déclaré dans `.mcp.json` du dépôt (non suivi par Git) ;
+  il pilote l'éditeur Unreal OUVERT via la « Remote Execution » Python (127.0.0.1 seulement, réglée dans le projet).
 - Toute nouvelle bibliothèque ou donnée : **lire sa licence** (le fichier, pas un résumé) avant de la
   proposer à NT. Détail : `docs/projet/memoire/audit-technologique-2026-10-31.md`.
 
