@@ -8,7 +8,7 @@ Dans le niveau /Game/Logements/<nom>/Carte (fait par importer_maquette.py), d'ap
   ensoleillé » : atmosphère physique + soleil à la direction de la fiche) et une lumière de ciel (Sky Light) qui éclaire par les
   fenêtres ; la lumière qui rebondit est calculée par Lumen ;
 - les vitres ne font pas d'ombre (le jour passe) ;
-- un réglage d'image (Post Process) : exposition fixe (`exposition`, en crans), qualité Lumen poussée pour le film ;
+- un réglage d'image (Post Process) : exposition fixe (`exposition`, en crans), qualité Lumen au maximum pour le film (4) ;
 - la CAMÉRA : une caméra de cinéma (objectif `focale_mm`, capteur 36 mm, sans flou), au même trajet que la vidéo Blender
   (moteur/blender/video_trajet.py : mêmes points, mêmes images clés, courbes adoucies) ;
 - la SÉQUENCE (/Game/Logements/<nom>/Plan) et le RÉGLAGE DU RENDU de film (/Game/Logements/<nom>/Rendu : PNG, format du trajet,
@@ -131,10 +131,10 @@ def poser_reglage_image(exposition):
         "auto_exposure_method": unreal.AutoExposureMethod.AEM_MANUAL,
         "auto_exposure_bias": exposition,
         "auto_exposure_apply_physical_camera_exposure": False,
-        "lumen_final_gather_quality": 2.0,
-        "lumen_scene_lighting_quality": 2.0,
-        "lumen_scene_detail": 2.0,
-        "lumen_reflection_quality": 2.0,
+        "lumen_final_gather_quality": 4.0,
+        "lumen_scene_lighting_quality": 4.0,
+        "lumen_scene_detail": 4.0,
+        "lumen_reflection_quality": 4.0,
         "motion_blur_amount": 0.0,
         "vignette_intensity": 0.0,
         "bloom_intensity": 0.2,

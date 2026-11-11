@@ -6,9 +6,12 @@ Pourquoi un chemin SANS accent : plusieurs outils d'Unreal (compilateur d'effets
 accentués, comme OpenCV (piège connu du projet : « Modélisation immobilière »).
 Un projet Unreal n'est qu'un fichier .uproject (la liste des greffons) et des réglages (Config\\*.ini) : rien à installer.
 Réglages choisis (cinématique réaliste d'un intérieur, éclairage entièrement calculé en direct, rien de « précalculé ») :
-- Lumen pour la lumière indirecte et les reflets (la lumière qui rebondit sur les murs et le parquet) ;
+- Lumen pour la lumière indirecte et les reflets (la lumière qui rebondit sur les murs et le parquet), calculé par les
+  rayons de la carte graphique (« ray tracing matériel », RTX) : le calcul « logiciel » laissait des traînées en éventail
+  sur les murs d'une chambre éclairée par une seule fenêtre (essai du 11/11/2026) ;
 - ombres virtuelles (nettes de près comme de loin) ; pas d'éclairage statique (on n'a jamais à « cuire » la lumière) ;
-- DirectX 12 ; exposition automatique coupée (réglée par Atelya, comme le « photographe » de Blender) ;
+- DirectX 12 en SM6 (le jeu d'effets récent : sans lui, pas de rayons ; en SM5 le « ray tracing » est ignoré
+  sans erreur, vu le 11/11/2026) ; exposition automatique coupée (réglée par Atelya, comme le « photographe » de Blender) ;
 - unités : Unreal compte en centimètres ;
 - « Remote Execution » de Python (sur cette machine seulement, 127.0.0.1) : le MCP de développement (runreal/unreal-mcp)
   pilote l'éditeur ouvert. Il ne sert qu'à Claude pendant le développement, jamais au produit.
@@ -26,6 +29,8 @@ GREFFONS = ["PythonScriptPlugin", "EditorScriptingUtilities", "SequencerScriptin
 
 DEFAULT_ENGINE = """[/Script/WindowsTargetPlatform.WindowsTargetSettings]
 DefaultGraphicsRHI=DefaultGraphicsRHI_DX12
+-D3D12TargetedShaderFormats=PCD3D_SM5
++D3D12TargetedShaderFormats=PCD3D_SM6
 
 [/Script/Engine.RendererSettings]
 r.DynamicGlobalIlluminationMethod=1
@@ -37,6 +42,10 @@ r.DefaultFeature.AutoExposure=False
 r.DefaultFeature.MotionBlur=False
 r.Lumen.TraceMeshSDFs=1
 r.AntiAliasingMethod=4
+r.RayTracing=True
+r.Lumen.HardwareRayTracing=True
+r.SkinCache.CompileShaders=True
+r.RayTracing.Shadows=False
 
 [/Script/UnrealEd.EditorPerformanceSettings]
 bThrottleCPUWhenNotForeground=False

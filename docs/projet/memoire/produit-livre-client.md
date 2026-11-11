@@ -90,3 +90,15 @@ Sky Atmosphere + soleil de la fiche ; vitres sans ombre ; Post Process expositio
 POSÉE dans le niveau puis « possédée » par la séquence (le modèle d'une caméra « spawnable » est inaccessible en Python) ;
 Movie Render Queue : PNG, 8 sous-images, 64 images de chauffe). Rendu en ligne de commande : `UnrealEditor.exe projet carte -game
 -LevelSequence=… -MoviePipelineConfig=… -RenderOffscreen`. Commande unique : `outils/unreal/cinematique_unreal.py`.
+**COMPARATIF MESURÉ CYCLES / EEVEE / UNREAL (11/11/2026, chambre d'app-002, trajet `trajet-chambre.json`, 96 images 1280×720,
+« 2 Jour voilé », RTX 2070)** : Cycles 256 éch. ~29 s/image (46 min) ; EEVEE 2,0 s/image (3 min 40) ; UNREAL 5.8 Lumen ray tracing
+matériel ~0,33 s/image (31 s de rendu, ~1 min avec le chargement ; compilation des effets la 1re fois seulement, quelques minutes).
+Écart moyen à Cycles (/255, 20 images) : EEVEE 26,3 ; UNREAL 15,1 (max 30 sur l'image 1 : mur gauche trop sombre au départ ;
+sol un peu plus foncé). Vidéo + planche : `D:\Atelya-Unreal\Paquets\rendus\comparatif-cycles-eevee-unreal.mp4/.jpg`
+(`outils/unreal/comparer_moteurs.py`). CONCLUSION : Unreal ≈ 90 fois plus rapide que Cycles et plus proche de Cycles qu'EEVEE →
+recommandation Unreal confirmée par la mesure. PIÈGES : (1) Git Bash change « /Game/… » en « C:/Program Files/Git/Game/… » (passer
+par Python/subprocess ou MSYS_NO_PATHCONV=1) ; (2) projet créé à la main = SM5 par défaut → le ray tracing est IGNORÉ sans erreur
+(« Skipped NVAPI RT queries since the feature level is below SM6 ») : `+D3D12TargetedShaderFormats=PCD3D_SM6` ; (3) Lumen logiciel =
+traînées en éventail sur les murs d'une pièce éclairée par une fenêtre → ray tracing matériel ; (4) exposition : calée sur la
+référence Cycles (`--reference`, +2,26 crans pour le ciel couvert) ; pour un logement SANS référence, il faudra une règle
+automatique (clarté des murs, comme le « photographe » de Blender) : CHANTIER SUIVANT.

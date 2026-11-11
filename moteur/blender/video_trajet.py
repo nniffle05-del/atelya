@@ -8,7 +8,8 @@ trajet.json : {"points": [[x, y, z, cap, tangage], …] (repère du logement, de
 Les points sont répartis régulièrement sur le plan, mouvement adouci au départ et à l'arrivée (courbes de Bézier).
 Pas de scintillement d'une image à l'autre : exposition et balance des blancs réglées UNE fois (première image), bruit de
 rendu figé (même graine à chaque image), débruiteur, lucioles écrêtées.
-Dernier argument facultatif : les seules images à rendre (« 48 » pour chronométrer une image).
+Argument facultatif suivant : les seules images à rendre (« 48 » pour chronométrer une image ; vide = toutes).
+Dernier argument facultatif : le moteur, « cycles » (défaut) ou « eevee » (comparatif du 11/11/2026 avec Unreal).
 """
 import json
 import math
@@ -29,6 +30,7 @@ def main() -> None:
     dossier.mkdir(parents=True, exist_ok=True)
     echantillons = int(arguments[2])
     seulement = [int(v) for v in arguments[3].split(",")] if len(arguments) > 3 and arguments[3] else None
+    moteur = arguments[4].lower() if len(arguments) > 4 else "cycles"
     scene = bpy.data.scenes[trajet["scene"]] if trajet.get("scene") in bpy.data.scenes else bpy.context.scene
     if bpy.context.window is not None:
         bpy.context.window.scene = scene
@@ -63,6 +65,12 @@ def main() -> None:
     scene.cycles.use_animated_seed = False  # même grain d'une image à l'autre : le débruiteur ne « bouillonne » pas
     scene.cycles.sample_clamp_indirect = 10.0
     print(f"Calcul sur : {choisir_processeur(scene)}")
+    if moteur == "eevee":
+        moteurs = [i.identifier for i in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
+        scene.render.engine = next(m for m in moteurs if "EEVEE" in m)
+        for nom, valeur in (("use_raytracing", True), ("taa_render_samples", 64), ("use_shadows", True)):
+            if hasattr(scene.eevee, nom):
+                setattr(scene.eevee, nom, valeur)
     scene.frame_set(1)
     if scene.get("jour"):
         exposition, blanc = reglage_de_photographe(scene, dossier)
