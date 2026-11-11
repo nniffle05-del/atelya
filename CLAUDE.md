@@ -326,7 +326,10 @@ Contrôle fabriqué à vrais lits : sols 70,3 → 84,1 %. Premier plan vidéo av
 `plan-lancement-lecture-claude.md`. Chantier suivant proposé : « tout ce qui n'est ni mur ni sol » (sur mesure, sanitaires…),
 jugé en vidéo ; NT : la CINÉMATIQUE avant la visite Unreal (`produit-livre-client.md`).
 
-**ATELYA → UNREAL, LE PAQUET (11/11/2026)** : `outils/unreal/exporter_pour_unreal.py <dossier 3d> <sortie> [--verifier]` = forme glTF (`moteur/blender/exporter_gltf.py` : placage UV « monde » calculé, verre lisible, brillances cuites) + fiche de scène `scene-atelya.json` (`moteur/export_unreal.py`) + photos des matières. Vérifié sur app-002 : maquette relue depuis le glTF = originale (séjour 1,86/255). Perdu : motifs dessinés (point de Hongrie, carreaux de ciment). **Unreal Engine 5.8.4 INSTALLÉ le 11/11/2026** dans `D:\Epic Games\UE_5.8` (5.9 = Preview, écartée ; pièges d'installation du lanceur dans la mémoire). Détail : fin de `produit-livre-client.md`.
+**ATELYA → UNREAL, LE PAQUET (11/11/2026)** : `outils/unreal/exporter_pour_unreal.py <dossier 3d> <sortie> [--verifier]` = forme glTF (`moteur/blender/exporter_gltf.py` : placage UV « monde » calculé, verre lisible, brillances cuites) + fiche de scène `scene-atelya.json` (`moteur/export_unreal.py`) + photos des matières. Vérifié sur app-002 : maquette relue depuis le glTF = originale (séjour 1,86/255). Perdu : motifs dessinés (point de Hongrie, carreaux de ciment). **Unreal Engine 5.8.4 INSTALLÉ le 11/11/2026** dans `D:\Epic Games\UE_5.8` (5.9 = Preview, écartée ; pièges d'installation du lanceur dans la mémoire). **Studio Unreal** `D:\Atelya-Unreal\AtelyaStudio`
+(SM6, Lumen ray tracing matériel) ; cinématique en une commande `outils/unreal/cinematique_unreal.py` ; **comparatif mesuré** (même plan,
+chambre app-002) : Cycles ~29 s/image, EEVEE 2,0, **Unreal ~0,33**, écart à Cycles EEVEE 26,3 / Unreal 15,1 (/255) → Unreal retenu.
+MCP de développement `unreal` (runreal) déclaré, utilisable à la prochaine conversation (éditeur ouvert). Détail : fin de `produit-livre-client.md`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
