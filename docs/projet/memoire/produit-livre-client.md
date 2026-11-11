@@ -70,3 +70,12 @@ Repère Unreal (cm, axes) à vérifier au premier import. Suite : installation U
 Installation (11/11/2026) : dans le lanceur Epic, UE 5.9 est marqué « Preview » (version d'essai). Conseil donné à NT : prendre la
 DERNIÈRE VERSION SANS « Preview » (stable), D:\Epic Games, sans symboles de débogage ni Android/iOS/Linux ; NT envoie la taille avant
 d'installer. Passer à 5.9 quand elle sera finale (les projets s'ouvrent dans une version plus récente, pas l'inverse).
+**UNREAL ENGINE 5.8.4 INSTALLÉ (11/11/2026, accord écrit NT « Oui », compte Epic de NT)** : `D:\Epic Games\UE_5.8` (29,5 Go ;
+Build.version 5.8.4, CL 58902052 ; sans symboles de débogage ni Android/iOS/Linux). Éditeur `Engine\Binaries\Win64\UnrealEditor.exe`
+et `UnrealEditor-Cmd.exe` (sans écran, pour l'automatisation) ; greffons Python (PythonScriptPlugin) et Interchange (import glTF)
+présents. Installés d'office par le lanceur avec le moteur : Fab UE Plugin et Quixel Bridge (Epic, même CLUF) : non utilisés.
+PIÈGES rencontrés : (1) un clic « Installer » dans le lanceur ouvert normalement déclenche une préparation du dossier en
+administrateur puis un REDÉMARRAGE du lanceur qui PERD l'installation (2 fois) → ouvrir le lanceur « Exécuter en tant
+qu'administrateur » ; le chemin proposé par défaut est C:\Program Files\Epic Games (à changer) ; (2) blocage à 62 % sans écriture
+pendant ~25 min → Pause puis Reprendre dans Téléchargements a relancé ; vérification finale ~45 min. LauncherInstalled.dat
+(ProgramData) restait vide : se fier à l'écran « Installés » ou à Engine\Build\Build.version.
