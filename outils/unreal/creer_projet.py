@@ -13,6 +13,8 @@ Réglages choisis (cinématique réaliste d'un intérieur, éclairage entièreme
 - DirectX 12 en SM6 (le jeu d'effets récent : sans lui, pas de rayons ; en SM5 le « ray tracing » est ignoré
   sans erreur, vu le 11/11/2026) ; exposition automatique coupée (réglée par Atelya, comme le « photographe » de Blender) ;
 - unités : Unreal compte en centimètres ;
+- « custom stencil » actif (r.CustomDepth=3) : les murs et plafonds y sont marqués, c'est le masque que regarde le
+  photographe d'Atelya pour régler l'exposition (moteur/photographe.py) ;
 - « Remote Execution » de Python (sur cette machine seulement, 127.0.0.1) : le MCP de développement (runreal/unreal-mcp)
   pilote l'éditeur ouvert. Il ne sert qu'à Claude pendant le développement, jamais au produit.
 """
@@ -46,6 +48,7 @@ r.RayTracing=True
 r.Lumen.HardwareRayTracing=True
 r.SkinCache.CompileShaders=True
 r.RayTracing.Shadows=False
+r.CustomDepth=3
 
 [/Script/UnrealEd.EditorPerformanceSettings]
 bThrottleCPUWhenNotForeground=False

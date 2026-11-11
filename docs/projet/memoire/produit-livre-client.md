@@ -102,3 +102,28 @@ par Python/subprocess ou MSYS_NO_PATHCONV=1) ; (2) projet créé à la main = SM
 traînées en éventail sur les murs d'une pièce éclairée par une fenêtre → ray tracing matériel ; (4) exposition : calée sur la
 référence Cycles (`--reference`, +2,26 crans pour le ciel couvert) ; pour un logement SANS référence, il faudra une règle
 automatique (clarté des murs, comme le « photographe » de Blender) : CHANTIER SUIVANT.
+**FILM DU LOGEMENT, ÉTAPE 1 : EXPOSITION AUTOMATIQUE DANS UNREAL (11/11/2026, demande NT : « sans référence Cycles », règle 21)** :
+FAIT pour les 5 éclairages. (1) LE PHOTOGRAPHE (`moteur/photographe.py`) : même règle et mêmes chiffres que Blender
+(`rendre.reglage_de_photographe` : médiane des murs et plafonds = `clarte_murs` de l'éclairage, balance des blancs `balance`), mais
+mesurée sur de PETITS ESSAIS DU FILM LUI-MÊME (réglage MRQ « Essai » : 320×180, une image sur 8, PNG + passe « M_MasqueBlancs » =
+murs et plafonds marqués en custom stencil, `r.CustomDepth=3`, liste `surfaces_blanches` de la fiche de scène) ; la courbe des tons
+est remontée à l'envers ; essais refaits avec la pente apprise (`prochaine_exposition`) jusqu'à ±0,15 cran (2 à 4 essais de
+~30 s) ; écart régulier essai → film compté d'office (`ESSAI_VERS_FILM` −0,18) ; CONTRÔLE du film sur ses vraies images, une
+reprise au plus. ÉCHEC NOTÉ : l'essai « sans courbe des tons » en EXR (valeurs physiques) ne suit PAS le film dans Unreal (valeurs
+plafonnées à 100, lumière indirecte écrêtée par Lumen à 10 APRÈS exposition, `r.Lumen.ScreenProbeGather.MaxRayIntensity`) : au soleil
+le film sortait 1,5 cran trop clair et la « constante » exposition → clarté variait de 4,5 à 7,5 crans selon la scène. (2) LA
+PELLICULE : la courbe d'usine d'Unreal écrase les sombres (parquet à 0,01 → 5/255 au lieu de 18 dans AgX : le SOL TROP FONCÉ) ;
+5 réglages (pente 0,514, pied 0,65, épaule 0,545, coupures 0 et 0,0642) imitent AgX de Blender 5.2 à 1,1/255 près sur les gris
+(14/255 d'usine) ; formule d'Unreal recopiée dans `courbe_unreal` (TonemapCommon.ush) et vérifiée. (3) MUR SOMBRE DE L'IMAGE 1 :
+`render_warm_up_frames` n'était pas activé → les 64 images de chauffe n'étaient pas calculées (Lumen pas « installé ») ; corrigé.
+(4) 5 ÉCLAIRAGES dans Unreal (`preparer_cinematique.py`) : soleil à la hauteur et direction de chaque ambiance, 110 000 lux hors
+atmosphère (mesuré dans le ciel de Blender : 138,6 W/m² face au soleil à 50°, ~94 700 lux au sol ; 1 W = 683 lm, 1 unité de ciel =
+683 nits), plafonniers en Rect Light (W × 683 lumens) le soir et la nuit. PIÈGE : `unreal.Color` est rangé bleu-vert-rouge → lampes
+BLEUES ; passer par `set_light_color(unreal.LinearColor(r=, g=, b=))`. (5) RÉSULTAT (chambre d'app-002, 96 images, jugé contre des
+images Cycles de CONTRÔLE jamais utilisées pour régler, `outils/unreal/juger_eclairages.py`) : écart moyen /255 voilé 12,0 (15,1 avant,
+quand l'exposition était CALÉE sur Cycles), soirée 10,6, nuit 7,8, ensoleillé 38,7, fin de journée 48,9 ; ~3 min par éclairage
+(dont ~1 min de rendu du film, 0,5-0,65 s/image chargement compris). Planches `..\atelya\b2\app-002\unreal\eclairages\`
+(`planche-image48.jpg`, `juge-unreal-photographe.jpg/.json`), films `D:\Atelya-Unreal\Paquets\rendus\app002\<éclairage>\plan.mp4`.
+RESTE pour l'ÉTAPE 2 (soleil) : dehors, le sol de la planète d'Unreal sort NOIR dans les fenêtres (Blender : sol gris vu par la
+caméra) ; fin de journée nettement plus orangée que Blender (atmosphère d'Unreal à 7°) ; ensoleillé et fin de journée ~0,7-1 cran
+plus sombres que Cycles hors murs. Commande : `outils/unreal/cinematique_unreal.py <paquet> <nom> <trajet> --eclairages tous`.

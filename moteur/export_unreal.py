@@ -75,7 +75,8 @@ PERTES = [
     {"quoi": "Verre (mélange transparent + reflet)", "pourquoi": "n'existe pas dans glTF : il partait opaque", "remede": "FAIT à "
      "l'export : verre à 94 % transparent ; dans Unreal, matériau verre natif conseillé (fiche : materiaux.verre)"},
     {"quoi": "Exposition et balance des blancs « de photographe »", "pourquoi": "réglage de la caméra Blender",
-     "remede": "à refaire dans Unreal (exposition automatique ou réglée sur la clarté des murs : eclairages.*.clarte_murs)"},
+     "remede": "FAIT dans Unreal (11/11/2026) : même règle, mesurée sur les murs et plafonds (surfaces_blanches) d'un rendu "
+               "d'essai sans courbe de couleurs, visée eclairages.*.clarte_murs (moteur/photographe.py)"},
 ]
 
 
@@ -165,6 +166,10 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
                              "note": "ouverture vers le ciel (Blender : « portail » qui guide la lumière du jour) ; "
                                      "Unreal (Lumen) n'en a pas besoin, gardée pour placer caméras et reflets"})
     ambiances = [{**a, "unreal": CIEL_UNREAL.get(a.get("ciel"), "")} for a in eclairages]
+    # Les murs et plafonds (collections « Murs » et « Plafonds » de Blender) : le « photographe » règle l'exposition et la
+    # balance des blancs sur eux (moteur/photographe.py). Leurs noms sont ceux des objets glTF, donc des acteurs Unreal.
+    blancs = sorted(b["id"] for b in construction.get("briques") or [] if b.get("categorie") in ("mur", "plafond")
+                    and b.get("id"))
 
     mobilier = [{"id": m["id"], "noeud_gltf": f"Meuble_{m['id']}", "categorie": m.get("categorie"), "modele": m.get("modele"),
                  "position": m.get("position"), "altitude": m.get("altitude", 0.0), "face_deg": m.get("face"),
@@ -192,6 +197,7 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
         "materiaux": materiaux,
         "lumieres": lumieres,
         "eclairages": ambiances,
+        "surfaces_blanches": blancs,
         "meubles": mobilier,
         "vues": construction.get("vues") or [],
         "credits": credits,

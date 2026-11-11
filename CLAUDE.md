@@ -330,6 +330,12 @@ jugé en vidéo ; NT : la CINÉMATIQUE avant la visite Unreal (`produit-livre-cl
 (SM6, Lumen ray tracing matériel) ; cinématique en une commande `outils/unreal/cinematique_unreal.py` ; **comparatif mesuré** (même plan,
 chambre app-002) : Cycles ~29 s/image, EEVEE 2,0, **Unreal ~0,33**, écart à Cycles EEVEE 26,3 / Unreal 15,1 (/255) → Unreal retenu.
 MCP de développement `unreal` (runreal) déclaré, utilisable à la prochaine conversation (éditeur ouvert). Détail : fin de `produit-livre-client.md`.
+**FILM DU LOGEMENT (11/11/2026), étape 1 FAITE : exposition automatique dans Unreal** (`moteur/photographe.py` : règle de Blender
+mesurée sur de petits essais du film + masque des murs, pente apprise, contrôle du film ; PELLICULE = courbe d'Unreal réglée comme
+AgX, fin du sol trop foncé ; préchauffe calculée, fin du mur sombre de l'image 1 ; 5 éclairages dont plafonniers). Contre Cycles
+(contrôle seulement) : voilé 12,0/255, soirée 10,6, nuit 7,8, ensoleillé 38,7, fin de journée 48,9. Étapes suivantes (ordre NT) :
+2 soleil réel « Jour ensoleillé » (sol noir dehors, fin de journée trop orangée), 3 réalisateur automatique (film 60-90 s Full HD de
+tout app-002), 4 motifs dessinés cuits. Une étape à la fois, validation NT.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

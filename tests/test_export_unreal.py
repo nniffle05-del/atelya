@@ -82,6 +82,8 @@ def test_fiche_de_scene(tmp_path):
                      "modele": "B0ABC", "literie": {"couette": [200, 200, 200], "oreillers": 2, "couleur_oreillers": [10, 20, 30],
                                                     "plaid": None}}],
         "vues": [{"id": "dessus"}], "reglages_teinte": [],
+        "briques": [{"id": "M1__plein_1", "categorie": "mur"}, {"id": "plafond__sejour", "categorie": "plafond"},
+                    {"id": "sol__sejour", "categorie": "sol"}, {"id": "O1__cadre", "categorie": "menuiserie"}],
     }
     (d3 / "construction.json").write_text(json.dumps(construction), encoding="utf-8")
     (d3 / "eclairages.json").write_text(json.dumps([{"id": "jour_soleil", "ciel": "physique"}, {"id": "nuit", "ciel": "nuit"}]),
@@ -109,6 +111,7 @@ def test_fiche_de_scene(tmp_path):
     assert fiche["lumieres"][1]["puissance_w"] == 50.0
     assert [e["unreal"] != "" for e in fiche["eclairages"]] == [True, True]
     assert fiche["meubles"][0]["noeud_gltf"] == "Meuble_lit_1"
+    assert fiche["surfaces_blanches"] == ["M1__plein_1", "plafond__sejour"]  # ce que regarde le photographe
     assert fiche["materiaux"]["Oreillers_lit_1"]["couleur"] == [round(10 / 255, 4), round(20 / 255, 4), round(30 / 255, 4)]
     assert fiche["credits"]["meubles"]["modeles"] == ["B0ABC"] and "Amazon.com" in fiche["credits"]["meubles"]["texte"]
     assert len(fiche["credits"]["matieres"]) == 2  # le chêne du point de Hongrie et le grain de la peinture

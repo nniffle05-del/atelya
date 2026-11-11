@@ -50,3 +50,13 @@ def test_repere_atelya_vers_unreal():
     texte = (Path(__file__).resolve().parents[1] / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
     assert "unreal.Vector(100.0 * x, -100.0 * y, 100.0 * z)" in texte
     assert "-float(cap)" in texte
+
+
+def test_images_d_essai_appariees(tmp_path):
+    """Movie Render Queue nomme la passe du masque « FinalImage » + nom du matériau : chaque image a son masque."""
+    for f in (1, 9, 17):
+        (tmp_path / f"FinalImage.{f:04d}.png").write_bytes(b"")
+        (tmp_path / f"FinalImageM_MasqueBlancs.{f:04d}.png").write_bytes(b"")
+    images, masques = cu.images_d_essai(tmp_path)
+    assert [p.name for p in images] == ["FinalImage.0001.png", "FinalImage.0009.png", "FinalImage.0017.png"]
+    assert [p.name for p in masques] == [f"FinalImageM_MasqueBlancs.{f:04d}.png" for f in (1, 9, 17)]
