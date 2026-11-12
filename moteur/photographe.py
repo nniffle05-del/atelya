@@ -200,3 +200,33 @@ def gain_unreal(blanc) -> list[float]:
     """Blender divise chaque couleur par `blanc` (niveau du blanc des courbes) ; Unreal la multiplie par son « color gain »
     (appliqué comme Blender : en valeurs linéaires, avant la courbe)."""
     return [1.0 / max(float(v), 1e-6) for v in blanc]
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# L'exposition EN MARCHANT (balade, 12/11/2026) : comme l'œil ou une vraie caméra, elle suit la pièce où l'on est, en douceur.
+ADAPTATION_FENETRE_S = 2.0  # moyenne glissante des réglages voulus (pas de « pompage » sur un regard bref)
+ADAPTATION_MAX_CRAN_S = 0.75  # au plus 0,75 cran par seconde (une adaptation calme)
+
+
+def exposition_en_marchant(images: list[int], voulues: list, ips: int = 24, fenetre_s: float = ADAPTATION_FENETRE_S,
+                           max_cran_s: float = ADAPTATION_MAX_CRAN_S) -> list[list]:
+    """Clés [[image, exposition], …] d'après les expositions voulues aux images d'essai (None = pas assez de murs vus : on
+    prend celle des voisines). Lissées (moyenne glissante), bornées en vitesse d'adaptation (dans les deux sens du temps : la
+    caméra anticipe un peu au lieu de seulement suivre), puis bornées comme une exposition d'intérieur."""
+    if not images:
+        return []
+    v = np.array([np.nan if x is None else float(x) for x in voulues], float)
+    if np.all(np.isnan(v)):
+        raise ValueError("PLANTÉ : aucune image d'essai ne voit de murs")
+    k = np.arange(len(v))
+    v = np.interp(k, k[~np.isnan(v)], v[~np.isnan(v)])
+    pas = max(1, int(np.median(np.diff(images)))) if len(images) > 1 else ips
+    n = max(1, int(round(fenetre_s * ips / pas)))
+    lisse = np.convolve(np.pad(v, n, mode="edge"), np.ones(2 * n + 1) / (2 * n + 1), mode="valid")
+    borne = max_cran_s * pas / ips
+    sortie = [float(lisse[0])]
+    for x in lisse[1:]:
+        sortie.append(sortie[-1] + max(-borne, min(borne, float(x) - sortie[-1])))
+    for i in range(len(sortie) - 2, -1, -1):
+        sortie[i] = sortie[i + 1] + max(-borne, min(borne, sortie[i] - sortie[i + 1]))
+    return [[int(i), round(_borner(x), 3)] for i, x in zip(images, sortie)]

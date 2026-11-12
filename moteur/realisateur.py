@@ -158,7 +158,8 @@ def _rectangle_meuble(m: dict) -> np.ndarray:
 class Scene2D:
     """Le logement vu de dessus : murs pleins (rectangles), fenêtres (rectangles « lumière »), meubles."""
 
-    def __init__(self, logement: dict):
+    def __init__(self, logement: dict, portes_fermees: bool | None = None):
+        portes_fermees = PORTES_FERMEES if portes_fermees is None else portes_fermees
         self.pieces = logement["pieces"]
         murs = {m["id"]: m for m in logement["murs"]}
         par_mur: dict[str, list[dict]] = {}
@@ -176,7 +177,7 @@ class Scene2D:
                     pleins.append(_rectangle(a + d * debut, a + d * s, m["epaisseur"]))
                 if o["type"] in ("fenetre", "porte_fenetre"):
                     fenetres.append(_rectangle(a + d * s, a + d * e, m["epaisseur"]))
-                elif PORTES_FERMEES:
+                elif portes_fermees:
                     pleins.append(_rectangle(a + d * s, a + d * e, m["epaisseur"]))  # porte fermée : on ne voit pas à travers
                 debut = max(debut, e)
             if debut < longueur:

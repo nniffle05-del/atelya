@@ -191,3 +191,21 @@ doit l'apprendre tout seul », voie choisie par NT) : `realisateur.savoir_faire(
 (bien, trop_pres, ennuyeux, trop_rapide, pas_assez_de_lumiere, contre_jour, piece_mal_montree, trop_haut, trop_plongeant, deforme…),
 chaque avis corrige un peu (pas bornés, `BORNES`) ; gardé dans `moteur/realisateur_appris.json` (+ historique) ; commande
 `outils/atelya/noter_film.py <dossier du film> "3:trop_pres,ennuyeux" "tous:bien"`.
+**LA BALADE (12/11/2026, NT : « au lieu de couper pièce par pièce, une vraie caméra qui se balade, qui ose, va au bout de la pièce,
+se retourne »)** : `moteur/promeneur.py` = UNE prise continue. (1) carte praticable (grille 5 cm : murs, fenêtres, meubles, battants
+ouverts = obstacles ; marge 20 cm pour passer une porte de 60 cm, coût plus fort près des obstacles pour marcher au milieu) ; (2) portes
+ouvertes COMME UN AGENT : seulement entre pièces visitées ou de circulation, battant à 90° vers l'intérieur de la pièce (jamais dans le
+couloir) ; placards, WC, pièces vides et porte palière fermés (`portes_ouvertes`, `porte_palliere`) ; (3) parcours : départ près de la
+porte palière, puis par pièce (ordre de visite) son meilleur point de vue (réalisateur) et son FOND (le plus loin de l'entrée dans la
+pièce, à ≥ 0,6 m des obstacles), plus court chemin (Dijkstra), lissé ; allure 0,45 m/s dans la pièce montrée, 0,8 m/s dans les
+passages ; arrêt 1,8 s au point de vue, demi-tour 3,2 s au fond ; (4) REGARD vers la profondeur (rayons 2D ; ±50° autour de la marche ;
+demi-tour vers la plus belle profondeur) — premier essai : la caméra fixait des murs à quelques cm ; tête ≤ 35 °/s. Unreal : battants
+pivotés sur leurs gonds (`preparer_cinematique.ouvrir_portes`, position d'origine gardée en étiquette, `refermer_portes` à chaque
+préparation) ; EXPOSITION EN MARCHANT : clés sur la séquence (« Settings.AutoExposureBias » du Post Process, vérifié : +2,03 cran pour
++2,0) d'après un essai par seconde de film (`photographe.exposition_en_marchant` : moyenne 2 s, ≤ 0,75 cran/s), 2 passes (écart médian
+1,37 → 0,18 cran) ; plafonniers des pièces sans fenêtre allumés. Commande : `outils/unreal/balade_unreal.py <paquet> <nom> <logement>`.
+App-002 : 58,7 m, 1 min 50.
+Balade, réglages du REGARD trouvés en mesurant la profondeur vue (part du film à moins de 1 m d'un mur) : regard vers la profondeur
+±50° autour de la marche, ÉLARGI à ±140° quand tout est à moins de 2 m devant (marche vers un angle ou une porte) ; rotation de la
+tête bornée dans les deux sens du temps (elle ANTICIPE les virages) ; fond de pièce à ≥ 0,6 m des obstacles (1 m excluait tout le coin
+repas). App-002 : 8 % → 6,5 % du film à moins de 1 m d'un mur (le reste : franchir des portes de 60 cm), profondeur médiane vue 3 m.

@@ -277,6 +277,49 @@ def allumer_lampes(ambiance, fiche, pieces=()):
     return n
 
 
+ORIGINE = "Atelya_origine:"
+
+
+def refermer_portes():
+    """Remet chaque battant ouvert par une préparation précédente à sa place d'origine (gardée dans une étiquette)."""
+    n = 0
+    for a in _acteurs().get_all_level_actors():
+        tags = [str(x) for x in a.tags]
+        origine = next((x for x in tags if x.startswith(ORIGINE)), None)
+        if origine is None:
+            continue
+        v = [float(c) for c in origine[len(ORIGINE):].split(",")]
+        a.set_actor_location_and_rotation(unreal.Vector(v[0], v[1], v[2]), unreal.Rotator(roll=v[3], pitch=v[4], yaw=v[5]),
+                                          False, False)
+        a.tags = [unreal.Name(x) for x in tags if not x.startswith(ORIGINE)]
+        n += 1
+    return n
+
+
+def ouvrir_portes(portes):
+    """Les portes ouvertes pour la balade (moteur/promeneur.portes_ouvertes) : le battant et ses poignées pivotent de
+    `angle_deg` (sens trigonométrique du plan d'Atelya) autour du gond. Repère d'Unreal : y inversé, donc lacet = -angle."""
+    n = 0
+    par_id = {p["id"]: p for p in portes}
+    for a in _acteurs().get_all_level_actors():
+        etiquette = a.get_actor_label()
+        ident = etiquette.split("__", 1)[0]
+        p = par_id.get(ident)
+        if p is None or not (etiquette.startswith(f"{ident}__battant") or etiquette.startswith(f"{ident}__poignee")):
+            continue
+        psi = math.radians(-float(p["angle_deg"]))
+        g = vers_unreal(p["gond"][0], p["gond"][1], 0.0)
+        loc = a.get_actor_location()
+        rot = a.get_actor_rotation()
+        a.tags = list(a.tags) + [unreal.Name(f"{ORIGINE}{loc.x},{loc.y},{loc.z},{rot.roll},{rot.pitch},{rot.yaw}")]
+        dx, dy = loc.x - g.x, loc.y - g.y
+        nouveau = unreal.Vector(g.x + dx * math.cos(psi) - dy * math.sin(psi), g.y + dx * math.sin(psi) + dy * math.cos(psi), loc.z)
+        a.set_actor_location_and_rotation(nouveau, unreal.Rotator(roll=rot.roll, pitch=rot.pitch,
+                                                                  yaw=rot.yaw + math.degrees(psi)), False, False)
+        n += 1
+    return n
+
+
 def vitres_sans_ombre():
     n = 0
     for a in _acteurs().get_all_level_actors():
@@ -344,6 +387,21 @@ def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None):
             unreal.log_warning(f"ATELYA réglage {drapeau} : {e}")
     v.set_editor_property("settings", r)
     return v
+
+
+def cles_exposition(seq, volume, cles):
+    """L'exposition qui VARIE au fil du film (balade d'une pièce à l'autre, comme l'œil ou une vraie caméra qui s'adapte) :
+    clés [[image, exposition Unreal], …] sur le réglage d'image (Post Process), interpolées en douceur."""
+    liaison = seq.add_possessable(volume)
+    piste = liaison.add_track(unreal.MovieSceneFloatTrack)
+    piste.set_property_name_and_path("AutoExposureBias", "Settings.AutoExposureBias")
+    section = piste.add_section()
+    section.set_range(0, int(max(c[0] for c in cles)) + 1)
+    canal = section.get_all_channels()[0]
+    for image, biais in cles:
+        canal.add_key(unreal.FrameNumber(int(image)), float(biais), 0.0, unreal.MovieSceneTimeUnit.DISPLAY_RATE,
+                      unreal.MovieSceneKeyInterpolation.AUTO)
+    return len(cles)
 
 
 def creer_sequence(racine, trajet):
@@ -474,7 +532,7 @@ def creer_reglage_essai(racine, trajet, sortie, moteur="lumen"):
         raise RuntimeError("PLANTÉ : réglage d'essai non créé")
     largeur, hauteur = trajet.get("format", [1280, 720])
     n = int(trajet.get("images", 96))
-    pas = max(1, n // ESSAI_MIN)
+    pas = int(trajet.get("essai_pas") or max(1, n // ESSAI_MIN))  # une balade : un essai par seconde de film
     _sortie(config, max(64, largeur // REDUCTION_ESSAI), max(36, hauteur // REDUCTION_ESSAI), sortie,
             "{render_pass}.{frame_number}", pas)
     passe = _passe(config, moteur)
@@ -519,13 +577,19 @@ def main():
     lampes = allumer_lampes(ambiance, fiche, reglage.get("lampes_pieces") or ())
     nb_dalles = poser_dalles(fiche)
     vitres = vitres_sans_ombre()
+    refermer_portes()
+    portes = ouvrir_portes(reglage.get("portes_ouvertes") or [])
     blancs = marquer_blancs(fiche)
     if not blancs:
         raise RuntimeError("PLANTÉ : aucun mur ni plafond reconnu (fiche : surfaces_blanches)")
     exposition = float(reglage.get("exposition", 0.0))
     gain = reglage.get("gain") or [1.0, 1.0, 1.0]
-    poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"))
-    creer_sequence(racine, trajet)
+    volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"))
+    seq = creer_sequence(racine, trajet)
+    nb_cles = 0
+    if reglage.get("exposition_cles"):
+        nb_cles = cles_exposition(seq, volume, reglage["exposition_cles"])
+        unreal.EditorAssetLibrary.save_loaded_asset(seq)
     rendus = Path(str(paquet)).parent / "rendus" / nom
     dossier = rendus / (reglage.get("dossier") or ambiance["id"])
     creer_reglage_rendu(racine, trajet, dossier, moteur, reglage.get("echantillons", ECHANTILLONS_PT),
@@ -533,7 +597,7 @@ def main():
     creer_reglage_essai(racine, trajet, dossier / "essai", moteur)
     niveaux.save_current_level()
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
-                                                 "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles,
+                                                 "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
                                                  "sortie": str(dossier)},
                                                 ensure_ascii=False))

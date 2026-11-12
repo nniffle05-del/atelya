@@ -1,0 +1,80 @@
+"""Le promeneur (moteur/promeneur.py) : une balade continue praticable (jamais dans un mur ni un meuble), qui passe les portes
+ouvertes des pièces visitées, laisse fermés placards et porte palière, et une exposition qui s'adapte en douceur."""
+import math
+
+import numpy as np
+import pytest
+
+from moteur import photographe as ph
+from moteur import promeneur as pm
+from moteur import realisateur as r
+
+
+def _logement():
+    # entrée (porte palière au nord), séjour à l'ouest avec fenêtre et canapé, chambre à l'est avec fenêtre, placard
+    murs = [{"id": "Ms", "debut": [0, 0], "fin": [10, 0], "epaisseur": 0.2}, {"id": "Mn", "debut": [0, 6], "fin": [10, 6], "epaisseur": 0.2},
+            {"id": "Mo", "debut": [0, 0], "fin": [0, 6], "epaisseur": 0.2}, {"id": "Me", "debut": [10, 0], "fin": [10, 6], "epaisseur": 0.2},
+            {"id": "M1", "debut": [6, 0], "fin": [6, 6], "epaisseur": 0.1}, {"id": "M2", "debut": [0, 4], "fin": [6, 4], "epaisseur": 0.1},
+            {"id": "M3", "debut": [8.8, 4.6], "fin": [10, 4.6], "epaisseur": 0.1}, {"id": "M4", "debut": [8.8, 4.6], "fin": [8.8, 6], "epaisseur": 0.1}]
+    ouvertures = [{"id": "F1", "type": "fenetre", "mur": "Ms", "position": 2.0, "largeur": 2.0, "hauteur": 1.4, "allege": 0.9},
+                  {"id": "F2", "type": "fenetre", "mur": "Ms", "position": 7.5, "largeur": 1.2, "hauteur": 1.4, "allege": 0.9},
+                  {"id": "Pal", "type": "porte", "mur": "Mn", "position": 2.5, "largeur": 0.9, "hauteur": 2.0},
+                  {"id": "P1", "type": "porte", "mur": "M2", "position": 4.0, "largeur": 0.8, "hauteur": 2.0},
+                  {"id": "P2", "type": "porte", "mur": "M1", "position": 1.5, "largeur": 0.75, "hauteur": 2.0},
+                  {"id": "P3", "type": "porte", "mur": "M4", "position": 0.3, "largeur": 0.6, "hauteur": 2.0}]
+    pieces = [{"id": "entree_1", "contour": [[0, 4], [6, 4], [6, 6], [0, 6]]},
+              {"id": "sejour_1", "contour": [[0, 0], [6, 0], [6, 4], [0, 4]]},
+              {"id": "chambre_1", "contour": [[6, 0], [10, 0], [10, 4.6], [8.8, 4.6], [8.8, 6], [6, 6]]},
+              {"id": "placard_1", "contour": [[8.8, 4.6], [10, 4.6], [10, 6], [8.8, 6]]}]
+    meubles = [{"id": "canape", "position": [3.0, 2.0], "face": 0.0, "dimensions": [2.0, 0.9, 0.8]}]
+    return {"murs": murs, "ouvertures": ouvertures, "pieces": pieces, "meubles": meubles}
+
+
+def test_portes_ouvertes_comme_un_agent():
+    log = _logement()
+    assert pm.porte_palliere(log) == "Pal"
+    portes = {p["id"]: p for p in pm.portes_ouvertes(log, {"sejour_1", "chambre_1"})}
+    assert set(portes) == {"P1", "P2"}  # ni la porte palière, ni le placard
+    assert portes["P1"]["vers"] == "sejour_1"  # le battant s'ouvre dans la pièce, pas dans l'entrée (circulation)
+    assert abs(abs(portes["P1"]["angle_deg"]) - 90) < 1e-6
+
+
+def test_balade_praticable_et_complete():
+    log = _logement()
+    b = pm.balade(log)
+    carte = pm.Carte(log, pm.portes_ouvertes(log, {"sejour_1", "chambre_1"}))
+    genres = [(e["genre"], e["piece"]) for e in b["etapes"]]
+    assert genres[0] == ("depart", "entree_1")
+    assert ("point_de_vue", "sejour_1") in genres and ("point_de_vue", "chambre_1") in genres
+    assert "placard_1" not in [e["piece"] for e in b["etapes"]]
+    for x, y, z, cap, tangage in b["trajet"]["points"]:  # jamais dans un mur, un meuble ou un battant
+        i, j = carte.case((x, y))
+        assert carte.distance[i, j] >= pm.MARGE_M * 0.85
+    # une marche fluide : pas de saut de plus de 1 m/s entre deux clés, la tête tourne doucement
+    pts = np.array(b["trajet"]["points"])
+    dt = pm.CLE_IMAGES / pm.IPS
+    assert np.max(np.linalg.norm(np.diff(pts[:, :2], axis=0), axis=1)) / dt < 1.0
+    tours = np.abs((np.diff(pts[:, 3]) + 180) % 360 - 180) / dt
+    assert np.max(tours) <= pm.ROTATION_MAX + 0.1  # caps arrondis au centième
+    assert b["trajet"]["images"] == (len(pts) - 1) * pm.CLE_IMAGES + 1
+
+
+def test_exposition_en_marchant():
+    images = list(range(0, 24 * 20, 24))  # 20 s d'essais, un par seconde
+    voulues = [-8.0] * 10 + [-12.0] * 10  # on passe d'une pièce sombre à une pièce au soleil
+    voulues[3] = None  # un essai sans murs vus
+    cles = ph.exposition_en_marchant(images, voulues)
+    expos = [c[1] for c in cles]
+    assert expos[0] == pytest.approx(-8.0, abs=0.05) and expos[-1] == pytest.approx(-12.0, abs=0.05)
+    assert max(abs(a - b) for a, b in zip(expos, expos[1:])) <= ph.ADAPTATION_MAX_CRAN_S + 1e-6  # adaptation calme
+    assert all(ph.EXPOSITION_UNREAL_BORNES[0] <= e <= ph.EXPOSITION_UNREAL_BORNES[1] for e in expos)
+    with pytest.raises(ValueError):
+        ph.exposition_en_marchant([0, 24], [None, None])
+
+
+def test_preparation_unreal_balade():
+    from pathlib import Path
+    texte = (Path(__file__).resolve().parents[1] / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
+    assert "def ouvrir_portes(" in texte and "refermer_portes()" in texte  # portes rouvertes / refermées sans cumul
+    assert '"Settings.AutoExposureBias"' in texte  # exposition en clés sur la séquence
+    assert math.isclose(pm.MARGE_M, 0.20)
