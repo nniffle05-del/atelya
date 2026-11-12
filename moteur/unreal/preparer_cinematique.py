@@ -275,8 +275,11 @@ def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None):
     return ciel
 
 
-def poser_dehors(racine, centre):
-    """Un grand sol gris (20 km) sous le logement, éclairé par le soleil et le ciel."""
+def poser_dehors(racine, centre, invisible=False):
+    """Un grand sol gris (20 km) sous le logement, éclairé par le soleil et le ciel. `invisible` (quand la vraie vue est posée,
+    13/11/2026) : la caméra ne le voit plus (il cachait le bas du décor : en plongeant vers la rue par le bas des fenêtres, on
+    tombait sur lui avant le décor), mais il renvoie toujours la lumière du soleil dans les pièces (lumière indirecte de
+    Lumen)."""
     m = _nouveau(racine, "Studio/M_Dehors", unreal.Material, unreal.MaterialFactoryNew())
     lib = unreal.MaterialEditingLibrary
     c = lib.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -400, 0)
@@ -294,6 +297,9 @@ def poser_dehors(racine, centre):
     mesh.set_material(0, m)
     mesh.set_render_custom_depth(True)  # marqué pour le masque « dehors » (mesure des fenêtres)
     mesh.set_custom_depth_stencil_value(STENCIL_DEHORS)
+    if invisible:
+        _proprietes(mesh, {"affect_indirect_lighting_while_hidden": True})
+        mesh.set_visibility(False, False)
     return sol
 
 
@@ -401,6 +407,95 @@ def poser_ciel_photo(racine, ambiance, fiche, ciel):
     return m, round(decalage, 4)
 
 
+def _texture_vue(racine, image):
+    """L'image d'une toile de vue (PNG RVBA, sRVB), importée en texture 2D (réimportée à chaque préparation : la toile change
+    quand on la refait d'après les photos)."""
+    chemin = f"{racine}/Studio/T_Vue_{Path(image).stem.replace('-', '_')}"
+    tache = unreal.AssetImportTask()
+    for nom, valeur in (("filename", str(image)), ("destination_path", chemin.rsplit("/", 1)[0]),
+                        ("destination_name", chemin.rsplit("/", 1)[1]), ("automated", True), ("replace_existing", True),
+                        ("save", True)):
+        tache.set_editor_property(nom, valeur)
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([tache])
+    t = unreal.load_asset(chemin)
+    if not isinstance(t, unreal.Texture2D):
+        raise RuntimeError(f"PLANTÉ : toile de vue non importée ({chemin} : {type(t).__name__})")
+    _proprietes(t, {"srgb": True, "lod_group": unreal.TextureGroup.TEXTUREGROUP_CINEMATIC,
+                    "address_x": unreal.TextureAddress.TA_CLAMP, "address_y": unreal.TextureAddress.TA_CLAMP})
+    unreal.EditorAssetLibrary.save_loaded_asset(t)
+    return t
+
+
+def _materiau_vue(racine, nom, texture, vue):
+    """Matériau de la toile : TRANSLUCIDE et SANS ÉCLAIRAGE (il n'entre ni dans le calcul de la lumière de Lumen, ni dans ses
+    traces à l'écran, ni dans la profondeur : derrière lui, le masque « dehors » voit toujours le sol et le ciel). L'image est
+    lue d'après la position du point dans le monde (pas d'après le maillage) : coin haut-gauche, axes u (droite) et v (bas).
+    Clarté AFFICHÉE indépendante de l'exposition de la caméra (× exposition inverse) : RVB de l'image (mur de la photo =
+    BLANC_REF) × force, où force = clarté visée des murs / BLANC_REF ; le dehors garde l'écart aux murs de la photo."""
+    m = _nouveau(racine, f"Studio/M_Vue_{nom}", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("two_sided", True)
+    _proprietes(m, {"use_translucency_vertex_fog": False, "apply_cloud_fogging": False, "allow_custom_depth_writes": False,
+                    "translucency_pass": unreal.MaterialTranslucencyPass.MTP_BEFORE_DOF})
+    lib = unreal.MaterialEditingLibrary
+    position = lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -1100, 0)
+    uv = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -800, 0)
+    uv.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT2)
+    e = unreal.CustomInput()
+    e.set_editor_property("input_name", "P")
+    uv.set_editor_property("inputs", [e])
+    c, au, av = vue["coin"], vue["axe_u"], vue["axe_v"]
+    uv.set_editor_property("code", f"float3 d = P - float3({c[0]:.3f}, {c[1]:.3f}, {c[2]:.3f});\n"
+                           f"return float2(dot(d, float3({au[0]:.6f}, {au[1]:.6f}, {au[2]:.6f})) / {vue['largeur_cm']:.3f},\n"
+                           f"              dot(d, float3({av[0]:.6f}, {av[1]:.6f}, {av[2]:.6f})) / {vue['hauteur_cm']:.3f});")
+    lib.connect_material_expressions(position, "", uv, "P")
+    image = lib.create_material_expression(m, unreal.MaterialExpressionTextureSample, -500, 0)
+    image.set_editor_property("texture", texture)
+    lib.connect_material_expressions(uv, "", image, "UVs")
+    inverse = lib.create_material_expression(m, unreal.MaterialExpressionEyeAdaptationInverse, -500, 300)
+    force = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -500, 450)
+    force.set_editor_property("r", float(vue.get("force", 1.0)))
+    f1 = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 100)
+    lib.connect_material_expressions(image, "RGB", f1, "A")
+    lib.connect_material_expressions(force, "", f1, "B")
+    f2 = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -100, 150)
+    lib.connect_material_expressions(f1, "", f2, "A")
+    lib.connect_material_expressions(inverse, "", f2, "B")
+    lib.connect_material_property(f2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    lib.connect_material_property(image, "A", unreal.MaterialProperty.MP_OPACITY)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    return m
+
+
+def poser_vues_dehors(racine, vues):
+    """La VRAIE VUE (moteur/vue_dehors.py) : une toile verticale par côté de l'immeuble, à la distance des immeubles d'en face,
+    peinte d'après les photos du client. Un vrai objet de la scène (demande NT, 12/11/2026), mais tenu hors de TOUT calcul de
+    lumière : pas d'ombre, pas dans Lumen (ni lumière indirecte, ni champs de distance), invisible aux rayons (Lumen matériel,
+    reflets), aux captures de ciel et de reflets. Premier essai du 12/11/2026 (sphère opaque de 15 km) : murs −1,2 cran ; la
+    toile translucide sans éclairage n'entre même pas dans les traces à l'écran de Lumen. Renvoie le nombre de toiles."""
+    plan = unreal.load_asset("/Engine/BasicShapes/Plane")  # 100 × 100 cm, à plat (normale +Z), centré
+    for i, vue in enumerate(vues):
+        texture = _texture_vue(racine, vue["image"])
+        m = _materiau_vue(racine, vue.get("id", str(i)).replace("-", "_"), texture, vue)
+        c, au, av, n = (unreal.Vector(*vue[k]) for k in ("coin", "axe_u", "axe_v", "normale_vers_logement"))
+        centre = c + au * (vue["largeur_cm"] / 2) + av * (vue["hauteur_cm"] / 2)
+        rotation = unreal.MathLibrary.make_rot_from_zx(n, au)
+        a = _poser(unreal.StaticMeshActor, centre, rotation, etiquette=f"Atelya_Vue_{vue.get('id', i)}")
+        comp = a.static_mesh_component
+        comp.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
+        comp.set_static_mesh(plan)
+        comp.set_world_scale3d(unreal.Vector(vue["largeur_cm"] / 100.0, vue["hauteur_cm"] / 100.0, 1.0))
+        comp.set_material(0, m)
+        _proprietes(comp, {"cast_shadow": False, "cast_dynamic_shadow": False, "cast_static_shadow": False,
+                           "cast_hidden_shadow": False, "affect_dynamic_indirect_lighting": False,
+                           "affect_indirect_lighting_while_hidden": False, "affect_distance_field_lighting": False,
+                           "visible_in_ray_tracing": False, "visible_in_reflection_captures": False,
+                           "visible_in_real_time_sky_captures": False, "receives_decals": False})
+    return len(vues)
+
+
 DALLE_EPAISSEUR_CM = 30.0
 DALLE_DEBORD_CM = 20.0  # recouvre le dessus des murs (14 à 20 cm d'épaisseur)
 
@@ -506,11 +601,56 @@ def vitres_sans_ombre():
         comp = a.static_mesh_component
         for i in range(comp.get_num_materials()):
             m = comp.get_material(i)
-            if m and m.get_name().lower().startswith(("verre", "mi_verre")):
+            if m and m.get_name().lower().startswith(("verre", "mi_verre", "m_verreclair")):
                 comp.set_editor_property("cast_shadow", False)
                 n += 1
                 break
     return n
+
+
+VERRE_OPACITE = 0.06  # moteur/blender/exporter_gltf.ALPHA_VERRE : 6 % de reflet, 94 % de lumière qui passe
+
+
+def _materiau_verre_clair(racine):
+    """VITRE CLAIRE : translucide, SANS couleur propre (base noire) ; il ne lui reste que son reflet (6 %, poli). Le verre
+    importé (glTF : surface BLANCHE à 94 % transparente) recevait le soleil et le ciel comme un mur : un voile laiteux sur tout
+    le dehors (vu le 12/11/2026 sur la vraie vue tirée des photos : immeubles d'en face délavés)."""
+    m = _nouveau(racine, "Studio/M_VerreClair", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    m.set_editor_property("two_sided", True)
+    _proprietes(m, {"translucency_lighting_mode": unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING})
+    lib = unreal.MaterialEditingLibrary
+    for prop, valeur, y in ((unreal.MaterialProperty.MP_BASE_COLOR, 0.0, 0), (unreal.MaterialProperty.MP_METALLIC, 0.0, 100),
+                            (unreal.MaterialProperty.MP_SPECULAR, 0.5, 200), (unreal.MaterialProperty.MP_ROUGHNESS, 0.03, 300),
+                            (unreal.MaterialProperty.MP_OPACITY, VERRE_OPACITE, 400)):
+        c = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -300, y)
+        c.set_editor_property("r", valeur)
+        lib.connect_material_property(c, "", prop)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    return m
+
+
+def verre_clair(racine, actif=True):
+    """Pose la VITRE CLAIRE sur toutes les vitres (actif) ou remet le verre importé (sinon : la carte garde le dernier choix,
+    il faut pouvoir revenir en arrière). Renvoie le nombre de vitres et le nom du verre importé."""
+    m = _materiau_verre_clair(racine)
+    importes = [x for x in unreal.EditorAssetLibrary.list_assets(racine, recursive=True, include_folder=False)
+                if x.rsplit("/", 1)[-1].split(".")[0].lower() in ("verre", "mi_verre")]
+    origine = unreal.load_asset(importes[0]) if importes else None
+    if not actif and origine is None:
+        raise RuntimeError(f"PLANTÉ : verre importé introuvable sous {racine}")
+    n = 0
+    for a in _acteurs().get_all_level_actors():
+        if not isinstance(a, unreal.StaticMeshActor):
+            continue
+        comp = a.static_mesh_component
+        for i in range(comp.get_num_materials()):
+            mi = comp.get_material(i)
+            if mi and mi.get_name().lower().startswith(("verre", "mi_verre", "m_verreclair")):
+                comp.set_material(i, m if actif else origine)
+                n += 1
+    return n, (origine.get_path_name() if origine else None)
 
 
 def marquer_blancs(fiche):
@@ -528,7 +668,7 @@ def marquer_blancs(fiche):
     return n
 
 
-def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None):
+def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None, halo=0.2):
     """Le réglage d'image (Post Process). `locale` : exposition LOCALE {"hautes_lumieres": 0..1, "pivot_crans": crans,
     "flou": 0..1} : les grandes zones plus claires que le pivot (les fenêtres) voient leur contraste réduit (1 = rien) ; le pivot
     est placé au-dessus du gris moyen d'Unreal (0,18) ; None = pas d'exposition locale."""
@@ -552,7 +692,7 @@ def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, lo
         # la demi-image d'ouverture. Sans lui, à 24 images/s, tout panoramique paraît saccadé (NT, 12/11/2026)
         "motion_blur_amount": 0.5,
         "vignette_intensity": 0.0,
-        "bloom_intensity": 0.2,
+        "bloom_intensity": float(halo),
         **PELLICULE,
         "expand_gamut": PELLICULE_COULEURS["expand_gamut"],
         "blue_correction": PELLICULE_COULEURS["blue_correction"],
@@ -758,12 +898,14 @@ def main():
         raise RuntimeError(f"PLANTÉ : moteur « {moteur} » inconnu ({MOTEURS})")
     ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"))
     if ciel == "physique" and reglage.get("dehors", True):
-        poser_dehors(racine, centre)
+        poser_dehors(racine, centre, invisible=bool(reglage.get("vues_dehors")))
     ciel_photo, materiau_ciel = None, None
     if reglage.get("ciel_photo"):
         materiau_ciel, ciel_photo = poser_ciel_photo(racine, ambiance, fiche, reglage["ciel_photo"])
+    vues = poser_vues_dehors(racine, reglage["vues_dehors"]) if reglage.get("vues_dehors") else 0
     lampes = allumer_lampes(ambiance, fiche, reglage.get("lampes_pieces") or ())
     nb_dalles = poser_dalles(fiche)
+    vitres_claires, verre_importe = verre_clair(racine, bool(reglage.get("verre_clair", False)))
     vitres = vitres_sans_ombre()
     refermer_portes()
     portes = ouvrir_portes(reglage.get("portes_ouvertes") or [])
@@ -772,7 +914,8 @@ def main():
         raise RuntimeError("PLANTÉ : aucun mur ni plafond reconnu (fiche : surfaces_blanches)")
     exposition = float(reglage.get("exposition", 0.0))
     gain = reglage.get("gain") or [1.0, 1.0, 1.0]
-    volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"), reglage.get("exposition_locale"))
+    volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"), reglage.get("exposition_locale"),
+                                 reglage.get("halo", 0.2))
     if materiau_ciel is not None:  # le ciel photographié, posé sur l'image (réglage d'image)
         r = volume.get_editor_property("settings")
         r.set_editor_property("weighted_blendables", unreal.WeightedBlendables(
@@ -792,7 +935,9 @@ def main():
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
-                                                 "ciel_photo_decalage": ciel_photo,
+                                                 "ciel_photo_decalage": ciel_photo, "vues_dehors": vues,
+                                                 "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
+                                                 "verre_importe": verre_importe,
                                                  "sortie": str(dossier)},
                                                 ensure_ascii=False))
 

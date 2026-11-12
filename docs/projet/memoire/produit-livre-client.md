@@ -359,3 +359,35 @@ sombre) au path tracer ; matière blanche (0,88) dans le glTF. C'est la vraie lu
 × actuel / exposition locale 0,5 / 0,3, pleine qualité) : même « ciel bien visible », on ne voit presque pas le ciel (à hauteur d'yeux,
 une fenêtre montre surtout l'horizon et ce qui est en dessous, ici le sol gris). NT garde la version ACTUELLE (sans exposition locale).
 CHANTIER À VENIR : la vraie vue par les fenêtres tirée des PHOTOS DU CLIENT (jamais une rue inventée).
+**Étape 5 (12-13/11/2026) : la VRAIE VUE par les fenêtres, tirée des photos du client.** Photos regardées : app-002 = 8 photos sur 15
+montrent le dehors (immeubles haussmanniens, arbres, garde-corps) ; app-001 = voilages partout, vue jamais visible (garder les fenêtres
+claires ; plus tard poser les voilages du client). Proposé : A « posée sur l'image » ou B « vrai objet dehors » ; NT : « optimiser la 2 ».
+`moteur/vue_dehors.py` : une TOILE verticale par côté de l'immeuble (fenêtres regroupées par direction du dehors), à DISTANCE_M = 35 m
+(app-002 mesuré à la main par la hauteur des étages : ~20 m l'immeuble le plus proche, ~55 m les plus lointains côté sud, ~29 m côté
+ouest ; à 21 m les photos se mêlaient mal), de -40 m à +26 m, coupées au coin de rue. Chaque point de la toile prend la couleur de la
+MEILLEURE photo qui le voit par une fenêtre (caméras de `verites/app-002/cameras-photos.json` ; masque = ouverture projetée faces
+intérieure ET extérieure, sans les pixels où un MUR plein est entre l'appareil et la fenêtre, sans les montants de la vraie fenêtre,
+sans les MEUBLES devant (OWLv2, rectangles gardés en cache), sans la marque de l'annonce, rétréci de 4 px + 2 × l'écart du calage ;
+fenêtre que l'appareil a dans le dos écartée) ; pas de moyenne (doublait les immeubles), couture 25 cm ; là où aucune photo ne voit :
+vraie vue PROLONGÉE EN FLOU (push-pull ; avant : trous transparents = « collage », avis NT). COULEUR : le dehors s'affiche COMME SUR
+LA PHOTO (teinte du mur neutralisée), la pellicule d'Unreal prise à l'envers couleurs comprises (`couleur_avant_pellicule`, exacte à
+< 1/255 ; la courbe seule désaturait tout ce qui est plus clair que les murs) ; image stockée / FORCE_TOILE (10). Règle « murs »
+(mur de la photo = mur du film) essayée puis écartée : délavait. Unreal (`preparer_cinematique.poser_vues_dehors`) : plan 100 cm mis à
+l'échelle, matériau TRANSLUCIDE SANS ÉCLAIRAGE, image lue d'après la position dans le monde, × exposition inverse (clarté affichée
+indépendante de l'exposition) ; hors de tout calcul de lumière (ombre, Lumen, champs de distance, rayons, captures). ÉTALONNAGE en
+bandes grises : affiché = demandé à 2-5/255 de 0,1 à 8. PIÈGES : (1) l'exposition locale (gardée dans un vieux réglage d'essai)
+écrasait les clairs ; (2) le CIEL PHOTOGRAPHIÉ posé sur l'image remplace tout ce qui a la profondeur du ciel, donc passait par-dessus
+la vue translucide et lui volait ses couleurs (arbres gris) : coupé quand la vue est posée ; (3) le SOL GRIS du dehors cachait le bas
+de la toile (caméra à 1,60 m qui plonge) : invisible à la caméra mais toujours dans la lumière indirecte (`poser_dehors(invisible)`) ;
+(4) verre importé = surface blanche à 94 % transparente : remplacé par une VITRE CLAIRE (base noire, 6 % de reflet,
+`verre_clair`) quand la vue est posée (sans effet mesurable sans vue). Outil `outils/unreal/vue_dehors_photos.py` ; film :
+`balade_unreal.py --photos verites/<logement>/cameras-photos.json` (moments de jour seulement : jour_soleil, jour_voile).
+MESURES (même vol que `film-12-11-soir`, jour ensoleillé, 185 images) : dehors presque blanc 89 → 21 %, blanc pur 7,6 → 0,01 %, vues
+laiteuses 79 → 16 images, couleur 0,004 → 0,038, détail 0,6 → 3,2 crans ; MURS inchangés (écart médian −0,012 → −0,015, trop clairs /
+sombres =, sauts =) ; images fixes avec / sans : hors de la vue 0,1 à 0,5/255. Depuis la place de la photo 15 : même clarté médiane
+et même couleur que l'annonce. Films `..\atelya\b2\app-002\unreal\film\vraie-vue-essai2.mp4` (+ `-avant-apres.mp4/.jpg`, essai 1 =
+collage `vraie-vue-essai1.mp4`, `vraie-vue-essai2-4-moments.jpg`). RESTE : bas des fenêtres flou et grisâtre (la caméra du film,
+plus haute et plus près des vitres, plonge vers la rue qu'aucune photo ne montre) ; parallaxe juste seulement pour le lointain
+(garde-corps peint sur la toile) ; distance par défaut, pas encore mesurée seule ; calage des caméras des photos fait à la main
+(chantier « caler les photos automatiquement » pour un nouveau client). NT : on demandera au client de vraies photos de la vue, mais
+il faut s'entraîner avec ce qu'on a.

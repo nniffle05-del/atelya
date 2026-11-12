@@ -1,10 +1,12 @@
 """La BALADE d'un logement dans Unreal : une seule prise continue, choisie par Atelya, de bout en bout (12/11/2026).
 
     python outils/unreal/balade_unreal.py <paquet> <nom> <logement.json> [--eclairage jour_soleil] [--moteur lumen_max]
+        [--photos verites/<logement>/cameras-photos.json]
 
 1. le PROMENEUR (moteur/promeneur.py) trace la balade d'après le plan : portes à ouvrir, chemin, regard ; balade.json et
    balade.png (vue de dessus) ;
-2. Unreal : portes ouvertes, plafonniers allumés dans les pièces sans fenêtre, caméra sur le chemin ;
+2. Unreal : portes ouvertes, plafonniers allumés dans les pièces sans fenêtre, caméra sur le chemin ; avec --photos (moments de
+   jour), la VRAIE VUE par les fenêtres tirée des photos du client (outils/unreal/vue_dehors_photos.py) et la vitre claire ;
 3. le photographe EN MARCHANT : un essai toutes les 0,25 s de film, l'exposition voulue à chaque essai, lissée comme un œil qui
    s'adapte (moteur/photographe.exposition_en_marchant), posée en clés sur la séquence ; un second essai la corrige ;
 4. le film (Movie Render Queue), son contrôle (murs à la clarté visée, image par image) et sa vidéo ;
@@ -25,12 +27,15 @@ sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cinematique_unreal as cu  # noqa: E402
 import mesurer_lumiere  # noqa: E402
+import vue_dehors_photos  # noqa: E402
 
 from moteur import photographe, promeneur  # noqa: E402
 from moteur.cinema import ciels  # noqa: E402
 from moteur.cinema import controle as controle_vol  # noqa: E402
 
 PREMIER_ESSAI = -9.0
+# La VRAIE VUE (étape 5, 13/11/2026) n'est posée qu'aux moments de JOUR : les photos d'annonce sont prises de jour.
+MOMENTS_VUE = ("jour_soleil", "jour_voile")
 PASSES = 2  # essais du photographe en marchant
 BIBLIOTHEQUE_CIELS = RACINE.parent / "atelya" / "bibliotheque" / "ciels"
 
@@ -68,6 +73,9 @@ def main() -> None:
     p.add_argument("--reprendre", action="store_true",
                    help="le film est déjà rendu (plantage après le rendu) : seulement contrôle, vidéo, mesure de la lumière, bilan")
     p.add_argument("--suffixe", default="", help="ajouté au nom du dossier du film (garder un film précédent, ex. « -v4 »)")
+    p.add_argument("--photos", default=None,
+                   help="caméras des photos du client (cameras-photos.json) : la VRAIE VUE par les fenêtres, tirée des photos "
+                        "(outils/unreal/vue_dehors_photos.py), posée aux moments de jour")
     a = p.parse_args()
     debut = time.time()
     paquet = Path(a.paquet)
@@ -93,9 +101,17 @@ def main() -> None:
     reglage = sortie.parent / f"reglage-{nom_dossier}.json"
     clarte = photographe.clarte_visee(ambiance)
     balance = float(ambiance.get("balance", photographe.FORCE_BALANCE))
+    vues = []
+    if a.photos and ambiance["id"] in MOMENTS_VUE:
+        vues = vue_dehors_photos.preparer(Path(a.logement), Path(a.photos), cu.STUDIO / "Paquets" / a.nom / "vues")
+        print(f"   vraie vue : {len(vues)} toile(s) d'après les photos du client", flush=True)
     base = {"eclairage": ambiance["id"], "moteur": a.moteur, "dossier": nom_dossier, "portes_ouvertes": b["portes_ouvertes"],
+            "vues_dehors": vues, "verre_clair": bool(vues),
             "lampes_pieces": [] if ambiance.get("lampes") else b["pieces_sans_fenetre"],
-            "exposition_locale": photographe.exposition_locale(clarte), "ciel_photo": ciel_photo(ambiance["id"])}
+            "exposition_locale": photographe.exposition_locale(clarte),
+            # le ciel photographié est posé SUR L'IMAGE à la place de tout ce qui est « ciel » : il passait par-dessus la vraie vue
+            # (translucide) et lui retirait ses couleurs (arbres gris, 13/11/2026) ; avec la vraie vue, pas de ciel photographié
+            "ciel_photo": None if vues else ciel_photo(ambiance["id"])}
 
     def preparer(exposition, gain, cles=None):
         contenu = {**base, "exposition": exposition, "gain": list(gain)}
