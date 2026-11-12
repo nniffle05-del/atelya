@@ -365,7 +365,9 @@ def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None):
         "lumen_scene_lighting_quality": 4.0,
         "lumen_scene_detail": 4.0,
         "lumen_reflection_quality": 4.0,
-        "motion_blur_amount": 0.0,
+        # flou de mouvement du cinéma : obturateur à 180° (0,5) ; Movie Render Queue l'obtient en accumulant ses sous-images sur
+        # la demi-image d'ouverture. Sans lui, à 24 images/s, tout panoramique paraît saccadé (NT, 12/11/2026)
+        "motion_blur_amount": 0.5,
         "vignette_intensity": 0.0,
         "bloom_intensity": 0.2,
         **PELLICULE,

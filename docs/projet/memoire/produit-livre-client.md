@@ -218,3 +218,18 @@ abaissée à 20 % sur ±1,2 m APRÈS le lissage (sinon effacée) ; allure 0,9 m/
 vers l'avant + vers le cadrage de la pièce où l'on est + vers la profondeur aux demi-tours − mur < 0,9 m ; rotation ≤ 30 °/s, chaque
 degré coûte) puis lissage 0,5 s. Lisser des caps après coup « moyennait » deux bonnes directions à travers un mur (13-28 % du film
 face à un mur) → DP : 4,4 %, profondeur médiane vue 4,5 m. App-002 : 43,6 m, 1 min 13.
+**LE BEAU TRAVELLING (12/11/2026, NT : « mouvements saccadés ; des fois il avance en arrière ; j'aimerais un beau travelling »)** :
+causes trouvées et corrigées dans `promeneur.vol` : (1) RECUL aux impasses → boucle de demi-tour quand elle tient (`_boucle_demi_tour`,
+rayons 0,4-1,5 m, amorcée jusqu'à 5 m avant) ; sinon ARRÊT complet en vol stationnaire 1,6 s, pivot à 60 °/s (30 °/s en vol), freinage
+en racine sur 1 m ; regard ≤ 40° de la direction du mouvement (pénalité forte au-delà) → recul 0 % ; (2) CROCHETS de trajectoire :
+garder le point d'origine près d'un obstacle faisait des zigzags → DOSAGE progressif lissé entre chemin sûr et courbe lisse, puis
+finition temporelle 0,2 s ; courbure mesurée aussi à ±0,2 m (freinage avant un virage sec) → accélération max 1,5 m/s² (p95 1,0 ;
+avant pics 5-6) ; dégagement ≥ 0,14 m (> 10 cm du plan de coupe d'Unreal) ; (3) passages déjà empruntés pénalisés (`VOL_DEJA_VU_*`,
+un circuit plutôt qu'un aller-retour quand il existe) ; (4) FLOU DE MOUVEMENT : `motion_blur_amount` 0 → 0,5 (obturateur 180°,
+accumulé par les 8 sous-images de Movie Render Queue) : sans lui tout panoramique à 24 i/s paraît saccadé. App-002 : 40,7 m, 1 min 09.
+**SURVOL DES MEUBLES ET HAUTEUR VARIABLE (12/11/2026, NT : « pourquoi tu ne contournes pas les objets en élevant la caméra ? »)** :
+`Carte(..., hauteur_camera)` : en vol, un meuble plus bas que la caméra − 0,5 m se SURVOLE (app-002 : tous ≤ 1 m) ; seuls murs, portes,
+meubles hauts bloquent. Hauteur 1,6 m → 1,9 m dans les grands espaces (moyenne des 180 rayons de 1,5 à 3,2 m), ≥ meuble survolé + 0,6 m,
+≤ plafond − 0,45 m, lissée ; plongée −7° + 15°/m au-dessus de 1,6 m. Fond d'une pièce = le plus loin du POINT DE VUE (traverser ce
+que le point de vue ne montrait pas) ; boucle de demi-tour amorcée à ≤ 1,5 m du bout (au-delà elle coupait l'excursion). App-002 :
+29,6 m, 50 s, boucle en goutte d'eau au-dessus de la table du coin repas.
