@@ -11,7 +11,8 @@ import numpy as np
 from moteur.cinema.navigation import Carte
 from moteur.cinema.reglages import (IPS, MARGE_M, VOL_ACCEL_LATERALE, VOL_BOUCLE_RAYONS, VOL_BOUCLE_RECUL_M,
                                     VOL_DEPART_ARRIVEE_M, VOL_FINITION_S, VOL_LISSAGE_M, VOL_PIVOT_S, VOL_RAYON_VUE_M,
-                                    VOL_ROTATION_MAX, VOL_VITESSE, VOL_VITESSE_VUE)
+                                    VOL_ROTATION_MAX, VOL_VITESSE, VOL_VITESSE_PASSAGE, VOL_VITESSE_VUE,
+                                    ROTATION_PASSAGE)
 
 
 ARRET_PLANIFIE_M = 0.7  # planificateur : on freine sur 70 cm avant un panoramique, on réaccélère sur 70 cm après
@@ -171,10 +172,12 @@ def courbe_du_vol(chemin: list, carte: Carte, pivots: list | None = None) -> tup
 
 
 def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict], durees: list[float] | None = None,
-                  virages_suivis: float | None = None) -> tuple[np.ndarray, float, list[tuple[int, int]]]:
+                  virages_suivis: float | None = None, passages: np.ndarray | None = None
+                  ) -> tuple[np.ndarray, float, list[tuple[int, int]]]:
     """La vitesse le long de la courbe (croisière, ralentie devant ce qu'on montre, dans les virages, au départ et à l'arrivée,
     arrêt et pivot aux demi-tours), puis UNE POSITION PAR IMAGE. Renvoie les positions, la longueur de la courbe (m) et les
-    arrêts (première et dernière image de chaque arrêt, dans l'ordre)."""
+    arrêts (première et dernière image de chaque arrêt, dans l'ordre). `passages` (planificateur) : pour chaque point de la
+    courbe, est-on dans un couloir ou l'entrée traversée ? on y va plus vite, et le regard y tourne plus vite."""
     seg = np.linalg.norm(np.diff(courbe, axis=0), axis=1)
     abscisse = np.concatenate([[0], np.cumsum(seg)])
     longueur = float(abscisse[-1])
@@ -182,6 +185,8 @@ def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict], 
 
     proche = np.min(np.stack([np.linalg.norm(courbe - r, axis=1) for r in reperes]), 0) if reperes else np.full(len(courbe), 9.0)
     vitesse = VOL_VITESSE_VUE + (VOL_VITESSE - VOL_VITESSE_VUE) * lissee(proche, 0.4, VOL_RAYON_VUE_M)
+    dans_passage = np.zeros(len(courbe)) if passages is None else np.clip(gauss(passages.astype(float), 5), 0, 1)
+    vitesse = vitesse + (VOL_VITESSE_PASSAGE - VOL_VITESSE) * dans_passage * lissee(proche, 0.4, VOL_RAYON_VUE_M)
     # la courbure (changement de direction par mètre, sur ±0,5 m) borne la vitesse : v² · courbure ≤ accélération latérale
     direction = np.unwrap(np.arctan2(np.gradient(courbe[:, 1]), np.gradient(courbe[:, 0])))
     n5 = max(1, int(0.5 / 0.1))
@@ -196,7 +201,7 @@ def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict], 
     if virages_suivis:
         # le REGARD doit pouvoir suivre le virage : la direction du mouvement ne tourne jamais plus vite que la caméra ne peut
         # tourner (sinon, au passage d'une porte, le regard reste en retard… sur le mur d'en face) ; planificateur, 12/11/2026
-        omega = math.radians(virages_suivis * VIRAGE_PART_ROTATION)
+        omega = np.radians((virages_suivis + (ROTATION_PASSAGE - virages_suivis) * dans_passage) * VIRAGE_PART_ROTATION)
         limite = omega / np.maximum(gauss(virage, 3), 1e-3)
         # sauf autour des arrêts (panoramiques) : la caméra y ralentit déjà jusqu'à s'arrêter, et le demi-tour y est voulu
         for j in jonctions:

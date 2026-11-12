@@ -51,7 +51,8 @@ def ecart(a, b) -> float:
 def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int], etapes: list[dict], voir: rz.Scene2D,
                   logement: dict, panoramiques: list | None = None, fin_cap: float | None = None,
                   avance_m: float | None = None, rotation_max: float = VOL_ROTATION_MAX,
-                  rotation_pivot: float = VOL_ROTATION_PIVOT) -> np.ndarray:
+                  rotation_pivot: float = VOL_ROTATION_PIVOT, passages: np.ndarray | None = None,
+                  rotation_passage: float | None = None) -> np.ndarray:
     """LE REGARD, choisi d'un seul coup sur tout le vol (programmation dynamique) : à chaque instant (une clé toutes les
     CLE_IMAGES images), une direction parmi 72 (tous les 5°) ; la suite retenue maximise ce qu'on voit (profondeur), regarde
     plutôt vers l'avant, se tourne vers le cadrage d'une pièce quand on y est, vers la plus belle profondeur aux demi-tours,
@@ -126,11 +127,15 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
     saut_vol = max(1, int(round(rotation_max * pas_cles / 5.0)))
     cout_rotation = 0.03 * np.abs(ecarts) * 5.0
     interdit = np.where(np.abs(ecarts) > saut_vol, 1e6, 0.0)
+    if passages is not None and rotation_passage is not None:  # dans les couloirs, le regard peut tourner un peu plus vite
+        saut_passage = max(1, int(round(rotation_passage * pas_cles / 5.0)))
+        interdit_passage = np.where(np.abs(ecarts) > saut_passage, 1e6, 0.0)
     total = notes[0].copy()
     venu = np.zeros((len(cles_idx), len(angles)), int)
     for n in range(1, len(cles_idx)):
         candidats = np.stack([np.roll(total, -e) for e in ecarts])  # candidats[i, a] = total[a + ecarts[i]]
-        candidats = candidats - cout_rotation[:, None] - (interdit[:, None] if vites_cles[n] > 0.15 else 0.0)
+        borne = interdit_passage if passages is not None and rotation_passage is not None and passages[cles_idx[n]] else interdit
+        candidats = candidats - cout_rotation[:, None] - (borne[:, None] if vites_cles[n] > 0.15 else 0.0)
         meilleur = np.argmax(candidats, 0)
         venu[n] = (np.arange(len(angles)) + ecarts[meilleur]) % len(angles)
         total = candidats[meilleur, np.arange(len(angles))] + notes[n]

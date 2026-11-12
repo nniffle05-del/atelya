@@ -36,6 +36,7 @@ from moteur.cinema.reglages import CIRCULATION, CLE_IMAGES, FOND_DISTANCE_M, IPS
 from moteur.cinema.trajectoire import allure_du_vol, courbe_du_vol
 
 REGARD_AVANCE_VOL_M = 1.2  # planificateur : le regard anticipe là où l'on sera 1,2 m plus loin
+OUVERTURE_CALME_M = 2.0  # planificateur : pas d'accélération « couloir » au tout début du film
 PIVOT_PLANIFIE = 70.0  # planificateur : °/s à l'arrêt (60 avant ; NT : les demi-tours plus rapides)
 ROTATION_PLANIFIEE = 35.0  # planificateur : °/s en vol (28 avant) : le regard suit mieux les virages des portes
 
@@ -210,11 +211,29 @@ def balade(logement: dict, savoir: dict | None = None, format_image=(1920, 1080)
             "longueur_m": round(float(np.sum(np.linalg.norm(np.diff(xy, axis=0), axis=1))), 1)}
 
 
+def _en_passage(logement: dict, points: np.ndarray) -> np.ndarray:
+    """Pour chaque point : est-on dans une circulation (couloir, dégagement, entrée) ou dans l'épaisseur d'une porte ?"""
+    circulations = [p["contour"] for p in logement["pieces"]
+                    if rz._type(p) in CIRCULATION and len(p.get("contour") or []) >= 3]
+    autres = [p["contour"] for p in logement["pieces"] if rz._type(p) not in CIRCULATION and len(p.get("contour") or []) >= 3]
+    sortie = np.zeros(len(points), bool)
+    for k, q in enumerate(points):
+        q = (float(q[0]), float(q[1]))
+        sortie[k] = any(rz._dedans(q, c) for c in circulations) or not any(rz._dedans(q, c) for c in autres)
+    # l'ouverture (les 2 premiers mètres) reste calme, même dans l'entrée
+    parcouru = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))])
+    sortie[parcouru < OUVERTURE_CALME_M] = False
+    return sortie
+
+
 def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage) -> dict:
     """Un plan de vol (parcours ou planificateur) → le vol complet : courbe et allure (trajectoire), regard, hauteur, clés."""
     pivots = getattr(parcours, "pivots", None)
     courbe, jonctions, durees = courbe_du_vol(parcours.chemin, parcours.carte, pivots)
-    positions, longueur, arrets = allure_du_vol(courbe, jonctions, parcours.etapes, durees, virages_suivis=ROTATION_PLANIFIEE if pivots is not None else None)
+    passages = _en_passage(logement, courbe) if pivots is not None else None
+    positions, longueur, arrets = allure_du_vol(courbe, jonctions, parcours.etapes, durees,
+                                                virages_suivis=ROTATION_PLANIFIEE if pivots is not None else None,
+                                                passages=passages)
     panoramiques = None
     if pivots is not None:  # le regard de chaque arrêt voulu par le planificateur : le cadrage de sa pièce, puis la sortie
         panoramiques = []
@@ -224,7 +243,8 @@ def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage
     caps = regard_du_vol(positions, courbe, jonctions, parcours.etapes, parcours.voir, logement, panoramiques,
                          getattr(parcours, "fin_cap", None), REGARD_AVANCE_VOL_M if pivots is not None else None,
                          ROTATION_PLANIFIEE if pivots is not None else VOL_ROTATION_MAX,
-                         PIVOT_PLANIFIE if pivots is not None else VOL_ROTATION_PIVOT)
+                         PIVOT_PLANIFIE if pivots is not None else VOL_ROTATION_PIVOT,
+                         _en_passage(logement, positions) if pivots is not None else None, ROTATION_PASSAGE)
     hauteurs, tangages = hauteurs_du_vol(positions, parcours.voir, logement)
     trajet = trajet_du_vol(positions, hauteurs, caps, tangages, s["focale_mm"], format_image, scene_eclairage)
     sans_fenetre = [p["id"] for p in logement["pieces"] if not parcours.scene.a_une_fenetre(p)]

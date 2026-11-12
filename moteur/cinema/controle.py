@@ -31,7 +31,7 @@ MUR_PART_MAX = 0.55  # au-delà de cette part du champ bouchée, l'image est un 
 MUR_CENTRE_MIN_M = 1.0  # … ou si le centre de l'image est à moins de ça d'un obstacle
 RECUL_DEG = 100.0  # regard à plus de ça de la direction du mouvement = la caméra recule
 VITESSE_EN_VOL = 0.15  # m/s : au-dessous, la caméra est (presque) à l'arrêt
-ROTATION_MAX_VOL = 40.0  # °/s en vol
+ROTATION_MAX_VOL = 50.0  # °/s en vol (40 avant le 12/11 : NT veut des demi-tours et des virages de couloir plus vifs ; le décor saute vers 80)
 ROTATION_MAX_ARRET = 80.0  # °/s à l'arrêt (pivot ; au-delà, à 24 images/s, le décor saute malgré le flou de mouvement)
 ACCELERATION_MAX = 1.2  # m/s² (vitesse lissée sur 0,25 s)
 FROLE_M = MARGE_M * 0.9
