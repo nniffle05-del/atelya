@@ -14,6 +14,7 @@ from moteur.cinema.reglages import (IPS, MARGE_M, VOL_ACCEL_LATERALE, VOL_BOUCLE
                                     VOL_ROTATION_MAX, VOL_VITESSE, VOL_VITESSE_VUE)
 
 
+ARRET_PLANIFIE_M = 0.7  # planificateur : on freine sur 70 cm avant un panoramique, on réaccélère sur 70 cm après
 VIRAGE_PART_ROTATION = 0.8  # dans un virage, la direction du mouvement tourne au plus à 80 % de la rotation permise au regard
 
 
@@ -205,7 +206,8 @@ def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict], 
     vitesse = gauss(gauss(vitesse, 0.6 / 0.1), 0.6 / 0.1)
     for j in jonctions:  # ralentir jusqu'au demi-tour (presque à l'arrêt, la caméra pivote), puis repartir — après le lissage
         d_arret = np.abs(abscisse - abscisse[min(j, len(abscisse) - 1)])
-        vitesse = np.where(d_arret < 1.0, 0.04 + (vitesse - 0.04) * np.sqrt(np.clip(d_arret, 0, 1.0)), vitesse)
+        r = ARRET_PLANIFIE_M if virages_suivis else 1.0  # planificateur : freinage et départ plus courts (avis de NT)
+        vitesse = np.where(d_arret < r, 0.04 + (vitesse - 0.04) * np.sqrt(np.clip(d_arret / r, 0, 1.0)), vitesse)
     vitesse = np.maximum(vitesse, 0.04)
     # au bout d'une impasse : arrêt complet en vol stationnaire VOL_PIVOT_S secondes (la caméra pivote vers la sortie), puis on repart
     durees = list(durees) if durees is not None else [VOL_PIVOT_S] * len(jonctions)

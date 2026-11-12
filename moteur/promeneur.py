@@ -36,6 +36,7 @@ from moteur.cinema.reglages import CIRCULATION, CLE_IMAGES, FOND_DISTANCE_M, IPS
 from moteur.cinema.trajectoire import allure_du_vol, courbe_du_vol
 
 REGARD_AVANCE_VOL_M = 1.2  # planificateur : le regard anticipe là où l'on sera 1,2 m plus loin
+PIVOT_PLANIFIE = 70.0  # planificateur : °/s à l'arrêt (60 avant ; NT : les demi-tours plus rapides)
 ROTATION_PLANIFIEE = 35.0  # planificateur : °/s en vol (28 avant) : le regard suit mieux les virages des portes
 
 # la balade À PIED (premier essai du 12/11/2026, remplacé par le vol ; gardé en option « marche »)
@@ -219,10 +220,11 @@ def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage
         panoramiques = []
         for (debut, fin), j in zip(arrets, sorted(jonctions)):
             pv = min(pivots, key=lambda q: float(np.linalg.norm(courbe[min(j, len(courbe) - 1)] - np.asarray(q["xy"]))))
-            panoramiques.append((debut, fin, pv["cap"]))
+            panoramiques.append((debut, fin, pv["cap"], pv.get("part", 0.55)))
     caps = regard_du_vol(positions, courbe, jonctions, parcours.etapes, parcours.voir, logement, panoramiques,
                          getattr(parcours, "fin_cap", None), REGARD_AVANCE_VOL_M if pivots is not None else None,
-                         ROTATION_PLANIFIEE if pivots is not None else VOL_ROTATION_MAX)
+                         ROTATION_PLANIFIEE if pivots is not None else VOL_ROTATION_MAX,
+                         PIVOT_PLANIFIE if pivots is not None else VOL_ROTATION_PIVOT)
     hauteurs, tangages = hauteurs_du_vol(positions, parcours.voir, logement)
     trajet = trajet_du_vol(positions, hauteurs, caps, tangages, s["focale_mm"], format_image, scene_eclairage)
     sans_fenetre = [p["id"] for p in logement["pieces"] if not parcours.scene.a_une_fenetre(p)]

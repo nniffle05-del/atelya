@@ -15,7 +15,6 @@ from moteur.cinema.trajectoire import gauss, lissee
 CENTRE_DEMI_DEG = 15.0  # le centre de l'image (comme le contrôleur)
 CENTRE_MUR_M = 1.0  # un obstacle plus près que ça au centre de l'image coûte jusqu'à CENTRE_POIDS
 CENTRE_POIDS = 4.0
-PANORAMIQUE_PART = 0.55  # part d'un panoramique passée sur le plus beau cadrage
 FIN_S = 2.5  # la conclusion : les dernières secondes regardent le plus beau cadrage de la dernière pièce
 
 
@@ -51,15 +50,16 @@ def ecart(a, b) -> float:
 
 def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int], etapes: list[dict], voir: rz.Scene2D,
                   logement: dict, panoramiques: list | None = None, fin_cap: float | None = None,
-                  avance_m: float | None = None, rotation_max: float = VOL_ROTATION_MAX) -> np.ndarray:
+                  avance_m: float | None = None, rotation_max: float = VOL_ROTATION_MAX,
+                  rotation_pivot: float = VOL_ROTATION_PIVOT) -> np.ndarray:
     """LE REGARD, choisi d'un seul coup sur tout le vol (programmation dynamique) : à chaque instant (une clé toutes les
     CLE_IMAGES images), une direction parmi 72 (tous les 5°) ; la suite retenue maximise ce qu'on voit (profondeur), regarde
     plutôt vers l'avant, se tourne vers le cadrage d'une pièce quand on y est, vers la plus belle profondeur aux demi-tours,
     et tourne doucement (au plus VOL_ROTATION_MAX °/s, chaque degré de rotation coûte un peu). Lisser après coup « moyenne »
     deux bonnes directions… à travers le mur qui les sépare : c'est ce que ce calcul évite. Renvoie un cap par image.
 
-    Planificateur (12/11/2026) : `panoramiques` = [(première image, dernière image, cap)] des arrêts au cœur d'une pièce en
-    cul-de-sac : la première moitié de l'arrêt (un peu plus) regarde le plus beau cadrage, la suite se tourne vers la sortie ;
+    Planificateur (12/11/2026) : `panoramiques` = [(première image, dernière image, cap, part)] des arrêts au cœur d'une pièce
+    en cul-de-sac : la part `part` de l'arrêt regarde le plus beau cadrage, la suite se tourne vers la sortie ;
     `fin_cap` : les dernières secondes regardent ce cadrage (la conclusion) ; `avance_m` : le regard anticipe là où la caméra
     sera dans `avance_m` mètres de chemin (et non dans une seconde : à vitesse lente, une seconde, c'est 20 cm, et le regard ne
     voyait pas venir le virage d'une porte)."""
@@ -83,7 +83,7 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
         else:
             j = min(len(positions) - 1, int(np.searchsorted(parcouru, parcouru[k] + avance_m)))
             # jamais au-delà du prochain arrêt : derrière un demi-tour, « plus loin sur le chemin » est… derrière soi
-            j = min([j] + [debut for debut, _, _ in panoramiques if debut >= k])
+            j = min([j] + [p[0] for p in panoramiques if p[0] >= k])
             devant = positions[j] - p
         if np.linalg.norm(devant) < 0.05:
             devant = p - positions[max(0, k - IPS)]
@@ -100,10 +100,10 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
             w = 1.0 - float(lissee(float(np.linalg.norm(p - np.asarray(e["xy"]))), 0.5, VOL_RAYON_VUE_M))
             if w > poids:
                 but, poids = e["cap"], w
-        for debut, fin, cap_pano in panoramiques:
-            if debut <= k <= debut + PANORAMIQUE_PART * (fin - debut):  # seulement une fois arrêté (sinon elle recule)
+        for debut, fin, cap_pano, part in panoramiques:
+            if debut <= k <= debut + part * (fin - debut):  # seulement une fois arrêté (sinon elle recule)
                 but, poids = cap_pano, 1.0  # d'abord le plus beau cadrage…
-            elif debut + PANORAMIQUE_PART * (fin - debut) < k <= fin:
+            elif debut + part * (fin - debut) < k <= fin:
                 but, poids = None, 0.0  # … puis on se tourne vers là où l'on va repartir
         if fin_cap is not None and k >= len(positions) - FIN_S * IPS:
             w = float(lissee(k - (len(positions) - FIN_S * IPS), 0, IPS))
@@ -121,7 +121,7 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
     pas_cles = CLE_IMAGES / IPS
     # rotation permise : VOL_ROTATION_MAX en vol, VOL_ROTATION_PIVOT à l'arrêt (vitesse sous 0,15 m/s)
     vites_cles = [float(np.linalg.norm(positions[min(len(positions) - 1, k + 1)] - positions[k]) * IPS) for k in cles_idx]
-    saut_max = max(1, int(round(VOL_ROTATION_PIVOT * pas_cles / 5.0)))  # en crans de 5°
+    saut_max = max(1, int(round(rotation_pivot * pas_cles / 5.0)))  # en crans de 5°
     ecarts = np.arange(-saut_max, saut_max + 1)
     saut_vol = max(1, int(round(rotation_max * pas_cles / 5.0)))
     cout_rotation = 0.03 * np.abs(ecarts) * 5.0

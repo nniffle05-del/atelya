@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cinematique_unreal as cu  # noqa: E402
 
 from moteur import photographe, promeneur  # noqa: E402
-from moteur.cinema import controle  # noqa: E402
+from moteur.cinema import controle as controle_vol  # noqa: E402
 
 PREMIER_ESSAI = -9.0
 PASSES = 2  # essais du photographe en marchant
@@ -61,9 +61,9 @@ def main() -> None:
     promeneur.dessiner(logement, b, sortie / "balade.png")
     print(f"   {b['longueur_m']} m, {b['duree_s']} s ; portes ouvertes {[x['id'] for x in b['portes_ouvertes']]}", flush=True)
     # le contrôleur relit le vol avant le tournage (moteur/cinema/controle.py) : note et défauts, écrits à côté du film
-    verdict = controle.controler(logement, b)
+    verdict = controle_vol.controler(logement, b)
     (sortie / "controle.json").write_text(json.dumps(verdict, ensure_ascii=False), encoding="utf-8")
-    print(controle.rapport(verdict), flush=True)
+    print(controle_vol.rapport(verdict), flush=True)
     trajet = paquet / "trajet-balade.json"
     trajet.write_text(json.dumps({**b["trajet"], "essai_pas": promeneur.IPS}, ensure_ascii=False), encoding="utf-8")
     reglage = sortie.parent / f"reglage-{nom_dossier}.json"

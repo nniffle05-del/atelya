@@ -31,8 +31,12 @@ DEGAGE_PART = 0.9
 DEGAGE_MAX_M = 1.4  # au-delà, assez dégagé pour tourner sans voir un mur de près (le contrôleur : mur « proche » < 1,2 m)
 GRANDE_PIECE_M2 = 20.0  # au-delà, la pièce a un second cœur
 COEUR_ECART_M = 3.0  # … à au moins ça du premier
-PANORAMIQUE_DEG_S = 45.0  # vitesse de rotation du panoramique au cœur d'une pièce en cul-de-sac
-PANORAMIQUE_MIN_S = 2.0
+PANORAMIQUE_DEG_S = 70.0  # vitesse de rotation du panoramique au cœur d'une pièce en cul-de-sac (45 avant l'avis de NT :
+# « dès qu'il se retourne, il prend un peu de temps » ; pas plus de ~70 °/s : au-delà, à 24 images/s, le décor saute)
+PANORAMIQUE_MIN_S = 1.2
+PAUSE_CADRAGE_S = 0.4  # le temps de regarder le plus beau cadrage
+SORTIE_DEG_S = 70.0  # puis on se tourne vers la sortie…
+SORTIE_EN_VOL = 0.5  # … et on repart quand la moitié de ce dernier virage est faite : la fin du virage se fait en accélérant
 DEMI_TOUR_DEG = 120.0  # au cœur d'une pièce, si le chemin repart à plus de ça de là où il arrivait : panoramique
 DIRECTION_M = 0.6  # longueur de chemin pour mesurer d'où l'on arrive et où l'on repart
 ORDRES_MAX = 5040  # 7 pièces montrées : on essaie tous les ordres ; au-delà, les plus proches d'abord
@@ -207,9 +211,13 @@ def planifier(logement: dict, s: dict) -> list[Plan]:
             if arrive is None or repart is None or abs(_ecart(arrive, repart)) < DEMI_TOUR_DEG:
                 continue
             # le panoramique : de là où l'on arrive vers le plus beau cadrage, puis vers la sortie
-            rotation = abs(_ecart(arrive, cap)) + abs(_ecart(cap, repart))
-            pivots.append({"xy": carte.xy(chemin[i]), "piece": ident, "cap": cap,
-                           "duree_s": round(max(PANORAMIQUE_MIN_S, rotation / PANORAMIQUE_DEG_S), 2)})
+            # le temps se partage selon les angles : tourner jusqu'au cadrage, s'y poser, puis tourner vers la sortie et repartir
+            # aussitôt (avant : moitié-moitié, et la caméra attendait parfois 2 s face à la porte)
+            vers_cadrage = abs(_ecart(arrive, cap)) / PANORAMIQUE_DEG_S + PAUSE_CADRAGE_S
+            vers_sortie = abs(_ecart(cap, repart)) / SORTIE_DEG_S
+            duree = max(PANORAMIQUE_MIN_S, vers_cadrage + SORTIE_EN_VOL * vers_sortie)
+            pivots.append({"xy": carte.xy(chemin[i]), "piece": ident, "cap": cap, "duree_s": round(duree, 2),
+                           "part": round(vers_cadrage / duree, 3)})
         plans.append(Plan(scene=scene, voir=voir, carte=carte, portes=portes, etapes=etapes, chemin=chemin, ordre=list(ordre),
                           pivots=pivots, fin_cap=etapes[-1]["cap"], estimation_s=round(estimation, 1)))
     return plans
