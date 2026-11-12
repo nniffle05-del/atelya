@@ -355,3 +355,7 @@ visée (écart médian +0,01 à +0,07 cran), murs trop clairs 0-3 % / trop sombr
 part sombre 0,6-3,8 %, bouchée ≤ 0,8 % ; coucher de soleil dans la fenêtre le soir, nuit bleu sombre. Rien à corriger.
 (4) PORTES OUVERTES GRIS-BLEU : même image en Lumen et au path tracer (calcul exact, 128 rayons) : porte aussi grise (un peu plus
 sombre) au path tracer ; matière blanche (0,88) dans le glTF. C'est la vraie lumière (face peu éclairée), pas un défaut.
+**Décision NT (12/11/2026, fin de soirée)** : après la planche `..\atelya\b2\app-002\unreal\film\fenetres-3-versions.jpg` (3 moments
+× actuel / exposition locale 0,5 / 0,3, pleine qualité) : même « ciel bien visible », on ne voit presque pas le ciel (à hauteur d'yeux,
+une fenêtre montre surtout l'horizon et ce qui est en dessous, ici le sol gris). NT garde la version ACTUELLE (sans exposition locale).
+CHANTIER À VENIR : la vraie vue par les fenêtres tirée des PHOTOS DU CLIENT (jamais une rue inventée).
