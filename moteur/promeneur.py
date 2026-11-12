@@ -400,6 +400,256 @@ def balade(logement: dict, savoir: dict | None = None, format_image=(1920, 1080)
             "longueur_m": round(float(np.sum(np.linalg.norm(np.diff(xy, axis=0), axis=1))), 1)}
 
 
+# ---------------------------------------------------------------------------------------------------------------------------
+# LA CAMÉRA VOLANTE (12/11/2026, NT : « 1 min 50 c'est trop long ; la caméra qui marche, ce n'est pas ouf, on ressent les
+# secousses ; il faudrait que la caméra vole »). Comme un drone de cinéma : une courbe continue très lissée, AUCUN arrêt (on
+# ralentit devant ce qu'on montre), accélérations douces, rotation fluide et anticipée, un peu plus haut. Plus court : l'ordre de
+# visite le plus court (plus d'aller-retour), le fond de pièce seulement dans les grandes pièces.
+VOL_HAUTEUR_M = 1.6
+VOL_TANGAGE_DEG = -7.0
+VOL_VITESSE = 0.9  # m/s en croisière
+VOL_VITESSE_VUE = 0.5  # m/s en passant devant ce qu'on montre
+VOL_RAYON_VUE_M = 1.4  # on ralentit et on tourne la caméra vers le cadrage à moins de ça du point de vue
+VOL_DEPART_ARRIVEE_M = 1.5  # accélération au départ, décélération à l'arrivée
+VOL_LISSAGE_M = 0.7  # lissage de la trajectoire (écart type, en mètres)
+VOL_LISSAGE_CAP_S = 0.8  # lissage de la rotation (écart type, en secondes)
+VOL_ROTATION_MAX = 28.0  # °/s
+VOL_MUR_MIN_M = 0.9  # après adoucissement, jamais le nez sur un mur plus près que ça (sauf en franchissant une porte)
+VOL_FOND_M2 = 20.0  # au-delà, la pièce a aussi son « fond » (on va au bout, on se retourne)
+VOL_ACCEL_LATERALE = 0.6  # m/s² : dans un virage serré (ou un demi-tour au bout d'un cul-de-sac), on ralentit en douceur
+
+
+def _gauss(valeurs: np.ndarray, sigma: float) -> np.ndarray:
+    """Lissage gaussien le long du temps / du chemin (écart type en nombre d'échantillons), bords prolongés."""
+    if sigma <= 0 or len(valeurs) < 3:
+        return valeurs.copy()
+    r = int(3 * sigma) + 1
+    noyau = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2)
+    noyau /= noyau.sum()
+    if valeurs.ndim == 1:
+        return np.convolve(np.pad(valeurs, r, mode="edge"), noyau, mode="valid")
+    return np.stack([np.convolve(np.pad(valeurs[:, k], r, mode="edge"), noyau, mode="valid")
+                     for k in range(valeurs.shape[1])], 1)
+
+
+def _lisser_vol(points: np.ndarray, carte: "Carte", sigma_m: float = VOL_LISSAGE_M, passes: int = 4) -> np.ndarray:
+    """Une courbe très lisse qui ne touche jamais un obstacle : lissages gaussiens répétés ; là où la courbe lissée passerait
+    trop près d'un obstacle, on garde le point d'avant (le chemin s'écarte moins du chemin sûr)."""
+    pts = _reechantillonner(points, 0.1)
+    for _ in range(passes):
+        lisse = _gauss(pts, sigma_m / 0.1)
+        for k in range(len(pts)):
+            i, j = carte.case(lisse[k])
+            if 0 <= i < carte.forme[0] and 0 <= j < carte.forme[1] and carte.distance[i, j] >= MARGE_M * 0.9:
+                pts[k] = lisse[k]
+    return pts
+
+
+def _distances_depuis(carte: "Carte", depart) -> dict:
+    """Coût du plus court chemin depuis `depart` vers toutes les cases (Dijkstra complet)."""
+    h, w = carte.forme
+    dist = {depart: 0.0}
+    tas = [(0.0, depart)]
+    voisins = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+    while tas:
+        c, u = heapq.heappop(tas)
+        if c > dist.get(u, math.inf):
+            continue
+        for di, dj in voisins:
+            v = (u[0] + di, u[1] + dj)
+            if not (0 <= v[0] < h and 0 <= v[1] < w) or not carte.libre[v]:
+                continue
+            nc = c + math.hypot(di, dj) * carte.cout[v]
+            if nc < dist.get(v, math.inf):
+                dist[v] = nc
+                heapq.heappush(tas, (nc, v))
+    return dist
+
+
+def vol(logement: dict, savoir: dict | None = None, format_image=(1920, 1080), scene_eclairage: str | None = None) -> dict:
+    """La caméra volante : même résultat que balade() (trajet, étapes, portes ouvertes, pièces sans fenêtre)."""
+    s = savoir or rz.savoir_faire()
+    scene = rz.Scene2D(logement)
+    pieces = [p for p in logement["pieces"] if rz._type(p) not in rz.SANS_INTERET and len(p.get("contour") or []) >= 3]
+    vues_par_piece = {}
+    for piece in pieces:
+        vues = rz.points_de_vue(scene, piece, 1, s)
+        if vues and not rz.rien_a_montrer(vues[0]):
+            vues_par_piece[piece["id"]] = vues[0]
+    portes = portes_ouvertes(logement, set(vues_par_piece))
+    carte = Carte(logement, portes)
+    ouvertes = {p["id"] for p in portes}
+    voir = rz.Scene2D({**logement, "ouvertures": [o for o in logement.get("ouvertures", [])
+                                                  if o["type"] != "porte" or o["id"] in ouvertes]}, portes_fermees=False)
+    entree = next((p for p in pieces if rz._type(p) == "entree"), pieces[0])
+    palliere = porte_palliere(logement)
+    if palliere:
+        o = next(o for o in logement["ouvertures"] if o["id"] == palliere)
+        m = next(m for m in logement["murs"] if m["id"] == o["mur"])
+        a, b = np.asarray(m["debut"], float), np.asarray(m["fin"], float)
+        d = (b - a) / np.linalg.norm(b - a)
+        repere = a + d * (o["position"] + o["largeur"] / 2)
+    else:
+        repere = np.asarray(entree["contour"], float).mean(0)
+    position = carte.plus_proche_libre(repere, carte.masque_piece(entree))
+    atteignable = carte.zones == carte.zones[position]
+    a_voir = {}
+    for piece in pieces:
+        vue = vues_par_piece.get(piece["id"])
+        masque = carte.masque_piece(piece) & atteignable
+        if vue is None or rz._type(piece) in CIRCULATION or not masque.any():
+            continue
+        a_voir[piece["id"]] = (piece, vue, masque, carte.plus_proche_libre(vue["position"], masque))
+    # l'ordre de visite le plus court : à chaque fois, la pièce la plus proche (par le chemin) de l'endroit où l'on est
+    etapes = [{"genre": "depart", "piece": entree["id"], "xy": carte.xy(position)}]
+    chemin = [position]
+    while a_voir:
+        dist = _distances_depuis(carte, chemin[-1])
+        ident = min(a_voir, key=lambda k: dist.get(a_voir[k][3], math.inf))
+        piece, vue, masque, cible = a_voir.pop(ident)
+        morceau = carte.chemin(chemin[-1], cible)
+        chemin += morceau[1:]
+        etapes.append({"genre": "point_de_vue", "piece": ident, "xy": carte.xy(cible), "cap": vue["cap"]})
+        if rz._aire(piece["contour"]) > VOL_FOND_M2:
+            entree_piece = next((c for c in morceau if masque[c]), cible)
+            large = masque & (carte.distance >= min(FOND_DISTANCE_M, float(carte.distance[masque].max()) * 0.9))
+            cases = np.argwhere(large if large.any() else masque)
+            loin = cases[int(np.argmax((cases[:, 0] - entree_piece[0]) ** 2 + (cases[:, 1] - entree_piece[1]) ** 2))]
+            fond = (int(loin[0]), int(loin[1]))
+            if math.dist(carte.xy(fond), carte.xy(cible)) > 1.5:
+                chemin += carte.chemin(chemin[-1], fond)[1:]
+                etapes.append({"genre": "fond", "piece": ident, "xy": carte.xy(fond)})
+
+    # la courbe, puis l'allure : croisière, ralentie devant ce qu'on montre, départ et arrivée en douceur
+    def lissee(x, a, b):
+        t = np.clip((x - a) / (b - a), 0, 1)
+        return t * t * (3 - 2 * t)
+
+    # les DEMI-TOURS (cul-de-sac : fond d'une pièce, cuisine en impasse) : la trajectoire y est coupée ; chaque morceau est lissé à
+    # part, et la caméra ralentit jusqu'à presque s'arrêter à la jonction, où elle pivote (un drone ne rebrousse pas chemin d'un coup)
+    brut = _reechantillonner(np.array([carte.xy(c) for c in chemin], float), 0.1)
+    coupes, groupe = [], []  # par groupe de détections voisines, le point où le retournement est le plus franc (la pointe)
+    for i in range(5, len(brut) - 5):
+        u, w = brut[i] - brut[i - 5], brut[i + 5] - brut[i]
+        nu, nw = np.linalg.norm(u), np.linalg.norm(w)
+        cosinus = float(np.dot(u, w) / (nu * nw)) if nu > 1e-6 and nw > 1e-6 else 1.0
+        if cosinus < -0.5:
+            if groupe and i - groupe[-1][0] > 10:
+                coupes.append(min(groupe, key=lambda g: g[1])[0])
+                groupe = []
+            groupe.append((i, cosinus))
+    if groupe:
+        coupes.append(min(groupe, key=lambda g: g[1])[0])
+    morceaux = np.split(np.arange(len(brut)), coupes)
+    courbe, jonctions = [], []
+    for k, idx in enumerate(morceaux):
+        morceau = brut[idx[0]:idx[-1] + 2] if k < len(morceaux) - 1 else brut[idx[0]:]
+        lisse = _lisser_vol(morceau, carte) if len(morceau) > 3 else morceau
+        base = _reechantillonner(morceau, 0.1)
+        if len(lisse) > 3 and len(base) == len(lisse):  # bouts ramenés exactement sur le chemin (pas de saut entre morceaux)
+            d_bout = np.minimum(np.arange(len(lisse)), np.arange(len(lisse))[::-1]) * 0.1
+            w = lissee(d_bout, 0.0, 0.8)[:, None]
+            lisse = base * (1 - w) + lisse * w
+        if courbe:
+            jonctions.append(len(np.concatenate(courbe)))
+        courbe.append(lisse)
+    courbe = np.concatenate(courbe)
+    seg = np.linalg.norm(np.diff(courbe, axis=0), axis=1)
+    abscisse = np.concatenate([[0], np.cumsum(seg)])
+    longueur = float(abscisse[-1])
+    reperes = [np.asarray(e["xy"]) for e in etapes[1:]]
+
+    proche = np.min(np.stack([np.linalg.norm(courbe - r, axis=1) for r in reperes]), 0) if reperes else np.full(len(courbe), 9.0)
+    vitesse = VOL_VITESSE_VUE + (VOL_VITESSE - VOL_VITESSE_VUE) * lissee(proche, 0.4, VOL_RAYON_VUE_M)
+    # la courbure (changement de direction par mètre, sur ±0,5 m) borne la vitesse : v² · courbure ≤ accélération latérale
+    direction = np.unwrap(np.arctan2(np.gradient(courbe[:, 1]), np.gradient(courbe[:, 0])))
+    n5 = max(1, int(0.5 / 0.1))
+    virage = np.abs(np.concatenate([direction[n5:], np.repeat(direction[-1], n5)])
+                    - np.concatenate([np.repeat(direction[0], n5), direction[:-n5]])) / (2 * n5 * 0.1)
+    vitesse = np.minimum(vitesse, np.sqrt(VOL_ACCEL_LATERALE / np.maximum(_gauss(virage, 3), 1e-3)))
+    vitesse *= 0.15 + 0.85 * lissee(abscisse, 0, VOL_DEPART_ARRIVEE_M) * lissee(longueur - abscisse, 0, VOL_DEPART_ARRIVEE_M)
+    vitesse = _gauss(_gauss(vitesse, 0.6 / 0.1), 0.6 / 0.1)
+    for j in jonctions:  # ralentir jusqu'au demi-tour (presque à l'arrêt, la caméra pivote), puis repartir — après le lissage
+        vitesse = vitesse * (0.2 + 0.8 * lissee(np.abs(abscisse - abscisse[min(j, len(abscisse) - 1)]), 0.0, 1.2))
+    vitesse = np.maximum(vitesse, 0.1)
+    positions, s_courant = [], 0.0
+    while s_courant < longueur:
+        v = float(np.interp(s_courant, abscisse, vitesse))
+        positions.append(np.array([np.interp(s_courant, abscisse, courbe[:, 0]), np.interp(s_courant, abscisse, courbe[:, 1])]))
+        s_courant += max(v, 0.05) / IPS
+    positions = np.array(positions)
+
+    pieces_par_id = {p["id"]: p for p in logement["pieces"]}
+    # LE REGARD, choisi d'un seul coup sur tout le vol (programmation dynamique) : à chaque instant (une clé toutes les
+    # CLE_IMAGES images), une direction parmi 72 (tous les 5°) ; la suite retenue maximise ce qu'on voit (profondeur), regarde
+    # plutôt vers l'avant, se tourne vers le cadrage d'une pièce quand on y est, vers la plus belle profondeur aux demi-tours,
+    # et tourne doucement (au plus VOL_ROTATION_MAX °/s, chaque degré de rotation coûte un peu). Lisser après coup « moyenne »
+    # deux bonnes directions… à travers le mur qui les sépare : c'est ce que ce calcul évite.
+    reveles = [(courbe[min(j, len(courbe) - 1)], regard_profond(voir.rayons(tuple(courbe[min(j, len(courbe) - 1)])), None))
+               for j in jonctions]
+    angles = np.arange(0, 360, 5.0)
+    cles_idx = list(range(0, len(positions), CLE_IMAGES))
+    if cles_idx[-1] != len(positions) - 1:
+        cles_idx.append(len(positions) - 1)
+    notes = np.zeros((len(cles_idx), len(angles)))
+    for n, k in enumerate(cles_idx):
+        p = positions[k]
+        rayons = voir.rayons(tuple(p))
+        profondeurs = np.array([min(_profondeur(rayons, a), 6.0) for a in angles])
+        devant = positions[min(len(positions) - 1, k + IPS)] - p
+        if np.linalg.norm(devant) < 0.05:
+            devant = p - positions[max(0, k - IPS)]
+        marche = _angle(devant) if np.linalg.norm(devant) > 0.05 else None
+        avant = np.cos(np.radians(angles - marche)) if marche is not None else np.zeros(len(angles))
+        but, poids = None, 0.0
+        for xy_j, but_j in reveles:
+            w = 1.0 - float(lissee(float(np.linalg.norm(p - xy_j)), 0.3, 1.5))
+            if w > poids:
+                but, poids = but_j, w
+        for e in etapes[1:]:
+            if e["genre"] != "point_de_vue" or not rz._dedans(tuple(p), pieces_par_id[e["piece"]]["contour"]):
+                continue
+            w = 1.0 - float(lissee(float(np.linalg.norm(p - np.asarray(e["xy"]))), 0.5, VOL_RAYON_VUE_M))
+            if w > poids:
+                but, poids = e["cap"], w
+        vers_but = np.cos(np.radians(angles - but)) if but is not None else np.zeros(len(angles))
+        notes[n] = profondeurs + 0.9 * avant * (1 - poids) + 2.5 * poids * vers_but - 3.0 * (profondeurs < VOL_MUR_MIN_M)
+    pas_cles = CLE_IMAGES / IPS
+    saut_max = int(VOL_ROTATION_MAX * pas_cles / 5.0) + 1  # en crans de 5°
+    ecarts = np.arange(-saut_max, saut_max + 1)
+    cout_rotation = 0.03 * np.abs(ecarts) * 5.0
+    total = notes[0].copy()
+    venu = np.zeros((len(cles_idx), len(angles)), int)
+    for n in range(1, len(cles_idx)):
+        candidats = np.stack([np.roll(total, -e) for e in ecarts])  # candidats[i, a] = total[a + ecarts[i]]
+        candidats = candidats - cout_rotation[:, None]
+        meilleur = np.argmax(candidats, 0)
+        venu[n] = (np.arange(len(angles)) + ecarts[meilleur]) % len(angles)
+        total = candidats[meilleur, np.arange(len(angles))] + notes[n]
+    suite = [int(np.argmax(total))]
+    for n in range(len(cles_idx) - 1, 0, -1):
+        suite.append(int(venu[n][suite[-1]]))
+    suite = suite[::-1]
+    caps_cles = [float(angles[suite[0]])]
+    for a in suite[1:]:
+        caps_cles.append(caps_cles[-1] + _ecart(caps_cles[-1], float(angles[a])))  # déroulé, sans saut de 360°
+    caps = np.interp(np.arange(len(positions)), cles_idx, caps_cles)
+    caps = _gauss(caps, 0.5 * IPS)  # finition : la rotation démarre et s'arrête en douceur
+
+    cle = 2  # des clés serrées : la caméra suit exactement la courbe lisse
+    points = [[round(float(positions[k][0]), 4), round(float(positions[k][1]), 4), VOL_HAUTEUR_M, round(float(caps[k]), 3),
+               VOL_TANGAGE_DEG] for k in range(0, len(positions), cle)]
+    nb_images = (len(points) - 1) * cle + 1
+    trajet = {"points": points, "images": nb_images, "ips": IPS, "focale_mm": s["focale_mm"], "format": list(format_image),
+              "balade": True, "vol": True}
+    if scene_eclairage:
+        trajet["scene"] = scene_eclairage
+    sans_fenetre = [p["id"] for p in logement["pieces"] if not scene.a_une_fenetre(p)]
+    return {"trajet": trajet, "etapes": etapes, "portes_ouvertes": [{k: v for k, v in p.items() if k != "battant"}
+                                                                     for p in portes],
+            "pieces_sans_fenetre": sans_fenetre, "duree_s": round(nb_images / IPS, 1), "longueur_m": round(longueur, 1)}
+
+
 def dessiner(logement: dict, resultat: dict, chemin, px_par_m: int = 60) -> None:
     """La balade vue de dessus : le chemin (rouge, une flèche par seconde dans le sens du regard), les étapes."""
     from moteur.images import ecrire_image

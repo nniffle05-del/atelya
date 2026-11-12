@@ -209,3 +209,12 @@ Balade, réglages du REGARD trouvés en mesurant la profondeur vue (part du film
 ±50° autour de la marche, ÉLARGI à ±140° quand tout est à moins de 2 m devant (marche vers un angle ou une porte) ; rotation de la
 tête bornée dans les deux sens du temps (elle ANTICIPE les virages) ; fond de pièce à ≥ 0,6 m des obstacles (1 m excluait tout le coin
 repas). App-002 : 8 % → 6,5 % du film à moins de 1 m d'un mur (le reste : franchir des portes de 60 cm), profondeur médiane vue 3 m.
+**LA CAMÉRA VOLANTE (12/11/2026, NT : « 1 min 50 trop long ; la caméra qui marche, on ressent les secousses ; il faudrait qu'elle
+vole »)** : `promeneur.vol` (défaut de `balade_unreal.py --mode vol`) : ordre de visite le plus court (plus proche pièce par le chemin,
+Dijkstra complet) ; fond seulement si pièce > 20 m² ; courbe = chemin rééchantillonné 10 cm, lissages gaussiens (0,7 m) sans
+toucher d'obstacle ; DEMI-TOURS (culs-de-sac) détectés à la pointe exacte, chaque morceau lissé à part et rejoint exactement, vitesse
+abaissée à 20 % sur ±1,2 m APRÈS le lissage (sinon effacée) ; allure 0,9 m/s, 0,5 m/s devant un point de vue (1,4 m), courbure ≤
+0,6 m/s² ; hauteur 1,6 m, tangage -7° ; REGARD PAR PROGRAMMATION DYNAMIQUE (72 directions, une clé / 4 images ; note = profondeur +
+vers l'avant + vers le cadrage de la pièce où l'on est + vers la profondeur aux demi-tours − mur < 0,9 m ; rotation ≤ 30 °/s, chaque
+degré coûte) puis lissage 0,5 s. Lisser des caps après coup « moyennait » deux bonnes directions à travers un mur (13-28 % du film
+face à un mur) → DP : 4,4 %, profondeur médiane vue 4,5 m. App-002 : 43,6 m, 1 min 13.

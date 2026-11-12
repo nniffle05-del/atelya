@@ -78,3 +78,21 @@ def test_preparation_unreal_balade():
     assert "def ouvrir_portes(" in texte and "refermer_portes()" in texte  # portes rouvertes / refermées sans cumul
     assert '"Settings.AutoExposureBias"' in texte  # exposition en clés sur la séquence
     assert math.isclose(pm.MARGE_M, 0.20)
+
+
+def test_camera_volante_douce():
+    """Le vol : une courbe lisse, jamais dans un obstacle, accélérations et rotations douces, regard qui voit loin."""
+    log = _logement()
+    v = pm.vol(log)
+    pts = np.array(v["trajet"]["points"])
+    dt = 2 / pm.IPS
+    carte = pm.Carte(log, pm.portes_ouvertes(log, {"sejour_1", "chambre_1"}))
+    for x, y, *_ in pts:
+        i, j = carte.case((x, y))
+        assert carte.distance[i, j] >= pm.MARGE_M * 0.85
+    vitesse = np.linalg.norm(np.diff(pts[:, :2], axis=0), axis=1) / dt
+    assert vitesse.max() <= pm.VOL_VITESSE + 0.05
+    rotation = np.abs(np.diff(pts[:, 3])) / dt
+    assert rotation.max() <= pm.VOL_ROTATION_MAX + 3
+    assert pts[0][2] == pm.VOL_HAUTEUR_M and v["trajet"]["vol"] is True
+    assert ("point_de_vue", "sejour_1") in [(e["genre"], e["piece"]) for e in v["etapes"]]

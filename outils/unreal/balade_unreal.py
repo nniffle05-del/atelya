@@ -41,6 +41,8 @@ def main() -> None:
     p.add_argument("logement")
     p.add_argument("--eclairage", default="jour_soleil")
     p.add_argument("--moteur", default="lumen_max", choices=["lumen", "lumen_max", "path_tracer"])
+    p.add_argument("--mode", default="vol", choices=["vol", "marche"],
+                   help="vol : caméra volante, courbe lisse sans arrêt (défaut, NT 12/11/2026) ; marche : la balade à pied")
     a = p.parse_args()
     debut = time.time()
     paquet = Path(a.paquet)
@@ -48,12 +50,12 @@ def main() -> None:
     ambiance = next((x for x in fiche.get("eclairages", []) if a.eclairage in (x.get("id"), x.get("nom"))), None)
     if ambiance is None:
         sys.exit(f"PLANTÉ : éclairage « {a.eclairage} » absent de la fiche")
-    nom_dossier = f"balade-{ambiance['id']}"
+    nom_dossier = f"{'vol' if a.mode == 'vol' else 'balade'}-{ambiance['id']}"
     sortie = cu.STUDIO / "Paquets" / "rendus" / a.nom / nom_dossier
     sortie.mkdir(parents=True, exist_ok=True)
     logement = json.loads(Path(a.logement).read_text(encoding="utf-8"))
     print("1. Le promeneur trace la balade", flush=True)
-    b = promeneur.balade(logement, scene_eclairage=ambiance.get("nom"))
+    b = (promeneur.vol if a.mode == "vol" else promeneur.balade)(logement, scene_eclairage=ambiance.get("nom"))
     (sortie / "balade.json").write_text(json.dumps(b, indent=1, ensure_ascii=False), encoding="utf-8")
     promeneur.dessiner(logement, b, sortie / "balade.png")
     print(f"   {b['longueur_m']} m, {b['duree_s']} s ; portes ouvertes {[x['id'] for x in b['portes_ouvertes']]}", flush=True)
