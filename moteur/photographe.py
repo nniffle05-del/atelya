@@ -34,7 +34,31 @@ FORCE_BALANCE = 0.7
 # `clarte_murs` (moteur/eclairages.py) mais, de jour, son essai granuleux (16 rayons, sans débruiteur) le fait exposer plus clair :
 # soleil 0,91 au lieu de 0,55 (séjour), voilé 0,54 au lieu de 0,47 (chambre, image 1), fin de journée 1,30 au lieu de 0,50 ; soirée
 # et nuit justes (0,47 et 0,37). Le style « photo d'annonce » (murs presque blancs, pièce aérée) vient de là : on le garde.
-CLARTE_UNREAL = {"jour_soleil": 0.90, "jour_voile": 0.55, "fin_de_journee": 1.30, "soiree": 0.45, "nuit": 0.35}
+# Jour ensoleillé 0,90 -> 1,0 (12/11/2026, NT : « fais ce qu'il y a de mieux visuellement ») : jusqu'au film v3, le masque des murs
+# comptait les meubles posés devant (plus sombres), et le photographe éclaircissait : murs réels du v3 0,32 cran AU-DESSUS de la
+# visée (médiane, 185 images). Masque corrigé, le film perdait cet éclat que NT avait validé (« tu as retiré la lumière ?! ») :
+# la visée est remontée pour le retrouver (film corrigé : -0,16 cran à 0,90 ; 0,90 x 2^(0,32 - 0,16) = 1,0). Les autres
+# éclairages, non mesurés, restent tels quels.
+CLARTE_UNREAL = {"jour_soleil": 1.0, "jour_voile": 0.55, "fin_de_journee": 1.30, "soiree": 0.45, "nuit": 0.35}
+
+
+# EXPOSITION LOCALE d'Unreal (cinématique, étape 4, 12/11/2026) : comme l'œil (ou un vidéaste immobilier qui « garde » ses
+# fenêtres), les grandes zones beaucoup plus claires que les murs (la vue par les fenêtres) sont adoucies, le reste ne bouge pas.
+# Le PIVOT est la clarté visée des murs (au-dessus du gris moyen 0,18 d'Unreal) : avec le pivot au gris moyen, les murs eux-mêmes
+# étaient assombris de 0,7 cran (mesuré). Essai sur 47 images du film v3 (contraste des hautes lumières 1 / 0,7 / 0,5, pivot sur
+# les murs) : dehors presque blanc 99 -> 74 -> 55 %, blanc pur 20 -> 4 %, murs inchangés (-0,10 / -0,07 / -0,05 cran).
+# ÉCARTÉE PAR DÉFAUT le même jour : sans vue réelle dehors (ciel brumeux, sol gris), baisser les fenêtres ne montre rien de plus
+# et retire l'éclat de la pièce (NT : « tu as retiré la lumière ?! »). 1 = sans exposition locale ; réglage gardé pour le jour où
+# une vraie vue sera posée derrière les fenêtres (essayé : 0,5).
+EXPOSITION_LOCALE_HAUTES_LUMIERES = 1.0
+
+
+def exposition_locale(clarte: float, hautes_lumieres: float = EXPOSITION_LOCALE_HAUTES_LUMIERES) -> dict | None:
+    """Le réglage d'exposition locale de la préparation Unreal (moteur/unreal/preparer_cinematique : « exposition_locale ») ;
+    None si elle est désactivée (hautes_lumieres = 1)."""
+    if hautes_lumieres >= 1.0:
+        return None
+    return {"hautes_lumieres": hautes_lumieres, "pivot_crans": round(math.log2(clarte / 0.18), 3)}
 
 
 def clarte_visee(ambiance: dict) -> float:
@@ -168,6 +192,9 @@ def murs_lineaires(image: Path, masque: Path, gain=(1.0, 1.0, 1.0)) -> np.ndarra
 
     rvb = _lire(image)
     m = _lire(masque)[..., 0]
+    if rvb.shape[0] > m.shape[0]:  # image du film (pleine taille) : mesurée à la taille du masque. 185 images Full HD en entier
+        # = 1,8 Go de couleurs de murs, plantage mémoire au contrôle du film (12/11/2026)
+        rvb = cv2.resize(rvb, (m.shape[1], m.shape[0]), interpolation=cv2.INTER_AREA)
     m = cv2.resize(m, (rvb.shape[1], rvb.shape[0]), interpolation=cv2.INTER_NEAREST) > 0.5
     m = cv2.erode(m.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
     return lineaire_affiche(rvb[m]) / np.asarray(gain, dtype=float)
@@ -204,15 +231,25 @@ def gain_unreal(blanc) -> list[float]:
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # L'exposition EN MARCHANT (balade, 12/11/2026) : comme l'œil ou une vraie caméra, elle suit la pièce où l'on est, en douceur.
-ADAPTATION_FENETRE_S = 2.0  # moyenne glissante des réglages voulus (pas de « pompage » sur un regard bref)
-ADAPTATION_MAX_CRAN_S = 0.75  # au plus 0,75 cran par seconde (une adaptation calme)
+# Réglages revus le 12/11/2026 (cinématique, étape 4), MESURÉS sur les murs du film v3 (outils/unreal/mesurer_lumiere.py) : avec un
+# essai par seconde, une moyenne de 2 s et 0,75 cran/s, l'exposition arrivait EN RETARD dans chaque pièce : en sortant d'un couloir
+# sans fenêtre (embrasure à l'ombre plein cadre), la chambre au soleil restait sur-exposée de +1,1 cran pendant 3 s ; 34 % du film
+# avait des murs à plus d'un demi-cran de la visée. Simulé sur les mêmes images : essais toutes les 0,25 s, MÉDIANE glissante de
+# 1,5 s (un moment bref, une embrasure qu'on frôle, ne fait plus bouger l'exposition), moyenne de 0,75 s et jusqu'à 2 crans/s (le
+# changement se fait PENDANT le passage de la porte, comme un opérateur qui tourne la bague) : 5 % du film, sur-exposition à
+# l'entrée de la chambre -1,1 -> -0,05 cran.
+ADAPTATION_MEDIANE_S = 1.5  # médiane glissante des réglages voulus : un regard bref ne compte pas
+ADAPTATION_FENETRE_S = 0.75  # puis moyenne glissante (pas de « pompage »)
+ADAPTATION_MAX_CRAN_S = 2.0  # au plus 2 crans par seconde
+ESSAI_PAS_IMAGES = 6  # un essai toutes les 6 images (0,25 s à 24 images/s)
 
 
 def exposition_en_marchant(images: list[int], voulues: list, ips: int = 24, fenetre_s: float = ADAPTATION_FENETRE_S,
-                           max_cran_s: float = ADAPTATION_MAX_CRAN_S) -> list[list]:
+                           max_cran_s: float = ADAPTATION_MAX_CRAN_S, mediane_s: float = ADAPTATION_MEDIANE_S) -> list[list]:
     """Clés [[image, exposition], …] d'après les expositions voulues aux images d'essai (None = pas assez de murs vus : on
-    prend celle des voisines). Lissées (moyenne glissante), bornées en vitesse d'adaptation (dans les deux sens du temps : la
-    caméra anticipe un peu au lieu de seulement suivre), puis bornées comme une exposition d'intérieur."""
+    prend celle des voisines). Médiane glissante (les moments brefs ne comptent pas), lissées (moyenne glissante), bornées en
+    vitesse d'adaptation (dans les deux sens du temps : la caméra anticipe un peu au lieu de seulement suivre), puis bornées
+    comme une exposition d'intérieur."""
     if not images:
         return []
     v = np.array([np.nan if x is None else float(x) for x in voulues], float)
@@ -221,7 +258,10 @@ def exposition_en_marchant(images: list[int], voulues: list, ips: int = 24, fene
     k = np.arange(len(v))
     v = np.interp(k, k[~np.isnan(v)], v[~np.isnan(v)])
     pas = max(1, int(np.median(np.diff(images)))) if len(images) > 1 else ips
-    n = max(1, int(round(fenetre_s * ips / pas)))
+    m = int(round(mediane_s * ips / pas / 2))
+    if m > 0:
+        v = np.array([np.median(v[max(0, i - m):i + m + 1]) for i in range(len(v))])
+    n = max(1, int(round(fenetre_s * ips / pas / 2)))
     lisse = np.convolve(np.pad(v, n, mode="edge"), np.ones(2 * n + 1) / (2 * n + 1), mode="valid")
     borne = max_cran_s * pas / ips
     sortie = [float(lisse[0])]

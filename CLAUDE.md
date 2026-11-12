@@ -361,6 +361,12 @@ murs 12,6 → 6,8 s, 46 s ; app-001 31 → 72/100. Film `..\atelya\b2\app-002\un
 (fondus refusés), demi-tours vifs. SUIVANT : 4 lumière et fenêtres (nouvelle conversation). Écartés : NavMesh, netteté variable,
 spline à la main, meubles inventés par règles (meubles = ceux du client). NT veut qu'on lui dise CHAQUE FOIS qu'une demande semble
 contre-productive. Note cinématique ~62/100. Détail : fin de `produit-livre-client.md`.
+**ÉTAPE 4 LUMIÈRE, 1er temps (12/11/2026)** : `outils/unreal/mesurer_lumiere.py` (fenêtres, sombre, sauts ; aussi à la fin de chaque
+balade) ; masque des murs JUSTE (comptait les meubles devant les murs) + canal « dehors » ; exposition en marchant plus vive (essais
+/0,25 s, médiane 1,5 s, 2 crans/s) ; exposition locale ÉCARTÉE (NT : « tu as retiré la lumière ?! ») et visée du jour
+ensoleillé 0,90 → 1,0 (éclat du v3). app-002 même vol : murs trop clairs 18 → 2 % du film, sauts durables 6 → 2, chambre plus
+grillée. Reste : il n'y a RIEN dehors (fenêtres grises sans couleur) → décision NT (vue CC0 à télécharger ?). Film
+`..\atelya\b2\app-002\unreal\film\lumiere-etape4.mp4`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

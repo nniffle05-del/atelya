@@ -66,10 +66,16 @@ def test_exposition_en_marchant():
     cles = ph.exposition_en_marchant(images, voulues)
     expos = [c[1] for c in cles]
     assert expos[0] == pytest.approx(-8.0, abs=0.05) and expos[-1] == pytest.approx(-12.0, abs=0.05)
-    assert max(abs(a - b) for a, b in zip(expos, expos[1:])) <= ph.ADAPTATION_MAX_CRAN_S + 1e-6  # adaptation calme
+    assert max(abs(a - b) for a, b in zip(expos, expos[1:])) <= ph.ADAPTATION_MAX_CRAN_S + 1e-6  # adaptation bornée
     assert all(ph.EXPOSITION_UNREAL_BORNES[0] <= e <= ph.EXPOSITION_UNREAL_BORNES[1] for e in expos)
     with pytest.raises(ValueError):
         ph.exposition_en_marchant([0, 24], [None, None])
+    # une embrasure sombre frôlée 0,5 s (2 essais à +2 crans) ne fait pas bouger l'exposition
+    images = list(range(0, 24 * 10, 6))
+    voulues = [-10.0] * len(images)
+    voulues[20] = voulues[21] = -8.0
+    expos = [c[1] for c in ph.exposition_en_marchant(images, voulues)]
+    assert max(expos) == pytest.approx(-10.0, abs=0.01)
 
 
 def test_preparation_unreal_balade():

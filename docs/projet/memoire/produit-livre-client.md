@@ -278,3 +278,47 @@ réglé dessus) 31 → 72,3/100. Films : `..\atelya\b2\app-002\unreal\film\plani
 Reste : sorties de pièces et couloir étroit (8-14, 24-30, 36-40 s de la v3), cuisine/salles d'eau vides. Note cinématique ~62/100.
 Étape suivante : 4 LUMIÈRE ET FENÊTRES (mesurer d'abord les fenêtres brûlées sur les images, puis corriger), dans une NOUVELLE
 conversation. Pistes notées : ouverture « maison de poupée », meubles de cuisine et sanitaires (meubles = ceux du client).
+**Étape 4, premier temps FAIT (12/11/2026, après-midi) : LUMIÈRE DU FILM MESURÉE puis corrigée à la source.** Outil
+`outils/unreal/mesurer_lumiere.py` (+ brique `moteur/cinema/lumiere.py`, lancée aussi à la fin de chaque `balade_unreal.py` →
+`lumiere.json`, `lumiere.png`) : chaque image qui a un masque d'essai (une toutes les 0,25 s), rangée dans la pièce de la caméra ;
+fenêtres (part du dehors en blanc pur / presque blanc, couleur, détail), intérieur (bouché < 20/255, sombre < 50/255), murs (écart à
+la clarté visée, part du film trop clair / trop sombre de > 0,5 cran, plus forte variation DURABLE en 1 s : médiane glissante 1 s,
+une embrasure frôlée 0,5 s est vraiment plus sombre et ne compte pas), écart entre pièces ; comparaison `--avant`.
+MASQUE À DEUX CANAUX (`preparer_cinematique._materiau_masque`) : rouge = murs et plafonds (photographe), vert = DEHORS vu par une
+fenêtre (sol du dehors marqué stencil 2, ou ciel = profondeur > 10 km). DÉFAUT ANCIEN TROUVÉ : le marquage d'Unreal (custom depth /
+stencil) ne dessine que les objets marqués entre eux → le masque des murs comptait les MEUBLES et SOLS posés devant les murs (le
+photographe croyait les murs plus sombres et éclaircissait tout le film : murs du v3 −0,32 cran trop clairs en médiane). Corrigé :
+pixel marqué seulement si profondeur marquée = profondeur de l'image (1 % + 2 cm). PIÈGE : sortie d'une texture de scène = 4
+composantes, la comparer à une couleur à 3 composantes ne compile pas (« select_internal is ambiguous » → matériau par défaut, sans
+erreur fatale) : prendre la 1re composante. Le journal montre aussi 72 « missing usage flag Nanite » : sans effet (recompilé au
+chargement), et « verre translucide sur maillage Nanite » : les vitres restent transparentes (vérifié sur les masques).
+MESURE DU FILM v3 (185 images) : fenêtres LAITEUSES 88 images sur 89 (96 % du dehors presque blanc, couleur 0) ; zones sombres
+quasi nulles (0,7 % ; seul pic = parquet rouge foncé de la chambre 1, une matière) ; murs trop clairs 29 % du film ; 6 sauts
+durables, les deux pires en passant une porte (couloir sans fenêtre → chambre au soleil : +1,1 cran pendant 3 s, l'exposition en
+retard). CORRECTIONS : (1) masque juste (ci-dessus) ; (2) EXPOSITION EN MARCHANT (`photographe.exposition_en_marchant`) : essais
+toutes les 0,25 s (`ESSAI_PAS_IMAGES` 6), médiane glissante 1,5 s, moyenne 0,75 s, jusqu'à 2 crans/s (le changement se fait pendant
+le passage de la porte) — réglages choisis par SIMULATION hors ligne sur les murs mesurés du v3 (exposition voulue = exposition
+utilisée + écart des murs) : murs à > 0,5 cran 34 % → 5 % ; (3) EXPOSITION LOCALE d'Unreal (`photographe.exposition_locale`,
+contraste des hautes lumières 0,5, PIVOT = clarté visée des murs, log2(0,9/0,18) = 2,32 crans) : essai 47 images, pivot au gris
+moyen = murs assombris de 0,7 cran (rejeté), pivot sur les murs = murs intacts, dehors blanc 99 → 55 %. FILM APRÈS (même vol, mêmes
+images, `..\atelya\b2\app-002\unreal\film\lumiere-etape4.mp4`, côte à côte `lumiere-avant-apres.mp4/.jpg`) : dehors blanc pur 4,3 →
+0,01 %, presque blanc 96 → 12 %, vues laiteuses 88 → 6 images ; murs trop clairs 29 → 0 %, trop sombres 4,9 → 3,2 % ; écart médian
+−0,32 → −0,16 ; sauts durables 6 → 2 (2,26 → 1,36 cran, aux deux portes du couloir) ; écart entre pièces 0,81 → 0,39 ; sombre =.
+Moins bien : étendue des clartés de l'intérieur 3,46 → 3,06 crans (image un peu plus douce). LIMITE : la vue reste grise et SANS
+COULEUR (0,004) : il n'y a RIEN dehors (ciel vu à l'horizontale = brume, sol gris 20 km). Aucun réglage de caméra n'y remédiera ;
+question posée à NT (ciel/rue photographiés CC0 Poly Haven = téléchargement à accorder, ou vue tirée des photos du client plus
+tard, ou garder des fenêtres claires). Pas encore branché : `cinematique_unreal.py` / `film_unreal.py` (plans séparés) gardent
+l'ancienne exposition (sans exposition locale). `balade_unreal.py` : options `--suffixe=-xx` (garder un film précédent) et
+`--reprendre` (plantage après le rendu : contrôle, vidéo, mesure seulement). Plantage corrigé : contrôle du film à 185 images Full
+HD = 1,8 Go → le photographe mesure une image du film à la taille de son masque.
+**Étape 4, DÉCISION NT (12/11/2026, soir) : « tu as retiré la lumière ?! » puis « fais ce qu'il y a de mieux visuellement ».** Le film
+ci-dessus (avec exposition locale, `lumiere-essai-expo-locale.mp4`) était plus terne : fenêtres 242 → 227/255, murs 199 → 195. Choix
+retenu : EXPOSITION LOCALE ÉCARTÉE par défaut (`photographe.EXPOSITION_LOCALE_HAUTES_LUMIERES = 1`, sans vue réelle dehors elle ne
+montre rien de plus et retire l'éclat ; réglage gardé pour le jour où une vraie vue sera posée) et clarté visée du JOUR ENSOLEILLÉ
+0,90 → 1,0 (`CLARTE_UNREAL`) pour retrouver l'éclat du v3 que NT avait validé (il venait en partie du masque faux, murs réels du v3
+à 1,12). Gardés : masque juste, exposition en marchant vive. FILM DE RÉFÉRENCE `..\atelya\b2\app-002\unreal\film\lumiere-etape4.mp4`
+(côte à côte avec le v3 : `lumiere-avant-apres.mp4/.jpg`) ; mêmes 185 images, visée 1,0 pour les deux : murs trop clairs 18,4 → 2,2 %
+du film, trop sombres 5,4 → 3,8 %, écart médian −0,17 → −0,01 cran, sauts durables 6 → 2 (2,26 → 1,39 cran, aux deux portes du couloir),
+écart entre pièces 0,81 → 0,36 ; fenêtres presque blanches 96 → 86 %, vues laiteuses 88 → 77, blanc pur 4,3 → 7,3 % ; intérieur
+197 → 193/255, fenêtres 242 → 239 (à l'œil : même éclat, plus de chambre grillée à 42 s). Le vrai remède des fenêtres = une vue
+dehors (photo de rue / ciel CC0 = téléchargement à accorder par NT, ou vue tirée des photos du client).

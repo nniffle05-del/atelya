@@ -114,7 +114,7 @@ def test_couleurs_de_la_pellicule():
 
 
 def test_clarte_visee_comme_les_images_de_blender():
-    assert ph.clarte_visee({"id": "jour_soleil", "clarte_murs": 0.55}) == 0.90  # ce que Blender rend vraiment (mesuré)
+    assert ph.clarte_visee({"id": "jour_soleil", "clarte_murs": 0.55}) == 1.0  # éclat du film v3 retrouvé, masque des murs juste (12/11/2026)
     assert ph.clarte_visee({"id": "nuit", "clarte_murs": 0.35}) == 0.35
     assert ph.clarte_visee({"id": "autre", "clarte_murs": 0.4}) == 0.4
     texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")

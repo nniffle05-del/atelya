@@ -43,6 +43,8 @@ NITS_PAR_UNITE = 683.0  # une clarté de ciel de Blender (W/m²/sr) en nits (cd/
 # (« 1 Jour ensoleillé », soleil à 50°) : 138,6 W/m² face au soleil, soit ~94 700 lux au sol ; ÷ ~0,87 (air traversé à 50°).
 SOLEIL_LUX = 110000.0
 STENCIL_BLANCS = 1
+STENCIL_DEHORS = 2  # le sol du dehors, pour le masque « dehors vu par une fenêtre »
+PROFONDEUR_CIEL_CM = 1.0e6  # au-delà de 10 km, c'est le ciel (le sol du dehors est marqué à part)
 # Le photographe : images d'essai au quart de la taille, une image sur PAS_ESSAI (au moins ESSAI_MIN images par plan).
 REDUCTION_ESSAI = 4
 ESSAI_MIN = 12
@@ -136,22 +138,91 @@ def _materiau_ciel(racine, couleur, force):
     return m
 
 
+def _premiere_composante(m, texture, y):
+    """La 1re composante d'une texture de scène (sa sortie a 4 composantes : comparée telle quelle à une couleur à 3
+    composantes, le nœud « si » ne compile pas, « select_internal is ambiguous », vu le 12/11/2026)."""
+    lib = unreal.MaterialEditingLibrary
+    r = lib.create_material_expression(m, unreal.MaterialExpressionComponentMask, -500, y)
+    for canal, garde in (("r", True), ("g", False), ("b", False), ("a", False)):
+        r.set_editor_property(canal, garde)
+    lib.connect_material_expressions(texture, "Color", r, "")
+    return r
+
+
+def _si_egal(m, entree, valeur, couleur, y):
+    """Nœud « si entrée == valeur alors couleur sinon noir » (entrée : 1 composante ; couleur : 3 composantes)."""
+    lib = unreal.MaterialEditingLibrary
+    egal = lib.create_material_expression(m, unreal.MaterialExpressionIf, -300, y)
+    lib.connect_material_expressions(entree, "", egal, "A")
+    egal.set_editor_property("const_b", float(valeur))
+    egal.set_editor_property("equals_threshold", 0.25)
+    for broche, c in (("A > B", (0, 0, 0)), ("A == B", couleur), ("A < B", (0, 0, 0))):
+        cst = lib.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -500, y + 200)
+        cst.set_editor_property("constant", unreal.LinearColor(float(c[0]), float(c[1]), float(c[2]), 1.0))
+        lib.connect_material_expressions(cst, "", egal, broche)
+    return egal
+
+
 def _materiau_masque(racine):
-    """Réglage d'image « masque » : blanc là où la surface est un mur ou un plafond (custom stencil = 1), noir ailleurs."""
+    """Réglage d'image « masque », deux canaux : ROUGE là où la surface est un mur ou un plafond (custom stencil = 1 : ce que
+    regarde le photographe) ; VERT là où l'on voit DEHORS par une fenêtre (sol du dehors, stencil = 2, ou ciel : profondeur au-delà
+    de PROFONDEUR_CIEL_CM). Le vert sert à mesurer les fenêtres (moteur/cinema/lumiere.py, 12/11/2026) ; le photographe ne lit
+    que le rouge.
+
+    VU ET CORRIGÉ le 12/11/2026 : le marquage (« custom depth / stencil ») ne dessine QUE les objets marqués, entre eux : un
+    meuble ou un sol non marqué devant un mur ne le cache pas. Le masque comptait donc comme « mur » les meubles posés devant
+    les murs (un buffet en bois foncé faisait croire les murs plus sombres, et le photographe éclaircissait le film). Un pixel
+    n'est plus marqué que si l'objet marqué est bien celui qu'on VOIT : sa profondeur marquée = la profondeur de l'image (à 1 %
+    + 2 cm près)."""
     m = _nouveau(racine, "Studio/M_MasqueBlancs", unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("material_domain", unreal.MaterialDomain.MD_POST_PROCESS)
     lib = unreal.MaterialEditingLibrary
-    texture = lib.create_material_expression(m, unreal.MaterialExpressionSceneTexture, -600, 0)
-    texture.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
-    egal = lib.create_material_expression(m, unreal.MaterialExpressionIf, -300, 0)
-    lib.connect_material_expressions(texture, "Color", egal, "A")
-    egal.set_editor_property("const_b", float(STENCIL_BLANCS))
-    egal.set_editor_property("equals_threshold", 0.25)
-    for broche, valeur in (("A > B", 0.0), ("A == B", 1.0), ("A < B", 0.0)):
-        cst = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -500, 200)
+    stencil = lib.create_material_expression(m, unreal.MaterialExpressionSceneTexture, -700, 0)
+    stencil.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
+    s = _premiere_composante(m, stencil, 200)
+    profondeur = lib.create_material_expression(m, unreal.MaterialExpressionSceneTexture, -700, 800)
+    profondeur.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_SCENE_DEPTH)
+    p = _premiere_composante(m, profondeur, 900)
+    marquee = lib.create_material_expression(m, unreal.MaterialExpressionSceneTexture, -700, 1200)
+    marquee.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_CUSTOM_DEPTH)
+    pm = _premiere_composante(m, marquee, 1300)
+    ecart = lib.create_material_expression(m, unreal.MaterialExpressionSubtract, -300, 1200)
+    lib.connect_material_expressions(pm, "", ecart, "A")
+    lib.connect_material_expressions(p, "", ecart, "B")
+    ecart_abs = lib.create_material_expression(m, unreal.MaterialExpressionAbs, -200, 1200)
+    lib.connect_material_expressions(ecart, "", ecart_abs, "")
+    tolerance = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -300, 1400)
+    lib.connect_material_expressions(p, "", tolerance, "A")
+    tolerance.set_editor_property("const_b", 0.01)
+    tolerance_cm = lib.create_material_expression(m, unreal.MaterialExpressionAdd, -200, 1400)
+    lib.connect_material_expressions(tolerance, "", tolerance_cm, "A")
+    tolerance_cm.set_editor_property("const_b", 2.0)
+    vu = lib.create_material_expression(m, unreal.MaterialExpressionIf, -100, 1300)  # 1 si l'objet marqué est visible
+    lib.connect_material_expressions(ecart_abs, "", vu, "A")
+    lib.connect_material_expressions(tolerance_cm, "", vu, "B")
+    for broche, valeur in (("A > B", 0.0), ("A == B", 1.0), ("A < B", 1.0)):
+        cst = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -200, 1500)
         cst.set_editor_property("r", valeur)
-        lib.connect_material_expressions(cst, "", egal, broche)
-    lib.connect_material_property(egal, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        lib.connect_material_expressions(cst, "", vu, broche)
+    murs_marques = _si_egal(m, s, STENCIL_BLANCS, (1, 0, 0), 0)
+    sol_marque = _si_egal(m, s, STENCIL_DEHORS, (0, 1, 0), 400)
+    marques = lib.create_material_expression(m, unreal.MaterialExpressionAdd, -100, 200)
+    lib.connect_material_expressions(murs_marques, "", marques, "A")
+    lib.connect_material_expressions(sol_marque, "", marques, "B")
+    visibles = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, 0, 300)
+    lib.connect_material_expressions(marques, "", visibles, "A")
+    lib.connect_material_expressions(vu, "", visibles, "B")
+    loin = lib.create_material_expression(m, unreal.MaterialExpressionIf, -300, 800)
+    lib.connect_material_expressions(p, "", loin, "A")
+    loin.set_editor_property("const_b", PROFONDEUR_CIEL_CM)
+    for broche, c in (("A > B", (0, 1, 0)), ("A == B", (0, 0, 0)), ("A < B", (0, 0, 0))):
+        cst = lib.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -500, 1000)
+        cst.set_editor_property("constant", unreal.LinearColor(float(c[0]), float(c[1]), float(c[2]), 1.0))
+        lib.connect_material_expressions(cst, "", loin, broche)
+    somme = lib.create_material_expression(m, unreal.MaterialExpressionMax, 100, 300)  # ciel : vert ; sinon les marqués vus
+    lib.connect_material_expressions(visibles, "", somme, "A")
+    lib.connect_material_expressions(loin, "", somme, "B")
+    lib.connect_material_property(somme, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     lib.recompile_material(m)
     unreal.EditorAssetLibrary.save_loaded_asset(m)
     return m
@@ -220,6 +291,8 @@ def poser_dehors(racine, centre):
     mesh.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Plane"))
     mesh.set_world_scale3d(unreal.Vector(DEHORS_COTE_M, DEHORS_COTE_M, 1.0))  # le plan d'Unreal fait 1 m de côté
     mesh.set_material(0, m)
+    mesh.set_render_custom_depth(True)  # marqué pour le masque « dehors » (mesure des fenêtres)
+    mesh.set_custom_depth_stencil_value(STENCIL_DEHORS)
     return sol
 
 
@@ -340,7 +413,7 @@ def marquer_blancs(fiche):
     noms = set(fiche.get("surfaces_blanches") or [])
     n = 0
     for a in _acteurs().get_all_level_actors():
-        if not isinstance(a, unreal.StaticMeshActor):
+        if not isinstance(a, unreal.StaticMeshActor) or a.get_actor_label() == "Atelya_Dehors":
             continue
         comp = a.static_mesh_component
         blanc = a.get_actor_label() in noms
@@ -350,7 +423,10 @@ def marquer_blancs(fiche):
     return n
 
 
-def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None):
+def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None):
+    """Le réglage d'image (Post Process). `locale` : exposition LOCALE {"hautes_lumieres": 0..1, "pivot_crans": crans,
+    "flou": 0..1} : les grandes zones plus claires que le pivot (les fenêtres) voient leur contraste réduit (1 = rien) ; le pivot
+    est placé au-dessus du gris moyen d'Unreal (0,18) ; None = pas d'exposition locale."""
     v = _poser(unreal.PostProcessVolume, etiquette="Atelya_ReglageImage")
     v.set_editor_property("unbound", True)
     r = v.get_editor_property("settings")
@@ -359,8 +435,10 @@ def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None):
         "auto_exposure_bias": float(exposition),
         "auto_exposure_apply_physical_camera_exposure": False,
         "color_gain": unreal.Vector4(float(gain[0]), float(gain[1]), float(gain[2]), 1.0),
-        "local_exposure_highlight_contrast_scale": 1.0,
+        "local_exposure_highlight_contrast_scale": float((locale or {}).get("hautes_lumieres", 1.0)),
         "local_exposure_shadow_contrast_scale": 1.0,
+        "local_exposure_middle_grey_bias": float((locale or {}).get("pivot_crans", 0.0)),
+        "local_exposure_blurred_luminance_blend": float((locale or {}).get("flou", 0.6)),
         "lumen_final_gather_quality": 4.0,
         "lumen_scene_lighting_quality": 4.0,
         "lumen_scene_detail": 4.0,
@@ -586,7 +664,7 @@ def main():
         raise RuntimeError("PLANTÉ : aucun mur ni plafond reconnu (fiche : surfaces_blanches)")
     exposition = float(reglage.get("exposition", 0.0))
     gain = reglage.get("gain") or [1.0, 1.0, 1.0]
-    volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"))
+    volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"), reglage.get("exposition_locale"))
     seq = creer_sequence(racine, trajet)
     nb_cles = 0
     if reglage.get("exposition_cles"):
