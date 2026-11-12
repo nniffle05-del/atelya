@@ -75,7 +75,7 @@ def test_controle_d_un_vol_d_atelya():
     vol = pm.vol(log)
     c = ct.controler(log, vol)
     assert 0 <= c["note"] <= 100
-    assert set(c["temps_par_piece_s"]) == {e["piece"] for e in vol["etapes"] if e["genre"] == "point_de_vue"}
+    assert set(c["temps_par_piece_s"]) == {e["piece"] for e in vol["etapes"] if e["genre"] in ("point_de_vue", "coeur", "conclusion")}
     assert len(c["courbes"]["vitesse"]) == vol["trajet"]["images"]
     assert "Note du vol" in ct.rapport(c)
 

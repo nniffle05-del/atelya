@@ -158,7 +158,7 @@ def controler(logement: dict, vol: dict, budget_s: float | None = None) -> dict:
 
     # 4. le temps passé dans chaque pièce qu'on voulait montrer
     pieces_images = [_piece_de(logement, q) for q in xy]
-    montrees = [e["piece"] for e in vol.get("etapes", []) if e["genre"] == "point_de_vue"]
+    montrees = [e["piece"] for e in vol.get("etapes", []) if e["genre"] in ("point_de_vue", "coeur", "conclusion")]
     temps = {pid: round(pieces_images.count(pid) / IPS, 1) for pid in dict.fromkeys(montrees)}
     for pid, t in temps.items():
         if t < PIECE_MIN_S:

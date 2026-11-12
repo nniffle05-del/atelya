@@ -11,7 +11,10 @@ import numpy as np
 from moteur.cinema.navigation import Carte
 from moteur.cinema.reglages import (IPS, MARGE_M, VOL_ACCEL_LATERALE, VOL_BOUCLE_RAYONS, VOL_BOUCLE_RECUL_M,
                                     VOL_DEPART_ARRIVEE_M, VOL_FINITION_S, VOL_LISSAGE_M, VOL_PIVOT_S, VOL_RAYON_VUE_M,
-                                    VOL_VITESSE, VOL_VITESSE_VUE)
+                                    VOL_ROTATION_MAX, VOL_VITESSE, VOL_VITESSE_VUE)
+
+
+VIRAGE_PART_ROTATION = 0.8  # dans un virage, la direction du mouvement tourne au plus à 80 % de la rotation permise au regard
 
 
 def lissee(x, a, b):
@@ -108,9 +111,10 @@ def _boucle_a(brut: np.ndarray, i: int, carte: Carte, recul: int) -> np.ndarray 
     return None
 
 
-def courbe_du_vol(chemin: list, carte: Carte) -> tuple[np.ndarray, list[int]]:
-    """Le chemin de la grille → la courbe lisse (un point tous les 10 cm) et les JONCTIONS (indices des demi-tours restés
-    sans boucle, où la caméra s'arrête et pivote)."""
+def courbe_du_vol(chemin: list, carte: Carte, pivots: list | None = None) -> tuple[np.ndarray, list[int], list[float]]:
+    """Le chemin de la grille → la courbe lisse (un point tous les 10 cm), les JONCTIONS (indices des demi-tours restés sans
+    boucle, où la caméra s'arrête et pivote) et la durée de chaque arrêt. `pivots` (planificateur) : les panoramiques voulus
+    ({"xy", "duree_s"}) : là, jamais de boucle, un arrêt de la durée demandée."""
     # les DEMI-TOURS (cul-de-sac : fond d'une pièce, cuisine en impasse) : la trajectoire y est coupée ; chaque morceau est lissé à
     # part, et la caméra ralentit jusqu'à presque s'arrêter à la jonction, où elle pivote (un drone ne rebrousse pas chemin d'un coup)
     brut = reechantillonner(np.array([carte.xy(c) for c in chemin], float), 0.1)
@@ -126,15 +130,27 @@ def courbe_du_vol(chemin: list, carte: Carte) -> tuple[np.ndarray, list[int]]:
             groupe.append((i, cosinus))
     if groupe:
         coupes.append(min(groupe, key=lambda g: g[1])[0])
-    # chaque demi-tour devient une boucle quand la place le permet (en partant de la fin : les indices restent justes)
-    restent = []
+    # les panoramiques voulus par le planificateur : un arrêt à l'endroit exact (le demi-tour détecté le plus proche est remplacé)
+    voulus = {}
+    for pv in pivots or []:
+        ecarts = np.linalg.norm(brut - np.asarray(pv["xy"]), axis=1)
+        i = int(np.argmin(ecarts))
+        if ecarts[i] > 0.3:
+            continue
+        coupes = [c for c in coupes if abs(c - i) > 10]
+        voulus[i] = float(pv["duree_s"])
+    coupes = sorted(set(coupes) | set(voulus))
+    # chaque autre demi-tour devient une boucle quand la place le permet (en partant de la fin : les indices restent justes)
+    restent, durees = [], {}
     for i in sorted(coupes, reverse=True):
-        boucle = boucle_demi_tour(brut, i, carte)
+        boucle = None if i in voulus else boucle_demi_tour(brut, i, carte)
         if boucle is None:
             restent.append(i)
+            durees[i] = voulus.get(i, VOL_PIVOT_S)
         else:
             decalage = len(boucle) - len(brut)
             restent = [j + decalage for j in restent]
+            durees = {j + decalage: d for j, d in durees.items()}
             brut = boucle
     coupes = sorted(restent)
     morceaux = np.split(np.arange(len(brut)), coupes)
@@ -150,12 +166,14 @@ def courbe_du_vol(chemin: list, carte: Carte) -> tuple[np.ndarray, list[int]]:
         if courbe:
             jonctions.append(len(np.concatenate(courbe)))
         courbe.append(lisse)
-    return np.concatenate(courbe), jonctions
+    return np.concatenate(courbe), jonctions, [durees[c] for c in coupes[:len(jonctions)]]
 
 
-def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict]) -> tuple[np.ndarray, float]:
+def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict], durees: list[float] | None = None,
+                  virages_suivis: float | None = None) -> tuple[np.ndarray, float, list[tuple[int, int]]]:
     """La vitesse le long de la courbe (croisière, ralentie devant ce qu'on montre, dans les virages, au départ et à l'arrivée,
-    arrêt et pivot aux demi-tours), puis UNE POSITION PAR IMAGE. Renvoie les positions et la longueur de la courbe (m)."""
+    arrêt et pivot aux demi-tours), puis UNE POSITION PAR IMAGE. Renvoie les positions, la longueur de la courbe (m) et les
+    arrêts (première et dernière image de chaque arrêt, dans l'ordre)."""
     seg = np.linalg.norm(np.diff(courbe, axis=0), axis=1)
     abscisse = np.concatenate([[0], np.cumsum(seg)])
     longueur = float(abscisse[-1])
@@ -174,6 +192,15 @@ def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict]) 
     virage_fin = np.abs(np.concatenate([direction[n2:], np.repeat(direction[-1], n2)])
                         - np.concatenate([np.repeat(direction[0], n2), direction[:-n2]])) / (2 * n2 * 0.1)
     vitesse = np.minimum(vitesse, np.sqrt(VOL_ACCEL_LATERALE / np.maximum(gauss(virage_fin, 4), 1e-3)))
+    if virages_suivis:
+        # le REGARD doit pouvoir suivre le virage : la direction du mouvement ne tourne jamais plus vite que la caméra ne peut
+        # tourner (sinon, au passage d'une porte, le regard reste en retard… sur le mur d'en face) ; planificateur, 12/11/2026
+        omega = math.radians(virages_suivis * VIRAGE_PART_ROTATION)
+        limite = omega / np.maximum(gauss(virage, 3), 1e-3)
+        # sauf autour des arrêts (panoramiques) : la caméra y ralentit déjà jusqu'à s'arrêter, et le demi-tour y est voulu
+        for j in jonctions:
+            limite[np.abs(abscisse - abscisse[min(j, len(abscisse) - 1)]) < 1.2] = np.inf
+        vitesse = np.minimum(vitesse, limite)
     vitesse *= 0.15 + 0.85 * lissee(abscisse, 0, VOL_DEPART_ARRIVEE_M) * lissee(longueur - abscisse, 0, VOL_DEPART_ARRIVEE_M)
     vitesse = gauss(gauss(vitesse, 0.6 / 0.1), 0.6 / 0.1)
     for j in jonctions:  # ralentir jusqu'au demi-tour (presque à l'arrêt, la caméra pivote), puis repartir — après le lissage
@@ -181,16 +208,19 @@ def allure_du_vol(courbe: np.ndarray, jonctions: list[int], etapes: list[dict]) 
         vitesse = np.where(d_arret < 1.0, 0.04 + (vitesse - 0.04) * np.sqrt(np.clip(d_arret, 0, 1.0)), vitesse)
     vitesse = np.maximum(vitesse, 0.04)
     # au bout d'une impasse : arrêt complet en vol stationnaire VOL_PIVOT_S secondes (la caméra pivote vers la sortie), puis on repart
-    arrets = sorted(float(abscisse[min(j, len(abscisse) - 1)]) for j in jonctions)
+    durees = list(durees) if durees is not None else [VOL_PIVOT_S] * len(jonctions)
+    arrets = sorted((float(abscisse[min(j, len(abscisse) - 1)]), d) for j, d in zip(jonctions, durees))
+    immobiles = []
     positions, s_courant = [], 0.0
     while s_courant < longueur:
         v = float(np.interp(s_courant, abscisse, vitesse))
         q = np.array([np.interp(s_courant, abscisse, courbe[:, 0]), np.interp(s_courant, abscisse, courbe[:, 1])])
         positions.append(q)
         suivant = s_courant + max(v, 0.04) / IPS
-        if arrets and s_courant < arrets[0] <= suivant:
-            positions += [q] * int(VOL_PIVOT_S * IPS)
+        if arrets and s_courant < arrets[0][0] <= suivant:
+            immobiles.append((len(positions), len(positions) + int(arrets[0][1] * IPS) - 1))
+            positions += [q] * int(arrets[0][1] * IPS)
             arrets.pop(0)
         s_courant = suivant
     # finition dans le temps (0,2 s) : gomme les petits crochets restants, la caméra ne bouge que de quelques centimètres
-    return gauss(np.array(positions), VOL_FINITION_S * IPS), longueur
+    return gauss(np.array(positions), VOL_FINITION_S * IPS), longueur, immobiles

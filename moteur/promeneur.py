@@ -27,11 +27,16 @@ import numpy as np
 from moteur import realisateur as rz
 from moteur.cinema.camera import hauteurs_du_vol, trajet_du_vol
 from moteur.cinema.navigation import Carte, _cotes, _hauteur_meuble, _rect, porte_palliere, portes_ouvertes  # noqa: F401
+from moteur.cinema.controle import controler
 from moteur.cinema.parcours import parcours_du_vol
+from moteur.cinema.planificateur import planifier
 from moteur.cinema.regard import angle as _angle, ecart as _ecart, profondeur as _profondeur, regard_du_vol, regard_profond
 from moteur.cinema.reglages import *  # noqa: F401,F403  (les réglages, sous leurs noms d'avant)
 from moteur.cinema.reglages import CIRCULATION, CLE_IMAGES, FOND_DISTANCE_M, IPS, MARGE_M, PAS_M
 from moteur.cinema.trajectoire import allure_du_vol, courbe_du_vol
+
+REGARD_AVANCE_VOL_M = 1.2  # planificateur : le regard anticipe là où l'on sera 1,2 m plus loin
+ROTATION_PLANIFIEE = 35.0  # planificateur : °/s en vol (28 avant) : le regard suit mieux les virages des portes
 
 # la balade À PIED (premier essai du 12/11/2026, remplacé par le vol ; gardé en option « marche »)
 VITESSE = 0.45  # m/s : une marche lente, dans la pièce qu'on montre
@@ -204,21 +209,51 @@ def balade(logement: dict, savoir: dict | None = None, format_image=(1920, 1080)
             "longueur_m": round(float(np.sum(np.linalg.norm(np.diff(xy, axis=0), axis=1))), 1)}
 
 
-def vol(logement: dict, savoir: dict | None = None, format_image=(1920, 1080), scene_eclairage: str | None = None) -> dict:
-    """LA CAMÉRA VOLANTE, brique après brique : ce qu'on montre et dans quel ordre (parcours), la courbe lisse et son allure
-    (trajectoire), le regard (regard), la hauteur et les clés (caméra). Même résultat que balade() (trajet, étapes, portes
-    ouvertes, pièces sans fenêtre)."""
-    s = savoir or rz.savoir_faire()
-    parcours = parcours_du_vol(logement, s)
-    courbe, jonctions = courbe_du_vol(parcours.chemin, parcours.carte)
-    positions, longueur = allure_du_vol(courbe, jonctions, parcours.etapes)
-    caps = regard_du_vol(positions, courbe, jonctions, parcours.etapes, parcours.voir, logement)
+def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage) -> dict:
+    """Un plan de vol (parcours ou planificateur) → le vol complet : courbe et allure (trajectoire), regard, hauteur, clés."""
+    pivots = getattr(parcours, "pivots", None)
+    courbe, jonctions, durees = courbe_du_vol(parcours.chemin, parcours.carte, pivots)
+    positions, longueur, arrets = allure_du_vol(courbe, jonctions, parcours.etapes, durees, virages_suivis=ROTATION_PLANIFIEE if pivots is not None else None)
+    panoramiques = None
+    if pivots is not None:  # le regard de chaque arrêt voulu par le planificateur : le cadrage de sa pièce, puis la sortie
+        panoramiques = []
+        for (debut, fin), j in zip(arrets, sorted(jonctions)):
+            pv = min(pivots, key=lambda q: float(np.linalg.norm(courbe[min(j, len(courbe) - 1)] - np.asarray(q["xy"]))))
+            panoramiques.append((debut, fin, pv["cap"]))
+    caps = regard_du_vol(positions, courbe, jonctions, parcours.etapes, parcours.voir, logement, panoramiques,
+                         getattr(parcours, "fin_cap", None), REGARD_AVANCE_VOL_M if pivots is not None else None,
+                         ROTATION_PLANIFIEE if pivots is not None else VOL_ROTATION_MAX)
     hauteurs, tangages = hauteurs_du_vol(positions, parcours.voir, logement)
     trajet = trajet_du_vol(positions, hauteurs, caps, tangages, s["focale_mm"], format_image, scene_eclairage)
     sans_fenetre = [p["id"] for p in logement["pieces"] if not parcours.scene.a_une_fenetre(p)]
     return {"trajet": trajet, "etapes": parcours.etapes,
             "portes_ouvertes": [{k: v for k, v in p.items() if k != "battant"} for p in parcours.portes],
             "pieces_sans_fenetre": sans_fenetre, "duree_s": round(trajet["images"] / IPS, 1), "longueur_m": round(longueur, 1)}
+
+
+def vol(logement: dict, savoir: dict | None = None, format_image=(1920, 1080), scene_eclairage: str | None = None,
+        planificateur: bool = True, budget_s: float | None = None) -> dict:
+    """LA CAMÉRA VOLANTE. Avec le PLANIFICATEUR (défaut depuis le 12/11/2026) : plusieurs plans de vol (ordres de visite,
+    panoramiques au cœur des pièces en cul-de-sac, conclusion sur le plus beau cadrage), chacun construit en entier puis noté
+    par le CONTRÔLEUR ; le meilleur est gardé (les autres notes sont dans « candidats »). Sans (`planificateur=False`) : le vol
+    d'avant (survol du 12/11/2026), pour comparer. Résultat : trajet, étapes, portes ouvertes, pièces sans fenêtre, contrôle."""
+    s = savoir or rz.savoir_faire()
+    if not planificateur:
+        return _construire(logement, parcours_du_vol(logement, s), s, format_image, scene_eclairage)
+    plans = planifier(logement, s)
+    if not plans:
+        return _construire(logement, parcours_du_vol(logement, s), s, format_image, scene_eclairage)
+    essais = []
+    for plan in plans:
+        r = _construire(logement, plan, s, format_image, scene_eclairage)
+        c = controler(logement, r, budget_s)
+        essais.append((c["note"], r, c, plan))
+    note, meilleur, c, plan = max(essais, key=lambda e: e[0])
+    meilleur["controle"] = {"note": c["note"], "resume": c["resume"], "budget_s": c["budget_s"]}
+    meilleur["candidats"] = [{"ordre": e[3].ordre, "note": e[0], "duree_s": e[1]["duree_s"],
+                              "panoramiques": [pv["piece"] for pv in e[3].pivots], "retenu": e[1] is meilleur}
+                             for e in essais]
+    return meilleur
 
 
 def dessiner(logement: dict, resultat: dict, chemin, px_par_m: int = 60) -> None:
@@ -242,7 +277,8 @@ def dessiner(logement: dict, resultat: dict, chemin, px_par_m: int = 60) -> None
         cv2.arrowedLine(image, ecran(p), ecran((p[0] + 0.35 * math.cos(c), p[1] + 0.35 * math.sin(c))), (0, 140, 255), 1,
                         cv2.LINE_AA, tipLength=0.4)
     for k, e in enumerate(resultat["etapes"]):
-        couleur = {"depart": (0, 160, 0), "point_de_vue": (200, 0, 200), "fond": (200, 120, 0)}[e["genre"]]
+        couleur = {"depart": (0, 160, 0), "point_de_vue": (200, 0, 200), "fond": (200, 120, 0), "coeur": (200, 120, 0),
+                   "conclusion": (0, 0, 200)}.get(e["genre"], (90, 90, 90))
         cv2.circle(image, ecran(e["xy"]), 7, couleur, -1)
         cv2.putText(image, str(k), (ecran(e["xy"])[0] + 8, ecran(e["xy"])[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, couleur, 2)
     ecrire_image(chemin, image)
