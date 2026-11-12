@@ -257,3 +257,11 @@ réelles. Survol : 30/100 au contrôleur (11 s face à des murs sur 50 s). Les c
 pris pour un meuble bas et « survolé », donc traversé) ; on passe SOUS un objet suspendu assez haut (suspension, bas ≥ 1,90 m) en
 descendant à 30 cm sous lui, image par image ; les meubles bas se survolent toujours. App-002 (aucun meuble en hauteur) : empreinte
 8/8 identique. 855 tests.
+**Décision NT (12/11/2026) sur les meubles** : « il faudra les mêmes meubles que le client ». Pas d'ameublement automatique
+« par règles » (idée tirée de l'outil Floorcraft, écartée) : les meubles viennent des PHOTOS du client (repérage OWLv2, bibliothèque
+ABO). Floorcraft (floorcraft.chirostudio.xyz, outil web fermé, sans licence, dessin du plan à la main) = concurrent à surveiller,
+rien à reprendre ; idée retenue pour plus tard : un plan d'OUVERTURE « maison de poupée » (maquette en coupe vue d'en haut).
+**Décision NT (12/11/2026) : UNE SEULE PRISE** (pas de fondus). Comparé sur les mêmes images : version 2 du vol planifié (48 s, une
+seule prise) contre version « fondus » (31 s, couloirs remplacés par des fondus de 0,6 s, `moteur/cinema/montage.py`,
+`outils/unreal/monter_fondus.py`) : NT préfère la PREMIÈRE. Le monteur reste disponible (outil), pas par défaut. Suite : réduire
+les passages de murs DANS la prise continue (couloirs, sorties de pièces, panoramiques).

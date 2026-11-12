@@ -196,7 +196,7 @@ def controler(logement: dict, vol: dict, budget_s: float | None = None) -> dict:
         if d["debut_s"] is not None and d["genre"] in COUT_PAR_S:
             r["secondes"] = round(r["secondes"] + d["fin_s"] - d["debut_s"], 2)
     return {"note": round(max(0.0, 100.0 - perte), 1), "duree_s": round(duree, 1), "budget_s": round(budget_s, 1),
-            "defauts": defauts, "resume": resume, "temps_par_piece_s": temps,
+            "defauts": defauts, "resume": resume, "temps_par_piece_s": temps, "pieces_par_image": pieces_images,
             "mesures": {"vitesse_max_m_s": round(float(vitesse.max()), 2),
                         "acceleration_max_m_s2": round(float(acceleration.max()), 2),
                         "rotation_max_deg_s": round(float(rotation.max()), 1),
