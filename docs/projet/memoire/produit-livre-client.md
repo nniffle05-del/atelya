@@ -252,3 +252,8 @@ d'après `altitude`, plafond), pièce vue < 3 s, fin sur un mur, budget de duré
 Vérifié sur les VRAIES IMAGES du survol de 50 s : 6 « nez au mur » sur 7 sont des murs plein écran (8, 30, 34, 40, 42, 49 s ; 43,8 s
 limite), 8 images « rien à signaler » toutes correctes ; les 2 secousses (15 et 21 s : 0,85 → 0,05 → 0,77 m/s en < 1 s) sont
 réelles. Survol : 30/100 au contrôleur (11 s face à des murs sur 50 s). Les corrections viendront avec le planificateur.
+**Étape 2 FAITE (12/11) : collisions EN HAUTEUR** (`moteur/cinema/navigation.py` : `etendue`, `bloque_le_vol`, `au_dessus_du_vol` ;
+`camera.hauteurs_du_vol`). Un meuble accroché à hauteur de caméra (meuble haut de cuisine 1,40 → 2,10 m) est un obstacle (avant :
+pris pour un meuble bas et « survolé », donc traversé) ; on passe SOUS un objet suspendu assez haut (suspension, bas ≥ 1,90 m) en
+descendant à 30 cm sous lui, image par image ; les meubles bas se survolent toujours. App-002 (aucun meuble en hauteur) : empreinte
+8/8 identique. 855 tests.

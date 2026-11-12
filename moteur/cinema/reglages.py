@@ -11,6 +11,7 @@ CIRCULATION = {"entree", "degagement", "couloir", "hall"}
 CONFORT_M = 0.6  # au-delà de cette distance des obstacles, plus de surcoût : on passe au milieu des passages
 BATTANT_EP = 0.05  # épaisseur d'un battant de porte ouvert
 SURVOL_MARGE_M = 0.5  # on survole un meuble si l'on passe au moins 50 cm au-dessus
+SOUS_OBJET_M = 0.3  # on passe SOUS un objet suspendu (suspension, étagère haute) avec au moins 30 cm de jeu
 FOND_DISTANCE_M = 0.6  # le fond d'une pièce est pris à au moins ça des murs et des meubles
 
 # le regard (12/11/2026, premier essai : la caméra fixait parfois un mur à quelques centimètres) : vers là où l'on voit LOIN, à au

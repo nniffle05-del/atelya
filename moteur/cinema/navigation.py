@@ -9,12 +9,31 @@ import cv2
 import numpy as np
 
 from moteur import realisateur as rz
-from moteur.cinema.reglages import BATTANT_EP, CIRCULATION, CONFORT_M, MARGE_M, PAS_M, SURVOL_MARGE_M
+from moteur.cinema.reglages import BATTANT_EP, CIRCULATION, CONFORT_M, MARGE_M, PAS_M, SOUS_OBJET_M, SURVOL_MARGE_M
 
 
 def _hauteur_meuble(m: dict) -> float:
     d = m.get("dimensions") or []
     return float(d[2]) if len(d) > 2 else 1.0
+
+
+def etendue(m: dict) -> tuple[float, float]:
+    """Le bas et le haut d'un meuble (m) : posé au sol, ou accroché en l'air (`altitude` = son bas : meuble haut de cuisine,
+    étagère, suspension)."""
+    bas = float(m.get("altitude") or 0.0)
+    return bas, bas + _hauteur_meuble(m)
+
+
+def au_dessus_du_vol(m: dict, hauteur_camera: float) -> bool:
+    """L'objet est suspendu assez haut pour que la caméra passe DESSOUS (en descendant un peu si besoin)."""
+    return etendue(m)[0] >= hauteur_camera + SOUS_OBJET_M
+
+
+def bloque_le_vol(m: dict, hauteur_camera: float) -> bool:
+    """Le meuble est un obstacle pour la caméra volante : trop haut pour être survolé, trop bas pour passer dessous (un meuble
+    haut de cuisine de 1,40 à 2,10 m, une armoire). Avant le 12/11/2026, seule la hauteur comptait : un meuble haut accroché
+    au mur passait pour un meuble bas, et la caméra l'aurait traversé."""
+    return etendue(m)[1] > hauteur_camera - SURVOL_MARGE_M and not au_dessus_du_vol(m, hauteur_camera)
 
 
 def _rect(centre_a, centre_b, ep):
@@ -103,9 +122,9 @@ class Carte:
                 d = (b - a) / np.linalg.norm(b - a)
                 passage = _rect(a + d * o["position"], a + d * (o["position"] + o["largeur"]), m["epaisseur"] + 0.3)
                 cv2.fillPoly(dedans, [self._pixels(passage)], 1)
-        # un meuble assez bas pour être SURVOLÉ (caméra volante) n'est pas un obstacle : seuls les meubles hauts bloquent
-        meubles = [poly for m, poly in scene.meubles
-                   if hauteur_camera is None or _hauteur_meuble(m) > hauteur_camera - SURVOL_MARGE_M]
+        # un meuble assez bas pour être SURVOLÉ, ou suspendu assez haut pour passer dessous (caméra volante), n'est pas un
+        # obstacle ; un meuble accroché à hauteur de caméra (meuble haut de cuisine) en est un
+        meubles = [poly for m, poly in scene.meubles if hauteur_camera is None or bloque_le_vol(m, hauteur_camera)]
         for poly in scene.pleins + scene.fenetres + meubles + [p["battant"] for p in portes]:
             cv2.fillPoly(obstacles, [self._pixels(poly)], 1)
         # murs des portes fermées (porte palière) : obstacles

@@ -78,3 +78,31 @@ def test_controle_d_un_vol_d_atelya():
     assert set(c["temps_par_piece_s"]) == {e["piece"] for e in vol["etapes"] if e["genre"] == "point_de_vue"}
     assert len(c["courbes"]["vitesse"]) == vol["trajet"]["images"]
     assert "Note du vol" in ct.rapport(c)
+
+
+def test_collisions_en_hauteur():
+    """Étape 2 : un meuble haut de cuisine (1,40 → 2,10 m) bloque la caméra volante, une table basse se survole, une suspension
+    (bas à 1,95 m) se passe DESSOUS : la caméra y descend à au moins 30 cm sous l'objet, puis remonte. Le vol d'Atelya ne
+    traverse plus rien (contrôleur)."""
+    import numpy as np
+
+    from moteur import realisateur as rz
+    from moteur.cinema import camera, navigation
+    from moteur.cinema.reglages import SOUS_OBJET_M, VOL_HAUTEUR_M
+    from tests.test_promeneur import _logement
+    log = _logement()
+    log["hauteur_sous_plafond"] = 2.5
+    haut = {"id": "haut", "position": [4.5, 3.5], "face": 0.0, "dimensions": [1.2, 0.4, 0.7], "altitude": 1.4}
+    table = {"id": "table", "position": [1.5, 2.5], "face": 0.0, "dimensions": [0.8, 0.5, 0.4]}
+    suspension = {"id": "lustre", "position": [3.0, 1.0], "face": 0.0, "dimensions": [0.6, 0.6, 0.5], "altitude": 1.95}
+    log["meubles"] += [haut, table, suspension]
+    assert navigation.bloque_le_vol(haut, VOL_HAUTEUR_M)
+    assert not navigation.bloque_le_vol(table, VOL_HAUTEUR_M) and not navigation.bloque_le_vol(suspension, VOL_HAUTEUR_M)
+    carte = navigation.Carte(log, [], hauteur_camera=VOL_HAUTEUR_M)
+    assert not carte.libre[carte.case((4.5, 3.5))] and carte.libre[carte.case((1.5, 2.5))] and carte.libre[carte.case((3.0, 1.0))]
+    # une traversée en ligne droite sous la suspension : la caméra passe dessous, assez bas
+    positions = np.stack([np.linspace(0.5, 5.5, 240), np.full(240, 1.0)], 1)
+    h, _ = camera.hauteurs_du_vol(positions, rz.Scene2D(log), log)
+    sous = np.abs(positions[:, 0] - 3.0) <= 0.3
+    assert h[sous].max() <= 1.95 - SOUS_OBJET_M + 1e-6
+    assert not any(d["genre"] == "traverse" for d in ct.controler(log, pm.vol(log))["defauts"])
