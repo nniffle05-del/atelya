@@ -45,6 +45,7 @@ SOLEIL_LUX = 110000.0
 STENCIL_BLANCS = 1
 STENCIL_DEHORS = 2  # le sol du dehors, pour le masque « dehors vu par une fenêtre »
 PROFONDEUR_CIEL_CM = 1.0e6  # au-delà de 10 km, c'est le ciel (le sol du dehors est marqué à part)
+NIVEAU_FLOU_CIEL = 6.0  # niveau de détail de la photo de ciel qui donne sa clarté moyenne locale (~32 pixels par face)
 # Le photographe : images d'essai au quart de la taille, une image sur PAS_ESSAI (au moins ESSAI_MIN images par plan).
 REDUCTION_ESSAI = 4
 ESSAI_MIN = 12
@@ -294,6 +295,110 @@ def poser_dehors(racine, centre):
     mesh.set_render_custom_depth(True)  # marqué pour le masque « dehors » (mesure des fenêtres)
     mesh.set_custom_depth_stencil_value(STENCIL_DEHORS)
     return sol
+
+
+
+
+def _proprietes(composant, valeurs):
+    for nom, valeur in valeurs.items():
+        try:
+            composant.set_editor_property(nom, valeur)
+        except Exception as e:  # noqa: BLE001 : propriété absente de cette version : signalée, pas bloquante
+            unreal.log_warning(f"ATELYA propriété {nom} : {e}")
+
+
+def _texture_ciel(racine, image):
+    """Le ciel photographié importé. Unreal 5.8 (import « Interchange ») en fait toujours un CUBE, malgré le réglage
+    LoadHdrAsLongLatCubemap=0 (vu le 12/11/2026) : on le garde en cube, et le matériau inverse lui-même le dépliage d'Unreal."""
+    chemin = f"{racine}/Studio/T_CielPhoto_{Path(image).stem}"
+    if not unreal.EditorAssetLibrary.does_asset_exist(chemin):
+        tache = unreal.AssetImportTask()
+        for nom, valeur in (("filename", str(image)), ("destination_path", chemin.rsplit("/", 1)[0]),
+                            ("destination_name", chemin.rsplit("/", 1)[1]), ("automated", True), ("replace_existing", True),
+                            ("save", True)):
+            tache.set_editor_property(nom, valeur)
+        unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([tache])
+    t = unreal.load_asset(chemin)
+    if not isinstance(t, unreal.TextureCube):
+        raise RuntimeError(f"PLANTÉ : ciel photographié non importé en cube ({chemin} : {type(t).__name__})")
+    return t
+
+
+def poser_ciel_photo(racine, ambiance, fiche, ciel):
+    """Le CIEL PHOTOGRAPHIÉ (moteur/cinema/ciels.py), DÉCOR vu par les fenêtres, posé SUR L'IMAGE (réglage d'image, avant la
+    courbe des tons) et non dans la scène : il ne remplace que les pixels de ciel (profondeur > PROFONDEUR_CIEL_CM) par la photo
+    vue dans la direction du regard (colonne = azimut, tournée pour que le soleil de la photo tombe sur le vrai soleil ; ligne =
+    hauteur). Il ne peut donc RIEN éclairer. Premier essai (12/11/2026) : une sphère de 15 km dans la scène assombrissait les murs
+    de 1,2 cran malgré toutes ses protections (ombre, captures, Lumen, rayons). Sa clarté suit l'exposition (× exposition de la
+    caméra, comme la scène). Renvoie le matériau (à poser dans le réglage d'image) et le décalage."""
+    texture = _texture_ciel(racine, ciel["image"])
+    d = direction_soleil(ambiance, fiche)
+    azimut = math.atan2(d[1], -d[0])  # vers le soleil, repère d'Unreal (y inversé) : (-dx, +dy)
+    decalage = (float(ciel["soleil_u"]) - azimut / (2 * math.pi)) % 1.0
+    m = _nouveau(racine, "Studio/M_CielPhoto", unreal.Material, unreal.MaterialFactoryNew())
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_POST_PROCESS)
+    m.set_editor_property("blendable_location", unreal.BlendableLocation.BL_SCENE_COLOR_BEFORE_DOF)
+    lib = unreal.MaterialEditingLibrary
+    regard = lib.create_material_expression(m, unreal.MaterialExpressionCameraVectorWS, -1100, 0)
+    calcul = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -800, 0)
+    calcul.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    entree = unreal.CustomInput()
+    entree.set_editor_property("input_name", "V")
+    calcul.set_editor_property("inputs", [entree])
+    # direction du regard -> (u, v) de l'image -> direction du cube d'Unreal qui lit ce pixel : l'inverse exact de son dépliage
+    # (TextureCompressorModule.cpp, LookupLongLatDouble : u = (1 + atan2(x, -z) / pi) / 2, v = acos(y) / pi)
+    calcul.set_editor_property("code", "float3 d = -normalize(V);\n"
+                               f"float u = frac(atan2(d.y, d.x) / 6.28318531 + {decalage:.6f});\n"
+                               "float v = acos(clamp(d.z, -1.0, 1.0)) / 3.14159265;\n"
+                               "float t = 3.14159265 * (2.0 * u - 1.0);\n"
+                               "float s = sin(3.14159265 * v);\n"
+                               "return float3(sin(t) * s, cos(3.14159265 * v), -cos(t) * s);")
+    lib.connect_material_expressions(regard, "", calcul, "V")
+    image = lib.create_material_expression(m, unreal.MaterialExpressionTextureSample, -500, 0)
+    image.set_editor_property("texture", texture)
+    image.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    lib.connect_material_expressions(calcul, "", image, "UVs")
+    # la même photo, très floue (niveau de détail 6 : ~32 pixels par face) = sa clarté moyenne autour de ce point
+    flou = lib.create_material_expression(m, unreal.MaterialExpressionTextureSample, -500, 200)
+    flou.set_editor_property("texture", texture)
+    flou.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    flou.set_editor_property("mip_value_mode", unreal.TextureMipValueMode.TMVM_MIP_LEVEL)
+    flou.set_editor_property("const_mip_value", NIVEAU_FLOU_CIEL)
+    lib.connect_material_expressions(calcul, "", flou, "UVs")
+    scene = lib.create_material_expression(m, unreal.MaterialExpressionSceneTexture, -700, 400)
+    scene.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    rvb = lib.create_material_expression(m, unreal.MaterialExpressionComponentMask, -500, 400)
+    for canal, garde in (("r", True), ("g", True), ("b", True), ("a", False)):
+        rvb.set_editor_property(canal, garde)
+    lib.connect_material_expressions(scene, "Color", rvb, "")
+    # CLARTÉ du vrai ciel calculé à ce pixel (déjà à l'exposition de la caméra) x DÉTAIL et COULEUR de la photo autour de sa
+    # moyenne locale : physiquement juste, sans chiffre d'exposition à deviner (essai avec l'exposition d'Unreal : ciel noir)
+    melange = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -250, 150)
+    melange.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    noms = []
+    for nom in ("I", "F", "S"):
+        e = unreal.CustomInput()
+        e.set_editor_property("input_name", nom)
+        noms.append(e)
+    melange.set_editor_property("inputs", noms)
+    melange.set_editor_property("code", "float3 w = float3(0.2126, 0.7152, 0.0722);\n"
+                                f"return I * {float(ciel.get('force', 1.0)):.4f} * dot(S, w) / max(dot(F, w), 1e-6);")
+    lib.connect_material_expressions(image, "RGB", melange, "I")
+    lib.connect_material_expressions(flou, "RGB", melange, "F")
+    lib.connect_material_expressions(rvb, "", melange, "S")
+    expose = melange
+    profondeur = lib.create_material_expression(m, unreal.MaterialExpressionSceneTexture, -700, 700)
+    profondeur.set_editor_property("scene_texture_id", unreal.SceneTextureId.PPI_SCENE_DEPTH)
+    choix = lib.create_material_expression(m, unreal.MaterialExpressionIf, 0, 300)
+    lib.connect_material_expressions(_premiere_composante(m, profondeur, 800), "", choix, "A")
+    choix.set_editor_property("const_b", PROFONDEUR_CIEL_CM)
+    lib.connect_material_expressions(expose, "", choix, "A > B")
+    lib.connect_material_expressions(rvb, "", choix, "A == B")
+    lib.connect_material_expressions(rvb, "", choix, "A < B")
+    lib.connect_material_property(choix, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    return m, round(decalage, 4)
 
 
 DALLE_EPAISSEUR_CM = 30.0
@@ -654,6 +759,9 @@ def main():
     ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"))
     if ciel == "physique" and reglage.get("dehors", True):
         poser_dehors(racine, centre)
+    ciel_photo, materiau_ciel = None, None
+    if reglage.get("ciel_photo"):
+        materiau_ciel, ciel_photo = poser_ciel_photo(racine, ambiance, fiche, reglage["ciel_photo"])
     lampes = allumer_lampes(ambiance, fiche, reglage.get("lampes_pieces") or ())
     nb_dalles = poser_dalles(fiche)
     vitres = vitres_sans_ombre()
@@ -665,6 +773,11 @@ def main():
     exposition = float(reglage.get("exposition", 0.0))
     gain = reglage.get("gain") or [1.0, 1.0, 1.0]
     volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"), reglage.get("exposition_locale"))
+    if materiau_ciel is not None:  # le ciel photographié, posé sur l'image (réglage d'image)
+        r = volume.get_editor_property("settings")
+        r.set_editor_property("weighted_blendables", unreal.WeightedBlendables(
+            array=[unreal.WeightedBlendable(weight=1.0, object=materiau_ciel)]))
+        volume.set_editor_property("settings", r)
     seq = creer_sequence(racine, trajet)
     nb_cles = 0
     if reglage.get("exposition_cles"):
@@ -679,6 +792,7 @@ def main():
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
+                                                 "ciel_photo_decalage": ciel_photo,
                                                  "sortie": str(dossier)},
                                                 ensure_ascii=False))
 

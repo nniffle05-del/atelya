@@ -322,3 +322,20 @@ du film, trop sombres 5,4 → 3,8 %, écart médian −0,17 → −0,01 cran, sa
 écart entre pièces 0,81 → 0,36 ; fenêtres presque blanches 96 → 86 %, vues laiteuses 88 → 77, blanc pur 4,3 → 7,3 % ; intérieur
 197 → 193/255, fenêtres 242 → 239 (à l'œil : même éclat, plus de chambre grillée à 42 s). Le vrai remède des fenêtres = une vue
 dehors (photo de rue / ciel CC0 = téléchargement à accorder par NT, ou vue tirée des photos du client).
+**Étape 4, CIEL PHOTOGRAPHIÉ (12/11/2026, soir, accord écrit de NT pour le téléchargement)** : `..\atelya\bibliotheque\ciels\`
+`kloofendal_48d_partly_cloudy_puresky_4k.hdr` (Poly Haven, Greg Zaal + Jarod Guest, CC0 lue, 20,7 Mo, LISEZMOI.txt ; copié sans accent
+dans `D:\Atelya-Unreal\Paquets\ciels\`). Un CIEL SEUL, pas une rue (une rue inventée ne serait pas la vue du logement : risque de
+tromper l'acheteur ; dit à NT). `moteur/cinema/ciels.py` (catalogue par éclairage : jour ensoleillé seulement ; colonne du soleil de
+la photo 0,595, hauteur 47,9°) ; `preparer_cinematique.poser_ciel_photo` : posé SUR L'IMAGE (réglage d'image avant la courbe des tons),
+pas dans la scène : seuls les pixels de ciel (profondeur > 10 km) sont remplacés, la photo lue dans la direction du regard, tournée
+pour que son soleil tombe sur le vrai. ESSAIS : (1) sphère de 15 km dans la scène = murs −1,2 cran malgré toutes les protections
+(ombre, captures, Lumen, rayons) → écartée ; (2) photo × exposition d'Unreal (nœud EyeAdaptation) = ciel NOIR → écarté ; (3) RETENU :
+clarté du VRAI ciel calculé à ce pixel × détail et couleur de la photo autour de sa moyenne locale (photo floue, niveau 6) : murs
+identiques au millième (0,1802 / 0,1802), nuages visibles à exposition basse (`..\atelya\b2\app-002\unreal\film\ciel-photo-expo-basse.jpg`).
+PIÈGES : Unreal 5.8 importe un .hdr toujours en CUBE (import « Interchange », le réglage LoadHdrAsLongLatCubemap=0 de
+Config/DefaultEditor.ini est ignoré) → le matériau inverse le dépliage d'Unreal (TextureCompressorModule.cpp, LookupLongLatDouble :
+u = (1 + atan2(x, −z)/π)/2, v = acos(y)/π) ; OpenCV du PC ne sait pas écrire d'EXR. LIMITE MESURÉE à l'exposition du film (planche
+`ciel-photo-essais.jpg`) : le ciel est ~2,9 crans au-dessus des murs → presque blanc, nuages à peine visibles (dehors presque blanc
+97 → 99 %) ; avec exposition locale 0,7 / 0,5 : 63 / 46 %, murs −0,03 cran seulement (visée 1,0), nuages devinés. Gardé par défaut
+(sans effet sur la lumière) ; exposition locale laissée à NT. Le gros du dehors vu par les fenêtres reste le SOL GRIS (logement
+supposé au 2e étage) : la vraie vue ne viendra que des photos du client.

@@ -63,6 +63,12 @@ ProjectName=Atelya Studio
 Description=Cinematiques et visites des logements construits par Atelya
 """
 
+# Un .hdr (ciel photographié) s'importe en image 2D « à plat » : Atelya calcule lui-même la direction (moteur/unreal/
+# preparer_cinematique.poser_ciel_photo). Sans ce réglage, en mode automatique, Unreal en fait un cube (12/11/2026).
+DEFAULT_EDITOR = """[TextureImporter]
+LoadHdrAsLongLatCubemap=0
+"""
+
 
 def creer(dossier: Path) -> Path:
     dossier.mkdir(parents=True, exist_ok=True)
@@ -74,6 +80,7 @@ def creer(dossier: Path) -> Path:
     chemin.write_text(json.dumps(projet, indent=1), encoding="utf-8")
     (dossier / "Config" / "DefaultEngine.ini").write_text(DEFAULT_ENGINE, encoding="utf-8")
     (dossier / "Config" / "DefaultGame.ini").write_text(DEFAULT_GAME, encoding="utf-8")
+    (dossier / "Config" / "DefaultEditor.ini").write_text(DEFAULT_EDITOR, encoding="utf-8")
     return chemin
 
 

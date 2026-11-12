@@ -27,10 +27,28 @@ import cinematique_unreal as cu  # noqa: E402
 import mesurer_lumiere  # noqa: E402
 
 from moteur import photographe, promeneur  # noqa: E402
+from moteur.cinema import ciels  # noqa: E402
 from moteur.cinema import controle as controle_vol  # noqa: E402
 
 PREMIER_ESSAI = -9.0
 PASSES = 2  # essais du photographe en marchant
+BIBLIOTHEQUE_CIELS = RACINE.parent / "atelya" / "bibliotheque" / "ciels"
+
+
+def ciel_photo(ambiance_id: str) -> dict | None:
+    """Le ciel photographié de cet éclairage (moteur/cinema/ciels.py), copié au besoin dans un dossier SANS ACCENT pour Unreal."""
+    reglage = ciels.ciel_photo(ambiance_id, (cu.STUDIO / "Paquets" / "ciels").as_posix())
+    if reglage is None:
+        return None
+    cible = Path(reglage["image"])
+    if not cible.is_file():
+        source = BIBLIOTHEQUE_CIELS / cible.name
+        if not source.is_file():
+            print(f"   (pas de ciel photographié : {source} absent)", flush=True)
+            return None
+        cible.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, cible)
+    return reglage
 
 
 def numero(chemin: Path) -> int:
@@ -77,7 +95,7 @@ def main() -> None:
     balance = float(ambiance.get("balance", photographe.FORCE_BALANCE))
     base = {"eclairage": ambiance["id"], "moteur": a.moteur, "dossier": nom_dossier, "portes_ouvertes": b["portes_ouvertes"],
             "lampes_pieces": [] if ambiance.get("lampes") else b["pieces_sans_fenetre"],
-            "exposition_locale": photographe.exposition_locale(clarte)}
+            "exposition_locale": photographe.exposition_locale(clarte), "ciel_photo": ciel_photo(ambiance["id"])}
 
     def preparer(exposition, gain, cles=None):
         contenu = {**base, "exposition": exposition, "gain": list(gain)}
