@@ -24,9 +24,11 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from moteur import realisateur as rz
-from moteur.cinema.navigation import Carte, _cotes, depart_dans_l_entree, distances_depuis, portes_ouvertes
+from moteur.cinema.navigation import (Carte, _cotes, depart_dans_l_entree, distances_depuis, portes_ouvertes,
+                                      redresser_aux_portes)
 from moteur.cinema.reglages import CIRCULATION, PAS_M, VOL_HAUTEUR_M, VOL_VITESSE
 
+PORTES_DROITES = False  # portes franchies droit (navigation.redresser_aux_portes) : ESSAYÉ le 12/11/2026, sans gain (app-002 6,8 -> 7,0 s face aux murs, app-001 note 74 -> 65) : écarté
 DEGAGE_PART = 0.9
 DEGAGE_MAX_M = 1.4  # au-delà, assez dégagé pour tourner sans voir un mur de près (le contrôleur : mur « proche » < 1,2 m)
 GRANDE_PIECE_M2 = 20.0  # au-delà, la pièce a un second cœur
@@ -218,6 +220,8 @@ def planifier(logement: dict, s: dict) -> list[Plan]:
             duree = max(PANORAMIQUE_MIN_S, vers_cadrage + SORTIE_EN_VOL * vers_sortie)
             pivots.append({"xy": carte.xy(chemin[i]), "piece": ident, "cap": cap, "duree_s": round(duree, 2),
                            "part": round(vers_cadrage / duree, 3)})
+        if PORTES_DROITES:
+            chemin = redresser_aux_portes(chemin, carte, logement, portes, [e["xy"] for e in etapes])
         plans.append(Plan(scene=scene, voir=voir, carte=carte, portes=portes, etapes=etapes, chemin=chemin, ordre=list(ordre),
                           pivots=pivots, fin_cap=etapes[-1]["cap"], estimation_s=round(estimation, 1)))
     return plans

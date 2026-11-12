@@ -231,3 +231,71 @@ def depart_dans_l_entree(logement: dict, carte: Carte, entree: dict) -> tuple[in
     else:
         repere = np.asarray(entree["contour"], float).mean(0)
     return carte.plus_proche_libre(repere, carte.masque_piece(entree))
+
+
+# PASSAGE DES PORTES (cinématique, étape 4, 12/11/2026) : le plus court chemin longe le mur puis tourne au dernier moment dans la
+# porte ; la caméra, qui regarde là où elle va, avait le nez sur le mur en sortant des pièces (app-002 : 25-27 s et 38-40 s, mur
+# à 0,2-0,3 m au centre de l'image, 6,8 s du film « nez au mur »). Comme un cadreur : on s'aligne FACE à la porte un peu avant, on
+# la franchit droit, on en ressort droit, en regardant à travers.
+PORTE_APPROCHE_M = (0.9, 0.7, 0.5)  # distance du point d'alignement, de part et d'autre (la plus grande qui tient)
+PORTE_ZONE_M = 0.6  # on raccorde le chemin d'origine à ça au-delà du point d'alignement
+PORTE_GARDE_M = 1.2  # un arrêt de la visite (cœur, point de vue) plus près que ça de la porte : on n'y touche pas
+
+
+def _libre(carte: Carte, q) -> bool:
+    i, j = carte.case(tuple(q))
+    return 0 <= i < carte.forme[0] and 0 <= j < carte.forme[1] and bool(carte.libre[i, j])
+
+
+def redresser_aux_portes(chemin: list, carte: Carte, logement: dict, portes: list[dict], gardes_xy: list) -> list:
+    """Le chemin (cases) où chaque porte ouverte franchie l'est DROIT : point d'alignement en face de la porte de chaque côté
+    (sur la normale du mur, à PORTE_APPROCHE_M), ligne droite entre les deux par le milieu de la porte. Sans place pour
+    s'aligner, ou près d'un arrêt de la visite (`gardes_xy`), la porte garde le chemin d'origine."""
+    par_id = {o["id"]: o for o in logement.get("ouvertures", [])}
+    xy = np.array([carte.xy(c) for c in chemin], float)
+    travaux = []
+    for p in portes:
+        o = par_id.get(p["id"])
+        if o is None:
+            continue
+        _, a, d, n, m = _cotes(logement, o)
+        centre = a + d * (o["position"] + o["largeur"] / 2)
+        ecarts = np.linalg.norm(xy - centre, axis=1)
+        i = int(np.argmin(ecarts))
+        if ecarts[i] > max(0.35, o["largeur"] / 2) or any(np.linalg.norm(np.asarray(g) - centre) < PORTE_GARDE_M for g in gardes_xy):
+            continue
+        avant = xy[max(0, i - 6)] - centre
+        cote = 1.0 if float(np.dot(avant, n)) >= 0 else -1.0
+        for approche in PORTE_APPROCHE_M:
+            A, B = centre + n * cote * approche, centre - n * cote * approche
+            ligne = [A + (B - A) * t for t in np.linspace(0, 1, max(2, int(2 * approche / PAS_M) + 1))]
+            if all(carte.degage(tuple(q), MARGE_M) for q in (A, B)) and all(_libre(carte, q) for q in ligne):
+                break
+        else:
+            continue
+        rayon = approche + PORTE_ZONE_M
+        e = i
+        while e > 0 and ecarts[e - 1] <= rayon:
+            e -= 1
+        x = i
+        while x < len(chemin) - 1 and ecarts[x + 1] <= rayon:
+            x += 1
+        if e == 0 or x == len(chemin) - 1:
+            continue  # la porte est au tout début ou à la toute fin du vol : on n'y touche pas
+        travaux.append((e, x, A, B, ligne))
+    for e, x, A, B, ligne in sorted(travaux, key=lambda t: -t[0]):
+        if any(e2 <= x and e <= x2 for e2, x2, *_ in travaux if (e2, x2) != (e, x) and e2 > e):
+            continue  # deux portes trop proches : on garde la plus en aval
+        try:
+            cases_ligne = []
+            for q in ligne:
+                c = carte.case(tuple(q))
+                if not cases_ligne or cases_ligne[-1] != c:
+                    cases_ligne.append(c)
+            nouveau = carte.chemin(chemin[e], cases_ligne[0])[:-1] + cases_ligne + carte.chemin(cases_ligne[-1], chemin[x])[1:]
+        except Exception:  # noqa: BLE001 : pas de chemin : on garde l'ancien
+            continue
+        if len(nouveau) < 2:
+            continue
+        chemin = chemin[:e] + nouveau + chemin[x + 1:]
+    return chemin

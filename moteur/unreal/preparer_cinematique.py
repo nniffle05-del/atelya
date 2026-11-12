@@ -657,10 +657,10 @@ def _lissage(config, sous_images, chauffe, spatial=1):
     lissage.set_editor_property("use_camera_cut_for_warm_up", False)
 
 
-def _variables(config, moteur="lumen", temporel=False):
+def _variables(config, moteur="lumen", temporel=False, ombres_contact=False):
     variables = config.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting)
     if moteur == "lumen_max":
-        for nom, valeur in (("r.Lumen.ScreenProbeGather.ShortRangeAO", 0),  # pas d'assombrissement de contact ajouté
+        for nom, valeur in (("r.Lumen.ScreenProbeGather.ShortRangeAO", 1 if ombres_contact else 0),  # ombres de contact (coins)
                             ("r.Lumen.ScreenProbeGather.Temporal.MaxFramesAccumulated", 32),  # lumière plus calme d'une image à l'autre
                             ("r.Lumen.RadianceCache.ProbeResolution", 32),  # cache de la lumière renvoyée plus fin
                             ("r.Lumen.RadianceCache.NumProbesToTraceBudget", 800),
@@ -692,7 +692,7 @@ def _passe(config, moteur):
     return config.find_or_add_setting_by_class(classe)
 
 
-def creer_reglage_rendu(racine, trajet, sortie, moteur="lumen", echantillons=ECHANTILLONS_PT, temporel=False):
+def creer_reglage_rendu(racine, trajet, sortie, moteur="lumen", echantillons=ECHANTILLONS_PT, temporel=False, ombres_contact=False):
     config = _nouveau(racine, "Rendu", unreal.MoviePipelinePrimaryConfig, None)
     if config is None:
         raise RuntimeError("PLANTÉ : réglage de rendu non créé")
@@ -704,12 +704,12 @@ def creer_reglage_rendu(racine, trajet, sortie, moteur="lumen", echantillons=ECH
         _lissage(config, 1, 8, spatial=int(echantillons))
     else:
         _lissage(config, SOUS_IMAGES, CHAUFFE_IMAGES)
-    _variables(config, moteur, temporel)
+    _variables(config, moteur, temporel, ombres_contact)
     unreal.EditorAssetLibrary.save_loaded_asset(config)
     return config
 
 
-def creer_reglage_essai(racine, trajet, sortie, moteur="lumen"):
+def creer_reglage_essai(racine, trajet, sortie, moteur="lumen", ombres_contact=False):
     """Le rendu d'essai du photographe : petites images du film (PNG, même pellicule et même exposition) + masque des murs et
     plafonds. (Un essai « sans courbe des tons » en EXR ne suit pas le film dans Unreal : abandonné le 11/11/2026.)"""
     config = _nouveau(racine, "Essai", unreal.MoviePipelinePrimaryConfig, None)
@@ -730,7 +730,7 @@ def creer_reglage_essai(racine, trajet, sortie, moteur="lumen"):
         _lissage(config, 1, 8, spatial=ECHANTILLONS_PT_ESSAI)
     else:
         _lissage(config, 1, CHAUFFE_ESSAI)
-    _variables(config, moteur)
+    _variables(config, moteur, ombres_contact=ombres_contact)
     unreal.EditorAssetLibrary.save_loaded_asset(config)
     return config
 
@@ -786,8 +786,8 @@ def main():
     rendus = Path(str(paquet)).parent / "rendus" / nom
     dossier = rendus / (reglage.get("dossier") or ambiance["id"])
     creer_reglage_rendu(racine, trajet, dossier, moteur, reglage.get("echantillons", ECHANTILLONS_PT),
-                        bool(reglage.get("debruiteur_temporel", False)))
-    creer_reglage_essai(racine, trajet, dossier / "essai", moteur)
+                        bool(reglage.get("debruiteur_temporel", False)), bool(reglage.get("ombres_contact", False)))
+    creer_reglage_essai(racine, trajet, dossier / "essai", moteur, bool(reglage.get("ombres_contact", False)))
     niveaux.save_current_level()
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,

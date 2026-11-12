@@ -16,6 +16,13 @@ CENTRE_DEMI_DEG = 15.0  # le centre de l'image (comme le contrôleur)
 CENTRE_MUR_M = 1.0  # un obstacle plus près que ça au centre de l'image coûte jusqu'à CENTRE_POIDS
 CENTRE_POIDS = 4.0
 FIN_S = 2.5  # la conclusion : les dernières secondes regardent le plus beau cadrage de la dernière pièce
+# PRÈS D'UNE PORTE et dans les couloirs (12/11/2026) : en passant une porte qui donne sur un couloir étroit, la caméra arrivait
+# face au mur d'en face (app-002 : 25-27 s, 38-40 s) car le regard restait à moins de VOL_REGARD_MAX_DEG de la marche ; là, il
+# peut déjà se tourner vers où l'on va (comme quelqu'un qui regarde dans le couloir en franchissant la porte).
+PORTE_LIBERTE_M = 1.2
+# ESSAYÉ à 75° le 12/11/2026 (contrôleur) : app-001 note 74,2 -> 76,6, nez au mur 6,2 -> 5,6 s ; mais app-002 6,8 -> 7,0 s.
+# Gain mitigé : laissé ÉGAL à VOL_REGARD_MAX_DEG (sans effet) ; à reprendre avec d'autres logements.
+REGARD_MAX_PORTE_DEG = VOL_REGARD_MAX_DEG
 
 
 def profondeur(rayons: dict, cap: float) -> float:
@@ -66,6 +73,17 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
     voyait pas venir le virage d'une porte)."""
     pieces_par_id = {p["id"]: p for p in logement["pieces"]}
     panoramiques = panoramiques or []
+    from moteur.cinema.navigation import _cotes  # (import tardif : navigation dépend de ce module par trajectoire)
+    centres_portes = []
+    if REGARD_MAX_PORTE_DEG > VOL_REGARD_MAX_DEG:
+        for o in logement.get("ouvertures", []):
+            if o["type"] == "porte":
+                try:
+                    _, a, d, _, _ = _cotes(logement, o)
+                except StopIteration:
+                    continue
+                centres_portes.append(a + d * (o["position"] + o["largeur"] / 2))
+    centres_portes = np.array(centres_portes, float).reshape(-1, 2)
     jonctions_libres = [] if panoramiques else jonctions  # avec le planificateur, les arrêts ont leur propre regard
     reveles = [(courbe[min(j, len(courbe) - 1)], regard_profond(voir.rayons(tuple(courbe[min(j, len(courbe) - 1)])), None))
                for j in jonctions_libres]
@@ -118,7 +136,10 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
             notes[n] -= CENTRE_POIDS * np.clip((CENTRE_MUR_M - centre) / 0.5, 0, 1)
         if marche is not None:  # un travelling regarde là où il va : au-delà de VOL_REGARD_MAX_DEG, fortement pénalisé
             ecart_marche = np.abs((angles - marche + 180) % 360 - 180)
-            notes[n] -= 6.0 * np.clip((ecart_marche - VOL_REGARD_MAX_DEG) / 30.0, 0, None)
+            pres_porte = len(centres_portes) and float(np.linalg.norm(centres_portes - p, axis=1).min()) < PORTE_LIBERTE_M
+            dans_passage = passages is not None and bool(passages[k])
+            limite = max(VOL_REGARD_MAX_DEG, REGARD_MAX_PORTE_DEG) if (pres_porte or dans_passage) else VOL_REGARD_MAX_DEG
+            notes[n] -= 6.0 * np.clip((ecart_marche - limite) / 30.0, 0, None)
     pas_cles = CLE_IMAGES / IPS
     # rotation permise : VOL_ROTATION_MAX en vol, VOL_ROTATION_PIVOT à l'arrêt (vitesse sous 0,15 m/s)
     vites_cles = [float(np.linalg.norm(positions[min(len(positions) - 1, k + 1)] - positions[k]) * IPS) for k in cles_idx]

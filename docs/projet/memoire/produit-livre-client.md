@@ -339,3 +339,19 @@ u = (1 + atan2(x, −z)/π)/2, v = acos(y)/π) ; OpenCV du PC ne sait pas écrir
 97 → 99 %) ; avec exposition locale 0,7 / 0,5 : 63 / 46 %, murs −0,03 cran seulement (visée 1,0), nuages devinés. Gardé par défaut
 (sans effet sur la lumière) ; exposition locale laissée à NT. Le gros du dehors vu par les fenêtres reste le SOL GRIS (logement
 supposé au 2e étage) : la vraie vue ne viendra que des photos du client.
+**Étape 4, SOIRÉE DU 12/11/2026 (NT : « je te laisse autodidacte jusqu'à la fin, tous tes points, et ce soir une cinématique »).**
+(1) RELIEF (coins et dessous des meubles jugés trop clairs) : ombres de contact de Lumen (`r.Lumen.ScreenProbeGather.ShortRangeAO`,
+réglage « ombres_contact » de la préparation, défaut coupé) mesurées contre l'image Cycles du séjour (clarté égalisée) : écart 10,3 →
+10,5/255, contraste des ombres (médiane − 10 % les plus sombres) Unreal 3,70 → 3,74 crans contre Cycles 3,30 : Unreal a DÉJÀ plus de
+relief que Cycles ; hypothèse fausse, laissé coupé. L'impression « plate » vient du style lumineux voulu (murs presque blancs).
+(2) CAMÉRA QUI FRÔLE LES MURS aux sorties de pièces (app-002 25-27 s, 38-40 s) : cause vue sur les images = la porte donne sur un
+COULOIR ÉTROIT (~1 m), la caméra arrive face au mur d'en face (le regard reste à < 40° de la marche). Essai A, portes franchies DROIT
+(`navigation.redresser_aux_portes`, `planificateur.PORTES_DROITES`) : app-002 nez au mur 6,8 → 7,0 s, app-001 note 74,2 → 65,3 :
+ÉCARTÉ (franchir droit fait fixer le mur d'en face encore plus). Essai B, regard libre jusqu'à 75° près des portes et dans les couloirs
+(`regard.REGARD_MAX_PORTE_DEG`) : app-001 74,2 → 76,6 (nez au mur 6,2 → 5,6 s) mais app-002 6,8 → 7,0 s : gain mitigé, laissé sans
+effet (= 40°), à reprendre sur d'autres logements. Vol d'app-002 vérifié identique au v3.
+(3) AUTRES MOMENTS (photographe en marchant, 2 passes, images d'essai, vol v3) : jour voilé, fin de journée, soirée, nuit : murs à la
+visée (écart médian +0,01 à +0,07 cran), murs trop clairs 0-3 % / trop sombres 2-4 % du film, sauts durables 1-2 (≤ 1,4 cran),
+part sombre 0,6-3,8 %, bouchée ≤ 0,8 % ; coucher de soleil dans la fenêtre le soir, nuit bleu sombre. Rien à corriger.
+(4) PORTES OUVERTES GRIS-BLEU : même image en Lumen et au path tracer (calcul exact, 128 rayons) : porte aussi grise (un peu plus
+sombre) au path tracer ; matière blanche (0,88) dans le glTF. C'est la vraie lumière (face peu éclairée), pas un défaut.

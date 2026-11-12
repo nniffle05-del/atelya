@@ -365,7 +365,11 @@ contre-productive. Note cinématique ~62/100. Détail : fin de `produit-livre-cl
 balade) ; masque des murs JUSTE (comptait les meubles devant les murs) + canal « dehors » ; exposition en marchant plus vive (essais
 /0,25 s, médiane 1,5 s, 2 crans/s) ; exposition locale ÉCARTÉE (NT : « tu as retiré la lumière ?! ») et visée du jour
 ensoleillé 0,90 → 1,0 (éclat du v3). app-002 même vol : murs trop clairs 18 → 2 % du film, sauts durables 6 → 2, chambre plus
-grillée. Reste : il n'y a RIEN dehors (fenêtres grises sans couleur) → décision NT (vue CC0 à télécharger ?). Film
+grillée. Ciel photographié CC0 posé sur l'image (sans effet sur la lumière ; presque blanc à l'exposition du film). Soirée du 12/11
+(NT : « autodidacte, tous tes points ») : relief = déjà plus que Cycles (ombres de contact laissées coupées) ; sorties de pièces
+face au mur d'un couloir étroit : 2 essais sans gain net (écartés) ; voilé / fin de journée / soirée / nuit sains ; portes grises =
+vraie lumière (path tracer). Film du soir `..\atelya\b2\app-002\unreal\film\film-12-11-soir.mp4` (+ `-avant-apres`). Reste : la
+vraie vue (photos du client), sorties de pièces, cuisine et salles d'eau vides. Film
 `..\atelya\b2\app-002\unreal\film\lumiere-etape4.mp4`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).

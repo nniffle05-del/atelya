@@ -132,3 +132,16 @@ def test_survol_des_meubles_bas():
     pts = np.array(pm.vol(log)["trajet"]["points"])
     assert pts[:, 2].max() <= 2.5 - pm.VOL_SOUS_PLAFOND_M + 1e-6 and pts[:, 2].min() >= pm.VOL_HAUTEUR_M - 0.05
     assert (pts[:, 4] <= pm.VOL_TANGAGE_DEG + 1e-6).all()  # plus haut, regard plus plongeant (jamais vers le haut)
+
+
+def test_portes_franchies_droit_option():
+    """L'option « portes franchies droit » (écartée par défaut, 12/11/2026) garde un chemin continu, praticable, de mêmes bouts."""
+    from moteur.cinema import navigation as nav
+    log = _logement()
+    carte = nav.Carte(log, nav.portes_ouvertes(log))
+    depart, arrivee = carte.plus_proche_libre((3.0, 5.0)), carte.plus_proche_libre((3.0, 1.0))
+    chemin = carte.chemin(depart, arrivee)
+    droit = nav.redresser_aux_portes(chemin, carte, log, nav.portes_ouvertes(log), [])
+    assert droit[0] == chemin[0] and droit[-1] == chemin[-1]
+    assert all(carte.libre[c] for c in droit)
+    assert all(max(abs(a[0] - b[0]), abs(a[1] - b[1])) <= 1 for a, b in zip(droit, droit[1:]))  # pas de saut entre cases
