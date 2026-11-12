@@ -245,3 +245,10 @@ spline retouchée à la main. Note cinématique ~55/100.
 **Étape 0 FAITE (12/11)** : le vol est découpé en briques `moteur/cinema/` (reglages, navigation, parcours, trajectoire, regard,
 camera) ; `moteur/promeneur.py` = chef d'orchestre + balade à pied, anciens noms toujours disponibles. Preuve : empreinte complète
 de vol() et balade() sur 4 logements app-002 (8 cas) IDENTIQUE au chiffre près avant / après.
+**Étape 1 FAITE (12/11) : le CONTRÔLEUR du vol** (`moteur/cinema/controle.py`, commande `outils/atelya/controler_vol.py`,
+appelé avant chaque tournage par `balade_unreal.py` → `controle.json` + note dans le bilan). Sur le plan, en ~2 s, sans rendu :
+nez au mur (part du champ à < 1,2 m > 55 % ou centre < 1 m), recul, rotation, à-coups, frôle, TRAVERSE (meubles posés en hauteur
+d'après `altitude`, plafond), pièce vue < 3 s, fin sur un mur, budget de durée (10 s par pièce montrée + 10 s : 50 s pour app-002).
+Vérifié sur les VRAIES IMAGES du survol de 50 s : 6 « nez au mur » sur 7 sont des murs plein écran (8, 30, 34, 40, 42, 49 s ; 43,8 s
+limite), 8 images « rien à signaler » toutes correctes ; les 2 secousses (15 et 21 s : 0,85 → 0,05 → 0,77 m/s en < 1 s) sont
+réelles. Survol : 30/100 au contrôleur (11 s face à des murs sur 50 s). Les corrections viendront avec le planificateur.

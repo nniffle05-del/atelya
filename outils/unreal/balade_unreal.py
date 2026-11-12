@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cinematique_unreal as cu  # noqa: E402
 
 from moteur import photographe, promeneur  # noqa: E402
+from moteur.cinema import controle  # noqa: E402
 
 PREMIER_ESSAI = -9.0
 PASSES = 2  # essais du photographe en marchant
@@ -59,6 +60,10 @@ def main() -> None:
     (sortie / "balade.json").write_text(json.dumps(b, indent=1, ensure_ascii=False), encoding="utf-8")
     promeneur.dessiner(logement, b, sortie / "balade.png")
     print(f"   {b['longueur_m']} m, {b['duree_s']} s ; portes ouvertes {[x['id'] for x in b['portes_ouvertes']]}", flush=True)
+    # le contrôleur relit le vol avant le tournage (moteur/cinema/controle.py) : note et défauts, écrits à côté du film
+    verdict = controle.controler(logement, b)
+    (sortie / "controle.json").write_text(json.dumps(verdict, ensure_ascii=False), encoding="utf-8")
+    print(controle.rapport(verdict), flush=True)
     trajet = paquet / "trajet-balade.json"
     trajet.write_text(json.dumps({**b["trajet"], "essai_pas": promeneur.IPS}, ensure_ascii=False), encoding="utf-8")
     reglage = sortie.parent / f"reglage-{nom_dossier}.json"
@@ -113,7 +118,8 @@ def main() -> None:
              "rendu_min": round(duree / 60, 1), "calcul_total_min": round((time.time() - debut) / 60, 1),
              "essais": historique, "controle_murs_crans": {"median": round(float(np.median(ecarts)), 2),
                                                            "max_abs": round(float(np.max(np.abs(ecarts))), 2)},
-             "portes_ouvertes": [x["id"] for x in b["portes_ouvertes"]], "video": str(film)}
+             "portes_ouvertes": [x["id"] for x in b["portes_ouvertes"]], "video": str(film),
+             "controle": {"note": verdict["note"], "resume": verdict["resume"]}}
     (sortie / "balade-bilan.json").write_text(json.dumps(bilan, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"4. Balade : {film} ({bilan['duree_film_s']} s) ; murs {bilan['controle_murs_crans']} cran ; "
           f"calcul {bilan['calcul_total_min']} min", flush=True)
