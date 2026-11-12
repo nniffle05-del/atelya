@@ -353,6 +353,11 @@ plafonds et sous les sols (`geometrie.dalles_de_l_immeuble`, catégorie « dalle
 AVIS de NT : `outils/atelya/noter_film.py` → `moteur/realisateur_appris.json`. À faire : sanitaires et meubles de cuisine (salles d'eau
 vides), reconstruire app-002 avec ses dalles, la visite libre plus tard.
 
+**ÉVOLUTION DE LA CINÉMATIQUE (12/11/2026, plan VALIDÉ par NT)** : survol de 50 s = référence ; ordre 0 découpage (FAIT :
+briques `moteur/cinema/`, film identique) → 1 contrôleur qualité → 2 collisions 3D (`altitude` des meubles ignorée aujourd'hui) →
+3 planificateur (un vol continu en moments typés, budget ~50-60 s) → 4 fenêtres et lumière. Écartés : NavMesh, netteté variable,
+spline à la main. NT veut qu'on lui dise CHAQUE FOIS qu'une demande semble contre-productive. Détail : fin de `produit-livre-client.md`.
+
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
 **Restes d'A2** (non prioritaires) :

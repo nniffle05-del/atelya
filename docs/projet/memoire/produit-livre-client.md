@@ -233,3 +233,15 @@ meubles hauts bloquent. Hauteur 1,6 m → 1,9 m dans les grands espaces (moyenne
 ≤ plafond − 0,45 m, lissée ; plongée −7° + 15°/m au-dessus de 1,6 m. Fond d'une pièce = le plus loin du POINT DE VUE (traverser ce
 que le point de vue ne montrait pas) ; boucle de demi-tour amorcée à ≤ 1,5 m du bout (au-delà elle coupait l'excursion). App-002 :
 29,6 m, 50 s, boucle en goutte d'eau au-dessus de la table du coin repas.
+
+**ÉVOLUTION DE LA CINÉMATIQUE (12/11/2026, cahier des charges de NT « audit → évaluation → plan → validation »).** NT préfère le
+SURVOL de 50 s (`..\atelya\b2\app-002\unreal\film\survol.mp4`) au travelling de 1 min 09 : il devient la référence. Audit
+présenté et VALIDÉ par NT : ordre 0 découpage → 1 contrôleur qualité (avant rendu + images d'essai) → 2 collisions 3D (le
+promeneur ignore l'`altitude` des meubles : un meuble haut de cuisine serait « survolé » donc traversé ; lampes suspendues,
+plafond) → 3 planificateur (UN vol continu en moments typés : ouverture, révélation, valorisation, transition, conclusion ;
+plusieurs candidats notés par le contrôleur ; BUDGET DE DURÉE ~50-60 s pour app-002) → 4 fenêtres et lumière en mouvement.
+Écartés (contre-productifs pour un film immobilier automatique) : NavMesh d'Unreal, netteté variable / changement de point,
+spline retouchée à la main. Note cinématique ~55/100.
+**Étape 0 FAITE (12/11)** : le vol est découpé en briques `moteur/cinema/` (reglages, navigation, parcours, trajectoire, regard,
+camera) ; `moteur/promeneur.py` = chef d'orchestre + balade à pied, anciens noms toujours disponibles. Preuve : empreinte complète
+de vol() et balade() sur 4 logements app-002 (8 cas) IDENTIQUE au chiffre près avant / après.

@@ -16,3 +16,9 @@ Ajout 2026-10-22 : à CHAQUE étape, expliquer d'abord POURQUOI on la fait, en l
 Ajout 2026-10-23 : NT veut qu'on lui dise quand ouvrir une nouvelle discussion. Règle convenue : à chaque fin d'étape (étape commitée), proposer un nouveau fil pour la suivante.
 
 Ajout 2026-11-08 (pendant B1, maquette sans défaut) : NT « tu m'as tellement pas expliqué… quand tu m'expliques avec des termes compliqués, je comprends pas ce que tu fais ». Cause : longue suite de corrections techniques (calage, nœuds, recouvrements) racontée en jargon, sans image simple ni point d'étape. À FAIRE : pendant un travail long, faire des points courts en mots de tous les jours avec une comparaison concrète (maquette en carton : planches = murs, moquette = sol), montrer les images avant/après, dire où on en est et ce qui reste ; aucun mot technique sans l'expliquer.
+
+Ajout 2026-11-12 (évolution de la cinématique) : NT « je veux que tu le dises à CHAQUE FOIS si tu penses que quelque chose qu'on
+veut faire est contre-productif ». RÈGLE PERMANENTE : avant de faire une demande (de NT ou d'un cahier des charges qu'il colle),
+dire franchement si elle risque de rendre Atelya moins bon, plus lourd ou plus lent pour peu de gain, et proposer mieux ; puis
+faire ce que NT décide. Ne pas exécuter en silence une idée qu'on juge mauvaise (ex. du 12/11 : NavMesh d'Unreal, netteté
+variable, spline retouchée à la main jugées contre-productives pour un film immobilier automatique).
