@@ -353,10 +353,14 @@ plafonds et sous les sols (`geometrie.dalles_de_l_immeuble`, catégorie « dalle
 AVIS de NT : `outils/atelya/noter_film.py` → `moteur/realisateur_appris.json`. À faire : sanitaires et meubles de cuisine (salles d'eau
 vides), reconstruire app-002 avec ses dalles, la visite libre plus tard.
 
-**ÉVOLUTION DE LA CINÉMATIQUE (12/11/2026, plan VALIDÉ par NT)** : survol de 50 s = référence ; ordre 0 découpage (FAIT :
-briques `moteur/cinema/`, film identique) → 1 contrôleur qualité → 2 collisions 3D (`altitude` des meubles ignorée aujourd'hui) →
-3 planificateur (un vol continu en moments typés, budget ~50-60 s) → 4 fenêtres et lumière. Écartés : NavMesh, netteté variable,
-spline à la main. NT veut qu'on lui dise CHAQUE FOIS qu'une demande semble contre-productive. Détail : fin de `produit-livre-client.md`.
+**ÉVOLUTION DE LA CINÉMATIQUE (12/11/2026, plan VALIDÉ par NT)** : briques `moteur/cinema/` (réglages, navigation, parcours,
+planificateur, trajectoire, regard, caméra, contrôle, montage). FAITES : 0 découpage (film identique), 1 CONTRÔLEUR (`controle.py`,
+`outils/atelya/controler_vol.py`, note /100 avant tournage), 2 collisions EN HAUTEUR (meubles accrochés, suspensions), 3
+PLANIFICATEUR (défaut de `promeneur.vol` : cœurs des pièces, panoramiques, conclusion, 4 ordres notés). app-002 : 32 → 58/100,
+murs 12,6 → 6,8 s, 46 s ; app-001 31 → 72/100. Film `..\atelya\b2\app-002\unreal\film\planifie-v3.mp4`. NT : UNE SEULE PRISE
+(fondus refusés), demi-tours vifs. SUIVANT : 4 lumière et fenêtres (nouvelle conversation). Écartés : NavMesh, netteté variable,
+spline à la main, meubles inventés par règles (meubles = ceux du client). NT veut qu'on lui dise CHAQUE FOIS qu'une demande semble
+contre-productive. Note cinématique ~62/100. Détail : fin de `produit-livre-client.md`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

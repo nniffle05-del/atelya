@@ -265,3 +265,16 @@ rien à reprendre ; idée retenue pour plus tard : un plan d'OUVERTURE « maison
 seule prise) contre version « fondus » (31 s, couloirs remplacés par des fondus de 0,6 s, `moteur/cinema/montage.py`,
 `outils/unreal/monter_fondus.py`) : NT préfère la PREMIÈRE. Le monteur reste disponible (outil), pas par défaut. Suite : réduire
 les passages de murs DANS la prise continue (couloirs, sorties de pièces, panoramiques).
+**Étape 3 FAITE (12/11/2026, soir) : le PLANIFICATEUR** (`moteur/cinema/planificateur.py`, défaut de `promeneur.vol`, ancien vol
+= `planificateur=False`). Chaque pièce montrée par son CŒUR (endroit dégagé ≥ 0,9 × min(dégagement max, 1,4 m), le plus près
+d'une porte ; 2 cœurs au-delà de 20 m²), plus beau cadrage recalculé DEPUIS le cœur ; pièce en cul-de-sac = arrêt doux +
+PANORAMIQUE (70 °/s, 0,4 s sur le cadrage, on repart à mi-virage de sortie) ; CONCLUSION au cœur de la dernière pièce sur son
+cadrage ; tous les ordres de visite estimés, 4 construits et notés par le contrôleur, le meilleur gardé (`candidats`). Regard :
+anticipe 1,2 m de chemin (jamais au-delà d'un arrêt), évite un obstacle au centre de l'image (même règle que le contrôleur) ;
+vitesse bornée pour que le regard suive les virages ; couloirs à 1,2 m/s et regard 45 °/s (pièces inchangées).
+Avis NT intégrés : demi-tours plus rapides et plus fluides ; UNE SEULE PRISE (version « fondus » comparée et refusée).
+Résultats (contrôleur, plan) : app-002 32 → 58,1/100, murs 12,6 → 6,8 s, 49,5 → 46 s, fin réussie, 0 hoquet ; app-001 (jamais
+réglé dessus) 31 → 72,3/100. Films : `..\atelya\b2\app-002\unreal\film\planifie-v3.mp4` (+ v1, v2, fondus-v2, aperçus 960).
+Reste : sorties de pièces et couloir étroit (8-14, 24-30, 36-40 s de la v3), cuisine/salles d'eau vides. Note cinématique ~62/100.
+Étape suivante : 4 LUMIÈRE ET FENÊTRES (mesurer d'abord les fenêtres brûlées sur les images, puis corriger), dans une NOUVELLE
+conversation. Pistes notées : ouverture « maison de poupée », meubles de cuisine et sanitaires (meubles = ceux du client).
