@@ -391,3 +391,16 @@ plus haute et plus près des vitres, plonge vers la rue qu'aucune photo ne montr
 (garde-corps peint sur la toile) ; distance par défaut, pas encore mesurée seule ; calage des caméras des photos fait à la main
 (chantier « caler les photos automatiquement » pour un nouveau client). NT : on demandera au client de vraies photos de la vue, mais
 il faut s'entraîner avec ce qu'on a.
+**Étape 5, suite (13/11/2026) : NT « le décor à une distance plus juste » (le bas) puis « fais-le » (les balcons).** (1) RUE : la
+toile des immeubles d'en face part du niveau de la rue (Z_BAS_M = -6, logement supposé au 2e étage) ; la rue = décor HORIZONTAL au
+niveau de la rue, de notre façade jusqu'aux immeubles d'en face (`vue_dehors.rues`), gris neutre uni (clarté du bas de la vraie vue) :
+les photos ne voient pas la chaussée. Rue « physique » (sol d'Unreal visible) essayée : blanche au soleil, écartée. (2) BALCONS : le
+format accepte `balcons` (`moteur/logement.Balcon` : contour, garde-corps {cotes, hauteur, genre verre/barreaudage/plein}, joues,
+dalle ; contrôle : pas dans une pièce, > 0,5 m²). app-002 : deux balcons relevés sur le plan (balcon_1 séjour 4,65 × 1,58 m, plan
+460 × 145 ; balcon_2 chambres 8,32 × 1,55 m, plan 840 × 150, joue côté séjour), statut mesure, dans `verites/app-002/logement.json`
+et `..\atelya\b2\app-002\video\apres\logement.json`. Unreal : `preparer_cinematique.poser_balcons` (dalle gris clair, lisses et
+montants laqués blancs tous les 1,4 m, verre dépoli 35 %, joues ; vrais objets : ombres et lumière renvoyée ; 33 objets pour app-002),
+passés par `balade_unreal` (toujours, pas seulement avec --photos). Décor : `vue_dehors.touche_un_balcon` retire des photos ce qui
+est la DALLE ou un mur de côté (sinon le carrelage du balcon partait sur la rue) ; un garde-corps en verre ou à barreaux laisse voir
+le dehors (tout retirer vidait la vue du séjour, essai du 13/11). LIMITES : balcons construits dans Unreal seulement (pas encore dans
+la maquette Blender ni lus sur un plan par Atelya : relevés à la main pour app-002) ; contour rectangulaire.

@@ -82,7 +82,8 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
         c = cameras["cameras"][nom]
         rvb = cv2.cvtColor(lire_image(str(chemin)), cv2.COLOR_BGR2RGB)
         ph = vue_dehors.preparer_photo(rvb, camera_photo.camera_depuis_dict(c["camera"]), ouvertures, c.get("qualite", "bonne"),
-                                       murs, caches.get(nom, []), ecart_px=float(c.get("ecart_moyen_px", 3.0)))
+                                       murs, caches.get(nom, []), ecart_px=float(c.get("ecart_moyen_px", 3.0)),
+                                       balcons=logement.get("balcons"))
         if ph is not None:
             ph["nom"] = nom
             photos.append(ph)

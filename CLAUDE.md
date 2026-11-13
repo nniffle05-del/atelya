@@ -372,6 +372,15 @@ vraie lumière (path tracer). Film du soir `..\atelya\b2\app-002\unreal\film\fil
 vraie vue (photos du client), sorties de pièces, cuisine et salles d'eau vides. Film
 `..\atelya\b2\app-002\unreal\film\lumiere-etape4.mp4`.
 
+**ÉTAPE 5 : LA VRAIE VUE (12-13/11/2026)** : `moteur/vue_dehors.py` + `outils/unreal/vue_dehors_photos.py`, film avec
+`balade_unreal.py --photos verites/<logement>/cameras-photos.json` (moments de jour). Une toile par côté de l'immeuble (immeubles d'en
+face, 35 m par défaut) + la rue à leurs pieds, peintes d'après les photos calées (meilleure photo par point, murs / meubles / balcons
+écartés, prolongée en flou ailleurs), couleurs comme sur la photo (pellicule d'Unreal à l'envers) ; dans Unreal, objet translucide
+sans éclairage (murs inchangés, mesuré), vitre claire, ciel photographié coupé avec la vue. BALCONS dans le format (`Balcon`) et
+construits dans Unreal (`poser_balcons`) ; app-002 : deux balcons du plan. app-002 : dehors presque blanc 89 → 21 %, couleur ×10.
+NT veut la distance la plus juste ; à faire : distance des immeubles mesurée seule, caméras des photos calées seules, balcons dans
+Blender et lus sur le plan. app-001 : voilages, pas de vue. Détail : fin de `produit-livre-client.md`.
+
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
 **Restes d'A2** (non prioritaires) :

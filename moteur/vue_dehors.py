@@ -267,12 +267,52 @@ def _remplir_quad(q: np.ndarray, cam, taille) -> np.ndarray:
     return un
 
 
+def _dans_polygone(x: np.ndarray, y: np.ndarray, contour) -> np.ndarray:
+    dedans = np.zeros(x.shape, bool)
+    pts = [tuple(map(float, q)) for q in contour]
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]):
+        coupe = (y1 > y) != (y2 > y)
+        xc = x1 + (y - y1) * (x2 - x1) / np.where(coupe, y2 - y1, 1.0)
+        dedans ^= coupe & (x < xc)
+    return dedans
+
+
+def touche_un_balcon(c3: np.ndarray, d: np.ndarray, balcons, hauteur_etage: float = 2.5) -> np.ndarray:
+    """Pour chaque rayon (origine c3, directions d : N × 3), touche-t-il un BALCON (sa dalle, un garde-corps plein ou un mur de
+    côté) ? Ce que la photo montre là est le balcon, construit dans la maquette : il ne doit pas partir au loin sur le décor."""
+    touche = np.zeros(len(d), bool)
+    for b in balcons or []:
+        niveau = float(b.get("niveau", -0.05))
+        descend = d[:, 2] < -1e-6
+        t = np.where(descend, (niveau - c3[2]) / np.where(descend, d[:, 2], -1.0), -1.0)
+        px, py = c3[0] + t * d[:, 0], c3[1] + t * d[:, 1]
+        touche |= (t > 0) & _dans_polygone(px, py, b["contour"])
+        gc = b.get("garde_corps") or {}
+        # un garde-corps en VERRE ou à BARREAUX laisse voir le dehors (sur la photo, la rue est derrière lui) : seuls un
+        # garde-corps plein et les murs de côté cachent la vue (essai du 13/11/2026 : tout retirer vidait la vue du séjour)
+        parois = [(q, float(gc.get("hauteur", 1.0))) for q in gc.get("cotes", [])] if gc.get("genre") == "plein" else []
+        parois += [(q, hauteur_etage) for q in b.get("joues", [])]
+        for (a, e), h in parois:
+            a, e = np.asarray(a, float), np.asarray(e, float)
+            seg = e - a
+            den = d[:, 0] * seg[1] - d[:, 1] * seg[0]
+            ok = np.abs(den) > 1e-9
+            den = np.where(ok, den, 1.0)
+            w = a - c3[:2]
+            tr = (w[0] * seg[1] - w[1] * seg[0]) / den
+            s_ = (w[0] * d[:, 1] - w[1] * d[:, 0]) / den
+            z = c3[2] + tr * d[:, 2]
+            touche |= ok & (tr > 0) & (s_ >= 0) & (s_ <= 1) & (z >= niveau - 0.2) & (z <= niveau + h)
+    return touche
+
+
 def masque_fenetres(cam, taille: tuple[int, int], ouvertures: list[dict], murs=None, caches=(),
-                    retrait: float = RETRAIT_M) -> tuple[np.ndarray, np.ndarray]:
+                    retrait: float = RETRAIT_M, balcons=None) -> tuple[np.ndarray, np.ndarray]:
     """Masques (H, L) des pixels de la photo par où l'on voit DEHORS : (vue, ouvertures). « ouvertures » : ouvertures projetées,
     faces intérieure ET extérieure du trou (le tableau de la fenêtre cache le reste), sans les pixels où un mur plein se trouve
     entre l'appareil et la fenêtre (`murs`, murs_et_trous) ; « vue » : la même chose sans les montants de la vraie fenêtre,
-    sans les rectangles `caches` (meubles devant la fenêtre : [x0, y0, x1, y1] en pixels) ni la marque de l'annonce."""
+    sans les rectangles `caches` (meubles devant la fenêtre : [x0, y0, x1, y1] en pixels), ni la marque de l'annonce, ni ce qui
+    est un BALCON (`balcons` du logement : construits dans la maquette, touche_un_balcon)."""
     largeur, hauteur = taille
     total = np.zeros((hauteur, largeur), np.uint8)
     montants = np.zeros((hauteur, largeur), np.uint8)
@@ -307,6 +347,11 @@ def masque_fenetres(cam, taille: tuple[int, int], ouvertures: list[dict], murs=N
             for face in (-o["epaisseur"] / 2, o["epaisseur"] / 2):
                 montants |= _remplir_quad(_quad(bo, face, 0.0), cam, taille)
     vue = total & (1 - montants)
+    if balcons and vue.any():
+        vs, us = np.nonzero(vue)
+        d = _rayons(cam, us.astype(float), vs.astype(float))
+        b = touche_un_balcon(np.array(cam[:3], float), d, balcons)
+        vue[vs[b], us[b]] = 0
     for x0, y0, x1, y1 in caches:
         vue[max(0, int(y0)):int(math.ceil(y1)), max(0, int(x0)):int(math.ceil(x1))] = 0
     lx, ly = int(LOGO[0] * largeur), int(LOGO[1] * hauteur)
@@ -374,11 +419,11 @@ def clarte_avant_pellicule(image_rvb: np.ndarray, blanc_lin: np.ndarray, clarte:
 
 
 def preparer_photo(image_rvb: np.ndarray, cam, ouvertures: list[dict], qualite: str = "bonne", murs=None,
-                   caches=(), clarte: float = 1.0, ecart_px: float = 3.0) -> dict | None:
+                   caches=(), clarte: float = 1.0, ecart_px: float = 3.0, balcons=None) -> dict | None:
     """Ce qu'une photo apporte : clarté avant pellicule de chaque pixel (clarte_avant_pellicule, murs du film à `clarte`), poids
     par pixel (fondu au bord de ce qu'elle voit dehors × qualité du calage). None si la photo ne voit aucune fenêtre."""
     h, w = image_rvb.shape[:2]
-    vue, ouv = masque_fenetres(cam, (w, h), ouvertures, murs, caches)
+    vue, ouv = masque_fenetres(cam, (w, h), ouvertures, murs, caches, balcons=balcons)
     # plus le calage de la photo est incertain (écart moyen de ses repères), plus on ne garde que le CŒUR de ses fenêtres : un
     # calage à 10 px près peignait sur la vue des bouts de cadre, de mur et d'interrupteur (essai du 12/11/2026)
     marge = int(round((MARGE_PX + MARGE_PAR_ECART * float(ecart_px)) * w / 1206.0))

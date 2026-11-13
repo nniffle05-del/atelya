@@ -261,6 +261,37 @@ class Meuble(Element):
     literie: Literie | None = Field(default=None, description="Couette, oreillers, plaid (lits seulement)")
 
 
+class GardeCorps(BaseModel):
+    """Le garde-corps d'un balcon : une suite de côtés (segments du contour non adossés à la façade)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cotes: list[tuple[Point, Point]] = Field(min_length=1, description="Segments [[x1, y1], [x2, y2]] du garde-corps")
+    hauteur: Longueur = Field(default=1.0, description="Hauteur au-dessus du sol du balcon (m) ; 1 m minimum en France")
+    genre: Literal["verre", "barreaudage", "plein"] = "verre"
+
+
+class Balcon(Element):
+    """Un balcon (ou une terrasse) : dalle dehors, au ras du logement, avec son garde-corps et ses éventuels murs de côté
+    (« joues »). Ajouté le 13/11/2026 : les photos d'une annonce montrent le balcon sous les baies ; sans lui, tout ce qu'elles
+    en montrent partait au loin dans la vraie vue (garde-corps peint sur les immeubles d'en face, carrelage sur la rue)."""
+
+    nom: str = Field(default="Balcon", min_length=1)
+    contour: list[Point] = Field(min_length=3)
+    garde_corps: GardeCorps
+    joues: list[tuple[Point, Point]] = Field(default_factory=list, description="Murs pleins sur un côté (axe, sur toute la "
+                                             "hauteur d'un étage)")
+    epaisseur_dalle: Longueur = Field(default=0.18)
+    niveau: float = Field(default=-0.05, description="Dessus de la dalle par rapport au sol du logement (m)")
+
+    @property
+    def surface_calculee(self) -> float:
+        total = 0.0
+        for (x1, y1), (x2, y2) in zip(self.contour, self.contour[1:] + self.contour[:1]):
+            total += x1 * y2 - x2 * y1
+        return abs(total) / 2
+
+
 class Logement(BaseModel):
     """Le logement complet, tel qu'il sera transmis à Blender."""
 
@@ -274,6 +305,7 @@ class Logement(BaseModel):
     ouvertures: list[Ouverture] = Field(default_factory=list)
     pieces: list[Piece] = Field(default_factory=list)
     meubles: list[Meuble] = Field(default_factory=list)
+    balcons: list[Balcon] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _coherence(self) -> Logement:
@@ -287,7 +319,8 @@ def verifier_coherence(logement: Logement) -> list[str]:
     """Renvoie la liste des incohérences trouvées (vide si tout va bien)."""
     erreurs: list[str] = []
 
-    tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces, *logement.meubles]]
+    tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces, *logement.meubles,
+                                   *logement.balcons]]
     doublons = sorted({i for i in tous_les_ids if tous_les_ids.count(i) > 1})
     if doublons:
         erreurs.append(f"identifiants en double : {', '.join(doublons)}")
@@ -324,7 +357,28 @@ def verifier_coherence(logement: Logement) -> list[str]:
         if m.altitude + m.dimensions[2] > logement.hauteur_sous_plafond + 1e-9:
             erreurs.append(f"le meuble {m.id} dépasse le plafond")
 
+    for b in logement.balcons:
+        cx = sum(x for x, _ in b.contour) / len(b.contour)
+        cy = sum(y for _, y in b.contour) / len(b.contour)
+        dedans = next((p.id for p in logement.pieces if _dans_contour((cx, cy), p.contour)), None)
+        if dedans is not None:
+            erreurs.append(f"le balcon {b.id} est dans la pièce {dedans} (un balcon est dehors)")
+        if b.surface_calculee < 0.5:
+            erreurs.append(f"le balcon {b.id} est trop petit ({b.surface_calculee:.2f} m²)")
+
     return erreurs
+
+
+def _dans_contour(point: Point, contour: list[Point]) -> bool:
+    """Le point est-il dans le polygone (règle du rayon qui croise les côtés) ?"""
+    x, y = point
+    dedans = False
+    n = len(contour)
+    for i in range(n):
+        (x1, y1), (x2, y2) = contour[i], contour[(i + 1) % n]
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            dedans = not dedans
+    return dedans
 
 
 def _convexe(contour: list[Point]) -> bool:

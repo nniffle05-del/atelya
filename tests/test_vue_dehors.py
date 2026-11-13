@@ -115,3 +115,61 @@ def test_vers_unreal_repere():
     assert abs(u["coin"][2] - 100 * vd.Z_HAUT_M) < 1e-6
     assert u["axe_v"] == [0.0, 0.0, -1.0]
     assert np.allclose(u["normale_vers_logement"], [0, -1, 0])  # vers +y d'Atelya = -Y d'Unreal
+
+
+def _balcon_sud():
+    """Balcon de 1,5 m devant la façade sud de la pièce a (garde-corps vitré au bord, mur de côté à l'est)."""
+    return {"id": "b1", "statut": "mesure", "source": "test", "contour": [[0.5, -0.1], [3.5, -0.1], [3.5, -1.6], [0.5, -1.6]],
+            "garde_corps": {"cotes": [[[3.5, -1.6], [0.5, -1.6]], [[0.5, -1.6], [0.5, -0.1]]], "hauteur": 1.0, "genre": "verre"},
+            "joues": [[[3.5, -0.1], [3.5, -1.6]]]}
+
+
+def test_balcon_dans_le_format():
+    from moteur.logement import Logement
+    log = {**_logement(), "schema": "logement/0.1", "projet_id": "t"}
+    for m in log["murs"]:
+        m.update(statut="mesure", source="test")
+    for o in log["ouvertures"]:
+        o.update(statut="mesure", source="test")
+    for p in log["pieces"]:
+        p.update(statut="mesure", source="test", nom=p["id"])
+    Logement.model_validate({**log, "balcons": [_balcon_sud()]})
+    dedans = {**_balcon_sud(), "contour": [[1, 1], [2, 1], [2, 2], [1, 2]]}
+    try:
+        Logement.model_validate({**log, "balcons": [dedans]})
+        assert False, "un balcon dans une pièce doit être refusé"
+    except ValueError as e:
+        assert "est dans la pièce" in str(e)
+
+
+def test_balcon_retire_de_la_vue_sauf_a_travers_le_verre():
+    log = _logement()
+    ouv = vd.ouvertures_vitrees(log)
+    cam = [2.0, 0.6, 1.5, -90.0, -20.0, 500.0, 500.0, 350.0]  # contre la fenêtre sud, en regardant vers le bas
+    sans, _ = vd.masque_fenetres(cam, (1000, 700), ouv, None)
+    avec, _ = vd.masque_fenetres(cam, (1000, 700), ouv, None, balcons=[_balcon_sud()])
+    assert avec.sum() < sans.sum()  # le sol du balcon est retiré
+    # rayon horizontal à 1,5 m : passe au-dessus du garde-corps vitré, ne touche rien ; rayon qui plonge : touche la dalle
+    d = np.array([[0.0, -1.0, 0.0], [0.0, -1.0, -1.0]])
+    t = vd.touche_un_balcon(np.array([2.0, 0.6, 1.5]), d, [_balcon_sud()])
+    assert list(t) == [False, True]
+    # un garde-corps PLEIN cache ce qui est derrière lui ; le verre non
+    rasant = np.array([[0.0, -1.0, -0.4]])  # passe le bord du balcon (y = -1,6) à 0,0 m : sous le haut du garde-corps
+    plein = {**_balcon_sud(), "garde_corps": {**_balcon_sud()["garde_corps"], "genre": "plein"},
+             "contour": [[0.5, -0.1], [3.5, -0.1], [3.5, -0.2], [0.5, -0.2]]}
+    plein["garde_corps"]["cotes"] = [[[3.5, -1.6], [0.5, -1.6]]]
+    verre = {**plein, "garde_corps": {**plein["garde_corps"], "genre": "verre"}}
+    assert vd.touche_un_balcon(np.array([2.0, 2.2, 1.5]), rasant, [plein])[0]
+    assert not vd.touche_un_balcon(np.array([2.0, 2.2, 1.5]), rasant, [verre])[0]
+
+
+def test_rue_au_pied_de_la_facade():
+    toiles = vd.facades(_logement(), {"facade-sud": 20.0, "facade-ouest": 30.0})
+    rues = {r["id"]: r for r in vd.rues(toiles)}
+    sud = rues["rue-sud"]
+    assert sud["genre"] == "rue" and abs(sud["origine"][2] - vd.Z_BAS_M) < 1e-9
+    assert abs(sud["longueur_v"] - 20.0) < 1e-9  # de notre façade jusqu'aux immeubles d'en face
+    P, L, H = vd.points_toile(sud, 0.5)
+    assert np.allclose(P[..., 2], vd.Z_BAS_M) and P[..., 1].max() < -0.1 and P[..., 1].min() > -20.2
+    u = vd.vers_unreal(sud)
+    assert u["normale_vers_logement"] == [0.0, -0.0, 1.0] or np.allclose(u["normale_vers_logement"], [0, 0, 1])

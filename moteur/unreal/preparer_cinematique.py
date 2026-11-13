@@ -496,6 +496,102 @@ def poser_vues_dehors(racine, vues):
     return len(vues)
 
 
+def _materiau_simple(racine, nom, couleur, rugosite, opacite=None):
+    """Matériau uni (sol de balcon, métal laqué, verre dépoli…) : couleur linéaire, rugosité ; `opacite` = translucide."""
+    m = _nouveau(racine, f"Studio/{nom}", unreal.Material, unreal.MaterialFactoryNew())
+    lib = unreal.MaterialEditingLibrary
+    if opacite is not None:
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+        m.set_editor_property("two_sided", True)
+        _proprietes(m, {"translucency_lighting_mode": unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING})
+        o = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 300)
+        o.set_editor_property("r", float(opacite))
+        lib.connect_material_property(o, "", unreal.MaterialProperty.MP_OPACITY)
+    c = lib.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -300, 0)
+    c.set_editor_property("constant", unreal.LinearColor(*[float(x) for x in couleur], 1.0))
+    lib.connect_material_property(c, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    r = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -300, 150)
+    r.set_editor_property("r", float(rugosite))
+    lib.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    lib.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    return m
+
+
+# BALCONS (13/11/2026) : couleurs d'après les photos d'app-002 (sol gris clair, montants et lisses laqués blancs, verre dépoli)
+BALCON_SOL = (0.42, 0.41, 0.39)
+BALCON_METAL = (0.80, 0.80, 0.80)
+BALCON_VERRE = (0.85, 0.87, 0.88)
+BALCON_VERRE_OPACITE = 0.35
+BALCON_FACADE = (0.75, 0.74, 0.72)
+POTEAU_ECART_M = 1.4
+
+
+def _boite(nom, a, b, z0, z1, epaisseur, materiau, ombre=True):
+    """Une boîte (cube d'Unreal mis à l'échelle) posée sur le segment a -> b (repère d'Atelya, m), de z0 à z1, d'épaisseur
+    donnée (centrée sur le segment)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    longueur = math.hypot(dx, dy)
+    if longueur < 1e-3 or z1 - z0 < 1e-3:
+        return None
+    centre = vers_unreal((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (z0 + z1) / 2)
+    rotation = unreal.Rotator(0.0, 0.0, -math.degrees(math.atan2(dy, dx)))  # roulis, tangage, lacet (y inversé)
+    acteur = _poser(unreal.StaticMeshActor, centre, rotation, etiquette=nom)
+    comp = acteur.static_mesh_component
+    comp.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Cube"))  # 100 cm de côté, centré
+    comp.set_world_scale3d(unreal.Vector(longueur, epaisseur, z1 - z0))
+    comp.set_material(0, materiau)
+    if not ombre:
+        comp.set_editor_property("cast_shadow", False)
+    return acteur
+
+
+def poser_balcons(racine, balcons, hauteur_etage=2.5):
+    """Les BALCONS du logement (logement.json : balcons ; moteur/logement.Balcon) : dalle au ras du logement, garde-corps (verre
+    dépoli entre des montants et des lisses laqués), murs de côté. De vrais objets : ils font de l'ombre et renvoient la
+    lumière comme en vrai. Contour rectangulaire (sinon : son rectangle le long du premier côté). Renvoie le nombre d'objets."""
+    if not balcons:
+        return 0
+    sol = _materiau_simple(racine, "M_BalconSol", BALCON_SOL, 0.8)
+    metal = _materiau_simple(racine, "M_BalconMetal", BALCON_METAL, 0.35)
+    verre = _materiau_simple(racine, "M_BalconVerre", BALCON_VERRE, 0.25, BALCON_VERRE_OPACITE)
+    facade = _materiau_simple(racine, "M_BalconFacade", BALCON_FACADE, 0.85)
+    n = 0
+    for b in balcons:
+        pts = [tuple(p) for p in b["contour"]]
+        niveau = float(b.get("niveau", -0.05))
+        ep = float(b.get("epaisseur_dalle", 0.18))
+        (ax, ay), (bx, by) = pts[0], pts[1]
+        ux, uy = bx - ax, by - ay
+        lu = math.hypot(ux, uy)
+        ux, uy = ux / lu, uy / lu
+        vx, vy = -uy, ux
+        us = [(px - ax) * ux + (py - ay) * uy for px, py in pts]
+        vs = [(px - ax) * vx + (py - ay) * vy for px, py in pts]
+        vmil = (min(vs) + max(vs)) / 2
+        a = (ax + ux * min(us) + vx * vmil, ay + uy * min(us) + vy * vmil)
+        c = (ax + ux * max(us) + vx * vmil, ay + uy * max(us) + vy * vmil)
+        if _boite(f"Atelya_Balcon_{b['id']}_dalle", a, c, niveau - ep, niveau, max(vs) - min(vs), sol):
+            n += 1
+        gc = b.get("garde_corps") or {}
+        h = float(gc.get("hauteur", 1.0))
+        for k, (p, q) in enumerate(gc.get("cotes", [])):
+            nom = f"Atelya_Balcon_{b['id']}_gc{k}"
+            n += bool(_boite(nom + "_lisse_haut", p, q, niveau + h - 0.05, niveau + h, 0.06, metal))
+            n += bool(_boite(nom + "_lisse_bas", p, q, niveau + 0.06, niveau + 0.10, 0.04, metal))
+            n += bool(_boite(nom + "_verre", p, q, niveau + 0.10, niveau + h - 0.05, 0.02, verre, ombre=False))
+            longueur = math.dist(p, q)
+            poteaux = max(1, math.ceil(longueur / POTEAU_ECART_M))
+            for i in range(poteaux + 1):
+                t = i / poteaux
+                x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+                dx, dy = (q[0] - p[0]) / longueur * 0.02, (q[1] - p[1]) / longueur * 0.02
+                n += bool(_boite(f"{nom}_poteau{i}", (x - dx, y - dy), (x + dx, y + dy), niveau, niveau + h, 0.04, metal))
+        for k, (p, q) in enumerate(b.get("joues", [])):
+            n += bool(_boite(f"Atelya_Balcon_{b['id']}_joue{k}", p, q, niveau - ep, niveau + hauteur_etage, 0.18, facade))
+    return n
+
+
 DALLE_EPAISSEUR_CM = 30.0
 DALLE_DEBORD_CM = 20.0  # recouvre le dessus des murs (14 à 20 cm d'épaisseur)
 
@@ -905,6 +1001,7 @@ def main():
     vues = poser_vues_dehors(racine, reglage["vues_dehors"]) if reglage.get("vues_dehors") else 0
     lampes = allumer_lampes(ambiance, fiche, reglage.get("lampes_pieces") or ())
     nb_dalles = poser_dalles(fiche)
+    nb_balcons = poser_balcons(racine, reglage.get("balcons") or [], float(reglage.get("hauteur_etage", 2.5)))
     vitres_claires, verre_importe = verre_clair(racine, bool(reglage.get("verre_clair", False)))
     vitres = vitres_sans_ombre()
     refermer_portes()
@@ -935,7 +1032,7 @@ def main():
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
-                                                 "ciel_photo_decalage": ciel_photo, "vues_dehors": vues,
+                                                 "ciel_photo_decalage": ciel_photo, "vues_dehors": vues, "objets_balcons": nb_balcons,
                                                  "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
                                                  "verre_importe": verre_importe,
                                                  "sortie": str(dossier)},

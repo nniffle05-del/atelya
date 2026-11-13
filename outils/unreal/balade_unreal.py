@@ -107,6 +107,8 @@ def main() -> None:
         print(f"   vraie vue : {len(vues)} toile(s) d'après les photos du client", flush=True)
     base = {"eclairage": ambiance["id"], "moteur": a.moteur, "dossier": nom_dossier, "portes_ouvertes": b["portes_ouvertes"],
             "vues_dehors": vues, "verre_clair": bool(vues),
+            # les BALCONS du plan (logement.json : balcons), construits dans la scène (13/11/2026)
+            "balcons": logement.get("balcons", []), "hauteur_etage": logement.get("hauteur_sous_plafond", 2.5),
             "lampes_pieces": [] if ambiance.get("lampes") else b["pieces_sans_fenetre"],
             "exposition_locale": photographe.exposition_locale(clarte),
             # le ciel photographié est posé SUR L'IMAGE à la place de tout ce qui est « ciel » : il passait par-dessus la vraie vue
