@@ -154,7 +154,7 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
     # montrent sous les fenêtres est le sol des BALCONS, qui collé sur la rue y faisait des plaques beiges, 13/11/2026), d'UNE
     # seule couleur par côté (moyenne des pieds des toiles vues, pondérée par leur part vue) : avec un décor qui suit la rue,
     # une couleur par toile faisait des coins de teintes différentes
-    rue_cote = {}
+    rue_cote, couverture = {}, []
     for cote in {f["cote"] for f in immeubles}:
         cs = [(vue_dehors.couleur_de_la_rue(f, faits[f["id"]]), faits[f["id"]]["couverte"] * f["longueur_u"])
               for f in immeubles if f["cote"] == cote and faits[f["id"]]["couverte"] > 0]
@@ -169,11 +169,22 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
             voisines = [couleurs[g["id"]] for g in immeubles if g["cote"] == f["cote"] and g["id"] in couleurs]
             r = vue_dehors.composer(f, [], defaut=np.median(voisines, axis=0))
         else:
+            # ce qui est SOUS la vue (jamais photographié) : gardé en petit pour que la caméra du film l'évite
+            sous = vue_dehors.sous_la_vue(r, f)
+            png = sortie / f"sous-la-vue-{f['id']}.png"
+            petit = cv2.resize(sous.astype(np.uint8) * 255, (max(1, sous.shape[1] // 8), max(1, sous.shape[0] // 8)),
+                               interpolation=cv2.INTER_AREA)
+            cv2.imencode(".png", petit)[1].tofile(str(png))
+            couverture.append({"id": f["id"], "n": [float(x) for x in f["n"]], "decalage": float(f["decalage"]),
+                               "origine": [float(x) for x in f["origine"]], "axe_u": [float(x) for x in f["axe_u"]],
+                               "longueur_u": float(f["longueur_u"]), "longueur_v": float(f["longueur_v"]),
+                               "sous_la_vue": png.as_posix()})
             r = vue_dehors.fondre_le_bas(r, f, rue_cote[f["cote"]])
         rue = rues[f["id"].replace("facade-", "rue-")]
         ecrire(f, r, f)
         ecrire(rue, vue_dehors.composer(rue, [], defaut=rue_cote[f["cote"]]), f)
-    (sortie / "vues-dehors.json").write_text(json.dumps({"vues": vues, "bilan": bilan,
+    (sortie / "vues-dehors.json").write_text(json.dumps({"vues": vues, "bilan": bilan, "couverture": couverture,
+                                                          "niveau_rue_m": vue_dehors.Z_BAS_M,
                                                           "photos_utilisees": [p["nom"] for p in photos]},
                                                          indent=1, ensure_ascii=False), encoding="utf-8")
     if apercus:

@@ -628,6 +628,30 @@ FONDU_BAS_M = 1.5  # sous ce que les photos voient, le bas d'une toile passe à 
 LARGEUR_BAS_M = 6.0  # la ligne vue la plus basse est prise sur cette largeur de toile (pas colonne par colonne)
 
 
+def _ligne_basse(vu: np.ndarray, pas: float) -> np.ndarray:
+    """Pour chaque colonne d'une toile, la ligne la plus basse que les photos voient, prise sur LARGEUR_BAS_M de large et
+    adoucie : une colonne étroite vue seulement en haut (derrière un montant de fenêtre, un meuble) faisait sinon un rectangle
+    gris de haut en bas (film du 13/11/2026). Colonnes non vues : comme leurs voisines vues."""
+    hauteur, largeur = vu.shape
+    vues = vu.any(0)
+    dernier = np.where(vues, hauteur - 1 - np.argmax(vu[::-1], axis=0), -1).astype(float)
+    cols = np.arange(largeur)
+    dernier = np.interp(cols, cols[vues], dernier[vues])
+    k_l = max(3, int(round(LARGEUR_BAS_M / pas)) | 1)
+    dernier = cv2.dilate(dernier.astype(np.float32)[None, :], np.ones((1, k_l), np.uint8))[0]
+    return cv2.GaussianBlur(dernier[None, :], (0, 0), k_l / 4)[0]
+
+
+def sous_la_vue(r: dict, toile: dict) -> np.ndarray | None:
+    """Masque (H, L) de ce qui est SOUS la vue : les points de la toile plus bas que tout ce que les photos montrent (le pied
+    des immeubles, jamais photographié depuis un étage). C'est ce que la caméra du film doit éviter de cadrer
+    (moteur/cinema/vide_dehors.py). None si aucune photo ne voit la toile."""
+    vu = r.get("_vu")
+    if vu is None or not vu.any():
+        return None
+    return np.arange(vu.shape[0])[:, None] > _ligne_basse(vu, toile["longueur_v"] / vu.shape[0])[None, :]
+
+
 def fondre_le_bas(r: dict, toile: dict, couleur_rue) -> dict:
     """Le BAS d'une toile d'immeubles qu'aucune photo ne voit (le pied des immeubles, à hauteur de rue : les photos prises
     d'un étage voient par-dessus le garde-corps) prend la couleur de la rue, en fondu sous la dernière ligne vue de chaque
@@ -636,18 +660,10 @@ def fondre_le_bas(r: dict, toile: dict, couleur_rue) -> dict:
     vu, c = r.get("_vu"), r.get("_couleur")
     if vu is None or c is None or not vu.any():
         return r
-    hauteur, largeur = vu.shape
+    hauteur = vu.shape[0]
     lignes = np.arange(hauteur)
-    vues = vu.any(0)
-    dernier = np.where(vues, hauteur - 1 - np.argmax(vu[::-1], axis=0), -1).astype(float)
-    cols = np.arange(largeur)
-    dernier = np.interp(cols, cols[vues], dernier[vues])  # colonnes non vues : comme leurs voisines vues
     pas = toile["longueur_v"] / hauteur
-    # la plus basse ligne vue sur LARGEUR_BAS_M de large, adoucie : une colonne étroite vue seulement en haut (derrière un
-    # montant de fenêtre, un meuble) faisait sinon un rectangle gris de haut en bas (film du 13/11/2026)
-    k_l = max(3, int(round(LARGEUR_BAS_M / pas)) | 1)
-    dernier = cv2.dilate(dernier.astype(np.float32)[None, :], np.ones((1, k_l), np.uint8))[0]
-    dernier = cv2.GaussianBlur(dernier[None, :], (0, 0), k_l / 4)[0]
+    dernier = _ligne_basse(vu, pas)
     k = max(1.0, FONDU_BAS_M / pas)
     a = np.clip((lignes[:, None] - dernier[None, :]) / k, 0.0, 1.0)[..., None]
     c = c * (1 - a) + np.asarray(couleur_rue, np.float32)[None, None, :] * a

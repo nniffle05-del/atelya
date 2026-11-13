@@ -489,3 +489,12 @@ RÈGLE : le décor ne montre QUE ce que les photos montrent, à sa place ; jamai
 combler ce qu'elles ne voient pas. Le manque sous la vue (« en dessous il n'y a rien » quand la caméra s'avance) reste ouvert :
 pistes fidèles = une photo de la vue prise par le client près de la vitre en regardant vers le bas ; une caméra du film qui ne
 plonge pas vers ce que les photos ne montrent pas (le réalisateur sait ce que le décor couvre).
+**Piste 1 choisie par NT (13/11/2026) : « la caméra du film évite de cadrer ce que les photos ne montrent pas ».** Fait : la
+fabrique du décor garde ce qui est SOUS la vue (`vue_dehors.sous_la_vue`, images `sous-la-vue-<toile>.png` + « couverture » dans
+`vues-dehors.json`) ; `moteur/cinema/vide_dehors.py` MESURE la part de l'image du film qui tombe sur ce vide (rayons de la caméra
+par les fenêtres → rue ou toile sous la vue). app-002, vol de 46 s : 21,5 s avec du vide (> 0,4 % de l'image), jusqu'à 6,3 %
+(séjour 15-22 s, chambres 30-34 et 41-46 s, cuisine 1-7 s). RÉSULTAT NÉGATIF : RELEVER LE REGARD ne retire rien (essayé jusqu'à
++15°, retiré du code) : ce qu'on voit par une fenêtre dépend de la PLACE de la caméra par rapport à l'appui / au garde-corps, pas
+de son inclinaison. BAISSER la caméra à la hauteur des photos du client (0,8-1,4 m, médiane 1,2 ; le film vole à 1,6-1,9 m) n'en
+retire qu'une partie : 1,4 m → 19,8 s / 4,4 % ; 1,2 m → 17,6 s / 3,6 % ; 1,0 m → 15,2 s / 2,9 %. Le reste = la caméra plus PRÈS
+des fenêtres que le photographe. Non branché dans le film ; décision NT attendue (voir message du 13/11).
