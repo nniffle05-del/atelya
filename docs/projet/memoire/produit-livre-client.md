@@ -506,3 +506,20 @@ meubles 8,6 s au lieu de 2,3 (note du contrôleur 66 → 57) et monte / descend 
 à 3 s, pour 20 s de vide). Gain faible, coût réel : pas branché, pas de film. Reste ouvert : le vide sous la vue ne se règle ni par
 le regard, ni par la hauteur ; il vient de la caméra plus près des fenêtres que le photographe. `vide_dehors.mesurer` peut servir
 à savoir SEUL si un logement a besoin d'une photo de la vue (ne la demander que dans ce cas).
+**LE REGARD ÉVITE LE VIDE, SAUF AUX CADRAGES (13/11/2026, idée de NT : « quand il sait que sur certains angles on voit le bas où
+il n'y a rien, pourquoi ne les évite-t-il pas ? »).** Branché PAR DÉFAUT dans le film (`balade_unreal --photos` : la vraie vue est
+préparée AVANT le vol, `vide_dehors.charger` → `promeneur.vol(decor=…)` → `regard_du_vol(vide=…)`). Le choix du regard
+(72 directions par instant) reçoit un coût pour chaque direction qui cadrerait du vide par une fenêtre
+(`vide_dehors.regard_sans_vide`, image de 96 px, résultats gardés). Trois versions essayées sur app-002 (vol de 46 s ; avant :
+21,5 s de vide, au pire 6,3 %, moyenne 1,22 %, note du contrôleur 66) :
+(1) STRICTE (coût dès 0,4 % de l'image) : 6,2 s / 2,0 %, mais les chambres ne montrent plus leur fenêtre, note 52,9 ; NT : « il
+évite tout, c'est dommage » ;
+(2) DOSÉE (rien ne coûte sous 2 % de l'image, plein coût à 5 %, poids 8) : 18,1 s / 4,2 % / 0,72 %, mais la première chambre
+n'était regardée que 0,9 s côté fenêtre ; NT : « il ne la regarde vraiment pas » ;
+(3) RETENUE = dosée + coût LEVÉ aux moments où la caméra MONTRE une pièce (cadrage d'un point de vue, panoramique, conclusion :
+`VIDE_CADRAGE` = 1) : note 66,5 (comme avant), fenêtres des chambres regardées 4,2 et 4,9 s (comme avant), vide 20,4 s, au pire
+5,3 %, moyenne 0,93 %. Gain réel mais MODESTE : le vide qui reste est celui des moments où l'on montre exprès la fenêtre de près.
+LIMITE DE FOND (dite à NT) : le bas vide apparaît justement quand on montre une fenêtre de près ; seule une photo qui voit le bas
+le réglerait vraiment ; NT ne veut ni message de relance au client, ni caméra tenue loin des fenêtres, ni contenu fabriqué.
+Tests : coût du regard, et vol avec / sans l'exception des cadrages (`tests/test_vide_dehors.py`). Films :
+`..\atelya\b2\app-002\unreal\film\vide-cadrages(-avant-apres).mp4` (versions 1 et 2 : `evite-le-vide*`, `vide-evite-dose*`).

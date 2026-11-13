@@ -13,7 +13,9 @@ du VIDE. `mesurer` donne la part de l'image sur du vide, clé par clé.
 Essais du 13/11/2026 sur app-002 (vol de 46 s) : 21,5 s avec du vide (> VIDE_MAX), jusqu'à 6,3 % de l'image. RELEVER LE REGARD
 n'y change rien (essayé jusqu'à +15°, retiré du code) : ce qu'on voit par une fenêtre dépend de la PLACE de la caméra par
 rapport à l'appui ou au garde-corps, pas de son inclinaison ; la fenêtre reste dans l'image. BAISSER la caméra à la hauteur des
-photos n'en retire qu'une partie (1,2 m : 17,6 s, 3,6 % au plus ; 1,0 m : 15,2 s, 2,9 %). Décision à prendre par NT.
+photos n'en retire qu'une partie (1,2 m : 17,6 s, 3,6 % au plus ; 1,0 m : 15,2 s, 2,9 %) et frôle les meubles : non retenu.
+Retenu (idée de NT) : le REGARD du vol évite les directions qui cadrent du vide (`regard_sans_vide`), sauf aux moments
+où la caméra montre une pièce (regard.VIDE_CADRAGE).
 """
 from __future__ import annotations
 
@@ -87,3 +89,39 @@ def mesurer(trajet: dict, logement: dict, decor: dict, tangages: np.ndarray | No
     tg = pts[:, 4] if tangages is None else tangages
     return np.array([part_de_vide([p[0], p[1], p[2], p[3], tg[i], f, largeur / 2, hauteur / 2], (largeur, hauteur), ouv, murs,
                                   logement.get("balcons"), decor) for i, p in enumerate(pts)])
+
+
+VIDE_TOLERE = 0.02  # part de l'image sur du vide qui ne coûte rien au regard (essayé à 0,4 % : les chambres ne montraient plus leur fenêtre)
+VIDE_PLEIN = 0.05  # à partir de cette part de l'image sur du vide, une direction de regard coûte le maximum
+_GARDE: dict = {}  # parts de vide déjà calculées (par décor)
+
+
+def regard_sans_vide(logement: dict, decor: dict, focale_mm: float, format_image, hauteur_m: float, tangage_deg: float):
+    """Pour le choix du REGARD du vol (moteur/cinema/regard.py) : une fonction (xy, cap) → coût de 0 à 1 de regarder dans
+    cette direction depuis cet endroit, d'après la part de l'image qui tomberait sur du vide (1 dès VIDE_PLEIN). NT,
+    13/11/2026 : « quand il sait que sur certains angles on voit le bas où il n'y a rien, pourquoi ne les évite-t-il pas ? »
+    La caméra peut toujours regarder une fenêtre de là où la vue des photos la couvre ; ailleurs, elle regarde autre chose.
+    Hauteur et plongée : celles du vol courant. Rayons sur une image de 96 px ; résultats gardés (les plans de vol candidats
+    repassent aux mêmes endroits)."""
+    largeur = 96
+    hauteur = int(round(largeur * format_image[1] / format_image[0]))
+    f = largeur * float(focale_mm) / 36.0
+    demi_champ = float(np.degrees(np.arctan(largeur / 2 / f))) + 3.0
+    ouv = vue_dehors.ouvertures_vitrees(logement)
+    murs = vue_dehors.murs_et_trous(logement)
+    balcons = logement.get("balcons")
+    bouts = np.array([q for o in ouv for q in (o["a"], o["b"], (o["a"] + o["b"]) / 2)], float).reshape(-1, 2)
+    garde = _GARDE.setdefault((id(decor), largeur, round(hauteur_m, 2), round(tangage_deg, 1)), {})
+
+    def cout(xy, cap: float) -> float:
+        cle = (round(float(xy[0]), 2), round(float(xy[1]), 2), round(float(cap)) % 360)
+        if cle not in garde:
+            v = 0.0
+            if len(bouts):
+                vers = np.degrees(np.arctan2(bouts[:, 1] - xy[1], bouts[:, 0] - xy[0]))
+                if (np.abs((vers - cap + 180) % 360 - 180) < demi_champ).any():  # une fenêtre peut être dans l'image
+                    v = part_de_vide([float(xy[0]), float(xy[1]), hauteur_m, float(cap), tangage_deg, f, largeur / 2,
+                                      hauteur / 2], (largeur, hauteur), ouv, murs, balcons, decor)
+            garde[cle] = v
+        return float(np.clip((garde[cle] - VIDE_TOLERE) / (VIDE_PLEIN - VIDE_TOLERE), 0.0, 1.0))
+    return cout

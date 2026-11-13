@@ -226,7 +226,7 @@ def _en_passage(logement: dict, points: np.ndarray) -> np.ndarray:
     return sortie
 
 
-def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage) -> dict:
+def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage, vide=None) -> dict:
     """Un plan de vol (parcours ou planificateur) → le vol complet : courbe et allure (trajectoire), regard, hauteur, clés."""
     pivots = getattr(parcours, "pivots", None)
     courbe, jonctions, durees = courbe_du_vol(parcours.chemin, parcours.carte, pivots)
@@ -244,7 +244,7 @@ def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage
                          getattr(parcours, "fin_cap", None), REGARD_AVANCE_VOL_M if pivots is not None else None,
                          ROTATION_PLANIFIEE if pivots is not None else VOL_ROTATION_MAX,
                          PIVOT_PLANIFIE if pivots is not None else VOL_ROTATION_PIVOT,
-                         _en_passage(logement, positions) if pivots is not None else None, ROTATION_PASSAGE)
+                         _en_passage(logement, positions) if pivots is not None else None, ROTATION_PASSAGE, vide)
     hauteurs, tangages = hauteurs_du_vol(positions, parcours.voir, logement)
     trajet = trajet_du_vol(positions, hauteurs, caps, tangages, s["focale_mm"], format_image, scene_eclairage)
     sans_fenetre = [p["id"] for p in logement["pieces"] if not parcours.scene.a_une_fenetre(p)]
@@ -254,20 +254,25 @@ def _construire(logement: dict, parcours, s: dict, format_image, scene_eclairage
 
 
 def vol(logement: dict, savoir: dict | None = None, format_image=(1920, 1080), scene_eclairage: str | None = None,
-        planificateur: bool = True, budget_s: float | None = None) -> dict:
+        planificateur: bool = True, budget_s: float | None = None, decor: dict | None = None) -> dict:
     """LA CAMÉRA VOLANTE. Avec le PLANIFICATEUR (défaut depuis le 12/11/2026) : plusieurs plans de vol (ordres de visite,
     panoramiques au cœur des pièces en cul-de-sac, conclusion sur le plus beau cadrage), chacun construit en entier puis noté
     par le CONTRÔLEUR ; le meilleur est gardé (les autres notes sont dans « candidats »). Sans (`planificateur=False`) : le vol
     d'avant (survol du 12/11/2026), pour comparer. Résultat : trajet, étapes, portes ouvertes, pièces sans fenêtre, contrôle."""
     s = savoir or rz.savoir_faire()
+    vide = None
+    if decor:  # ce que la vraie vue couvre (vide_dehors.charger) : le regard évite de cadrer ce que les photos ne montrent pas
+        from moteur.cinema import vide_dehors
+        from moteur.cinema.reglages import VOL_HAUTEUR_M, VOL_TANGAGE_DEG
+        vide = vide_dehors.regard_sans_vide(logement, decor, s["focale_mm"], format_image, VOL_HAUTEUR_M, VOL_TANGAGE_DEG)
     if not planificateur:
-        return _construire(logement, parcours_du_vol(logement, s), s, format_image, scene_eclairage)
+        return _construire(logement, parcours_du_vol(logement, s), s, format_image, scene_eclairage, vide)
     plans = planifier(logement, s)
     if not plans:
-        return _construire(logement, parcours_du_vol(logement, s), s, format_image, scene_eclairage)
+        return _construire(logement, parcours_du_vol(logement, s), s, format_image, scene_eclairage, vide)
     essais = []
     for plan in plans:
-        r = _construire(logement, plan, s, format_image, scene_eclairage)
+        r = _construire(logement, plan, s, format_image, scene_eclairage, vide)
         c = controler(logement, r, budget_s)
         essais.append((c["note"], r, c, plan))
     note, meilleur, c, plan = max(essais, key=lambda e: e[0])

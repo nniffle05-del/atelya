@@ -15,6 +15,8 @@ from moteur.cinema.trajectoire import gauss, lissee
 CENTRE_DEMI_DEG = 15.0  # le centre de l'image (comme le contrôleur)
 CENTRE_MUR_M = 1.0  # un obstacle plus près que ça au centre de l'image coûte jusqu'à CENTRE_POIDS
 CENTRE_POIDS = 4.0
+VIDE_CADRAGE = 1.0  # part de ce coût levée quand la caméra est au cadrage d'une pièce (NT : la 1re chambre ne montrait plus sa fenêtre)
+VIDE_POIDS = 8.0  # regarder du vide par une fenêtre (plus que le cadrage d'une pièce : 2,5, et qu'un mur au centre : 4)
 FIN_S = 2.5  # la conclusion : les dernières secondes regardent le plus beau cadrage de la dernière pièce
 # PRÈS D'UNE PORTE et dans les couloirs (12/11/2026) : en passant une porte qui donne sur un couloir étroit, la caméra arrivait
 # face au mur d'en face (app-002 : 25-27 s, 38-40 s) car le regard restait à moins de VOL_REGARD_MAX_DEG de la marche ; là, il
@@ -59,7 +61,7 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
                   logement: dict, panoramiques: list | None = None, fin_cap: float | None = None,
                   avance_m: float | None = None, rotation_max: float = VOL_ROTATION_MAX,
                   rotation_pivot: float = VOL_ROTATION_PIVOT, passages: np.ndarray | None = None,
-                  rotation_passage: float | None = None) -> np.ndarray:
+                  rotation_passage: float | None = None, vide=None) -> np.ndarray:
     """LE REGARD, choisi d'un seul coup sur tout le vol (programmation dynamique) : à chaque instant (une clé toutes les
     CLE_IMAGES images), une direction parmi 72 (tous les 5°) ; la suite retenue maximise ce qu'on voit (profondeur), regarde
     plutôt vers l'avant, se tourne vers le cadrage d'une pièce quand on y est, vers la plus belle profondeur aux demi-tours,
@@ -70,7 +72,11 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
     en cul-de-sac : la part `part` de l'arrêt regarde le plus beau cadrage, la suite se tourne vers la sortie ;
     `fin_cap` : les dernières secondes regardent ce cadrage (la conclusion) ; `avance_m` : le regard anticipe là où la caméra
     sera dans `avance_m` mètres de chemin (et non dans une seconde : à vitesse lente, une seconde, c'est 20 cm, et le regard ne
-    voyait pas venir le virage d'une porte)."""
+    voyait pas venir le virage d'une porte).
+
+    `vide` (moteur/cinema/vide_dehors.regard_sans_vide, 13/11/2026) : fonction (xy, cap) → 0 à 1 ; une direction qui cadrerait,
+    par une fenêtre, ce que les photos du client ne montrent pas (le bas de la vue) coûte jusqu'à VIDE_POIDS : la caméra
+    regarde ailleurs à cet endroit-là."""
     pieces_par_id = {p["id"]: p for p in logement["pieces"]}
     panoramiques = panoramiques or []
     from moteur.cinema.navigation import _cotes  # (import tardif : navigation dépend de ce module par trajectoire)
@@ -134,6 +140,9 @@ def regard_du_vol(positions: np.ndarray, courbe: np.ndarray, jonctions: list[int
             ecarts_rayons = np.abs((rayons["angles"][None, :] - angles[:, None] + 180) % 360 - 180)
             centre = np.where(ecarts_rayons <= CENTRE_DEMI_DEG, rayons["distance"][None, :], np.inf).min(1)
             notes[n] -= CENTRE_POIDS * np.clip((CENTRE_MUR_M - centre) / 0.5, 0, 1)
+        if vide is not None:
+            # … sauf là où la caméra MONTRE une pièce (son cadrage, la conclusion) : la vue fait partie de ce qu'on montre
+            notes[n] -= VIDE_POIDS * (1.0 - VIDE_CADRAGE * poids) * np.array([vide(p, a) for a in angles])
         if marche is not None:  # un travelling regarde là où il va : au-delà de VOL_REGARD_MAX_DEG, fortement pénalisé
             ecart_marche = np.abs((angles - marche + 180) % 360 - 180)
             pres_porte = len(centres_portes) and float(np.linalg.norm(centres_portes - p, axis=1).min()) < PORTE_LIBERTE_M

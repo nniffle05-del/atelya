@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cinematique_unreal as cu  # noqa: E402
 import mesurer_lumiere  # noqa: E402
 import vue_dehors_photos  # noqa: E402
+from moteur.cinema import vide_dehors  # noqa: E402
 
 from moteur import photographe, promeneur  # noqa: E402
 from moteur.cinema import ciels  # noqa: E402
@@ -88,7 +89,22 @@ def main() -> None:
     sortie.mkdir(parents=True, exist_ok=True)
     logement = json.loads(Path(a.logement).read_text(encoding="utf-8"))
     print("1. Le promeneur trace la balade", flush=True)
-    b = (promeneur.vol if a.mode == "vol" else promeneur.balade)(logement, scene_eclairage=ambiance.get("nom"))
+    # la VRAIE VUE d'abord : le vol doit savoir ce qu'elle couvre pour ne pas cadrer ce que les photos ne montrent pas
+    vues, decor = [], None
+    if a.photos and ambiance["id"] in MOMENTS_VUE:
+        dossier_vues = cu.STUDIO / "Paquets" / a.nom / "vues"
+        vues = vue_dehors_photos.preparer(Path(a.logement), Path(a.photos), dossier_vues)
+        decor = vide_dehors.charger(dossier_vues)
+        print(f"   vraie vue : {len(vues)} toile(s) d'après les photos du client", flush=True)
+    if a.mode == "vol":
+        b = promeneur.vol(logement, scene_eclairage=ambiance.get("nom"), decor=decor)
+    else:
+        b = promeneur.balade(logement, scene_eclairage=ambiance.get("nom"))
+    if decor:
+        v = vide_dehors.mesurer(b["trajet"], logement, decor)
+        b["vide_dehors"] = {"secondes": round(float((v > vide_dehors.VIDE_MAX).sum() * 2 / b["trajet"]["ips"]), 1),
+                            "au_pire": round(float(v.max()), 4), "moyen": round(float(v.mean()), 5)}
+        print(f"   vide sous la vue : {b['vide_dehors']['secondes']} s, au pire {100 * v.max():.1f} % de l'image", flush=True)
     (sortie / "balade.json").write_text(json.dumps(b, indent=1, ensure_ascii=False), encoding="utf-8")
     promeneur.dessiner(logement, b, sortie / "balade.png")
     print(f"   {b['longueur_m']} m, {b['duree_s']} s ; portes ouvertes {[x['id'] for x in b['portes_ouvertes']]}", flush=True)
@@ -101,10 +117,6 @@ def main() -> None:
     reglage = sortie.parent / f"reglage-{nom_dossier}.json"
     clarte = photographe.clarte_visee(ambiance)
     balance = float(ambiance.get("balance", photographe.FORCE_BALANCE))
-    vues = []
-    if a.photos and ambiance["id"] in MOMENTS_VUE:
-        vues = vue_dehors_photos.preparer(Path(a.logement), Path(a.photos), cu.STUDIO / "Paquets" / a.nom / "vues")
-        print(f"   vraie vue : {len(vues)} toile(s) d'après les photos du client", flush=True)
     base = {"eclairage": ambiance["id"], "moteur": a.moteur, "dossier": nom_dossier, "portes_ouvertes": b["portes_ouvertes"],
             "vues_dehors": vues, "verre_clair": bool(vues),
             # les BALCONS du plan (logement.json : balcons), construits dans la scène (13/11/2026)
