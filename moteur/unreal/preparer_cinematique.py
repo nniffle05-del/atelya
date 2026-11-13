@@ -518,11 +518,13 @@ def _materiau_simple(racine, nom, couleur, rugosite, opacite=None):
     return m
 
 
-# BALCONS (13/11/2026) : couleurs d'après les photos d'app-002 (sol gris clair, montants et lisses laqués blancs, verre dépoli)
+# BALCONS (13/11/2026) : d'après les photos d'app-002 (sol gris clair, montants et lisses laqués blancs, verre CLAIR : on voit
+# nettement les arbres et la rue à travers ; 35 % d'opacité le rendait laiteux, comparaison avec l'annonce du 13/11)
 BALCON_SOL = (0.42, 0.41, 0.39)
 BALCON_METAL = (0.80, 0.80, 0.80)
-BALCON_VERRE = (0.85, 0.87, 0.88)
-BALCON_VERRE_OPACITE = 0.35
+BALCON_VERRE = (0.30, 0.32, 0.33)
+BALCON_VERRE_OPACITE = 0.12
+LISSE_HAUTE_M = 0.10  # la lisse du haut : une bande blanche d'environ 10 cm sur les photos
 BALCON_FACADE = (0.75, 0.74, 0.72)
 POTEAU_ECART_M = 1.4
 
@@ -577,9 +579,12 @@ def poser_balcons(racine, balcons, hauteur_etage=2.5):
         h = float(gc.get("hauteur", 1.0))
         for k, (p, q) in enumerate(gc.get("cotes", [])):
             nom = f"Atelya_Balcon_{b['id']}_gc{k}"
-            n += bool(_boite(nom + "_lisse_haut", p, q, niveau + h - 0.05, niveau + h, 0.06, metal))
+            if gc.get("genre") == "plein":  # muret maçonné (balcon du séjour d'app-002, photo 03)
+                n += bool(_boite(nom + "_muret", p, q, niveau - ep, niveau + h, 0.15, facade))
+                continue
+            n += bool(_boite(nom + "_lisse_haut", p, q, niveau + h - LISSE_HAUTE_M, niveau + h, 0.06, metal))
             n += bool(_boite(nom + "_lisse_bas", p, q, niveau + 0.06, niveau + 0.10, 0.04, metal))
-            n += bool(_boite(nom + "_verre", p, q, niveau + 0.10, niveau + h - 0.05, 0.02, verre, ombre=False))
+            n += bool(_boite(nom + "_verre", p, q, niveau + 0.10, niveau + h - LISSE_HAUTE_M, 0.02, verre, ombre=False))
             longueur = math.dist(p, q)
             poteaux = max(1, math.ceil(longueur / POTEAU_ECART_M))
             for i in range(poteaux + 1):

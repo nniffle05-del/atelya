@@ -1021,7 +1021,7 @@
   {
    "id": "balcon_1",
    "statut": "mesure",
-   "source": "plan_cotes",
+   "source": "plan_cotes ; garde-corps plein vu sur la photo 03",
    "nom": "Balcon du séjour",
    "contour": [
     [
@@ -1065,7 +1065,7 @@
      ]
     ],
     "hauteur": 1.0,
-    "genre": "verre"
+    "genre": "plein"
    }
   },
   {
