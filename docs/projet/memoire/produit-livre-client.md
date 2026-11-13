@@ -546,3 +546,17 @@ photos (lit → chambre, canapé / table → séjour, rangées de placards → c
 les pièces de ce type ; en revanche OWLv2 voit MAL les fenêtres (note ≤ 0,36, la grande baie du séjour absente) : il faudra un
 autre repérage des vitres (zones très claires) ; masque du sol de `sols_photos` contre le sol prévu. Atelya doit savoir dire « pas
 réussi » (écart entre la 1re et la 2e note, pièces jumelles) et alors ne pas utiliser la photo pour la vue.
+**Suite du 14/11/2026 (NT : « fais ce qu'il y a de mieux pour la performance et la qualité d'Atelya ») : la voie « lignes seules »
+est ÉCARTÉE.** Deux essais de plus sur le même prototype : (1) en DONNANT la bonne pièce à Atelya (oracle), toujours 3/11 sur
+app-002 : le séjour échoue même ainsi, la note par les lignes n'est pas assez sûre ; le type de pièce d'après les meubles ne
+suffirait donc pas ; (2) « un clic approximatif puis réglage seul » : 4 départs tirés à ± 0,4 m et ± 8° autour de la place faite à
+la main, sur les 22 photos : les 4 réglages ne retombent JAMAIS au même endroit (0/22 d'accord à 0,2 m et 2° ; écarts entre eux
+~0,4 m et ~10°), 4/22 seulement restent à < 0,6 m et < 6° de la main. L'ajustement fin ne converge donc pas : la belle image du
+séjour (photo-04) était un cas isolé, la phrase « l'ajustement fin colle très bien » écrite la veille était trop optimiste.
+CONCLUSION : avec les seules lignes de la photo contre les murs de la 3D, ni le choix de la place ni le réglage fin ne sont
+fiables dans une pièce meublée. PROPOSITION À NT (non décidée) : au LANCEMENT, le calage des photos rejoint la « lecture par
+Claude via l'API » (décision du 08/11) : Claude donne les repères de chaque photo (arêtes de murs, montants, avec leurs pixels :
+c'est exactement ce qu'il a fait à la main pour `cameras-photos.json`), NOTRE code calcule la caméra (`camera_photo.ajuster`) et
+la contrôle (écart en pixels, caméra dans le logement, hauteur et focale plausibles), sinon la photo n'est pas utilisée pour la
+vue. Autonomie complète plus tard, sans doute avec un modèle appris (licence à lire, accord NT). Prototype gardé dans
+`pc/essais-cameras-seules/` pour mémoire, rien de branché.

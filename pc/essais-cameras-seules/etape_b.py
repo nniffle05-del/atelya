@@ -7,6 +7,8 @@ import numpy as np
 from moteur.images import lire_image, ecrire_image
 import etape_a as ea
 
+import os
+ORACLE = os.environ.get('ORACLE') == '1'
 TAU = 8.0  # px : au-delà, une ligne prévue n'est pas « sur » une ligne de la photo
 SEUIL = 0.3
 NB = 12  # classes d'orientation (15°)
@@ -39,7 +41,9 @@ def modele(logement):
             b1, h1 = sommets[k]
             b0, h0 = min(b0, b1), max(h0, h1)
         sommets[k] = (b0, h0)
+    bornes = []
     for p in logement["pieces"]:
+        bornes.append(len(A))
         c = np.array(p["contour"], float)
         for i in range(len(c)):
             a, b = c[i], c[(i + 1) % len(c)]
@@ -70,9 +74,11 @@ def modele(logement):
                 cur = s1
             if L - cur > 0.02:
                 A.append(a + t * cur); B.append(a + t * L); genre.append(0); bas.append(0.0); haut.append(hsp)
+    bornes.append(len(A))
+    pe = np.concatenate([np.full(bornes[k + 1] - bornes[k], k) for k in range(len(bornes) - 1)])
     S = np.array(list(sommets.keys()), float)
     SB = np.array([v[0] for v in sommets.values()]); SH = np.array([v[1] for v in sommets.values()])
-    return {"hsp": hsp, "A": np.array(A), "B": np.array(B), "genre": np.array(genre), "bas": np.array(bas), "haut": np.array(haut),
+    return {"hsp": hsp, "A": np.array(A), "B": np.array(B), "genre": np.array(genre), "pe": pe, "bas": np.array(bas), "haut": np.array(haut),
             "S": S, "SB": SB, "SH": SH, "pieces": [np.array(p["contour"], float) for p in logement["pieces"]],
             "ids": [p["id"] for p in logement["pieces"]]}
 
@@ -227,13 +233,25 @@ def noter(mod, car, cams, pas_col=8, detail=False):
     return note
 
 
-def chercher(mod, car, vh, f, alphas, base, w, pas=0.25, zs=(0.9, 1.15, 1.4)):
+def permis(mod, G, pieces_ok):
+    """Dans une des pièces permises, ou à moins d'1 m d'une de leurs portes (photo prise du seuil)."""
+    if pieces_ok is None:
+        return np.ones(len(G), bool)
+    ok = np.isin(piece_de(mod, G), list(pieces_ok))
+    portes = (mod["genre"] == 1) & np.isin(mod["pe"], list(pieces_ok))
+    if portes.any():
+        ok |= dist_seg(G, mod["A"][portes], mod["B"][portes]).min(1) < 1.0
+    return ok
+
+
+def chercher(mod, car, vh, f, alphas, base, w, pas=0.25, zs=(0.9, 1.15, 1.4), pieces_ok=None):
     """Toutes les places (grille de `pas` m dans les pièces), 4 orientations par angle candidat, plusieurs hauteurs."""
     tout = np.concatenate(mod["pieces"])
     xs = np.arange(tout[:, 0].min() + 0.1, tout[:, 0].max(), pas)
     ys = np.arange(tout[:, 1].min() + 0.1, tout[:, 1].max(), pas)
     G = np.array([(x, y) for x in xs for y in ys])
     G = G[(piece_de(mod, G) >= 0)]
+    G = G[permis(mod, G, pieces_ok)]
     G = G[dist_seg(G, mod["A"][mod["genre"] != 1], mod["B"][mod["genre"] != 1]).min(1) > 0.12]
     caps = [(base - al + 90 * k) % 360 for al in alphas for k in range(4)]
     res = []
@@ -247,7 +265,7 @@ def chercher(mod, car, vh, f, alphas, base, w, pas=0.25, zs=(0.9, 1.15, 1.4)):
     return np.concatenate(res)
 
 
-def affiner(mod, car, cam, tours=40, echelle=1.0):
+def affiner(mod, car, cam, tours=40, echelle=1.0, pieces_ok=None):
     cam = np.array(cam, float)
     pas = np.array([0.2, 0.2, 0.15, 4.0, 0, 30.0, 0, 20.0]) * echelle
     best = float(noter(mod, car, cam, pas_col=4)[0])
@@ -264,7 +282,7 @@ def affiner(mod, car, cam, tours=40, echelle=1.0):
                 continue
             ns = noter(mod, car, np.array(essais), pas_col=4)
             k = int(np.argmax(ns))
-            if ns[k] > best + 1e-6 and piece_de(mod, essais[k][None, :2])[0] >= 0:
+            if ns[k] > best + 1e-6 and piece_de(mod, essais[k][None, :2])[0] >= 0 and permis(mod, essais[k][None, :2], pieces_ok)[0]:
                 cam, best, bouge = essais[k], float(ns[k]), True
         if not bouge:
             pas *= 0.5
@@ -308,7 +326,12 @@ if __name__ == "__main__":
             k = c["camera"]
             main = np.array([k[x] for x in ("x", "y", "z", "cap", "tangage", "f", "u0", "v0")])
             n_main = float(noter(mod, car, main, pas_col=4)[0])
-            R = chercher(mod, gros, vh, f, [al], base, w)
+            q = main.copy()
+            while piece_de(mod, q[None, :2])[0] < 0:
+                q[:2] += 0.05 * np.array([np.cos(np.radians(q[3])), np.sin(np.radians(q[3]))])
+            pm = piece_de(mod, q[None, :2])[0]
+            ok_p = {pm} if ORACLE else None
+            R = chercher(mod, gros, vh, f, [al], base, w, pieces_ok=ok_p)
             ordre = np.argsort(-R[:, 8])
             choisis = []
             for o in ordre:
@@ -317,13 +340,13 @@ if __name__ == "__main__":
                     choisis.append(r)
                 if len(choisis) == 24:
                     break
-            fins = [affiner(mod, car, affiner(mod, gros, r[:8], tours=12)[0], echelle=0.5) for r in choisis]
+            fins = [affiner(mod, car, affiner(mod, gros, r[:8], tours=12, pieces_ok=ok_p)[0], echelle=0.5, pieces_ok=ok_p) for r in choisis]
             fins.sort(key=lambda x: -x[1])
             cam, note = fins[0]
             second = fins[1][1] if len(fins) > 1 else 0.0
             dpos = float(np.linalg.norm(cam[:2] - main[:2]))
             dcap = abs((cam[3] - main[3] + 180) % 360 - 180)
-            pm, pa = piece_de(mod, main[None, :2])[0], piece_de(mod, cam[None, :2])[0]
+            pa = piece_de(mod, cam[None, :2])[0]
             ligne = (f"{app} {nom} [{c.get('qualite')}] écart place {dpos:5.2f} m, cap {dcap:5.1f}°, z {cam[2]:.2f}/{main[2]:.2f}, f {cam[5]:.0f}/{main[5]:.0f}, "
                      f"pièce {'OK ' if pm == pa else 'NON'} ({mod['ids'][pa]}) | note {note:.2f} (2e {second:.2f}, main {n_main:.2f}) | {time.time() - t0:.0f} s")
             print(ligne, flush=True)
