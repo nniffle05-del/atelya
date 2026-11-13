@@ -523,3 +523,4 @@ LIMITE DE FOND (dite à NT) : le bas vide apparaît justement quand on montre un
 le réglerait vraiment ; NT ne veut ni message de relance au client, ni caméra tenue loin des fenêtres, ni contenu fabriqué.
 Tests : coût du regard, et vol avec / sans l'exception des cadrages (`tests/test_vide_dehors.py`). Films :
 `..\atelya\b2\app-002\unreal\film\vide-cadrages(-avant-apres).mp4` (versions 1 et 2 : `evite-le-vide*`, `vide-evite-dose*`).
+**FUSION DANS `main` (13/11/2026, accord NT « fais ce que tu penses être le mieux ») :** toute la branche `etape-ecran-lecture-claude` (108 commits, jusqu'à l'étape 6 de la cinématique) fusionnée dans `main` (f0a49c8) et POUSSÉE sur GitHub. Étape suivante conseillée à NT : caméras des photos calées seules, dans une nouvelle conversation.
