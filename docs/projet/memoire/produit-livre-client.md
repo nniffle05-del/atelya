@@ -498,3 +498,11 @@ par les fenêtres → rue ou toile sous la vue). app-002, vol de 46 s : 21,5 s a
 de son inclinaison. BAISSER la caméra à la hauteur des photos du client (0,8-1,4 m, médiane 1,2 ; le film vole à 1,6-1,9 m) n'en
 retire qu'une partie : 1,4 m → 19,8 s / 4,4 % ; 1,2 m → 17,6 s / 3,6 % ; 1,0 m → 15,2 s / 2,9 %. Le reste = la caméra plus PRÈS
 des fenêtres que le photographe. Non branché dans le film ; décision NT attendue (voir message du 13/11).
+**Option « baisser la caméra » essayée et NON RETENUE (13/11/2026, NT : demander le moins possible au client, ne pas éloigner la
+caméra des fenêtres).** Essai (non gardé dans le code) : la caméra descend seule vers la hauteur médiane des photos du client
+(1,19 m sur app-002) aux moments où du vide entrerait dans l'image, jamais sous un meuble survolé, descente élargie et adoucie.
+Mesuré sur le vol d'app-002 : vide 21,5 → 18,1 s, au pire 6,3 → 4,1 % de l'image, moyenne 1,2 → 0,7 % ; MAIS la caméra frôle les
+meubles 8,6 s au lieu de 2,3 (note du contrôleur 66 → 57) et monte / descend sans cesse (4 m de dénivelé cumulé ; 2 m en élargissant
+à 3 s, pour 20 s de vide). Gain faible, coût réel : pas branché, pas de film. Reste ouvert : le vide sous la vue ne se règle ni par
+le regard, ni par la hauteur ; il vient de la caméra plus près des fenêtres que le photographe. `vide_dehors.mesurer` peut servir
+à savoir SEUL si un logement a besoin d'une photo de la vue (ne la demander que dans ce cas).
