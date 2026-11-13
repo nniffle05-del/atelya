@@ -404,3 +404,9 @@ passés par `balade_unreal` (toujours, pas seulement avec --photos). Décor : `v
 est la DALLE ou un mur de côté (sinon le carrelage du balcon partait sur la rue) ; un garde-corps en verre ou à barreaux laisse voir
 le dehors (tout retirer vidait la vue du séjour, essai du 13/11). LIMITES : balcons construits dans Unreal seulement (pas encore dans
 la maquette Blender ni lus sur un plan par Atelya : relevés à la main pour app-002) ; contour rectangulaire.
+Comparaison avec l'annonce depuis la place des photos 03, 14, 15 (`..\atelya\b2\app-002\unreal\film\balcons-zoom-v3.jpg`) : verre
+des garde-corps trop laiteux (35 % -> 12 %, base gris foncé : on voit la rue à travers, comme sur la photo 15), lisse haute 5 -> 10 cm,
+balcon du SÉJOUR = MURET PLEIN (photo 03 ; erreur de relevé corrigée, `genre: plein`, construit en muret). Film final
+`vraie-vue-balcons2.mp4` (+ `-avant-apres`) : dehors presque blanc 89 -> 26 %, couleur 0,004 -> 0,051, détail 0,6 -> 3,7 crans, murs
+inchangés (trop clairs / sombres =, écart médian -0,012 -> -0,029). NT : « j'aime beaucoup ». Qui fait quoi (question de NT) : Atelya
+construit, peint le décor et tourne seul ; relevés à la main par Claude pour app-002 : balcons, caméras des photos, distance 35 m.
