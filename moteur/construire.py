@@ -5,7 +5,7 @@
 Produit dans le dossier de sortie :
 - construction.json : les briques calculées, avec leur matériau, les lampes
   et les caméras (lisible, utile pour vérifier) ;
-- maquette.blend : la maquette habillée, à ouvrir dans Blender ;
+- maquette.blend : la maquette habillée, à ouvrir dans Blender, avec une scène par éclairage (menu des scènes) ;
 - images/vue-dessus.png et images/vue-<pièce>.png : les deux images rendues.
 
 Options : --sans-images (maquette seulement, rapide) ; --brouillon (images
@@ -30,10 +30,12 @@ from moteur.habillage import plan_habille
 from moteur.logement import charger_logement
 
 DOSSIER_SCRIPTS = Path(__file__).parent / "blender"
+# B2-3 : la bibliothèque de matières (photos CC0, hors Git). Variable ATELYA_MATIERES, sinon à côté du dépôt sur le PC.
+MATIERES_PC = Path(__file__).resolve().parents[2] / "atelya" / "bibliotheque" / "matieres"
 BLENDER_MAC = "/Applications/Blender.app/Contents/MacOS/Blender"
 
 # Qualité des images : (échantillons, pourcentage de la taille finale 1600 × 1000).
-QUALITES = {"finale": (128, 100), "brouillon": (16, 25)}
+QUALITES = {"finale": (512, 100), "brouillon": (16, 25)}  # B2-4 : 512 passes, sinon la lumière du jour marbre les murs
 
 
 def trouver_blender() -> str | None:
@@ -42,6 +44,59 @@ def trouver_blender() -> str | None:
         if candidat and Path(candidat).is_file():
             return candidat
     return None
+
+
+def trouver_matieres() -> Path | None:
+    """Le dossier de la bibliothèque de matières, ou None (Blender dessine alors ses sols par calcul)."""
+    for candidat in (os.environ.get("ATELYA_MATIERES"), MATIERES_PC):
+        if candidat and (Path(candidat) / "matieres.json").is_file():
+            return Path(candidat)
+    return None
+
+
+MEUBLES_PC = Path(__file__).resolve().parents[2] / "atelya" / "bibliotheque" / "meubles-abo"
+
+
+def trouver_meubles() -> Path | None:
+    """Le dossier de la bibliothèque de meubles ABO, ou None (Blender pose alors des blocs aux bonnes dimensions)."""
+    for candidat in (os.environ.get("ATELYA_MEUBLES"), MEUBLES_PC):
+        if candidat and (Path(candidat) / "liste.json").is_file():
+            return Path(candidat)
+    return None
+
+
+def choisir_modeles(plan: dict, bibliotheque: Path | None) -> dict:
+    """Pour chaque meuble du commerce du plan : le modèle ABO le plus proche (catégorie, dimensions, couleur) et son fichier.
+    Deux meubles identiques (mêmes catégorie, dimensions et couleur, comme 4 chaises autour d'une table) prennent le même
+    modèle ; deux meubles différents de même catégorie dans le logement évitent de prendre le même."""
+    if bibliotheque is None or not plan.get("meubles"):
+        return plan
+    from moteur.meubles import chemin_modele, charger_liste, choisir
+    liste = charger_liste(bibliotheque)
+    fichier_memoire = bibliotheque / "couleurs-mesurees.json"  # vraie couleur des textures, mesurée une fois par modèle
+    memoire = json.loads(fichier_memoire.read_text(encoding="utf-8")) if fichier_memoire.is_file() else {}
+    avant = len(memoire)
+    deja: dict[tuple, str] = {}
+    pris: dict[str, set] = {}
+    for m in plan["meubles"]:
+        if m["sur_mesure"]:
+            continue
+        cle = (m["categorie"], tuple(round(d, 2) for d in m["dimensions"]), tuple(m["couleur"] or ()))
+        ident = m.get("modele") or deja.get(cle)
+        if ident is None:
+            e = choisir(m["categorie"], m["dimensions"], m["couleur"], liste, exclure=pris.get(m["categorie"], set()),
+                        bibliotheque=bibliotheque, memoire=memoire)
+            ident = e["id"] if e else None
+        if ident is None:
+            continue
+        deja[cle] = ident
+        pris.setdefault(m["categorie"], set()).add(ident)
+        fichier = chemin_modele(bibliotheque, ident)
+        if fichier is not None:
+            m["modele"], m["fichier"] = ident, str(fichier.resolve())
+    if len(memoire) > avant:
+        fichier_memoire.write_text(json.dumps(memoire), encoding="utf-8")
+    return plan
 
 
 def lancer_blender(*arguments: str) -> None:
@@ -63,12 +118,22 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     dossier.mkdir(parents=True, exist_ok=True)
 
     plan = dossier / "construction.json"
-    plan.write_text(json.dumps(plan_habille(logement), indent=2, ensure_ascii=False),
+    plan.write_text(json.dumps(choisir_modeles(plan_habille(logement), trouver_meubles()), indent=2, ensure_ascii=False),
                     encoding="utf-8")
 
     maquette = dossier / "maquette.blend"
+    matieres = trouver_matieres()
     lancer_blender("--python", str(DOSSIER_SCRIPTS / "poser_briques.py"),
-                   "--", str(plan), str(maquette))
+                   "--", str(plan), str(maquette), *([str(matieres.resolve())] if matieres else []))
+    if json.loads(plan.read_text(encoding="utf-8")).get("reglages_teinte"):
+        # B2 temps 2 : la teinte des sols vus sur une photo du client est réglée au rendu (voir regler_teintes.py).
+        lancer_blender(str(maquette), "--python", str(DOSSIER_SCRIPTS / "regler_teintes.py"),
+                       "--", str(plan), str(dossier / "reglages_teinte.json"))
+    if json.loads(plan.read_text(encoding="utf-8")).get("vues"):
+        # B2 temps 2 (09/11/2026) : une scène Blender par éclairage (jour, voilé, fin de journée, soirée, nuit) ; la scène
+        # active reste le jour ensoleillé, où la teinte des sols vient d'être réglée (voir moteur/eclairages.py).
+        from moteur.eclairages import poser as poser_eclairages
+        poser_eclairages(plan, maquette, maquette)
     return maquette
 
 
@@ -103,7 +168,7 @@ def main() -> None:
         maquette = construire(args.logement, args.sortie)
         print(f"Maquette prête : {maquette}")
         if not args.sans_images:
-            print("Calcul des images (une à deux minutes)…")
+            print("Calcul des images (quelques minutes)…")
             qualite = "brouillon" if args.brouillon else "finale"
             for image in rendre(maquette, Path(args.sortie) / "images", qualite):
                 print(f"Image prête : {image}")

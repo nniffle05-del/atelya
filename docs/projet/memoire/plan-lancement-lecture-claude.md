@@ -1,0 +1,820 @@
+---
+name: plan-lancement-lecture-claude
+description: Décision NT du 08/11/2026 — au lancement, c'est Claude (par l'API) qui lit les plans, Atelya fait tout le reste ; lecteur entraîné gardé en secours / second avis ; chantiers d'entraînement au second plan ; étape choisie = brancher l'écran de vérification sur la lecture de Claude
+metadata:
+  type: project
+---
+**Décision NT (08/11/2026, projet claude.ai), changement de plan :**
+
+- **Au lancement, ce n'est PAS Atelya qui lit les plans : c'est Claude, par l'API** (clé API sur console.anthropic.com,
+  pas l'abonnement : ses conditions interdisent l'usage automatique, voir [[lecture-par-api-claude]]). Claude lit le plan et
+  rend sa lecture ; Atelya fait tout le reste.
+- **Atelya lira les plans lui-même À TERME**, quand il sera assez fort. Raison : entraîner le lecteur sur de vrais plans coûte
+  trop cher et prend trop de temps pour l'instant (vérités faites par Opus imparfaites ; celles de Fable presque parfaites mais
+  ~8 plans épuisent le quota de la semaine).
+- **Le lecteur entraîné n'est PAS jeté** (U-Net essai 5 / 7b, aiguillage, traducteur) : il sert de **secours** et de **second
+  avis** pour contrôler la lecture de Claude.
+- **Chantiers d'entraînement du lecteur AU SECOND PLAN** : lot 2 du générateur, essai 8, vérités et entraînement sur les 105
+  vrais plans. **Ne pas les reprendre sans l'accord de NT.** (Le travail fait reste sur la branche `etape-vrais-plans-105`.)
+- **Atelya = tout ce qui suit la lecture** : écran de vérification, géométrie, Blender, habillage, photos et matières, meubles,
+  soleil réel, caméra et cinématique, Unreal, plan 2D propre. Rien de tout cela n'est à « entraîner » : c'est du code (règles),
+  plus au besoin des modèles déjà entraînés sous licence commerciale (SAM 2, DINOv2).
+- **Claude ne calcule PAS les mètres** : il rend tout en pixels de l'image envoyée (murs, ouvertures, pièces, textes lus avec
+  leur position, doutes) ; c'est notre code qui calcule l'échelle (cotes, surfaces, « 1/50 ») avec les garde-fous
+  d'`echelle_plan`, pour qu'une erreur de calcul de Claude ne passe pas en silence.
+- **Coût et exactitude de la lecture par Claude** : testés dans un AUTRE fil (outil `outils/lecture_api/lire_plans_claude.py`
+  et mémoire `lecture-par-api-claude.md`, branche `origin/claude/project-thread-qtyplp`). Ne pas refaire ce test ailleurs,
+  ne rien dépenser, **ne jamais mettre de clé API dans le dépôt ni dans le fil**. NB : cet outil demande à Claude des MÈTRES ;
+  le format en pixels de l'étape ci-dessous le remplacera le moment venu (le chiffre d'exactitude sera alors à refaire).
+
+**Étape choisie par NT (08/11/2026) : brancher l'écran de vérification sur la lecture de Claude.** Branche dédiée
+(`etape-ecran-lecture-claude`). Contenu demandé : 1) format de la lecture de Claude en pixels (+ textes et doutes) ;
+2) traducteur lecture de Claude → `logement.json` + `verification.json` (calage pixels ↔ mètres) ; 3) doutes (bon sens,
+construction, cotes/surfaces contradictoires, doutes de Claude ; en option : désaccord avec Atelya) ; 4) essai sans clé API sur
+les vérités des 15 vrais plans (`verites/`) prises comme lecture parfaite + copies abîmées exprès ; aucun réglage sur les 13
+plans d'examen ; 5) ensuite seulement : NT chronomètre la correction à l'écran, puis 3D Blender. **Plan validé par NT le 08/11/2026**
+(base : `etape-vrais-plans-105` fusionnée dans `main` en local par avance rapide, 33e58de, choix « B » de NT ; nouvelle branche
+`etape-ecran-lecture-claude` partie de ce `main`).
+
+**Correction validée par NT (08/11/2026) : l'échelle à « deux clés ».** NT a demandé si Claude n'est pas plus adapté à la lecture
+complète. Réponse honnête : non mesuré à ce jour ; Claude est sans doute meilleur pour COMPRENDRE (quelle cote mesure quel mur,
+textes, styles jamais vus ; notre code ne lit l'échelle que sur 4/15 vrais plans), moins sûr pour le CALCUL exact (pixels précis,
+longues chaînes de calcul, erreurs dites avec aplomb). Donc : Claude donne, pour chaque cote, sa valeur et les deux bouts de son
+trait en pixels, plus SA propre échelle proposée ; notre code recalcule l'échelle depuis ces cotes avec les contrôles d'accord
+actuels ; si les deux échelles s'accordent à 3 % → « sûre », sinon doute fort en tête de l'écran. Si les mesures montrent un jour
+que Claude ne se trompe pas sur l'échelle, on pourra lui donner plus de poids sans rien refaire.
+Partage des rôles rappelé à NT : la LECTURE (reconnaître murs, portes, pièces, textes) = le gros du travail = Claude ; la qualité
+de lecture dépend donc surtout de lui (Atelya signale, l'humain corrige) ; dépendance à Anthropic (prix, disponibilité) → U-Net
+gardé en secours ; tout ce qui suit la lecture = 100 % Atelya.
+
+**Images envoyées à l'API (documentation officielle lue le 08/11/2026, pages vision et vision-coordinates)** : modèles « haute
+résolution » (Claude 4.7 et suivants : Opus 5.5, Sonnet 5.5, Fable 5.1) = côté ≤ 2 576 px ET ≤ 4 784 jetons (1 jeton = carré de
+28 × 28 px) ; au-delà l'API RÉDUIT l'image en silence et Claude rend ses coordonnées dans l'image réduite. Bord vide ajouté en bas
+et à droite (multiple de 28) sans déplacer l'origine. Coordonnées de Claude = APPROXIMATIVES (doc) → recalage sur le trait du
+dessin ; pour les détails fins, envoyer un recadrage. Un PDF envoyé tel quel est converti à une taille inconnue → toujours envoyer
+NOTRE image. Garde-fou : bloc image `"transformations": {"oversized_image": "error"}` (refus au lieu de réduction). Coordonnées
+absolues en pixels demandées explicitement (la doc déconseille les coordonnées 0-1000). Formule de réduction recopiée dans
+`moteur/lecture_claude.py` (`taille_pour_claude`, testée sur les exemples de la doc).
+
+**Sous-étape 1 FAITE (08/11/2026)** : `moteur/lecture_claude.py` 0.1.0 = format `lecture-claude/0.1` (pydantic strict : murs axe +
+épaisseur px, ouvertures bord à bord, pièces nom écrit + type parmi les 11 du coloriage + point + contour facultatif, cotes texte +
+valeur_m + cadre + DEUX BOUTS + mur, surfaces, autres textes, échelle proposée par Claude, niveaux non lus, doutes de Claude) ;
+`controler_fiche` (refus : forme, image d'une autre taille ou que l'API réduirait, point loin hors image, trait nul ; doutes : nombre
+écrit ≠ valeur comptée, point hors contour ; petits débords ramenés au bord) ; `consigne()` = texte pour Claude (rien envoyé) ;
+`tests/test_lecture_claude.py` 12 tests.
+
+**Sous-étape 2 FAITE (08/11/2026)** : `moteur/traduire_claude.py` 0.1.0 (`traduire(source, fiche contrôlée, facteur)` → `PlanLu`
+que `preparer_verification.verification_du_plan` affiche SANS changement). Enchaînement : murs recalés sur l'encre
+(`moteur/recalage_murs.py` = `affiner_mur` DÉPLACÉ tel quel depuis `outils/verite/faire_verite.py`, qui l'importe) → bâti → pièces =
+zones fermées autour du point de Claude (contour de Claude si les murs ne ferment pas : doute faible ; sinon pièce non construite,
+doute fort ; deux points dans la même zone sans contours = pièces réunies, doute faible) → « coloriage de Claude » (classes du U-Net,
+768 px) donné à `lire_echelle_plan` avec les textes de Claude comme textes de PDF (textes exacts du PDF prioritaires) + `decider` →
+DEUX CLÉS : Atelya (dessin) et Claude (proposée) d'accord à 3 % → « lue » ; désaccord → « à vérifier » + doute fort
+`echelle_desaccord` (brouillon à l'échelle d'Atelya) ; seulement Atelya → « lue » ; sans clé d'Atelya → toujours « à vérifier »,
+brouillon = cotes de Claude recalculées par nous depuis leurs bouts (plus grand groupe d'accord à 3 %, ≥ 2 cotes) → échelle proposée
+par Claude (taille vraisemblable) → secours d'Atelya. Logement : repère d'Atelya (origine coin sud-ouest intérieur), ouvertures sur
+le mur désigné par Claude s'il passe par elles sinon le plus proche (≤ 12 px ou l'épaisseur), raccourcies au bout du mur. Doutes :
+fiche (fort), Claude (gravité de Claude), plusieurs niveaux (en tête), échelle, pièces, puis `examiner` (bon sens). Défaut trouvé par
+les tests et corrigé : deux cotes en désaccord → la médiane n'en gardait aucune (division par zéro) → plus grand groupe d'accord.
+Constat : notre lecteur trouve l'échelle par les SURFACES recopiées par Claude même sans cotes dessinées (textes non vérifiés sur
+l'image) → piste sous-étape 3 : vérifier que les textes de Claude existent bien sur l'image (OCR sur leur cadre).
+Outil : `outils/lecture_claude/traduire_fiche.py` (`preparer` = envoi.png à la taille exacte + consigne.txt ; `traduire` = mêmes
+sorties que lire_plan.py, ecran.html compris ; aucun appel à l'API). Tests : `tests/test_traduire_claude.py` 11 (plan dessiné exprès,
+positions de Claude décalées de 3 px : murs à 5 mm près, pièces à 1-2 %, calage sur l'encre, désaccord 20 % attrapé, image envoyée
+réduite de moitié, pièce ouverte, pièces réunies, ouverture hors mur, cote mal recopiée, plusieurs niveaux, fiche refusée).
+
+**Sous-étape 3 FAITE (08/11/2026)** : `moteur/doutes_claude.py` 0.1.0, branché dans `traduire_claude` 0.2.0. Trois contrôles de ce que
+Claude affirme contre ce qu'il n'a pas produit : (1) textes recopiés : PDF → un texte exact du PDF avec le même nombre doit être dans
+le cadre (sinon fort) ; image → cadre presque sans encre (< 1 %) = texte inventé (fort), sinon OCR d'Atelya sur le seul cadre (agrandi
+×2) : autres chiffres lus → FAIBLE (l'OCR se trompe souvent sur les vrais plans), rien lu → rien ; (2) cote contre le dessin
+(échelle LUE seulement) : longueur entre les marques retrouvées par Atelya (tolérance 3 %) sinon entre les bouts de Claude (5 % ou
+8 px) contre le nombre ÉCRIT → fort ; (3) surface écrite contre la pièce construite (échelle lue seulement ; pièce rattachée par
+Claude, sinon celle qui contient le texte) : écart > 10 % et > 0,5 m² → fort. Seuils posés par principe, à recalibrer sur les vérités
+d'ENTRAÎNEMENT. Limite connue : un texte inventé posé sur un trait (encre présente) n'est pas vu si l'OCR ne lit rien. Corrigé au
+passage : les doutes écrits avant la construction désignaient les éléments par l'id de la fiche (« P1 ») → remis aux ids du logement
+(l'écran surligne le bon élément) ; message « pièces réunies » avec les noms. Doutes de construction (3D) : déjà ajoutés par
+`verification_du_plan`. Option « second avis d'Atelya » (U-Net) : NON faite, à proposer à NT après mesure du taux de fausses alertes
+(sous-étape 4). Tests : 7 de plus dans `tests/test_traduire_claude.py` (30 pour l'étape).
+
+**DÉCISION NT (08/11/2026, après la sous-étape 3)** : « Non, on testera l'API à la fin. » La sous-étape 4 (essai sur les vérités +
+copies abîmées) et tout test de l'API sont REPORTÉS À LA FIN. Priorité : qu'Atelya soit performant PARTOUT, en commençant par la
+partie Blender (la 3D et les rendus). Entrée de travail : un plan dont FABLE a fait la vérité (vérités Fable relues = fr-021 à fr-027,
+fr-029 à fr-041, plans d'ENTRAÎNEMENT, utilisables librement), pris comme « lecture de Claude ». Plan choisi : fr-031 (coté en m,
+1/50, 115 px/m, 15 murs, 17 ouvertures, 8 pièces, confiance 88 ; image `..\atelya\vrais-plans\lot-2026-11-05\fr-031.jpg`).
+
+**Premier passage fr-031 de bout en bout (08/11/2026)** : `outils/lecture_claude/fiche_depuis_verite.py` (vérité → fiche, murs
+affinés de verite.json, échelle de la vérité = clé de Claude, remarques de Fable = doutes faibles) puis `traduire_fiche.py traduire
+--textes-atelya` (OCR d'Atelya comme textes) → ..\atelya\lectures-claude\fr-031\ (ecran.html) → `python -m moteur.construire` →
+..\atelya\lectures-claude\fr-031\3d\ (maquette.blend, 2 images Cycles, 37 s). Constats : échelle « à vérifier » car la lecture des
+cotes d'Atelya se trompe sur ce plan (8,04 → 106 px/m au lieu de 115, cotes contredites/ambiguës) : les deux clés ont bien refusé
+« lue » ; 2 doutes « porte de 3,01 m / 2,40 m » = conventions des vérités (front de placard et cuisine ouverte tracés en mur de 2-3 px
++ porte de toute la largeur). Rendu : disposition juste, mais DÉFAUTS 3D vérifiés au zoom : (1) filet BLEU (ciel) à la jonction
+sol / mur côté fenêtres = trou entre le sol et le mur ; (2) filet de LUMIÈRE à la jonction plafond / mur ; (3) petits CARRÉS NOIRS aux
+jonctions de murs (vue de dessus) ; (4) faux murs fins des vérités rendus comme des murs. Qualité : pièces vides, lumière plate, soleil
+fixe inventé, pas de plinthes, focale très large, 2 images seulement. Plan Blender (B1 maquette sans défaut → B2 rendu photo d'annonce
+→ B3 soleil réel → B4 meubles → B5 caméra / cinématique + comparatif) proposé à NT, en attente de son choix.
+
+**Why:** lancer Atelya plus vite avec une lecture déjà bonne, sans payer maintenant l'entraînement sur de vrais plans ; garder
+la vérification humaine et nos garde-fous d'échelle pour qu'aucune erreur de Claude ne passe en silence.
+**How to apply:** ne plus proposer d'entraînement du lecteur comme priorité ; juger les étapes sur ce qu'elles apportent à la
+chaîne « lecture de Claude → vérification → 3D » ; ne jamais faire calculer l'échelle par Claude ; aucune dépense API sans
+accord écrit de NT. Voir [[objectif-global-nt]], [[atelya-verification-reelle]], [[ecran-verification]],
+[[atelya-echelle-vrais-plans]], [[vrais-plans-francais]].
+Meubles (B4) : NT veut du RÉALISTE avant tout (08/11/2026) → ABO retenu, Sand3D écarté (voir audit-technologique-2026-10-31.md).
+
+**B1 « maquette sans défaut » (08/11/2026, accord NT « Oui »)** — image donnée à NT : maquette en carton, murs = planches, sol =
+moquette. Défauts vus sur fr-031 et leurs causes : filet de ciel au pied des murs et de lumière au plafond (sols/plafonds = contour lu,
+quelques mm en retrait des murs), carrés noirs aux jonctions (deux murs l'un dans l'autre : dessus à la même hauteur qui se font de
+l'ombre au rendu ; aussi bouts lus qui se croisent ou s'arrêtent à 3,5 cm), cuisine NOIRE (deux sols superposés : la 1re pièce d'une
+zone partagée gardait toute la zone), faux murs fins des vérités. Corrections :
+- `moteur/geometrie.py` : bouts à moins de max(3 cm, ½ épaisseur du plus mince) réunis ; nœud de 3 murs dont 2 alignés = T accepté (avant
+  refusé), le mur qui arrive s'arrête sur la FACE ; bout libre qui s'arrête avant / entre dans / traverse un autre mur coupé sur la bonne
+  face (angle L croisé : l'un va à la face extérieure, l'autre à la face intérieure ; dépassement ≤ 50 cm) ; sols et plafonds CALÉS sur
+  les faces des murs (côté parallèle à 2°, à ≤ 10 cm, longeant la face sur ≥ 90 %) ; bouche-trous en fin de calculer_briques.
+- `moteur/controle_maquette.py` 0.1.0 (nouveau) : grille de 4 mm vue de dessus ; trous du sol et du plafond, sols superposés, murs
+  superposés ; `jours_a_boucher` : fente (épaisseur = plus grand cercle inscrit ≤ 6 cm) bouchée par le sol de la pièce voisine ;
+  morceau de pièce ≤ 1 m² complété ; vide enclos sans pièce ≤ 2 m² rempli comme un mur (gaine) ; plus grand = JAMAIS bouché.
+- `moteur/preparer_verification.py` : doutes `zone_sans_piece` (fort, ≥ 0,25 m² : pièce oubliée, terrasse, partie commune ?) et
+  `vide_rempli` (faible, ≥ 0,5 m² : WC ou placard oublié ?).
+- `moteur/traduire_claude.py` : zone partagée par plusieurs pièces à contours DÉCOUPÉE entre elles (chaque point à la pièce dont le
+  contour le contient, sinon la plus proche) ; jamais deux pièces au même endroit ; contour à angles droits gardé seulement s'il épouse
+  la zone (≤ 3 % ET ≤ 1,5 px en moyenne le long du bord ; avant : comparaison des seules surfaces).
+- `outils/lecture_claude/fiche_depuis_verite.py` : faux murs des vérités (< 5 cm, couverts à ≥ 85 % par des ouvertures) retirés, chaque
+  pièce reçoit son contour.
+- `moteur/blender/poser_briques.py` : chaque mur monte de 0,1 mm de plus que le précédent (cycle de 10, ≤ 0,9 mm) : deux murs qui se
+  croisent en X (fr-021, murs de 80 cm) n'ont plus leurs dessus au même niveau (plus de noir) ; invisible.
+Mesures sur les 20 vérités Fable (`pc/b1/mesurer_jours.py`, résultats `..\atelya\b1\jours.json`) : avant 3 à 163 trous par plan et 2
+plans refusés par la 3D (fr-023, fr-034) ; après : 20/20 construits, 15/20 SANS AUCUN TROU, les 5 autres (fr-022, 023, 034, 035, 036,
+037 : grandes zones sans pièce de 1,7 à 67 m²) signalées ; sols superposés ≤ 0,04 m² (bruit de mesure : ~0,004 m² par mètre de frontière
+commune) ; murs superposés de 7,5 → 2,2 m² (fr-021, croix de murs épais, rendue propre par le décalage de hauteur) et ≤ 0,3 m² ailleurs.
+Rendus Blender vérifiés à l'œil : fr-031 (avant/après : `..\atelya\b1\fr-031-*-avant-apres.png`), fr-030, fr-021, fr-024, fr-026,
+fr-038 : plus de filet bleu, plus de filet de lumière, plus de carrés noirs, cuisine ouverte visible. Limites : quelques fins traits
+sombres le long de murs extérieurs de fr-021 (marches entre morceaux de mur d'épaisseurs différentes ? non vérifié) ; placards devenus
+des niches ouvertes (portes de placard à ajouter en B2/B4). Tests : `tests/test_controle_maquette.py` (6), 6 de plus dans
+`test_geometrie.py`, 1 de plus dans `test_traduire_claude.py`.
+
+**Après B1 (08/11/2026), discussion sur B2** : NT rappelle qu'Atelya produit TOUTE la maquette 3D (maquette.blend), pas seulement des
+images ; produit livré = visite libre (Unreal plus tard), cinématique, photos fixes, tous tirés de la même maquette. B2 renommée
+« maquette 3D réaliste », en deux temps : (1) dans la maquette (plinthes, portes de placard, encadrements, bibliothèque de vraies
+matières CC0, lumière du jour) puis (2) photos du client → matières de chaque pièce (choix dans la bibliothèque, corrigé à l'écran de
+vérification). NT : « il faudrait des photos de bonne qualité que le client délivre » → oui, c'est la brique photos (décision du 22/10 :
+le plan donne la forme, les photos l'apparence). PREMIER JEU D'ESSAI PLAN + PHOTOS reçu de NT le 08/11/2026 « avec les accords » :
+`..\atelya\photos-clients\app-001\` (4 pièces 124 m², HSP 3 m ; captures d'écran d'une annonce : plan basse définition sans cotes,
+12 photos ~1206 × 800 px avec marques ; LISEZMOI.txt = pièces et matières vues). À demander si possible : les originaux en pleine
+définition, sans marques. Ces photos de photographe servent aussi de RÉFÉRENCE de qualité pour les rendus.
+
+
+**B2 proposée à NT (08/11/2026, en attente de son accord)** : temps 1 en 4 sous-étapes, une à la fois, chacune montrée en images
+avant/après sur fr-031 + 2 autres vérités, contrôle des trous inchangé : B2-1 plinthes et encadrements (portes, appuis de fenêtre) ;
+B2-2 portes de placard (les niches ouvertes de B1) ; B2-3 bibliothèque de vraies matières (13 Poly Haven + 1 ambientCG en 2K, 3 cartes
+chacune : couleur, relief, brillance ; ~106 Mo ; dossier proposé `..\atelya\bibliotheque\matieres\` hors Git) + point de Hongrie et
+carreaux de ciment fabriqués par calcul ; B2-4 lumière du jour (ciel physique intégré à Blender, plafonniers éteints le jour, réglage
+d'exposition « comme un photographe »). Temps 2 (après) : lecture d'app-001 faite à la main comme une vérité, puis photos → matières.
+Licences relues : voir audit-technologique-2026-10-31.md (fin).
+**Accord NT (08/11/2026, écrit) : « télécharger toutes les matières »** → les 14 matières proposées sont téléchargées par
+`outils/bibliotheque/telecharger_matieres.py` dans `..\atelya\bibliotheque\matieres\` (hors Git) : 14 dossiers × 3 images 2048 × 2048
+(couleur.jpg, relief.jpg = normale OpenGL, brillance.jpg = rugosité), 98,6 Mo, sommes de contrôle Poly Haven vérifiées, `matieres.json`
+(source, auteurs, taille réelle couverte par une image en m) et `CREDITS.txt`. Vu à l'œil : 4 fiches ne ressemblaient pas à leur nom →
+renommées : floor_tiles_06 = `damier_pierre`, marble_01 = `pierre_beige`, square_tiled_wall = `mosaique_rayee` (brun/gris), Tiles036 =
+`faience_blanche` (carrés, pas métro) ; white_plaster_02 est gris taché → servira pour le grain, couleur de peinture posée par Atelya.
+Manquent encore : vraie faïence métro, marbre blanc (à ajouter si besoin, même licence). NT parle aussi de « télécharger le GitHub
+envoyé tout à l'heure » (meubles : ABO ou Sand3D ?) → question posée, rien téléchargé. Tailles : ABO officiel abo-3dmodels.tar 154 Go
+en un bloc ; réenvoi codepawl/abo-glb 43,1 Go (fichiers séparés) ; Sand3D (code) 24 Mo, Apache 2.0, écarté par NT le 08/11. Disque D : 900 Go libres.
+
+**B2-1 plinthes et encadrements (08/11/2026, « Oui » de NT ; corniches : plus tard)** — `moteur/habillage.py` 0.3 (règle FIXE, même
+partout ; NT a demandé si c'était d'après les photos : non, règle fixe d'abord, les photos ajusteront au temps 2 avec correction à
+l'écran) : PLINTHES 10 cm × 1,5 cm posées sur le sol calé de chaque pièce, seulement là où un mur existe au niveau du sol 2 cm derrière
+le bord (rien devant porte / porte-fenêtre / passage ouvert), arrêtées à 1 mm du chambranle, biseau dans les angles (rentrants et
+sortants), bout droit sinon ; CHAMBRANLE 6,5 cm × 2 cm sur les deux faces autour de chaque porte (3 morceaux qui ne se recouvrent pas,
+coupés au bout du mur et sous le plafond) ; FENÊTRES : cadre à 5 cm derrière la face intérieure (côté pièce trouvé comme pour la porte
+d'entrée ; au milieu si pièce des deux côtés), APPUI 2,5 cm sous les fenêtres d'allège ≥ 30 cm (pas sous les portes-fenêtres), qui
+dépasse de 3 cm. Tests : 3 de plus dans `test_habillage.py` (aire exacte de l'anneau de plinthes = biseaux sans trou ni recouvrement).
+Géométrie (calculer_briques) INCHANGÉE → contrôle des trous de B1 identique. Rendus avant/après rapprochés (porte, fenêtre, angle) sur
+fr-031, fr-030, fr-021 : `..\atelya\b2\<plan>-avant-apres.png`. fr-021 : 88 morceaux de plinthes (153 m), 84 morceaux de chambranle,
+40 d'appui. Limites connues : poteaux isolés au milieu d'une pièce sans plinthe autour ; 3 petits côtés (≤ 1,3 m) de fr-021 où le mur
+est à plus de 2 cm du bord de la pièce → pas de plinthe ; plinthe arrêtée net au bout d'un mur qui borde un passage ouvert (pas de
+retour autour du bout).
+
+**NT, 08/11/2026 (après B2-1)** : les finitions ne doivent PAS être posées partout par une règle fixe : Atelya doit décider
+**logement par logement** s'il y en a ou pas (« s'il voit qu'il y en a ou qu'il n'y en a pas »). Proposé : chaque finition
+(plinthes, et ensuite placards, corniches…) devient un réglage PAR PIÈCE dans le logement (avec / sans / plinthe carrelée,
+statut « estimé » tant que rien ne l'a vu), visible et modifiable à l'écran de vérification ; au temps 2, Atelya le remplit
+lui-même d'après les photos du client (statut « vu sur photo »). En attente du « oui » de NT avant de le faire (avant B2-2).
+
+**Plinthes pièce par pièce (08/11/2026, « Oui » de NT)** — format : champ facultatif `plinthes` de chaque pièce
+(`moteur/logement.py`, `Plinthes` : choix bois / carrelage / aucune + statut : « ajoute » = règle par défaut, personne ne l'a vu ;
+« estime » = vu par Atelya sur une photo (source photo_xx, temps 2) ; « mesure » = choisi à l'écran (source verification)). Sans
+champ : règle par défaut `habillage.plinthes_par_defaut` (carrelage dans une pièce carrelée d'après son nom, bois ailleurs).
+`habillage` 0.4 : « aucune » → rien ; « carrelage » → 8 cm × 1 cm, matière du sol (carrelage si le sol est en parquet).
+`preparer_verification` 0.3.0 : le fichier de l'écran porte la règle par défaut écrite (`completer_plinthes`, confiance 0,5) →
+l'écran (fiche de la pièce) montre la liste « Plinthes » + d'où vient le choix, et `reglerPlinthes` (calculs-verif.js) enregistre le
+choix de la personne. Écran testé dans Chrome sans fenêtre (Node absent du PC) : 9/9. Rendus : `..\atelya\b2\fr-031-plinthes-par-piece.png`
+(séjour bois / carrelage / aucune, salle d'eau par défaut), capture `..\atelya\b2\ecran-plinthes.png`. Même principe prévu pour les
+portes de placard (B2-2) et les corniches.
+
+**B2-2 portes de placard (08/11/2026, « Oui » de NT)** — même principe que les plinthes : champ `placard` de la pièce
+(`PortesPlacard` : coulissantes / battantes / aucune + statut ajoute / estime / mesure). Un placard = nom placard / rangement /
+dressing / penderie ET ≤ 4 m² (`habillage.est_placard` ; un dressing plus grand = une pièce, porte ordinaire : fr-038 9 et 16 m²),
+ou choix écrit. Règle par défaut : battantes sous 1 m de façade, coulissantes au-delà. `habillage` 0.5 : (1) façade OUVERTE (bord du
+sol du placard sans mur derrière, ≥ 40 cm, avec une autre pièce devant) → portes du sol au plafond juste derrière la ligne
+(coulissantes : panneaux ≤ 1 m, deux au moins, recouvrement 3 cm, deux plans, rails haut et bas, baguettes de prise ; battantes :
+portes ≤ 60 cm, fente 3 mm, poignées près des jonctions) ; (2) façade dessinée comme une PORTE dans un mur → le battant et les
+poignées de la porte sont remplacés par des portes de placard (cadre et chambranles gardés). Corrigé au passage : deux portes
+proches se partagent le trumeau (`_place_de_chaque_cote`) ; avant, leurs chambranles se recouvraient → filet noir (fr-031).
+Vrais plans : fr-031 (façade 3,04 m → 4 coulissants ; porte 1,57 m → 2), fr-021 (façade 2,17 m → 3 ; porte 0,62 → 1 battante),
+fr-030 : placards fermés de tous côtés sur la lecture (aucun accès, défaut de la vérité) → rien. Écran : liste « Portes du placard »
+dans la fiche d'un placard seulement (`estPlacard`, `reglerPlacard`), testée dans Chrome 7/7 ; préparateur : `completer_finitions`.
+Rendus : `..\atelya\b2\placards-b2-2.png`. Limite vue : petites lignes au sol à la jonction des parquets de deux pièces (fr-021, défaut
+d'avant B2-2, à revoir avec les vraies matières B2-3).
+
+**B2-3 vraies matières (08/11/2026, « Oui » de NT)** — catalogue `moteur/matieres.py` (9 sols : parquet chêne lames droites,
+bâtons rompus, point de Hongrie (calculé avec le chêne clair), stratifié, carrelage beige (photo en biais tournée de 45° :
+`ROTATION_PHOTO`), carreaux de ciment (calculés : cercles aux coins, étoile, losange rouge, 20 cm), tomettes, damier de pierre,
+dalles de pierre beige). ÉCARTÉ après essai à l'œil : granito (la photo terrazzo_tiles brune ressemble à du liège ou de la moquette :
+à remplacer par un vrai granito gris). Format : champ `sol` de la pièce (`Sol` : matiere + statut). Défaut : parquet chêne / carrelage
+beige selon le nom ; plinthes supposées carrelées si le sol est carrelé (matière du sol ; sous des carreaux de ciment, plinthe unie) ;
+renommer une pièce à l'écran oublie ce qu'Atelya avait SUPPOSÉ (statut ajoute) d'après l'ancien nom. Blender (`moteur/blender/materiaux.py`) :
+`Materiaux` créés à la demande, photos de la bibliothèque (couleur sRGB, brillance et relief non-couleur, normale OpenGL) en projection
+boîte à la taille réelle (matieres.json), toutes dans le même sens (`habillage.orientation_sols` = sens des murs les plus longs, le même
+dans tout le logement), murs et plafonds = peinture + grain de l'enduit (rugosité 0,8-0,95, relief 0,25), photos RANGÉES dans le .blend
+(fr-031 : 19 Mo). Bibliothèque trouvée par `construire.trouver_matieres` (variable ATELYA_MATIERES, sinon ..\atelya\bibliotheque\matieres) ;
+sans elle (Mac, tests) : anciens parquet / carrelage calculés. CORRIGÉ : les fines lignes au sol entre deux pièces (fr-021) = fentes entre
+sols (on voyait le vide) + bandes de raccord B1 posées à la même hauteur que les sols ; → copie de chaque sol 1 mm plus bas élargie de 2 cm
+(`sous_sols`, même matière : le dessin continue) et bandes de raccord à -0,5 mm : lignes disparues. Encadrement d'une porte voisine d'une
+fenêtre : peut couvrir tout le trumeau (seules deux portes se le partagent). Écran : liste « Sol » dans la fiche de chaque pièce (Chrome 6/6) ;
+un test Python vérifie que l'écran et le moteur ont la même liste. Rendus : `..\atelya\b2\sols-b2-3.png` (les 9 sols),
+`..\atelya\b2\fr-031-sejour-avant-apres-b2.png`. Reste vu : fin trait sombre dans le tableau d'une porte-fenêtre de fr-031 (existait
+avant, ombre de l'embrasure : à revoir avec la lumière B2-4) ; faïence murale des salles d'eau pas encore posée (les murs sont partagés
+entre deux pièces : il faudra peindre chaque face) ; portes de placard toujours blanches.
+
+**Parquets en plus (08/11/2026, demande de NT : « trouver d'autres parquets très réalistes », l'actuel lui semble un peu foncé)** :
+86 parquets comparés en vignettes (64 ambientCG, 22 Poly Haven, tous CC0, rien téléchargé à part les vignettes). 15 PROPOSÉS, en
+attente du « oui » de NT pour le téléchargement (~245 Mo, 2K) : ambientCG WoodFloor051 (chêne clair moderne), 062 (chêne beige), 056
+(chêne grisé), 040 (chêne à nœuds, larges lames), 064 (lames foncées), 052 et 057 (VRAIS points de Hongrie), 053 et 058 (bâtons rompus
+clairs), 055 et 060 (parquet VERSAILLES), 069 (mosaïque des années 60-70) ; Poly Haven laminate_floor_03, oak_wood_planks,
+old_wooden_floor_03 (photos). Les ambientCG sont « PBRProcedural » (fabriqués à partir de photos de bois, pas photographiés d'un bloc) :
+on garde seulement ceux qui passent l'essai de rendu à l'œil, comme pour le granito. Planche : `..\atelya\b2\parquets-proposes.png`.
+**Suite (08/11/2026 soir, « Oui » de NT + « adapte un parquet aux photos »)** : les 15 parquets sont téléchargés
+(`telecharger_matieres.py` étendu ; bibliothèque : 29 matières, 242 Mo). Essai dans le séjour entier de fr-031
+(`..\atelya\b2\parquets-essai.png`) : GARDÉS 10 (chêne clair moderne, chêne grisé, chêne à nœuds, chêne clair larges lames, chêne
+naturel, vieux parquet, 2 points de Hongrie, 2 bâtons rompus) → catalogue de 19 sols ; ÉCARTÉS du choix (gardés dans la bibliothèque) :
+chêne beige et lames foncées (unis, plastique), Versailles clair et chaud (motif trop petit, rosé), mosaïque (terne). Mesure sur les
+photos d'app-001 (`moteur/teinte_photo.py`, mur blanc = étalon) : le parquet d'app-001 renvoie ~(0,52 ; 0,24 ; 0,10) de la lumière,
+notre parquet par défaut ~(0,22 ; 0,12 ; 0,06) → 2,4 fois plus sombre : NT avait raison. Nouveau : `teinte` du sol de la pièce
+(3 multiplicateurs, nom de matériau « matiere~r,g,b »). Essai fr-031 façon app-001 (`..\atelya\b2\app001-parquet.png`) : le dessin et
+la clarté suivent la photo, mais la couleur sort ROSÉE au rendu : l'éclairage actuel (plafonniers blanc chaud + ciel uni) teinte
+tout ; à régler avec B2-4 (lumière du jour) avant de juger la couleur. Chevrons d'app-001 plus grands que ceux d'ambientCG (colonnes
+~40 cm contre ~30). NT : « ça ressemble plus au 15 » (n° 15 de la planche proposée = mosaïque ?) → question posée.
+
+**B2-4 lumière du jour (09/11/2026 nuit, « tu peux commencer la lumière du jour » de NT ; il retire sa remarque sur le « 15 »)** —
+`habillage` 0.7 + `moteur/blender/poser_briques.py` + `rendre.py` : (1) le soleil n'est plus une lampe : ciel physique de Blender
+(`ShaderNodeTexSky`, MULTIPLE_SCATTERING, disque solaire) dans la direction du soleil du plan (convention vérifiée par l'ombre d'un poteau :
+rotation 0 = soleil vers +y, 90° = vers +x ; `sun_direction` ne vaut rien pour ce type) ; sous l'horizon, vu par la caméra, un sol gris
+éclairé par le ciel (sinon fond NOIR en vue de dessus) ; (2) un PORTAIL (lampe `is_portal`) sur la face extérieure de chaque fenêtre /
+porte-fenêtre qui donne dehors (`habillage.portails`) ; (3) plafonniers gardés mais éteints de jour (`hide_render`, propriété « nuit ») ;
+(4) réglage « de photographe » au rendu (`reglage_de_photographe`) : photo d'essai (16 passes, 1/5 de la taille) où tout sauf murs et
+plafonds est découpé (`is_holdout`) → exposition = médiane des murs à 0,55 ; balance des blancs = couleur des murs ramenée à 70 % vers le
+blanc (courbes de couleur, `white_level`) : le reflet orangé du parquet ne teinte plus les murs en rose ; (5) 512 passes en qualité finale
+(128 marbrait les murs ; ~1 min 30 par vue intérieure sur la RTX 2070), lucioles bornées (`sample_clamp_indirect` 10). Parquet par
+défaut des pièces à vivre → `chene_naturel_photo` (NT : l'ancien était trop foncé). Rendus : `..\atelya\b2\b2-4-lumiere.png` (avant B2 /
+après, défaut / adapté à la photo d'app-001 / la photo). Le soleil reste celui inventé du plan (azimut 200°, hauteur 50°) : le VRAI soleil
+(orientation du logement, date, heure) = étape B3, règle 20 (« soleil inventé non »).
+
+**Fin du temps 1 de B2 (09/11/2026)** : NT d'accord pour faire le TEMPS 2 (app-001) dans une NOUVELLE conversation. Note honnête
+~71/100 prêt client (fabriqués ~93, vrais plans ~53, inchangés). Limites connues à reprendre : soleil encore inventé (B3) ; chevrons du
+parquet adapté plus petits que ceux d'app-001 (prévoir une échelle du motif par pièce) ; ~1 min 30 par vue de pièce ; pas de faïence
+murale ; portes de placard toujours blanches ; fin trait sombre dans l'embrasure d'une porte-fenêtre de fr-031. Le téléchargement des
+meubles ABO tourne dans cette conversation : s'il s'arrête (fermeture de VS Code, veille), relancer la même commande (il reprend).
+
+**B2 temps 2, étape 1 : vérité d'app-001 (09/11/2026, nouvelle conversation)** — plan seul découpé de la capture :
+`..\atelya\photos-clients\app-001\verite\plan.png` (1100 × 670 px) ; photos découpées sans l'écran du téléphone :
+`app-001\photos\photo-01..12.png` + `planche.png`. Saisie à la main (`faire_verite.py`) : 32 murs, 24 ouvertures, 12 pièces ;
+copie dans le dépôt `verites/app-001/`. ÉCHELLE (plan sans cotes) : 49,4 px/m = la somme des 12 pièces vaut les 124 m² annoncés
+(131,35 m² à 48 px/m) ; contrôle indépendant : les passages de porte font 0,61-0,71 m = portes standard de 63 et 73 cm (et non
+~80 cm comme supposé avant) ; porte d'entrée double 1,23 m ; emprise 17,6 × 11,7 m. Pièces : séjour / salle à manger 46,0 m², cuisine
+ouverte 16,0, entrée 3,2, chambre 1 18,4 (placard le long du mur ouest, photo 08), chambre 2 19,2 (enfant, photos 10-11), salle de
+bains 4,9 (baignoire + double vasque, photo 12), salle d'eau 3,2 (douche, photo 09), WC 1,1, WC 2 1,9, dégagement 7,4, rangement 2,4,
+placard 0,3. Palier, escalier, ascenseur, courettes : non tracés. Incertitudes écrites dans la saisie (`incertain`) : HSP 2,80 dans
+salle de bains / dégagement / cuisine (format à une seule hauteur → 3 m), fenêtres sud posées en portes-fenêtres (2,1 m de large au
+dessin), accès de la salle d'eau supposé par la chambre 1 (mur plus fin), faux murs cuisine/séjour (y 222) et entrée/séjour (x 820),
+porte vers la courette (photo 07), usage du « rangement » inconnu + vide fermé (gaine ?), caisson bleu de la télé = meuble.
+Contrôle : `verite\controle-zoom.png`. En attente de la validation de NT avant la 3D (étape 2).
+**Correction demandée par NT (09/11/2026) : « tu as inventé des portes, relis bien le plan »** : la 1re lecture séparait cuisine /
+séjour / entrée par des faux murs avec un passage de toute la largeur (convention des vérités, retirée plus loin par
+`fiche_depuis_verite`, mais dessinée en VERT = porte sur l'image de contrôle) et posait une porte vers la courette d'après la photo 07.
+Le plan ne montre RIEN de tout cela. RÈGLE (NT) : ne JAMAIS ajouter une limite, une porte ou une cloison absente du plan, même pour
+séparer des sols ; un espace ouvert = UNE pièce ; le plan fait foi, la photo ne crée pas d'élément. Relecture zone par zone (zooms ×5,
+pixels) : trait fin y 222 + pointillé y 241 = bord du plafond plus bas de la cuisine (HSP 2,80, poutre visible photo 02) ; traits fins
+x 370 et x 407 du rangement = meubles (le « vide fermé » n'existait pas) ; triangle bleu du WC = lave-mains d'angle ; porte
+cuisine ↔ sas confirmée par les pixels (trou du mur x 504 de y 177 à 211, battant dessiné ouvert). Vérité corrigée : 30 murs,
+21 ouvertures, 10 pièces, 49,8 px/m (124 m²) : séjour / salle à manger / cuisine ouverte / entrée 65,2 m², chambre 1 18,1,
+chambre 2 18,9, dégagement 7,3, salle de bains 4,8, rangement 3,3, salle d'eau 3,1, WC 2 1,9, WC 1,1, placard 0,3. Sols différents
+dans l'espace ouvert (carreaux de ciment, lames droites, chevrons) : à proposer à NT à l'étape des sols, sans mur inventé.
+**Vérité validée par NT (« Je valide », 09/11/2026).** Étape 2 (3D par Atelya) : `fiche_depuis_verite` → `traduire_fiche traduire`
+(`..\atelya\lectures-claude\app-001\`, plan copié en `app-001.png` pour nommer la sortie) → `python -m moteur.construire` →
+`app-001\3d\` (1 min 56, 0 trou au sol et au plafond, murs superposés 0,18 m²). Images : `..\atelya\b2\app-001\etape2-*.png`.
+CORRIGÉ au passage : la HSP écrite « HSP 3m » (nombre entier) n'était pas lue → 2,50 m par défaut ; `lecture_cotes.FORME_HSP`
+accepte l'entier, et plusieurs HSP différentes → la plus fréquente, à égalité la plus haute (faux plafonds plus bas) ; app-001 → 3,00 m.
+`fiche_depuis_verite` reprend les textes de la saisie (clé `textes` : [texte, genre, x0, y0, x1, y1]) et la source d'échelle
+(`source_echelle_claude`). DÉFAUT TROUVÉ (pas encore corrigé, proposé à NT) : `traduire_claude` dessine chaque mur prolongé de
+½ épaisseur + 3 px à ses bouts, avec des bouts RONDS (cv2.line épais) → à chaque angle SAILLANT le bâti déborde de ~25 cm dans la
+pièce → contour du séjour arrondi autour de l'angle (46 points au lieu des 12 de la fiche), sol et plafond arrêtés avant le mur,
+bouché ensuite par `jours_a_boucher` (19 bouche-trous sur app-001) → filet de lumière en haut de l'angle + trace sur le plafond
+(`etape2-defaut-angle-plafond.png`). Correction proposée : bouts carrés et, quand le bout touche un autre mur, prolonger seulement
+de la ½ épaisseur de cet autre mur ; à mesurer sur les 20 vérités (`pc/b1/mesurer_jours.py`) avant / après.
+**Défaut des angles CORRIGÉ (accord NT « oui t'as raison », 09/11/2026) : traducteur de la lecture de Claude 0.2.1**
+(`moteur/traduire_claude._bati` + `_coupe_du_bout`). Les murs sont dessinés en bandes à bouts COUPÉS DROIT : un bout qui touche un
+autre mur (angle, té, même décalé de 3 px par le recalage) s'arrête sur la FACE LOINTAINE de cet autre mur (angle rempli, rien ne
+dépasse dans la pièce) ; un bout près d'un autre mur sans le croiser (courbe faite de morceaux décalés d'un pixel, fr-026) est
+prolongé de ½ épaisseur + 3 px ; un bout LIBRE (mur qui s'arrête dans la pièce) est coupé net (fr-022 : un mur de 98 cm prolongé de
+50 cm laissait un vide). Les côtés des murs restent dessinés au pixel près comme avant (même largeur que cv2.line) : origine et
+surfaces inchangées. En plus : le contour à angles droits d'une pièce est refusé s'il mord sur une pièce voisine (plus de 0,1 px par
+pixel de bord, `DEBORD_VOISINES_PX`) : fr-022, séjour partagé en deux, 0,18 m² de sols superposés (rendus noirs). Mesure sur les
+20 vérités de Fable + app-001 (script de mesure dans le dossier temporaire, chaîne de `pc/b1/mesurer_jours.py`) : bouche-trous
+607 → 295 morceaux, 48,4 → 20,9 m² ; trous 11 → 10 (aucun plan avec un trou de plus) ; sols superposés 0,072 → 0,027 m² ; points
+des contours de pièces divisés par ~2 ; pièces un peu plus grandes (elles vont jusqu'aux murs ; app-001 120,7 → 121,7 m² pour 124
+annoncés). App-001 : bouche-trous 19 → 8 au plafond, plus de filet ni de trace à l'angle saillant
+(`..\atelya\b2\app-001\angle-avant-apres.png`). RESTE (autre cause, dans la 3D) : un petit trait clair au raccord du mur du poteau
+avec la façade EN BIAIS (≈ 10,5 ; 1,7 m), raccord de deux murs de travers dans `moteur/geometrie.py`. 2 tests ajoutés.
+**Étape 3 (sols d'après les photos), proposition puis correction de NT (09/11/2026).** Format : UN sol par pièce aujourd'hui ;
+proposé : des « zones de sol » dans une pièce (polygone + sol, statut estimé « vu sur photo », sans mur, sans trait, sans plinthe,
+corrigeables à l'écran), découpe avec Shapely (BSD-3, déjà installé partout comme dépendance de RapidOCR : rien à installer).
+Photos → sols : séjour / salle à manger = point de Hongrie (01-04) ; entrée + passage = lames droites étroites (07) ; chambres =
+lames droites étroites (08, 10, 11) ; salle de bains = petits carreaux blancs ~10 cm (12) ; carreaux de ciment « cubes » jaune / gris
+/ blanc dans la cuisine (05, 06) ; salle d'eau, WC, dégagement, rangement, placard : sol jamais vu (supposé). CORRECTION NT : dans
+l'espace ouvert il n'y a que DEUX sols entre séjour et cuisine : le point de Hongrie s'avance jusqu'à l'îlot (chaises et « table »
+comprises) ; APRÈS l'îlot, côté évier / meubles de cuisine, les carreaux de ciment ; la limite est PARALLÈLE aux meubles de
+cuisine (et non sur le côté, au milieu de l'îlot, comme proposé d'abord ; pas de lames dans la cuisine). Croquis :
+`..\atelya\b2\app-001\etape3-proposition-sols.png` (limite au milieu de l'îlot, y ≈ 147 px du plan).
+**Étape 3, suite (09/11/2026).** NT : l'entrée et le passage restent en lames droites jusqu'à la cuisine. FAIT dans Atelya : format
+`Piece.zones_sol` (ZoneSol : contour CONVEXE + sol ; `logement.verifier_coherence`), `Sol.echelle` (taille du motif 0,3-3 ; nom de
+matériau « matiere@1.13~r,g,b », `matieres.echelle_du_nom`), briques `zone_sol__<pièce>__<n>` découpées sur le contour calé de la pièce
+(`geometrie._couper_par_convexe`, Sutherland-Hodgman, vérifié contre Shapely sur 300 rectangles) et posées 0,5 mm au-dessus du sol
+(`ZONE_SOL_Z`), matériau de la zone (`habillage.materiau_de`) ; deux carrelages DESSINÉS par Atelya (`outils/bibliotheque/dessiner_carreaux.py`,
+rien de téléchargé) : `carreaux_cubes` (losanges 11,5 cm en cubes, blanc / gris clair / gris / moutarde, joint gris foncé ; 1,593 ×
+1,725 m) et `petits_carreaux_clairs` (10 cm) ; images non carrées dans Blender (`taille_image_m` [l, h]) ; outil
+`outils/habillage/poser_sols.py` + choix d'app-001 `verites/app-001/sols.json` (= VÉRITÉ DES SOLS d'app-001, faite À LA MAIN par Claude :
+NT a fait remarquer que ce travail n'est pas fait par Atelya → prochaine étape proposée : la BRIQUE PHOTOS, notée contre cette vérité).
+Choix : séjour point de Hongrie ×1,13 (teinte mesurée sur la photo 04 ; la 03 est faussée par le reflet des fenêtres), zone carreaux en
+cubes devant la cuisine (y ≥ 9,3 m), zone lames `chene_clair_photo` ×0,32 (lames ~7 cm) x ≥ 13,54 m (entrée + passage), chambres
+`chene_clair_photo` ×0,32, salle de bains petits carreaux ; `vieux_parquet` écarté (trop foncé : teinte hors bornes). 3D :
+`..\atelya\lectures-claude\app-001\3d-sols\` (0 trou, 0 sol superposé).
+DÉFAUT DE COULEUR AU RENDU trouvé (touche tous les clients) : parquet miel sur la photo (161, 106, 57), rosé-gris au rendu (177, 158,
+152) malgré la bonne teinte. Causes mesurées (essais dans le dossier temporaire, vue séjour) : (1) le parquet est presque CIRÉ (carte de
+brillance du chêne clair) et renvoie la lumière blanche/bleue du ciel vu en biais ; (2) AgX (réglage de pellicule par défaut de
+Blender 5, jamais choisi par nos scripts) délave les couleurs ; « Standard » ou « Khronos PBR Neutral » gardent la couleur mais rendent les
+murs cyan d'un côté et orangés de l'autre (la balance des blancs sur la moyenne des murs ne peut pas neutraliser une pièce éclairée à
+la fois par le ciel et par le parquet ensoleillé ; un ciel plus brumeux n'y change rien). SOLUTION retenue à l'essai : garder AgX (murs
+blancs), parquet SATINÉ (rugosité 0,7, reflet 0,1) et TEINTE RÉGLÉE AU RENDU (boucle : petite image, sol mesuré contre le mur blanc,
+comparé au rapport sol / mur de la photo, teinte corrigée ; bornes de teinte abaissées à 0,02) : en 3 tours le sol passe à
+(159, 108, 81), murs blancs (207, 214, 214). Image : `..\atelya\b2\app-001\etape3-couleur-essais.png`. Reste : bleu un peu haut (81
+contre 57), chevrons moins contrastés que la photo (nuance par lame à augmenter). À rendre automatique dans Atelya (accord NT demandé).
+**DEMANDE NT (09/11/2026) : « je veux qu'Atelya ait plein de types d'éclairage, et qu'on puisse les changer à l'écran de
+vérification ».** Aujourd'hui : un seul éclairage (ciel physique + soleil inventé du plan, azimut 200° / hauteur 50°, portails aux
+fenêtres, plafonniers éteints le jour, réglage « de photographe » au rendu). Proposition faite à NT (en attente de sa réponse) : des
+AMBIANCES au niveau du logement (jour ensoleillé, jour voilé, fin de journée, soirée lampes allumées, nuit) et des LUMINAIRES par
+pièce (plafonnier, suspension, spots, appliques, lampe d'appoint, ruban sous meubles de cuisine ; blanc chaud / neutre), supposés selon
+la pièce puis modifiables à l'écran ; règle 20 respectée (moment flatteur oui, soleil inventé non : le soleil suit l'orientation réelle,
+étape B3) ; la teinte des sols se règle UNE fois dans l'ambiance de référence (jour, comme les photos d'annonce), les autres ambiances
+sont calculées physiquement à partir de là.
+**PRÉCISION NT (09/11/2026) : PAS à l'écran de vérification** : il veut que la MAQUETTE BLENDER d'Atelya contienne PLUSIEURS éclairages tout prêts, qu'il change lui-même DANS BLENDER. Proposé : une SCÈNE Blender par éclairage (copies liées : murs, sols, meubles partagés ; chaque scène a son ciel, ses lampes et son réglage de photographe) : jour ensoleillé, jour voilé, fin de journée, soirée lampes allumées, nuit ; on change d'éclairage par le menu des scènes. Ordre : d'abord finir le défaut de couleur, puis les éclairages.
+**Défaut de couleur CORRIGÉ dans Atelya (09/11/2026, accord NT « on corrige d'abord le défaut de couleur »).** (1) Parquets
+SATINÉS (`materiaux.RUGOSITE_BOIS` 0,6-0,85 à partir de la brillance de la photo, `REFLET_BOIS` 0,15 ; `_sorte` : tout nom inconnu
+= bois, les parquets du temps 1 n'étaient pas dans `SORTES`) ; nuance par lame du point de Hongrie ±12 % → ±20 %. (2) TEINTE RÉGLÉE AU
+RENDU, automatique : `Sol.couleur_photo` (part de lumière du sol sur la photo, mur blanc = étalon, posée par `poser_sols`) ;
+`habillage.reglages_teinte` (matériau, cible, caméra de réglage DANS la pièce à ~3,5 m du sol visé, 16 mm) ; `moteur/blender/
+regler_teintes.py` lancé par `construire` après `poser_briques` : masques du sol et des murs (objets « découpés »), même réglage de
+photographe que l'image finale, sol mesuré contre les murs bien éclairés (50e-90e centile), teinte corrigée, 3 tours, maquette
+enregistrée, `reglages_teinte.json` ; bornes de teinte 0,02-4. AgX GARDÉ (murs blancs ; « Standard » / « PBR Neutral » rendaient les
+murs cyan / orangés). Scripts Blender : `main()` seulement si lancés par Blender (`if __name__ == "__main__"`) — avant, un import
+relançait tout le rendu. PIÈGE corrigé : `reglage_de_photographe` impose RGBA pour son essai (une image sans transparence comptait tout
+comme du mur → image brûlée). App-001 : séjour (146, 107, 92) contre photos (150, 99, 72) / (161, 106, 57), murs (212, 216, 216) ;
+construction 5 min 10 (dont ~2 min de réglage). Images : `..\atelya\b2\app-001\etape3-sejour.png`, `etape3-vue-dessus.png`.
+Tests : `tests/test_zones_sol.py` (6).
+**Retour NT sur l'étape 3 (09/11/2026)** : (1) la comparaison était TROMPEUSE : la vue 3D (caméra automatique d'Atelya dans un coin du
+séjour) a été mise à côté des photos 04 (salle à manger) et 02 (séjour) comme si c'était la même vue → ne plus jamais comparer une vue
+3D à une photo prise d'ailleurs ; c'est l'étape 4 (caméras au même endroit que chaque photo). (2) « La jonction des murs est trop
+brute, sur le plan et les photos c'est plus smooth » : sur les photos 07, 08, 11, une CORNICHE moulurée fait le tour du plafond
+(gorge à gradins de ~10-15 cm) ; en 3D, murs et plafond se coupent à angle vif. Proposé : corniches choisies pièce par pièce (comme
+plinthes et sols) + arêtes de murs légèrement adoucies ; image `..\atelya\b2\app-001\corniches-photos.png`. En attente de NT.
+**Corniches FAITES (09/11/2026, accord NT « oui ça marche »).** `Piece.corniche` (Corniche : « aucune » / « simple » / « moulure »,
+statut comme les plinthes ; défaut `CORNICHE_PAR_DEFAUT` = aucune) ; `habillage.corniches` : bandes de plâtre en gradins le long de
+chaque côté du plafond où un mur monte jusqu'au plafond (`PROFILS_CORNICHE` : moulure = 4 gradins, avancée 2 / 4,5 / 7,5 / 10 cm,
+hauteur 15 / 11 / 6,5 / 3 cm ; simple = 3 × 8 cm), biseaux dans les angles comme les plinthes (`_bandes`), rangées avec les PLAFONDS
+(matériau plafond_blanc, cachées sur la vue de dessus). PIÈGE corrigé : le contour lu d'une pièce s'arrête parfois à 3 cm d'un mur fin
+(app-001, mur de 8 cm de l'entrée) → sondes à 2, 5 et 9 cm (`SONDES_CORNICHE`), trous < 12 cm refermés, morceau à < 6 cm d'un angle
+prolongé jusqu'à l'angle (sinon trou sombre de 10 cm dans l'angle saillant). Écran de vérification : liste « Corniche » dans la fiche de
+chaque pièce (`reglerCorniche`). `poser_sols` pose la corniche vue sur photo (clé `corniche`) ; app-001 : séjour, chambres 1 et 2 =
+moulure (photos 07, 08, 11). ESSAYÉ ET RETIRÉ : arrondi des arêtes par le nœud « Bevel » de Cycles (traits verticaux à chaque raccord
+de briques de mur). Question NT « pourquoi un effet sur les murs ? » : les marbrures viennent de la compression des APERÇUS (fichier
+lisse à la taille réelle, vérifié contraste ×4 ; 512 / 1024 passes, seuil adaptatif 0,003, plus de rebonds : aucune différence
+mesurable) ; NT : « c'est bon ». À garder en tête : murs rosés à gauche / bleutés à droite (lumière renvoyée par le parquet ensoleillé
+contre lumière du ciel), physiquement juste mais neutralisé par les photographes → à traiter avec les éclairages.
+**Étape 4 (temps 2 d'app-001) : caméras au même endroit que les photos (09/11/2026, demande NT).** Méthode « camera matching » :
+sur chaque photo, Claude relève des arêtes dont la place est connue dans le logement (angles verticaux, pieds et hauts de murs,
+montants de fenêtres et de portes), en pixels (photos renforcées en contraste, CLAHE d'OpenCV, sinon les jonctions blanches ne se
+voient pas) ; `moteur/camera_photo.py` ajuste la caméra (moindres carrés Levenberg-Marquardt écrits avec numpy : PAS de scipy
+sur le PC, rien installé). Caméra de photographe d'immobilier : DE NIVEAU (verticales droites) + décentrement vertical (u0
+fixé au milieu, v0 libre) ; paramètres x, y, z, cap, tangage, f (px), u0, v0 ; un repère « ligne » = deux points de la photo
+SUR l'arête (pas besoin de ses bouts), plus robuste que des points. Rappels doux (focale, hauteur) quand les repères ne fixent
+pas un paramètre : sans eux le calcul part à l'infini (téléobjectif) ou colle l'appareil à un mur. Relevé d'app-001 :
+`verites/app-001/cameras-photos.json` (caméra, repères décrits, écart, qualité, notes) ; 11 photos calées : 03, 05, 06, 07, 08,
+10, 11, 12 « bonnes » (écart 1 à 10 px), 01 et 04 « moyennes », 02 « approchée » (recul mal fixé : x 9,6-10,4 m pour le même
+écart, x pris à 10,0) ; photo 09 NON calable (montage de deux gros plans, aucune arête de la pièce). Appareils à 0,87-1,37 m du
+sol, champ horizontal 76-105°. Outil : `outils/habillage/caler_photos.py` (dessiner = arêtes de la maquette sur la photo ;
+rendre = caméras posées dans une COPIE `maquette-photos.blend` par `moteur/blender/poser_cameras_photos.py` (caméras d'Atelya
+retirées de la copie) puis `rendre.py` ; planche = photo | maquette | superposées). Tests `tests/test_camera_photo.py` (5).
+Sorties : `..\atelya\b2\app-001\etape4\` (rendus/, cote-a-cote-*.png, planche-ensemble.jpg).
+CE QUE LE CALAGE A APPRIS SUR LE LOGEMENT (faits mesurés sur les photos, rien changé dans la vérité sans NT) : la disposition
+réelle du séjour diffère des meubles dessinés sur le plan (canapé contre le MUR OUEST sous le tableau, caisson bleu au milieu,
+télé tournée vers l'ouest, bibliothèque dans le retour de mur sud, table devant le pan coupé, rangements contre le mur est) ; la
+porte blanche des photos 01, 02, 07 donne sur la courette (absente du plan, non ajoutée) : porte de 73 cm entre y = 6,70 et 7,43
+dans le mur M8, qui va en vrai jusqu'à y ≈ 7,64 (maquette 7,09) ; fenêtre O7 de l'entrée collée à l'angle (maquette : 75 cm
+plus loin) ; coin repas (photo 04) : mur des fenêtres presque à angle droit du mur du fond, fenêtres bien plus grandes que la
+porte-fenêtre de 1,2 m de la maquette ; fenêtres du séjour et des chambres plus hautes et plus larges qu'en maquette ; plafond de
+la cuisine 2,80 m (maquette 3,00 partout).
+CONSTATS DES RENDUS (planche `..\atelya\b2\app-001\etape4\planche-ensemble.jpg`) : géométrie superposée correctement ; parquet
+de la maquette plus foncé et plus rouge que sur les photos dans ces vues (teinte réglée sur la seule vue de référence du séjour) ;
+autour de l'îlot (photos 02, 05, 06) et dans l'entrée (07) le sol est en LAMES DROITES, la maquette y met carreaux / point de
+Hongrie → la vérité des sols est à revoir (brique photos) ; taches de soleil dures alors que les photos ont une lumière douce
+filtrée par les voilages ; murs de couleur absents (gris de l'entrée, rouge de la salle de bains) ; petits carreaux de la salle
+de bains ressemblants. **NT (09/11) : « J'aime beaucoup, on est sur la bonne voie »** = étape 4 validée. Suite : éclairages, puis
+brique photos.
+**ÉCLAIRAGES dans la maquette Blender (09/11/2026, accord NT « Oui »).** Une SCÈNE Blender par éclairage, changée par NT dans le
+menu des scènes (en haut à droite de Blender) : « 1 Jour ensoleillé » (la scène d'origine : ciel physique, soleil 50°, c'est
+là que la teinte des sols est réglée), « 2 Jour voilé » (ciel couvert de la CIE, clarté (1 + 2 sin h)/3, sans soleil), « 3 Fin
+de journée » (soleil à 7°, balance des blancs faible pour garder l'or), « 4 Soirée lampes allumées » (soleil à −3° = ciel du
+crépuscule dans les fenêtres, plafonniers allumés blanc chaud ≈ 2 700 K), « 5 Nuit » (fond bleu nuit, plafonniers allumés).
+Scènes = COPIES LIÉES (bpy.ops.scene.new LINK_COPY) : murs, sols, plafonds, menuiseries, portails et caméras PARTAGÉS (une
+matière changée l'est partout) ; chaque scène a son monde, sa collection « Lampes allumées … » (copies des plafonniers) et son
+exposition / balance des blancs DÉJÀ réglées (réglage « de photographe » depuis la vue de la pièce principale), donc l'image est
+juste dès qu'on change de scène. Murs neutres de jour (balance 0,85-0,95), couleur de la lumière gardée le soir (0,25-0,35).
+Règle 20 : la direction du soleil reste la direction PROVISOIRE du plan (orientation réelle = étape B3), seule la hauteur change.
+Code : `moteur/eclairages.py` (définitions + `python -m moteur.eclairages construction.json maquette.blend sortie.blend`),
+`moteur/blender/poser_eclairages.py`, `rendre.py` (4e argument = nom de la scène ; clarté et balance lues dans la scène),
+`construire` pose les scènes à chaque maquette (scène active = jour ensoleillé, images inchangées), `caler_photos.py rendre
+--scene`. Tests : `tests/test_eclairages.py` (4), `test_blender.py::test_une_scene_par_eclairage`. App-001 :
+`..\atelya\b2\app-001\eclairages\maquette-eclairages.blend` (copie, la maquette 3d-sols n'est pas touchée), aperçu
+`apercu-5-eclairages.jpg`, comparaison des 11 photos en jour voilé `planche-jour-voile.jpg` : plus de taches de soleil, murs
+neutres, lumière douce = bien plus proche des photos ; RESTE : parquet du séjour trop foncé / rouge (teinte, pas lumière),
+voilages, mobilier, murs de couleur.
+**Correctifs des éclairages après essai de NT dans Blender (09/11/2026).** (1) NT : « jour voilé c'est super blanc » → clarté
+visée du jour voilé 0,60 → 0,47 (murs 196 → 186 / 255). (2) La VRAIE cause de la vue toute blanche : les plafonniers, éteints
+par `hide_render` (calcul final seulement), restaient ALLUMÉS dans la vue 3D de Blender (elle ne lit pas hide_render) → avec
+l'exposition faite pour le ciel seul, tout était brûlé ; la « Nuit » paraissait en plein jour. Corrigé : `hide_viewport = True`
+aussi (`poser_briques.creer_lumiere`, et `poser_eclairages` pour les maquettes déjà construites) ; les copies allumées du soir et de
+la nuit restent visibles. Vérifié par capture de l'écran de NT (Blender relancé par script, `bpy.app.timers` pour choisir la scène
+et le mode Rendu une fois la fenêtre ouverte). Aussi : direction du ciel couvert normée (sans effet sur le rendu, gardé par
+prudence). PIÈGES pour NT : Blender installé depuis une archive → Windows n'ouvre pas les .blend d'un double-clic (lancer
+blender.exe avec le fichier) ; se déplacer en vue caméra déplace la CAMÉRA ; cliquer sur le TEXTE du nom de scène le renomme
+(cliquer l'icône à gauche). Copie de visite : `..\atelya\b2\app-001\eclairages\maquette-visite-4.blend`.
+**MCP for Blender installé sur le PC (09/11/2026, accord écrit NT : « Oui, tu peux… je t'autorise »).** `mcp-for-blender` 2.2.4
+(MIT, Siddharth Ahuja ; version du 24/10 choisie exprès, la 2.2.7 n'avait que 5 jours), lancé par `uvx` (environnement isolé du
+cache uv, Python 3.13 d'`atelya\.pythons`, ~25 Mo, rien dans `.venv`). Module Blender `blender_mcp.py` (« MCP for Blender »)
+copié dans `%APPDATA%\Blender Foundation\Blender\5.2\scripts\addons\` ; vérifié dans le code : consentement de collecte éteint par
+défaut, intégrations internet (Poly Haven, Sketchfab, Hyper3D, Hunyuan3D — interdit UE —, Tripo, Meshy, Poly Pizza) éteintes,
+serveur en écoute sur localhost:9876, démarrage automatique. Réglage Claude Code : `.mcp.json` à la racine du dépôt (exclu par
+`.git/info/exclude`, jamais poussé), `DISABLE_TELEMETRY=true`. RESTE À FAIRE (Blender doit être FERMÉ, sinon il écrase ses
+préférences en se fermant) : activer le module (`blender -b --python-expr` : `bpy.ops.preferences.addon_enable(module="blender_mcp")`
+puis `bpy.ops.wm.save_userpref()`), relancer Claude Code et accepter le serveur « blender » du projet, ouvrir Blender, vérifier la
+liaison. Règle : n'agir par MCP que sur des COPIES de maquettes. Piège : le classificateur de sécurité a refusé une commande qui
+fermait Blender de force ET installait ; séparer les actions, demander à NT de fermer Blender.
+**MCP for Blender EN SERVICE (09/11/2026, 13h30).** Module activé Blender fermé par `blender -b --python activer.py`
+(`addon_enable("blender_mcp")` + `save_userpref`) ; préférences d'avant gardées dans `config\userpref-avant-mcp.blend`. PIÈGE :
+`--python-expr` depuis PowerShell 5.1 perd les guillemets → passer par un fichier .py. Le serveur s'ouvre seul sur
+localhost:9876 quelques secondes APRÈS le chargement de la maquette (35 Mo) : si « Could not connect », attendre et réessayer.
+`get_addon_status` : collecte éteinte, bibliothèques et générateurs internet éteints. Ce qui marche par MCP : lire les scènes,
+changer la scène affichée à l'écran de NT (`context.window.scene = …`), rendre (Cycles GPU, 800 × 500, ~6 s par scène),
+`wm.open_mainfile` sur une autre COPIE sans relancer Blender. Copies de travail : `..\atelya\b2\app-001\eclairages\maquette-mcp.blend`,
+`maquette-mcp-2.blend` ; planche des 5 éclairages rendus par MCP : `planche-5-eclairages-mcp.jpg`.
+**DÉFAUT TROUVÉ PAR MCP ET CORRIGÉ (09/11)** : « 5 Nuit » contenait AUSSI la collection « Lampes allumées 4 Soirée… » (20
+plafonniers au lieu de 10). Cause : sans fenêtre, `bpy.ops.scene.new(LINK_COPY)` copie la DERNIÈRE scène créée, pas `origine`
+(le `temp_override(scene=…)` est ignoré) ; les lampes étaient allumées dans la même boucle. Correctif : `poser_eclairages` crée
+toutes les scènes PUIS allume les lampes ; test renforcé (`test_une_scene_par_eclairage` : une seule collection de lampes par
+scène, même nombre en soirée et la nuit ; échoue sur l'ancien code). App-001 refaite (`maquette-eclairages.blend` ; l'ancienne
+= `maquette-eclairages-avant-correctif-nuit.blend`) : 4 premières scènes identiques, Nuit exposition −1,27 → −0,37, image
+quasi identique (l'exposition compensait). Les copies de visite `maquette-visite*.blend` gardent l'ancien défaut.
+**APERÇU GRANULEUX dans Blender (NT 09/11 : « l'image est un peu pixelisée »).** Ce n'était PAS le PC : la vue 3D en mode
+« Rendu » gardait les réglages par défaut de Blender = calcul sur le PROCESSEUR (`scene.cycles.device` CPU, la carte graphique
+n'était prise qu'au rendu final par `rendre.choisir_processeur`), aucun débruitage, arrêt dès 10 % de bruit (« Rendering Done »
+mais plein de grain, vu par capture d'écran). Correctif : `poser_briques.regler_apercu` (GPU, débruitage OpenImageDenoise dès la
+1re passe, seuil 2 %, 256 passes), appelé à la construction et par `poser_eclairages` pour chaque scène ; test
+`test_une_scene_par_eclairage` étendu. Vérifié à l'écran : image propre dès la 29e passe. App-001 `maquette-eclairages.blend`
+refaite. `look` de MCP ne capture PAS l'aperçu Cycles (EEVEE / Workbench seulement) : faire une capture d'écran Windows
+(System.Drawing en PowerShell). CE QUI EST ATELYA ET CE QUI NE L'EST PAS : maquette, scènes d'éclairage, réglages, correctifs =
+code d'Atelya (`moteur/`) ; MCP = outil du copilote pour regarder et essayer en direct, jamais une brique d'Atelya (le client
+n'en a pas besoin) ; tout réglage trouvé par MCP doit être reporté dans le code d'Atelya, sinon il est perdu à la maquette suivante.
+**Éclairages VALIDÉS par NT (09/11/2026 : « Oui, franchement, j'aime bien »).** Puis étape 3 = brique photos.
+**Vérité des sols d'app-001 RÉVISÉE (09/11/2026, accord NT « D'accord »)** avant d'écrire la brique photos (elle sera notée contre
+elle). Méthode : chemin inverse du calage (pixel de la photo → point du sol, en m) ; quadrillage du sol tous les 50 cm dessiné sur
+chaque photo calée ; zones coloriées pixel par pixel sur les photos (jaune cubes, bleu lames, rose point de Hongrie), planche
+`..\atelya\b2\app-001\brique-photos\verite-sols-actuelle-contre-proposee.jpg`. Résultat : bande devant l'îlot (sous les chaises) et
+passage îlot → caisson bleu → entrée en LAMES DROITES (avant : point de Hongrie) ; jointure en biais (frise) vue sur la photo 02, une
+droite (10,6 ; 8,35) → (13,54 ; 4,6) qui respecte tous les points des photos bien calées (±0,3-0,5 m) ; avancée des cubes devant le
+bout de l'îlot à ±0,3 m (photos 05 et 06 en désaccord : limite du calage). Zones découpées en morceaux CONVEXES (règle du format
+`ZoneSol`, sinon refus). Nouveau champ `couleur_visee` (CIELAB L/a/b, médiane des pixels « bois » de chaque photo puis moyenne) :
+point de Hongrie L 52,5 a 12,2 b 27,4 (photos 01, 03, 04) ; lames du séjour L 50,4 a 15,3 b 31,9 (05, 06, 07) ; chambres
+L ≈ 50,5 a ≈ 16 b ≈ 31,5. MESURÉ : la maquette en jour voilé donne au point de Hongrie L ≈ 39 a ≈ 19 (trop foncé, trop rouge) ;
+cause = teinte réglée au rendu sous plein soleil depuis UNE vue (regler_teintes) → à régler en jour voilé contre `couleur_visee`.
+Vocabulaire NT : « l'œil de Meta » = DINOv2 (déjà dans Atelya, `oeil.py`, poids sur le PC). Limite dite à NT : app-001 seul = mise
+au point ET examen → note optimiste ; il faudra 2-3 autres logements avec photos jamais regardés pour une note honnête.
+**BRIQUE PHOTOS v1 (09/11/2026, NT : « fais le meilleur pour qu'Atelya soit le plus performant », sans m'influencer).**
+Temps 1 « sol à plat » (`moteur/sol_a_plat.py`) : chaque photo calée → vue de dessus 1 cm/px (grille posée sur le sol, projetée
+par la caméra ; écarté : hors de la pièce de l'appareil, caché par un mur de la pièce (rayon qui sort du contour), derrière,
+hors cadre, finesse < 0,35 px de photo par cm de sol) ; photo prise depuis une embrasure → point de vue juste à l'intérieur ;
+`assembler` = la photo la plus fine par point. App-001 : 80,3 m² vus sur 121,7 (66 %) ; image `..\atelya\b2\app-001\brique-photos\
+sol-a-plat.png` (confirme la jointure de la vérité révisée). Temps 2 « œil » : `moteur/oeil_dinov2.py` (DINOv2 réécrit, poids
+`..\atelya\modeles-externes`), `moteur/reconnaitre_sols.py` : 4 FAMILLES (lames, point_de_hongrie, batons_rompus, carreaux),
+vignettes 1 m → 224 px tous les 25 cm (vues à 85 %), empreinte = CLS + moyenne des carrés, régression logistique (torch, pas de
+scikit-learn sur le PC), votes par cases de 25 cm pondérés par √finesse × confiance ; temps 3 `sols_des_pieces` (famille la plus
+votée + zones d'une autre famille ≥ 1 m², enveloppe convexe) ; temps 4 `couleur_du_sol` (CIELAB médiane robuste) ; `noter`.
+Apprentissage SANS app-001 (`outils/habillage/apprendre_sols.py`) : vignettes de la bibliothèque CC0 abîmées exprès (flou du
+lointain, couleur, reflet, objet) + photos d'essai Blender (`outils/habillage/photos_d_essai.py` : maquettes fr-021…038, sol
+tiré au hasard par pièce, zone d'un autre sol 40 % des grandes pièces, caméras de photographe, 3 éclairages ; 123 photos,
+`..\atelya\b2\brique-photos-essais\`) ; fr-031 et fr-038 = CONTRÔLE jamais appris ; carreaux_cubes et petits_carreaux_clairs
+(dessinés d'après app-001) écartés des exemples. Contrôle (209 m²) : ViT-S biblio seule 93,7 % de la surface juste, + essais
+96,3 % (21/25 pièces ; erreurs = pièces à deux sols où la zone domine ce qui est vu) ; ViT-B 90,3 / 93,2 → retenu ViT-S
+biblio+essais = `moteur/modeles/sols-vits14-v1.pt` (15 Ko, SHA dans pc/MODELES.txt). Commande : `outils/habillage/sols_photos.py
+reconnaitre <cameras> <logement> <modele> <sortie> [--verite logement-avec-sols] [--couleurs sols.json]`.
+**EXAMEN app-001 (une fois, 09/11) : 72 % de la surface juste (74,9 m² jugés)** ; lames 84,8 %, carreaux (cubes) 100 %, point de
+Hongrie 47 % (vu au centre du séjour seulement, ailleurs pris pour des lames) ; pièces 2/3 (séjour décidé « lames » avec une
+zone point de Hongrie) ; fausses zones « carreaux » = lit blanc (chambre 1) et meuble blanc (salle à manger) étirés par la mise
+à plat. Couleurs ΔE : séjour 1,4 (par hasard), chambre 2 10,6, chambre 1 18,3 (le lit compte dans la médiane). CAUSES : photos
+d'essai = pièces VIDES, vraies photos = pièces MEUBLÉES ; point de Hongrie lointain et flou ≈ lames. Toute amélioration conçue
+après avoir vu ces erreurs rend app-001 « examen déjà vu » : le dire à NT à chaque nouvelle note sur app-001 ; il faut d'autres
+logements avec photos jamais regardés. Pistes : meubles dans les photos d'essai (bibliothèque ABO), classe « pas du sol »,
+poids plus fort des vues fines, vignettes plus grandes pour les chevrons.
+**B4 MEUBLES, première version (09/11/2026, NT : « mets les meubles quand même sur app-001… un bout de rendu final… tu
+apprendras en même temps les meubles à Atelya »).** Format : `Meuble` dans logement.json (`meubles` : categorie, piece,
+position = milieu du pied, face = direction de l'avant en degrés comme le cap des caméras, dimensions largeur/profondeur/hauteur,
+altitude, couleur sRGB, modele ABO imposé facultatif ; statut estime/mesure/ajoute ; id unique AVEC les pièces : « placard_1 »
+était déjà une pièce). Catalogue `moteur/meubles.py` : catégories → types ABO + mots du nom + mots exclus (suspension : pas de
+« flush ») ; sur mesure (cuisine, îlot, caisson, placard, télévision) = blocs. `construire.choisir_modeles` : Atelya choisit le
+modèle ABO le plus proche (écart log des dimensions + couleur du champ « color ») ; meubles identiques = même modèle ; bibliothèque
+`trouver_meubles()` (`..\atelya\bibliotheque\meubles-abo`, 7 641 meubles, 44 Go, FINI). Blender `moteur/blender/poser_meubles.py` :
+modèle ABO importé UNE fois dans sa collection (hors scène, fake user), meubles = instances de collection ; ABO arrive avant
+vers -y, posé au sol, centré, size_metres = [largeur, HAUTEUR, profondeur] (vérifié sur un canapé) ; rotation z = face + 90° ;
+échelle par axe bornée à ±15 % de la médiane ; textures limitées 2048 au rendu (simplify, 8 Go de carte). DÉFAUT CORRIGÉ :
+`regler_teintes` masque la collection Meubles pendant la mesure (sinon tapis et canapé vus à la place du parquet → point de
+Hongrie réglé à 0,22/0,02/0,02, rendu rouge foncé). Vérité des meubles d'app-001 : `verites/app-001/meubles.json` (47 meubles,
+relevés par Claude avec les caméras calées : pieds reportés au sol, objets muraux sur le plan du mur, puis BOÎTES 3D dessinées
+sur les photos et corrigées) ; caisson bleu EN BIAIS (télé vers le nord-ouest, face 135°), le photographe de la photo 07 se tient
+derrière ; les photos se contredisent de 30-50 cm (et des meubles ont été déplacés entre deux prises : fauteuils jaunes au premier
+plan de la photo 01, absents de la 05). Maquette meublée : `..\atelya\b2\app-001\meubles\3d\maquette.blend` (5 éclairages,
+~420 Mo), rendus « jour voilé » depuis les 11 caméras : `..\atelya\b2\app-001\meubles\photos\` (cote-a-cote-photo-XX.png).
+Constats : placement juste dans l'ensemble ; écarts de style (table de repas « ferme » bois au lieu de blanche, tabourets blancs
+au lieu de jaunes, lit superposé métal au lieu de bois, armoire et placards en blocs unis, pas de rideaux ni de coussins).
+Tests : `tests/test_meubles.py` (4), `test_blender.py::test_meubles_sur_mesure_poses_tournes_et_mesures`.
+**BRIQUE PHOTOS v2 : photos d'entraînement MEUBLÉES et 5e réponse « meuble » (09/11/2026, NT « Oui »).** `photos_d_essai.py
+--meubles` : meubles ABO tirés au hasard par pièce (contre un mur ou au milieu, tapis souvent, table + chaises), sans chevauchement
+(grille 5 cm), dimensions réelles du modèle, caméras jamais dans un meuble ; masque des meubles par photo
+(`moteur/blender/masques_meubles.py`, Workbench à plat, blanc = meuble, tapis compris) dans `<tirage>\masques\`. 12 tirages
+meublés (`-m1/-m2`, 6 logements, ~10 min chacun, 2 h en tout). Apprentissage : vignette dont la moitié centrale est couverte à
+> 60 % de meuble (masque mis à plat) → « meuble », < 10 % → sol, entre → écartée ; 4 383 vignettes d'essai dont 844 « meuble ».
+`CarteDesSols` : seules les familles de sol décident (`indices_sol`, `vue`) ; case vue seulement comme meuble = inconnue ;
+couleur mesurée hors des cases à > 50 % « meuble ». CONTRÔLE (fr-031, fr-038) : 4 familles = vides 96,0 % / meublées 83,4 % ;
+avec « meuble » = 93,5 % / 84,5 % (meuble reconnu 71 %) ; erreurs restantes = point de Hongrie ↔ bâtons rompus, petites pièces
+vues de loin. Retenu sur le contrôle meublé : `moteur/modeles/sols-vits14-v2.pt` (SHA dans pc/MODELES.txt). app-001 (PLUS un
+examen propre) : v1 72 % → v2 81,5 % (point de Hongrie 47 → 80 %, cubes 99 %, lames 79 %) ; couleurs ΔE séjour 4,3, chambre 1
+18 → 10,3, chambre 2 10,6 → 3,3 ; reste : séjour décidé « lames » (44 % des votes) avec une zone point de Hongrie de 20 m²,
+fausse zone point de Hongrie de 2,6 m² en chambre 1 (lit), fausse zone carreaux de 1,3 m² en chambre 2.
+**BRIQUE PHOTOS BRANCHÉE SUR LA 3D (09/11/2026, NT : « prends celle que tu recommandes »).** Chaîne automatique : photos calées +
+logement SANS sols → `sols_photos.py logement <cameras> <logement> moteur/modeles/sols-vits14-v2.pt <sortie>` → logement avec
+les sols trouvés seuls (statut estime, source « brique photos », confiance = part des avis) → construire → maquette.
+Morceaux : (1) `moteur/blanc_des_murs.py` = blanc des murs trouvé SEUL : points sur la face intérieure des murs de la pièce
+(1,3-2,2 m, tous les 15 cm), fenêtres et portes écartées (`ouvertures_sur_le_contour`, ± 15 cm), visibles depuis l'appareil,
+médiane 7 × 7 px, murs entre la médiane et le 9e dixième de clarté ; écart avec les rectangles choisis à la main 2-9 % ; murs
+gris (entrée) et meubles hauts = erreur connue. (2) `albedos_par_region` : couleur visée (couleur_photo) PHOTO PAR PHOTO contre le
+blanc de la même photo, médiane pondérée des photos ; pixels « bois » seulement pour un parquet (a > 4, b > 12) ; pixels proches
+de la couleur dominante (2 écarts médians). App-001 : séjour (lames) 0,59/0,26/0,10 contre vérité 0,60/0,26/0,10 ; chambre 1
+0,51/0,23/0,11 contre 0,51/0,20/0,07 ; chambre 2 0,55/0,21/0,06 contre 0,51/0,22/0,08 ; zone point de Hongrie du séjour trop pâle
+(tapis). (3) `choisir_matiere` : empreinte moyenne de la région contre `prototypes_bibliotheque` (vignettes d'1 m de chaque
+matière, à l'échelle) ; point de Hongrie = matière dessinée par Atelya ; les cubes ne sont pas des références (pas dans
+matieres.json) → cuisine en « carrelage_interieur ». Lames → « chene_noeuds » partout. (4) `sols_vers_logement`. `SolAPlat`
+garde la photo, la caméra, la pièce et le point de vue. Rendus : `..\atelya\b2\app-001\auto\` (planche-sols-auto.jpg : annonce |
+sols relevés à la main | sols trouvés seuls) : parquet automatique souvent PLUS proche des photos (plus clair, plus miel) que la
+vérité à la main. REJETÉ : règle « pas de zone là où l'œil voit > 35-50 % de meubles » (+5 points sur le contrôle fabriqué,
+mais app-001 81,5 → 52 % : sur les vraies photos l'œil dit « meuble » bien plus souvent) → LEÇON : un réglage validé seulement
+sur photos fabriquées peut nuire sur les vraies ; `ZONE_MEUBLE_MAX = 1.0` (désactivé). Tests `tests/test_blanc_des_murs.py` (4).
+**MEUBLES PLUS RÉALISTES (09/11/2026, NT « Letsgooo »).** (1) Sur mesure DESSINÉ (`moteur/blender/sur_mesure.py`, appelé par
+`poser_meubles.bloc`) : portes en modules de ~60 cm, joint 4 mm, 18 mm d'épaisseur ; cuisine basse = socle 12 cm en retrait + plan
+de travail 4 cm qui dépasse ; colonne four (verre noir 0,85-1,45 m) ; îlot à façades des deux côtés ; placard à portes ~50 cm,
+poignées verticales, MIROIRS au milieu si la description dit « miroir » (la description passe dans le plan) ; télévision avec
+écran brillant. « Bloc_<id> » reste le corps exact (tests). Corps à 0,9 de la couleur des façades (0,55 : flancs presque marron).
+(2) RIDEAUX : `Rideaux` sur une `Ouverture` (voilage et/ou rideaux, couleur sRGB, statut/source) ; `habillage.rideaux_du_plan`
+(face intérieure du mur = côté où est une pièce ; tringle 12 cm sous le plafond, au moins 30 cm au-dessus de la fenêtre) ;
+`moteur/blender/rideaux.py` : surface plissée (voilage plis 10 cm/2,2 cm, rideaux 16/4 cm), voilage = translucide + transparent
+(laisse passer la lumière diffuse), rideaux = deux pans de 45 cm ouverts. App-001 : voilages blancs O10, O11 ; rideaux beiges O8 ;
+voilage + rideaux mauves O9 (`verites/app-001/meubles.json`, clé « rideaux »). `outils/habillage/meubler.py` ajoute meubles et
+rideaux d'une vérité à un logement. (3) VRAIE COULEUR des meubles ABO : `meubles.couleur_texture` (lecture du .glb à la main :
+textures de couleur, médiane des pixels non noirs × facteur) ; `choisir` garde les 40 modèles aux dimensions les plus proches
+puis départage par la vraie couleur (poids 1,2) ; mémoire `..\atelya\bibliotheque\meubles-abo\couleurs-mesurees.json`. Ex. :
+table « White » = bois (173, 136, 101) → plus choisie ; tabourets maintenant JAUNES, table de repas blanche. Rendus v3 (sols
+trouvés seuls + meubles détaillés + rideaux) : `..\atelya\b2\app-001\v3\` (planche-v3.jpg). Reste : rangement mural de la salle à
+manger (cases ouvertes bois/blanc) rendu en placard à portes ; carreaux cubes → carrelage beige ; caisson visible sur la photo 07.
+**BIBLIOTHÈQUE DE SOLS ÉLARGIE (09/11/2026, accord écrit NT « Oui » après liste, tailles et licences).** 40 matières CC0 de plus
+(`outils/bibliotheque/telecharger_matieres.py`, qui COMPLÈTE maintenant matieres.json au lieu de l'écraser ; sauvegarde
+`matieres-avant-2026-11-09.json`) : ambientCG Tiles099-104 (« carreaux décorés bleus », plutôt azulejos que ciment), damiers et
+motifs de marbre Tiles012-016, mosaïques hexagonales Tiles071-072, tomettes hexagonales Tiles064-066, granitos Tiles109/110/040/043
+et Terrazzo013/018, pierre en damier Tiles139, marbre Tiles074, grandes dalles grises Tiles050, carrelage blanc Tiles025, pastilles
+Tiles129B/120 ; Poly Haven : parquets diagonal, rectangulaire, lames ×3, usé, plancher, stratifié 2, lames foncées 2, mosaïque de
+marbre, carreaux longs blancs, carreaux carrés, granit, vieux carrelage. 620 Mo en tout ; 71 matières dans la bibliothèque. Taille
+réelle : fiche ambientCG (dimensionX, cm) sinon ESTIMÉE en comptant les carreaux (`taille_estimee`). Catalogue `moteur/matieres.py` :
+61 sols (39 carrelages, 16 lames, 3 bâtons rompus, 3 point de Hongrie) ; écran de vérification régénéré (même liste, test) ;
+Blender reçoit la sorte de chaque sol par le plan (`sortes_sols`), plus de liste recopiée à la main. Plantage corrigé : une matière
+de 30 cm (pastilles) se répète plus de 3 fois dans une vignette d'1 m. Classificateur réappris avec cette bibliothèque (v3) :
+contrôle vides 92,7 %, meublées 81,0 % (v2 : 93,5 / 84,5) → v2 GARDÉ pour les familles ; la bibliothèque élargie sert au CHOIX de
+la matière dans la famille (prototypes) et à la pose.
+**REPÉRAGE DES MEUBLES (en cours, 09/11/2026).** `moteur/reperer_meubles.py` : œil DINOv2 par carrés de 14 px (photo réduite à
+672 × 448), 9 groupes + « rien » appris sur les photos d'essai meublées (masques de catégories : `masques_meubles.py -- dossier
+'["canape", …]'` → pixel = n° de catégorie) ; taches → pied (bas de la tache) → sol par la caméra → recul d'une demi-profondeur ;
+fusion entre photos ; dos au mur le plus proche ; note contre la vérité (même groupe, < 0,8 m). Outil
+`outils/habillage/apprendre_meubles.py` (contrôle fr-031/fr-038, `--app001`).
+Repérage des meubles v1 (09/11/2026) : 35 827 carrés appris (photos d'essai meublées hors contrôle ; lampes et plantes trop rares :
+25-27 carrés) ; justesse apprise 95 %. NOTE sur les meubles VUS sur au moins une photo (`vu_sur_une_photo`) : contrôle 44/84
+retrouvés (52 %), 44 en trop, place à 0,2-0,4 m ; réglage SUR LE CONTRÔLE (balayage seuil × taille de tache × fusion) :
+taches ≥ 16 carrés, fusion 1,8 m (chaises 0,45, fauteuils 0,6). app-001 (une fois après réglage) : 16/34 retrouvés (47 %), 24 en
+trop, place à 0,30 m ; canapé 0/1, lits 0/2, fauteuils 1/3, chaises 5/9, rangements 6/11, tapis 2/2. Plan
+`..\atelya\b2\app-001\v3\meubles-reperes.png`. Détections au bon endroit, CATÉGORIES confondues dans le salon (meubles ABO rendus
+≠ vrais meubles). Modèle `moteur/modeles/meubles-vits14-v1.pt`. Pistes : plus de photos d'essai meublées (tous les logements,
+plus de tirages), lampes et plantes plus fréquentes, segmentation plus fine (carrés de 14 px sur 448 px = 25 px de photo),
+orientation lue sur la photo.
+**APP-002 = EXAMEN (décision NT du 09/11/2026 : « Examen »).** 2e logement plan + photos (reçu de NT « avec les accords »),
+`..\atelya\photos-clients\app-002\` (plan-capture.jpg, photos\photo-01 à 15.jpg dans l'ordre d'envoi, LISEZMOI.txt). JAMAIS
+utilisé pour mettre Atelya au point (ni apprentissage, ni seuil) ; Atelya y passe UNE fois quand plan, caméras et vérités sont
+prêts. Étapes : (1) vérité du plan FAITE : `verites/app-002/` (verite-saisie.json, logement.json, controle.png ; plan.jpg copié
+mais pas dans Git) : 64,0 px/m d'après 8 cotes (± 2 %), HSP 2,50 supposée, 12 pièces ; AUCUNE cloison dessinée entre séjour et
+chambre 1 → une seule pièce « séjour + chambre 1 (ouverts) » (règle NT) ; porte du WC placée sur son mur ouest (à vérifier) ;
+gaines en murs épais. Piège : une ouverture doit être saisie SUR un mur (porte dans un trou entre deux murs = deux pièces
+fusionnées) ; (2) calage des 15 caméras ; (3) vérités sols et meubles ; (4) passage unique d'Atelya et note.
+**Grande série de photos meublées (09-10/11/2026, NT « Oui »)** : 42 tirages de plus (14 logements d'ENTRAÎNEMENT fr-022…041 dont
+la vérité existe, jamais les plans d'examen ; 3 tirages chacun, ~4 h ; 526 photos d'essai en tout, 0 plantage ; générateur :
+plantage d'un tirage = ligne « PLANTÉ » et la série continue, reprise des tirages faits, masques de catégories dans la même passe,
+`--depart`). Repérage des meubles réappris (122 869 carrés) : contrôle 44/84 retrouvés, 46 en trop (v1 : 44/84, 44) ; app-001
+11/34 (v1 16/34) → AUCUN gain, v1 GARDÉ. LEÇON : la limite n'est pas le nombre de photos fabriquées mais l'écart fabriqué/réel et
+la méthode (classificateur linéaire sur carrés de 25 px). Piste proposée à NT (accord nécessaire, licence à lire) : détecteur
+d'objets déjà entraîné sur de vraies photos (OWLv2, Google, annoncé Apache 2.0). Sols réappris avec ces photos (v4) : en cours.
+App-002 : relevé du plan VALIDÉ par NT (10/11/2026 : « C'est bon t'as mon accord ») : séjour + chambre 1 ouverts, porte du WC côté
+dégagement, HSP 2,50 ; porte-fenêtre O10 vers le petit balcon (pas une fenêtre : même bleu sur le dessin de contrôle, source de
+confusion) ; placards A (entrée) et B (près de la chambre 1) AVEC portes de placard (la « porte » saisie devant un placard
+devient des portes de placard en 3D). Étape suivante : calage des 15 caméras.
+App-002, calage des caméras FAIT (10/11/2026, `verites/app-002/cameras-photos.json`, commit 0d38265) : 11/15 photos calées
+(01, 03, 04, 05, 07, 10, 14, 15 bonnes ; 02 moyenne ; 08 et 09 cuisine approchées, ±30 cm) ; mises de côté avec leur raison :
+06 (repères sur un seul mur, plan peut-être inexact vers la baie O14), 11 (chambre 2, un seul mur visible), 12 et 13 (salle d'eau,
+coins cachés, sol presque invisible). Chambres : photos 10/11 = chambre 2 (radiateur à droite de la baie), 14/15 = chambre 3.
+Repères relevés à la main par Claude ; caméra calculée et traits de contrôle dessinés par le code d'Atelya (`moteur/camera_photo.py`).
+Étape suivante (après accord NT) : vérités des sols et des meubles d'app-002, AVANT de lancer Atelya une seule fois.
+App-002, vérités de l'examen écrites AVANT tout passage d'Atelya (10/11/2026) : `verites/app-002/sols.json` (parquet chêne en lames
+`chene_naturel_photo` au séjour + ancienne chambre 1, entrée, chambres 2 et 3 ; grands carreaux beiges `pierre_beige` en cuisine et
+salle d'eau ; aucune zone d'un autre sol ; couleur visée mesurée sur les photos calées, points du sol projetés, hors meubles et sol
+caché ; chambres sur zones choisies à la main) et `verites/app-002/meubles.json` (41 objets : table + 7 chaises, buffet, commode,
+bureau, 2 canapés, meuble télé, bibliothèque, chambres, cuisine à ±30 cm ; aucun rideau). Logement de vérité avec sols :
+`..\atelya\b2\app-002\examen\logement-verite-sols.json` (poser_sols.py). Attente : accord NT avant le passage unique d'Atelya.
+**EXAMEN app-002 PASSÉ (une seule fois, 10/11/2026, modèles en service, aucun réglage)** — sorties `..\atelya\b2\app-002\examen\`.
+SOLS (sols-vits14-v2) : **79,2 % de la surface juste** (43,9 m² jugés) ; pièces 3/4 justes (cuisine carreaux, séjour lames 98 %
+des votes, chambre 2 lames) ; chambre 3 FAUSSE (carreaux : le lit blanc étiré par la mise à plat, 59 % des votes) ; fausses zones
+point de Hongrie sur les lits (ch. 2 : 3,4 m² ; ch. 3 : 1,1 m²) ; entrée non jugée (1,1 m² vus, 0 vignette). Couleurs ΔE : séjour
+2,1, chambre 3 4,5, cuisine 5,4, chambre 2 9,7. MEUBLES (meubles-vits14-v1) : **10/30 retrouvés (33 %)**, 9 en trop, place à
+0,44 m ; canapés 1/2, chaises 3/8, rangements 6/14, lits 0/2, tables 0/4 (app-001 : 47 %). MÊME CAUSE qu'app-001 : les LITS (et
+grands meubles blancs) trompent les sols et ne sont pas reconnus comme lits. Après cette note, app-002 = « examen déjà vu ».
+**« PAS DU SOL » + LITS ET TABLES (10/11/2026, NT : « fais ce qu'il y a de mieux et de plus performant »).** But : écarter lits,
+couettes, canapés, gros meubles blancs AVANT le vote du sol, et mieux repérer lits et tables. app-001 et app-002 = examens DÉJÀ VUS :
+rien n'y est réglé (non-recul seulement, une fois à la fin) ; mise au point sur le contrôle fabriqué fr-031/fr-038 ; vraie note =
+nouveau logement fourni par NT. Plan validé : (1) diagnostic, (2) OWLv2 dans Atelya vérifié sur photos fabriquées, (3) « pas du sol »
+sur la PHOTO avant la mise à plat (OWLv2 + DINOv2 sol/pas sol + parallaxe entre photos), (4) lits/tables par OWLv2, (5) mise en
+service si mieux sans recul. OWLv2 : licence lue (Apache 2.0 code ET poids, voir CLAUDE.md § 3) ; accord NT (« fais ce qu'il y a de
+mieux ») → base B/16 téléchargée dans `..\atelya\modeles-externes\owlv2-base\` (model.safetensors 619 918 824 octets, SHA256
+e1e130b9e404cf91a75ad45644c1da9d7fa5284085eecc864266a6923efb99e7, révision HF cfd3195b ; vocab.json, merges.txt, config ;
+LICENSE-scenic-Apache-2.0.txt). Aucune bibliothèque installée : code à réécrire dans Atelya (comme oeil.py), poids lus à la main.
+Étape 1 FAITE (diagnostic, contrôle meublé fr-031-m1/m2, fr-038-m1/m2, sols-vits14-v2) : 229,2 m² jugés, 84,6 % justes ; 61,0 m²
+(27 %) sont sous un meuble (masque mis à plat, tapis compris) : justes à 72,3 % contre 89,0 % ailleurs ; 16,9 des 35,4 m² faux sont
+sous un meuble (≈ la moitié des erreurs) ; l'autre moitié = confusions de familles (point de Hongrie / bâtons rompus / lames).
+CONSTAT : les « lits » des photos fabriquées ne ressemblent pas aux vrais : blocs blancs LISSES (ni couette plissée, ni oreillers,
+ni plaid), dont des lits mezzanine en métal noir (catégorie « lit » sans exclure « loft »), posés au hasard (cuisine, séjour,
+dégagement) ; contrôle meublé = 2 lits seulement. Le contrôle SOUS-ESTIME donc le défaut des vrais lits (app-002 : chambre 3
+entière fausse). Script : scratchpad `diag_etape1.py` (non gardé).
+**NT (10/11/2026) : « meubles » = TOUT ce qui n'est ni mur ni sol** (cuisine, placards, sanitaires, électroménager, radiateurs,
+luminaires, déco…). NT doute qu'Atelya sache DESSINER du sur mesure réaliste. Vérifié dans liste.json d'ABO : 0 sanitaire (évier,
+WC, douche, baignoire, robinet), 0 électroménager (frigo, plaque, hotte, lave-vaisselle, micro-ondes), 0 radiateur, pas de cuisine
+intégrée ; OK pour meubles libres, lampes (345), suspensions/lustres (~140), tableaux (599), miroirs (109), coussins (275),
+plantes (182). Proposé à NT comme CHANTIER SUIVANT (après « pas du sol ») : essai côte à côte sur la cuisine d'app-001 (dessiné par
+Atelya avec vraies matières PBR contre vrais modèles 3D d'une bibliothèque : Poly Haven CC0, Sketchfab par objet, fichiers
+fabricants pour architectes, BlenderKit — licences à LIRE avant de proposer, accord NT avant tout téléchargement) ; NT juge sur
+l'image, puis choix catégorie par catégorie. Pas commencé.
+Étape 2 (10/11/2026) : OWLv2 RÉÉCRIT dans Atelya (`moteur/owlv2.py` : réseau, découpage des mots CLIP, poids safetensors lus à la
+main ; aucune bibliothèque ajoutée) ; contrôle de référence = image d'exemple officielle (deux chats) : 0,614 / 0,665 exactement,
+rectangles à 0,1 px. Banc `outils/habillage/verifier_owlv2.py` (38 phrases → 9 groupes + « autre » : fenêtre, porte, radiateur…) :
+403 photos d'essai meublées anciennes, seuil 0,2 : 70 % des meubles retrouvés sur la photo (lits 76 %, rangements 79 %, tapis 78 %,
+chaises 52 %), 1,7 rectangle en trop par photo ; ~0,25 s/photo. Piège vu : zone de sol en granito prise pour un tapis (« carpet
+0,27 ») → ne pas écarter le sol sur un simple « tapis ». LITERIE : format `Literie` (couette, oreillers 0-4, couleur, plaid) sur un
+Meuble ; Blender `moteur/blender/literie.py` (hauteur du matelas par rayons ; matelas ajouté sur un cadre seul ; couette arrondie à
+deux bruits de plis ; oreillers ; plaid) ; masque : linge = lit. Photos d'essai : chaque chambre reçoit un lit 9 fois sur 10 contre un
+mur + chevets, linge 9 fois sur 10 (couettes blanches/claires ~65 %) ; « loft » exclu des lits simples. Série : contrôle fr-031-m3/m4,
+fr-038-m3/m4 (45 photos) + 18 tirages d'entraînement -m4 (graine 2026, journal `..\atelya\b2\journal-photos-literie.txt`).
+CONTRÔLE AVEC VRAIS LITS (sols-vits14-v2) : 260,6 m² jugés, 70,3 % justes (contre 84,6 % sur l'ancien contrôle) ; sous meubles
+47 % (72 % avant), ailleurs 84 % ; fr-038-m4 chambre 1 prise pour du carrelage (comme app-002 ch. 3) ; nombreuses fausses zones
+dans les chambres → le contrôle reproduit enfin le défaut des vraies photos. OWLv2 sur ce contrôle (seuil 0,2) : lits 18/21 (86 %),
+canapés 6/7, rangements 19/24, tables 17/26, tous 87/119 (73 %) ; lits « en trop » = surtout DOUBLONS (« bed » + « bed with a
+duvet ») → fusionner. Planches `..\atelya\b2\owlv2-verification(-literie)\`.
+DÉFAUT À RÉPARER (vu le 10/11/2026) : `verites/fr-026/logement.json` (relu, commit 0b93a86) ne se construit plus : porte O20 de
+2,94 m sur le mur M9 (3,10 m, épaisseur 3,8 cm) à 7,9 cm du début → « chevauche une autre ouverture ou l'angle du mur M9 »
+(moteur/geometrie.py). Les anciens tirages fr-026-m1/m2 venaient de la version d'avant. Le tirage fr-026-m4 de la série literie a
+donc planté (série continuée sans lui). À reprendre dans le chantier des vérités, pas dans « pas du sol ».
+Série literie FINIE (10/11/2026) : contrôle fr-031-m3/m4, fr-038-m3/m4 + 17 tirages d'entraînement -m4 (fr-026-m4 PLANTÉ : défaut de
+sa vérité, voir plus haut). Leçon PC : OWLv2/DINOv2 sur la carte PENDANT un rendu Blender → « CUDA illegal memory access » :
+calculs sur le processeur (CUDA_VISIBLE_DEVICES="") tant que Blender rend.
+ÉTAPE 3 FAITE (10/11/2026) : « PAS DU SOL ». `moteur/pas_du_sol.py` : masque des rectangles OWLv2 (lits, canapés, RANGEMENTS ;
+note ≥ 0,25 ; jamais les tapis) ; `sol_a_plat.mettre_a_plat(ecarter=…)` → points DOUTEUX (pas effacés : effacer faisait jeter les
+vignettes voisines à cause de COUVERTURE_MIN 85 % → un tiers du vrai sol perdu, pièces non jugées) ; `vignettes(douteux=…)` :
+douteux ≤ 35 % remplacé par le sol propre (poids 1 − part), au-delà poids 0,05 ; `CarteDesSols.votes_propres` : une pièce vue
+proprement sur ≥ 1 m² n'est décidée (famille + zones) que par ses cases propres ; `assembler` préfère la photo qui voit le point
+propre ; couleur mesurée hors points douteux. Banc `outils/habillage/essayer_pas_du_sol.py` (tout compté sur la surface et les
+pièces jugées SANS écartement : ce qui n'est plus jugé = raté). Essai 3/4 (sols-vits14-v2) : RETENU OWLv2 lits+canapés+rangements :
+vrais lits 70,3 → 84,1 % (sous meubles 47 → 82 %), anciens meublés 84,6 → 84,9 %, vides 93,5 = 93,5 %, pièces justes identiques
+(18, 15, 21 / 25). Rejetés : + tables/chaises ou + fauteuils (−1 pièce juste), DINOv2 seul (change des pièces VIDES : retire du
+vrai sol), OWLv2+DINOv2 (moins bon). Clé 3 « parallaxe » PAS faite (gain déjà obtenu ; peu de photos qui se recouvrent dans les
+chambres ; couette blanche = même couleur des deux côtés). Option `--pas-du-sol` de `outils/habillage/sols_photos.py`
+(reconnaitre, logement) ; PAS encore en service par défaut (étape 5 : non-recul app-001/app-002 une fois). Planche
+`..\atelya\b2\pas-du-sol\planche-fr-038-m4.jpg` (chambre 1 : carreaux faux → lames juste ; tirage 67 → 84 %). 803 tests.
+ÉTAPE 4 FAITE (10/11/2026, NT : « si OWL est meilleur que DINO, prends ce qu'il y a de mieux ») : REPÉRAGE DES MEUBLES PAR OWLv2.
+`moteur/reperer_meubles.py` : `meubles_owl_d_une_photo` (bas du rectangle = pied, reporté au sol par la caméra calée, milieu une
+demi-profondeur plus loin ; tapis = milieu entre haut et bas reportés ; rectangle coupé par le bas de la photo = poids 0,1 dans la
+fusion) ; `coller_au_mur` (lit tête au mur, canapé et rangement dos au mur, si le mur est à ≤ demi-profondeur + 1 m : corrige la
+profondeur, peu sûre sur une photo) ; `reperer_owl` (fusion entre photos ET entre phrases « bed » / « bed with a duvet ») ;
+`reperer_depuis_releve(releve, logement, racine)` ; SEUILS_OWL par groupe réglés sur les tirages d'ENTRAÎNEMENT (OWLv2 n'apprend
+rien), notés sur le CONTRÔLE (outil `outils/habillage/reperer_meubles_owl.py`, cache `..\atelya\b2\meubles-owl\objets-owl.json`).
+CONTRÔLE : anciens m1/m2 45/84 retrouvés, 33 en trop (DINOv2 v1, pourtant réglé sur ce contrôle : 44/84, 44) ; vrais lits m3/m4
+56/99, 26 en trop (DINOv2 : 36/99, 57) ; lits 8/11 (2/11), tables 13/23 (8/23), chaises 8/12 (3/12). Entraînement lits 32 → 44/68
+grâce au collage au mur (16/68 lits étaient vus mais placés à 0,8-1,5 m). Plante : 0/44 à l'entraînement → seuil 0,5, presque
+éteinte. Plan `..\atelya\b2\meubles-owl\plan-fr-038-m4.png`. PAS encore en service (étape 5 : non-recul app-001/app-002).
+ÉTAPE 5 FAITE (10/11/2026) : NON-RECUL sur les examens DÉJÀ VUS, une seule fois, aucun réglage (`outils/habillage/non_recul_examens.py`,
+sorties `..\atelya\b2\non-recul-2026-11-10\`). Passages « avant » = notes connues exactement (rien changé par accident). SOLS :
+app-001 81,5 → 83,6 % (pièces 2/3 = 2/3 ; séjour toujours « lames » au lieu de point de Hongrie) ; app-002 79,2 → 87,9 % (3/4 = 3/4 ;
+fausse zone de la chambre 1 disparue ; chambre 2 toujours « carreaux » au lieu de lames). MEUBLES (OWLv2 contre DINOv2) : app-001
+16/34 → 25/34, en trop 24 → 18 (lits 0/2 → 2/2, chaises 5/9 → 9/9, fauteuils 1/3 → 3/3, tables 2/5 → 3/5, rangements 6/11 → 5/11) ;
+app-002 10/30 → 22/30, en trop 9 = 9 (lits 0/2 → 2/2, tables 0/4 → 3/4, chaises 3/8 → 8/8, canapés 1/2 → 2/2). MIS EN SERVICE :
+« pas du sol » par défaut dans `sols_photos.py` (`--sans-pas-du-sol` = ancien) ; meubles par `outils/habillage/reperer_meubles_photos.py`
+(OWLv2). meubles-vits14-v1.pt gardé en réserve (comparaison). Reste : vidéo avant/après d'une chambre d'app-002 (durée à annoncer à NT).
+Correctif (10/11/2026, vu en préparant la vidéo) : avec « pas du sol », la MATIÈRE et la TEINTE d'une pièce se mesuraient encore sur
+les points douteux (chambre d'app-002 → « parquet diagonal » teinte verdâtre 0,39/0,44/0,30) : `albedos_par_region` ignore les points
+douteux, le choix de la matière ne prend que les vignettes propres → « chêne à nœuds » 0,29/0,22/0,10 (familles inchangées : le
+non-recul tient). Lits trouvés par photos : linge par défaut (couette blanc cassé, 2 oreillers, `LITERIE_PAR_DEFAUT`).
+PREMIER PLAN VIDÉO : `moteur/blender/video_trajet.py` (caméra qui glisse entre des points [x, y, z, cap, tangage], Bézier ;
+exposition/balance réglées UNE fois ; graine figée ; clamp) + `outils/habillage/video_piece.py` (--chrono = une image ; .mp4 par
+OpenCV). App-002 chambre « 2 » (chambre_1) : `..\atelya\b2\app-002\video\` (avant = sols sans pas du sol + meubles DINOv2 ; après =
+pas du sol + OWLv2 ; trajet-chambre.json, 96 images 1280×720, 18 mm, « 2 Jour voilé »). Chrono : 22 s l'image à 128 échantillons
+(chargement compris) ; murs TACHÉS par le débruiteur à 128 (risque de scintillement) ; parquet TROP FONCÉ (photo L ≈ 52) = défaut
+de teinte au rendu, à reprendre à part.
+VIDÉO AVANT/APRÈS FAITE (10/11/2026) : `..\atelya\b2\app-002\video\avant-apres.mp4` (côte à côte, 96 images, 256 échantillons ; avant
+42 min, après 46 min ; GPU à 85 °C) + `avant-apres-planche.jpg`. Avant : pas de lit, fausse bande de point de Hongrie (la couette),
+un tapis ; après : lit trouvé seul avec son linge par défaut, sol en lames sans fausse zone. Restent visibles : parquet trop foncé
+(teinte au rendu), légères marbrures sur les murs blancs, trajet écrit à la main. CHANTIER « PAS DU SOL » TERMINÉ (étapes 1-5).
+Note ~73/100 prêt client (était ~71). Chantier suivant proposé à NT : RÉALISATEUR AUTOMATIQUE (trajet calculé depuis le plan,
+garde-fous, ordre de visite) + UNE commande photos → maquette meublée → film + teinte des parquets au rendu (règle n° 21 : tout
+par défaut). Ensuite : « tout ce qui n'est ni mur ni sol ». Vraie note : nouveau logement avec photos (NT).
+**TEST DE BOUT EN BOUT ATELYA + CLAUDE sur app-002 (10/11/2026, NT « on teste tout le processus »)** : NT a renvoyé le plan et les
+photos d'app-002 (14/15 photos identiques au pixel, + 1 photo de la salle à manger un autre jour) → PAS une note neuve (examen
+déjà vu), mais banc de bout en bout (toutes les vérités existent). Sorties `..\atelya\b2\app-002\bout-en-bout\plan-capture\`.
+ÉTAPE 1 (lecture du plan par Claude, au format lecture-claude/0.1, à l'œil sur des agrandissements quadrillés, SANS ouvrir la
+vérité ; limite : plan déjà vu) : `fiche-claude.json` (26 murs, 20 ouvertures, 12 pièces, 20 cotes = chaque « 500 X 215 » coupé
+en deux cotes « 500 » / « 215 » bornées aux faces intérieures, échelle proposée 64,0 px/m, 7 doutes). Traduction Atelya : 12 pièces,
+93,3 m² contre 93,6 m² pour la vérité ; pièces à ±5 % sauf WC 1,17 contre 0,77 m², salle de bains 5,29 contre 4,64 m² ; fenêtre
+ouest du séjour lue « fenêtre » (vérité : porte-fenêtre). TROUS révélés : (1) ÉCHELLE « à vérifier » : la 2e clé cherche des TRAITS
+de cote, absents sur ce style de plan (dimensions « L X l » écrites DANS les pièces, très courant en France) → Atelya doit vérifier
+ces dimensions en mesurant lui-même la pièce entre ses murs ; (2) gaines lues comme murs de 74-78 cm (doute juste) ; (3) le format
+n'a pas de type « porte de placard » (façades de placard = portes de 1,93 et 2,72 m, doutes forts). Écran : `ecran.html`.
+**ÉCRAN DE VÉRIFICATION MALLÉABLE (10/11/2026, NT : « il manque plein de paramètres exploitables… rendre quelque chose de
+malléable »).** Point 1 FAIT : portes et fenêtres à la souris (`outils/verification-plan/calculs-verif.js` : `morceauxLibres` = mur
+sans ses angles ni l'appui d'un autre mur ni les autres ouvertures ; `deplacerOuverture` = glisser le long du mur ou jusqu'à un autre
+mur, jamais dans un angle ni sur une autre ouverture, aimant 8 cm ; `etirerOuverture` = tirer un bord, largeur ≥ 40 cm ;
+`verification.js` : poignées aux deux bords de l'ouverture choisie). Interprétation retenue de NT (« si je déplace une porte, le mur
+ne va pas se déplacer avec ») : (a) la porte reste accrochée à son mur — à confirmer. Sens d'ouverture d'une porte : ABSENT du format
+(champ à ajouter avant de pouvoir l'inverser). TESTS JS SANS NODE : `outils/verification-plan/tests/lancer_dans_edge.py` les lance
+dans Microsoft Edge (déjà sur Windows, --headless), branché sur pytest (`test_ecran_verification.py`) ; 57/57 (dont syntaxe de
+verification.js). PIÈGE : jamais de « \n » dans du JS écrit par Python (devient un vrai retour à la ligne) → String.fromCharCode(10).
+Reste proposé (points 2-6) : murs (épaisseur à la poignée, redresser, coller), types « gaine » et « porte de placard », meubles à
+l'écran (déplacer, tourner, taille, type), cote corrigée = tout se recale. Le chronométrage NT (étape 2 du test de bout en bout)
+attend l'écran malléable.
+ÉCRAN MALLÉABLE, suite (10/11/2026, NT : « fais tout, même ce que tu avais mis en haut ») : (1) murs alignés qui se chevauchent
+FUSIONNÉS (`fusionnerMursAlignes` : < 1°, < ½ épaisseur, recouvrement > 1 cm ; portes de l'autre mur reportées à leur vraie place) et
+pièces RECALCULÉES SEULES après chaque changement de mur ET à l'ouverture de l'écran (`apresMurs`, `corrigerMurs` ; noms, types, sols
+gardés ; pièce non fermée gardée et signalée) ; (2) pièces à la souris : coins et milieux des côtés, aimant sur les faces des murs
+(et leur angle), alertes « traverse un mur » / « chevauche », contours faits à la main GARDÉS au recalcul (`v.contours_manuels`,
+bouton « Revenir au contour calculé »), LIMITE INVISIBLE (outil : cloison pour le calcul des pièces seulement, pas de mur en 3D,
+`v.limites`) ; (3) murs : épaisseur à la poignée (rond orange), « Rendre droit » (< 5°, murs accrochés suivent ; vrai biais refusé),
+« Redresser tous les murs presque droits » (pas automatique : de vrais biais existent) ; « coller » = outil Relier existant ;
+(4) doutes 0.3.0 : bloc plein court (longueur ≤ 2,5 × épaisseur) = gaine/poteau (faible), « porte » large donnant sur un placard =
+façade (pas de doute) ; (5) MEUBLES à l'écran : emprise au sol (trait épais = avant), glisser (dos collé au mur à < 15 cm, change de
+pièce), rond violet de rotation (crans 15°, angle droit à < 7°), fiche (type parmi les 35 catégories du moteur — test d'égalité,
+taille, ±90°), outil « Un meuble », suppression (une pièce supprimée emporte ses meubles), cohérence (pièce connue, plafond) ;
+(6) ÉCHELLE des plans à dimensions DANS les pièces : traducteur Claude 0.3.0, `_cotes_entre_murs` = Atelya mesure lui-même chaque
+dimension entre les faces des murs du DESSIN (trait sombre ≥ 3 px, hachures ignorées ; ≤ 8 % des bouts de Claude ; ≥ 3 d'accord à
+3 %) → app-002 : échelle LUE (8 dimensions, 64,9 px/m contre 64,0 vérité, confirmée par Claude) ; doutes forts 6 → 4 (3 « cote contre
+dessin » honnêtes : « 490 » écrit pour 4,69 m dessinés, + séjour/chambre 1). Tests JS 71/71 dans Edge.
+(7) SENS D'OUVERTURE DES PORTES (10/11/2026) : format `SensPorte` sur `Ouverture.sens` (charniere debut/fin, ouvre_vers
+gauche/droite du mur ; None = comme avant) ; 3D (`habillage._porte`) : poignée opposée aux gonds, battant affleurant la face vers
+laquelle la porte s'ouvre ; écran : arc vert de chaque porte (POINTILLÉS tant que personne ne l'a réglé), boutons « Gonds de l'autre
+côté » / « S'ouvre de l'autre côté » ; défaut à l'écran = la porte s'ouvre VERS LA PIÈCE (pas vers entrée/dégagement/couloir,
+puis séjour) ; pas d'arc au-delà de 1,30 m (façades de placard, baies). App-002 : écran régénéré avec 30 meubles trouvés par OWLv2
+reportés du repère de la vérité (u = 118 + 64 x, v = 651 − 64 y) dans celui de la lecture (calage 64,9 px/m) — capture Edge vérifiée.
+Tests JS 73/73. ÉCRAN MALLÉABLE : les 7 points FAITS. Suite du test de bout en bout : étape 2 = NT chronomètre l'écran.

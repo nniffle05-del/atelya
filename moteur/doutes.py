@@ -37,7 +37,7 @@ import numpy as np
 
 from moteur.coloriage import redresser
 
-VERSION_DOUTES = "0.2.0"
+VERSION_DOUTES = "0.3.0"  # 10/11/2026 : blocs pleins (gaines, poteaux) et façades de placard
 PLUSIEURS_NIVEAUX = "plusieurs_niveaux"  # code du doute : l'image dessine plusieurs niveaux ou logements, un seul est lu
 
 # --- Seuils (réglés sur les bancs ; voir /mnt/project-files/atelya-doutes/plan.md) ---
@@ -154,6 +154,27 @@ class _Grille:
 
 # ---------------------------------------------------------------- contrôles de bon sens
 
+BLOC_RAPPORT_MAX = 2.5  # un « mur » trop épais pas plus long que 2,5 fois son épaisseur est un bloc (gaine, poteau)
+
+
+def _donne_sur_un_placard(o: dict, mur: dict, pieces: list[dict], types: dict[str, str]) -> bool:
+    """L'ouverture donne-t-elle sur un placard (une pièce de type « placard » d'un côté ou de l'autre de son milieu) ?"""
+    from moteur.sol_a_plat import dans_polygone
+    d = np.subtract(mur["fin"], mur["debut"]).astype(float)
+    longueur = float(np.hypot(*d))
+    if longueur < 1e-9:
+        return False
+    d /= longueur
+    n = np.array([-d[1], d[0]])
+    milieu = np.asarray(mur["debut"], float) + d * (o["position"] + o["largeur"] / 2)
+    for cote in (-1, 1):
+        q = milieu + cote * n * (mur["epaisseur"] / 2 + 0.12)
+        for p in pieces:
+            if types.get(p["id"]) == "placard" and dans_polygone(np.array([q[0]]), np.array([q[1]]), p["contour"])[0]:
+                return True
+    return False
+
+
 def controles_bon_sens(logement: dict, types: dict[str, str] | None = None,
                        noms_lus: list[str] | None = None) -> list[dict]:
     """Les incohérences d'un logement lu, sans regarder l'image.
@@ -168,13 +189,21 @@ def controles_bon_sens(logement: dict, types: dict[str, str] | None = None,
 
     for m in logement["murs"]:
         if not EPAISSEUR_MIN <= m["epaisseur"] <= EPAISSEUR_MAX:
-            doutes.append(_doute("epaisseur", f"mur de {100 * m['epaisseur']:.0f} cm d'épaisseur : improbable",
-                                 "fort", m["id"], _zone_mur(m)))
+            longueur = float(np.hypot(m["fin"][0] - m["debut"][0], m["fin"][1] - m["debut"][1]))
+            if m["epaisseur"] > EPAISSEUR_MAX and longueur <= BLOC_RAPPORT_MAX * m["epaisseur"]:
+                # un bloc plein court : gaine technique ou poteau, pas un mur de 75 cm (10/11/2026)
+                doutes.append(_doute("bloc", f"bloc plein de {100 * longueur:.0f} × {100 * m['epaisseur']:.0f} cm : gaine ou poteau",
+                                     "faible", m["id"], _zone_mur(m)))
+            else:
+                doutes.append(_doute("epaisseur", f"mur de {100 * m['epaisseur']:.0f} cm d'épaisseur : improbable",
+                                     "fort", m["id"], _zone_mur(m)))
 
     for o in logement["ouvertures"]:
         if o["mur"] not in murs:
             continue
         L = o["largeur"]
+        if o["type"] == "porte" and L > LARGEUR_PORTE_MAX and _donne_sur_un_placard(o, murs[o["mur"]], pieces, types):
+            continue  # la façade d'un placard (plusieurs portes) : large, normal ; la 3D en fait des portes de placard
         if o["type"] == "porte" and not LARGEUR_PORTE_MIN <= L <= LARGEUR_PORTE_MAX:
             doutes.append(_doute("largeur_porte", f"porte de {100 * L:.0f} cm de large : improbable", "fort",
                                  o["id"], _zone_ouverture(o, murs)))

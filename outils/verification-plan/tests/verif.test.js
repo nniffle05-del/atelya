@@ -97,6 +97,45 @@ test("une correction ne touche jamais l'original (c'est ce qui permet « Annuler
   assert.equal(JSON.stringify(v), avant);
 });
 
+test("plinthes choisies à l'écran : la pièce les garde, marquées « mesure » (vu par la personne)", () => {
+  const v = exemple();
+  const w = C.reglerPlinthes(v, "chambre", "aucune");
+  const p = w.logement.pieces.find((x) => x.id === "chambre");
+  assert.deepEqual(p.plinthes, { choix: "aucune", statut: "mesure", source: "verification", confiance: 1 });
+  assert.ok(w.verifies.includes("chambre"));
+  assert.equal(v.logement.pieces.find((x) => x.id === "chambre").plinthes, undefined); // l'original ne bouge pas
+  assert.throws(() => C.reglerPlinthes(v, "chambre", "marbre"));
+  assert.throws(() => C.reglerPlinthes(v, "inconnue", "bois"));
+});
+
+test("portes de placard choisies à l'écran ; un placard se reconnaît à son nom et à sa petite taille", () => {
+  const v = exemple();
+  const w = C.reglerPlacard(v, "chambre", "battantes");
+  const p = w.logement.pieces.find((x) => x.id === "chambre");
+  assert.deepEqual(p.placard, { choix: "battantes", statut: "mesure", source: "verification", confiance: 1 });
+  assert.ok(C.estPlacard(p)); // un choix écrit suffit
+  assert.throws(() => C.reglerPlacard(v, "chambre", "miroir"));
+  const carre = (c) => [[0, 0], [c, 0], [c, c], [0, c]];
+  assert.ok(C.estPlacard({ nom: "Placard 1", contour: carre(1) }));
+  assert.ok(C.estPlacard({ nom: "Pièce 4 (rangement)", contour: carre(1) }));
+  assert.ok(!C.estPlacard({ nom: "Dressing", contour: carre(3) })); // 9 m² : une vraie pièce
+  assert.ok(!C.estPlacard({ nom: "Chambre", contour: carre(1) }));
+});
+
+test("sol choisi à l'écran ; un changement de nom oublie seulement ce qu'Atelya avait supposé", () => {
+  const v = exemple();
+  const w = C.reglerSol(v, "chambre", "tomettes");
+  assert.deepEqual(w.logement.pieces.find((x) => x.id === "chambre").sol,
+    { matiere: "tomettes", statut: "mesure", source: "verification", confiance: 1 });
+  assert.throws(() => C.reglerSol(v, "chambre", "moquette"));
+  const suppose = { matiere: "parquet_chene_lames", statut: "ajoute", source: "regle_par_defaut", confiance: 0.5 };
+  v.logement.pieces.find((x) => x.id === "sejour").sol = suppose;
+  const r = C.renommerPiece(C.reglerSol(v, "chambre", "tomettes"), "sejour", "Salle d'eau");
+  assert.equal(r.logement.pieces.find((x) => x.id === "sejour").sol, undefined);
+  const r2 = C.renommerPiece(C.reglerSol(v, "chambre", "tomettes"), "chambre", "Bureau");
+  assert.equal(r2.logement.pieces.find((x) => x.id === "chambre").sol.matiere, "tomettes");
+});
+
 test("propositions en un clic : la porte oubliée est ajoutée et le doute disparaît", () => {
   let v = exemple();
   const d = C.trouverDoutes(v).find((x) => x.element === null);
@@ -550,4 +589,283 @@ test("deux ouvertures l'une sur l'autre : incohérence pour le moteur, et un poi
   assert.deepEqual(w.logement.ouvertures.map((o) => o.id), ["F"]);
   assert.deepEqual(C.verifierCoherence(w.logement), []);
   assert.ok(!C.pointsAVerifier(w).some((p) => p.genre === "recouvrement"));
+});
+
+// ---------- Portes et fenêtres malléables (10/11/2026) ----------
+// Une pièce de 4 × 3 m : M1 au sud (0,0)→(4,0), M2 à l'est, M3 au nord, M4 à l'ouest ; un mur intérieur M5 s'appuie sur M1 à x = 2.
+const salle = () => ({
+  schema: "verification/0.1",
+  calage: { px_par_m: 100, origine_px: [210, 760] },
+  logement: {
+    schema: "logement/0.1", projet_id: "T", unites: "m", hauteur_sous_plafond: 2.5,
+    murs: [
+      { id: "M1", debut: [0, 0], fin: [4, 0], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M2", debut: [4, 0], fin: [4, 3], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M3", debut: [4, 3], fin: [0, 3], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M4", debut: [0, 3], fin: [0, 0], epaisseur: 0.2, statut: "estime", source: "atelya" },
+      { id: "M5", debut: [2, 0], fin: [2, 3], epaisseur: 0.1, statut: "estime", source: "atelya" },
+    ],
+    ouvertures: [
+      { id: "P1", type: "porte", mur: "M1", position: 0.5, largeur: 0.8, hauteur: 2.04, allege: 0, statut: "estime", source: "atelya" },
+      { id: "F1", type: "fenetre", mur: "M3", position: 1.0, largeur: 1.0, hauteur: 1.25, allege: 0.95, statut: "estime", source: "atelya" },
+    ],
+    pieces: [],
+  },
+});
+
+test("morceaux libres d'un mur : sans ses angles, sans l'appui d'un autre mur", () => {
+  const lg = salle().logement;
+  const libres = C.morceauxLibres(lg, lg.murs[0], "P1");
+  assert.equal(libres.length, 2);
+  procheP(libres[0], [0.1, 1.95]); // angle ouest (demi-épaisseur de M4) puis l'appui de M5 (5 cm de chaque côté)
+  procheP(libres[1], [2.05, 3.9]);
+});
+
+test("glisser une porte : elle suit la souris le long du mur, sans déborder dans un angle", () => {
+  let v = C.deplacerOuverture(salle(), "P1", [1.2, 0.05]);
+  let p = v.logement.ouvertures.find((o) => o.id === "P1");
+  proche(p.position, 0.8); // centrée sous la souris
+  v = C.deplacerOuverture(salle(), "P1", [0.2, 0]);
+  p = v.logement.ouvertures.find((o) => o.id === "P1");
+  proche(p.position, 0.1); // calée contre l'angle, pas dedans
+  v = C.deplacerOuverture(salle(), "P1", [1.9, 0]);
+  p = v.logement.ouvertures.find((o) => o.id === "P1");
+  proche(p.position + p.largeur, 1.95); // arrêtée contre le mur intérieur M5
+  assert.equal(p.mur, "M1");
+  assert.ok(v.verifies.includes("P1"));
+});
+
+test("aimant : un bord à moins de 8 cm d'un angle s'y colle", () => {
+  const v = C.deplacerOuverture(salle(), "P1", [0.65, 0]); // bord à 0,25 m : loin de l'angle, pas d'aimant
+  proche(v.logement.ouvertures[0].position, 0.25);
+  const w = C.deplacerOuverture(salle(), "P1", [0.56, 0]); // bord à 0,16 m : à 6 cm de l'angle (0,1) → collé
+  proche(w.logement.ouvertures[0].position, 0.1);
+});
+
+test("glisser une porte jusqu'à un autre mur : elle change de mur", () => {
+  const v = C.deplacerOuverture(salle(), "P1", [4.0, 1.5], 0.3);
+  const p = v.logement.ouvertures.find((o) => o.id === "P1");
+  assert.equal(p.mur, "M2");
+  proche(p.position, 1.1); // centrée à 1,5 m le long de M2
+});
+
+test("une porte ne passe pas sur une autre ouverture", () => {
+  const v = C.deplacerOuverture(salle(), "P1", [1.5, 3.0], 0.3); // vers M3, sur la fenêtre F1 (de x = 3 à x = 2 le long de M3)
+  const p = v.logement.ouvertures.find((o) => o.id === "P1");
+  const f = v.logement.ouvertures.find((o) => o.id === "F1");
+  assert.equal(p.mur, "M3");
+  assert.ok(p.position + p.largeur <= f.position + 1e-6 || p.position >= f.position + f.largeur - 1e-6);
+});
+
+test("tirer un bord : la largeur change, l'autre bord ne bouge pas, jamais moins de 40 cm ni dans l'angle", () => {
+  let v = C.etirerOuverture(salle(), "P1", 1, [1.6, 0]);
+  let p = v.logement.ouvertures[0];
+  proche(p.position, 0.5); proche(p.largeur, 1.1);
+  v = C.etirerOuverture(salle(), "P1", 0, [-1, 0]);
+  p = v.logement.ouvertures[0];
+  proche(p.position, 0.1); proche(p.largeur, 1.2); // arrêté à l'angle
+  v = C.etirerOuverture(salle(), "P1", 1, [0.6, 0]);
+  proche(v.logement.ouvertures[0].largeur, C.LARGEUR_MIN);
+});
+
+test("le logement reste cohérent après les gestes", () => {
+  let v = C.deplacerOuverture(salle(), "P1", [3, 0]);
+  v = C.etirerOuverture(v, "P1", 0, [2.2, 0]);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+});
+
+// ---------- Murs alignés qui se chevauchent, pièces recalculées seules (10/11/2026) ----------
+
+test("deux murs alignés qui se chevauchent n'en font qu'un ; la porte de l'autre garde sa vraie place", () => {
+  const v0 = salle();
+  // M1 lu deux fois : un second morceau de 3 à 5 m, 3 cm plus haut, qui porte une fenêtre de 4 à 4,5 m
+  v0.logement.murs.push({ id: "M1b", debut: [3, 0.03], fin: [5, 0.03], epaisseur: 0.2, statut: "estime", source: "atelya" });
+  v0.logement.ouvertures.push({ id: "F2", type: "fenetre", mur: "M1b", position: 1.0, largeur: 0.5, hauteur: 1.25, allege: 0.95, statut: "estime", source: "atelya" });
+  const v = C.fusionnerMursAlignes(v0);
+  assert.equal(v.logement.murs.filter((m) => m.id.startsWith("M1")).length, 1);
+  const m1 = v.logement.murs.find((m) => m.id === "M1");
+  procheP(m1.debut, [0, 0]); procheP(m1.fin, [5, 0]);
+  const f2 = v.logement.ouvertures.find((o) => o.id === "F2");
+  assert.equal(f2.mur, "M1"); proche(f2.position, 4.0, 1e-3);
+  proche(v.logement.ouvertures.find((o) => o.id === "P1").position, 0.5);
+  assert.equal(v0.logement.murs.length, 6); // l'original n'est pas touché
+});
+
+test("deux murs alignés bout à bout, ou parallèles mais éloignés, ne sont pas fusionnés", () => {
+  const v0 = salle();
+  v0.logement.murs.push({ id: "M6", debut: [4, 0], fin: [6, 0], epaisseur: 0.2, statut: "estime", source: "atelya" }); // bout à bout
+  v0.logement.murs.push({ id: "M7", debut: [0, 0.5], fin: [4, 0.5], epaisseur: 0.1, statut: "estime", source: "atelya" }); // 50 cm plus haut
+  assert.equal(C.fusionnerMursAlignes(v0), v0);
+});
+
+test("après un changement de murs, les pièces sont recalculées seules et gardent leur nom", () => {
+  const v0 = salle();
+  v0.logement.pieces = [
+    { id: "A", nom: "Chambre", contour: [[0.1, 0.1], [1.9, 0.1], [1.9, 2.9], [0.1, 2.9]], statut: "estime", source: "atelya", sol: { matiere: "chene_naturel_photo", statut: "ajoute", source: "t" } },
+    { id: "B", nom: "Bureau", contour: [[3, 1], [3.5, 1], [3.5, 1.5], [3, 1.5]], statut: "estime", source: "atelya" }, // zone coloriée mal placée
+  ];
+  const r = C.apresMurs(v0);
+  const a = r.v.logement.pieces.find((p) => p.id === "A"), b = r.v.logement.pieces.find((p) => p.id === "B");
+  proche(C.surfacePolygone(a.contour), 1.85 * 2.8, 0.05); // collée aux faces des murs
+  proche(C.surfacePolygone(b.contour), 1.85 * 2.8, 0.05); // la zone mal placée remplit maintenant SA pièce
+  assert.equal(a.sol.matiere, "chene_naturel_photo"); // ce qui avait été réglé est gardé
+  assert.deepEqual(r.ouvertes, []);
+});
+
+// ---------- Pièces malléables et limites invisibles (10/11/2026) ----------
+const sallePieces = () => {
+  const v = salle();
+  v.logement.pieces = [
+    { id: "A", nom: "Chambre", contour: [[0.1, 0.1], [1.95, 0.1], [1.95, 2.9], [0.1, 2.9]], statut: "estime", source: "atelya" },
+    { id: "B", nom: "Bureau", contour: [[2.05, 0.1], [3.9, 0.1], [3.9, 2.9], [2.05, 2.9]], statut: "estime", source: "atelya" },
+  ];
+  return v;
+};
+
+test("tirer un coin de pièce : il se colle dans l'angle des faces des murs", () => {
+  const v = C.deplacerCoinPiece(sallePieces(), "A", 2, [1.88, 2.84], 0.15);
+  procheP(v.logement.pieces[0].contour[2], [1.95, 2.9]);
+  assert.ok(v.contours_manuels.includes("A"));
+});
+
+test("pousser un côté de pièce : il reste parallèle et se colle à la face d'un mur", () => {
+  const v0 = sallePieces();
+  v0.logement.pieces[0].contour = [[0.1, 0.1], [1.5, 0.1], [1.5, 2.9], [0.1, 2.9]]; // côté est trop court de 45 cm
+  const v = C.deplacerCotePiece(v0, "A", 1, [1.9, 1.5], 0.15);
+  const c = v.logement.pieces[0].contour;
+  proche(c[1][0], 1.95); proche(c[2][0], 1.95); proche(c[1][1], 0.1); proche(c[2][1], 2.9);
+});
+
+test("alertes : une pièce qui passe à travers un mur ou chevauche une autre est signalée", () => {
+  const v0 = sallePieces();
+  v0.logement.pieces[0].contour = [[0.1, 0.1], [3.0, 0.1], [3.0, 2.9], [0.1, 2.9]];
+  const a = C.alertesPiece(v0.logement, "A");
+  assert.ok(a.some((x) => x.includes("à travers un mur")));
+  assert.ok(a.some((x) => x.includes("Bureau")));
+  assert.deepEqual(C.alertesPiece(sallePieces().logement, "A"), []);
+});
+
+test("un contour fait à la main est gardé quand les pièces se recalculent après un changement de mur", () => {
+  let v = C.deplacerCoinPiece(sallePieces(), "A", 2, [1.5, 2.5], 0.01);
+  const voulu = v.logement.pieces[0].contour.map((q) => q.slice());
+  v = C.apresMurs(C.modifierMur(v, "M3", { epaisseur: 0.25 })).v;
+  assert.deepEqual(v.logement.pieces.find((p) => p.id === "A").contour, voulu);
+  v = C.oublierContourManuel(v, "A");
+  proche(C.surfacePolygone(v.logement.pieces.find((p) => p.id === "A").contour), 1.85 * 2.775, 0.2); // calcul sur grille : quelques cm rognés
+});
+
+test("limite invisible : un espace ouvert devient deux pièces, sans aucun mur ajouté ; l'enlever les réunit", () => {
+  const v0 = salle();
+  v0.logement.murs = v0.logement.murs.filter((m) => m.id !== "M5"); // un seul espace de 4 × 3 m
+  v0.logement.pieces = [{ id: "S", nom: "Séjour", contour: [[0.1, 0.1], [3.9, 0.1], [3.9, 2.9], [0.1, 2.9]], statut: "estime", source: "atelya" }];
+  const v = C.ajouterLimite(v0, [2.5, 0.12], [2.5, 2.88], 0.15);
+  assert.equal(v.logement.murs.length, 4);
+  assert.equal(v.logement.pieces.length, 2);
+  assert.ok(v.logement.pieces.some((p) => p.nom === "Séjour"));
+  const total = v.logement.pieces.reduce((s, p) => s + C.surfacePolygone(p.contour), 0);
+  proche(total, 3.8 * 2.8, 0.3); // la limite occupe une bande de 3 cm, et le calcul sur grille rogne un peu
+  const w = C.supprimerLimite(v, 0);
+  assert.equal(w.logement.pieces.length, 1);
+});
+
+// ---------- Murs : redresser, épaisseur (10/11/2026) ----------
+test("rendre droit un mur qui penche de 1° : les murs accrochés suivent, un vrai biais est refusé", () => {
+  const v0 = salle();
+  v0.logement.murs[2].fin = [0, 3.07]; // M3 (4,3)→(0,3,07) : penche de ~1°
+  v0.logement.murs[3].debut = [0, 3.07]; // M4 accroché à ce bout
+  const v = C.redresserMur(v0, "M3");
+  const m3 = v.logement.murs[2], m4 = v.logement.murs[3];
+  proche(m3.debut[1], m3.fin[1]);
+  procheP(m4.debut, m3.fin);
+  proche(C.ecartDroit(m3), 0);
+  const v1 = salle();
+  v1.logement.murs[2].fin = [0, 3.8]; // 11° : un vrai biais
+  assert.throws(() => C.redresserMur(v1, "M3"));
+  assert.equal(C.redresserTousLesMurs(v1), v1);
+});
+
+test("poignée d'épaisseur : deux fois la distance à l'axe, bornée de 3 à 80 cm", () => {
+  const m = salle().logement.murs[0];
+  procheP(C.poigneeEpaisseur(m), [2, 0.1]);
+  proche(C.epaisseurDepuisPoignee(m, [2, 0.12]), 0.24);
+  proche(C.epaisseurDepuisPoignee(m, [2, 2]), 0.8);
+  proche(C.epaisseurDepuisPoignee(m, [2, 0.001]), 0.03);
+});
+
+// ---------- Meubles à l'écran (10/11/2026) ----------
+const salleMeublee = () => {
+  const v = sallePieces();
+  v.logement.meubles = [
+    { id: "lit1", categorie: "lit", piece: "A", position: [1.0, 1.5], face: 0, dimensions: [1.6, 2.05, 1.0], altitude: 0, statut: "estime", source: "repérage photos" },
+    { id: "tapis1", categorie: "tapis", piece: "B", position: [3.0, 1.5], face: 0, dimensions: [1.4, 1.0, 0.02], altitude: 0, statut: "estime", source: "repérage photos" },
+    { id: "chaise1", categorie: "chaise", piece: "B", position: [3.0, 1.5], face: 90, dimensions: [0.45, 0.5, 0.85], altitude: 0, statut: "estime", source: "repérage photos" },
+  ];
+  return v;
+};
+
+test("meubles : l'emprise suit la face ; la souris prend la chaise posée sur le tapis", () => {
+  const lg = salleMeublee().logement;
+  const e = C.empreinteMeuble(lg.meubles[0]); // face 0 : l'avant vers +x, la largeur (1,6) le long de y
+  procheP(e[0], [1.0 - 1.025, 1.5 - 0.8]); // coin arrière droit (vu de face)
+  assert.equal(C.elementSous(lg, [3.0, 1.5], 0.05).id, "chaise1");
+  assert.equal(C.elementSous(lg, [3.4, 2.0], 0.05).id, "tapis1");
+});
+
+test("glisser un meuble : il se colle dos au mur, et change de pièce s'il y passe", () => {
+  // le lit (avant vers +x) recule vers le mur ouest : son dos (à 1,025 m derrière son milieu) se colle à la face x = 0,1
+  let v = C.deplacerMeuble(salleMeublee(), "lit1", [0.05, 0], 0.15);
+  proche(v.logement.meubles[0].position[0], 0.1 + 1.025);
+  v = C.deplacerMeuble(salleMeublee(), "chaise1", [-2.0, 0], 0.01);
+  assert.equal(v.logement.meubles.find((m) => m.id === "chaise1").piece, "A");
+  assert.equal(v.logement.meubles.find((m) => m.id === "chaise1").statut, "mesure");
+});
+
+test("tourner un meuble : crans de 15°, pile à l'angle droit à moins de 7°", () => {
+  let v = C.tournerMeuble(salleMeublee(), "lit1", [1.1, 3.5]); // presque plein nord
+  proche(v.logement.meubles[0].face, 90);
+  v = C.tournerMeuble(salleMeublee(), "lit1", [2.0, 2.0]); // 26,6° → 30°
+  proche(v.logement.meubles[0].face, 30);
+});
+
+test("modifier, ajouter, supprimer un meuble ; une pièce supprimée emporte ses meubles", () => {
+  let v = C.modifierMeuble(salleMeublee(), "tapis1", { categorie: "canape", dimensions: [2.1, 0.9, 0.85] });
+  assert.equal(v.logement.meubles[1].categorie, "canape");
+  assert.throws(() => C.modifierMeuble(salleMeublee(), "lit1", { dimensions: [1.6, 2, 3.0] })); // dépasse le plafond
+  v = C.ajouterMeuble(salleMeublee(), "table", [0.8, 0.8]);
+  const t = v.logement.meubles[v.logement.meubles.length - 1];
+  assert.equal(t.piece, "A"); assert.deepEqual(t.dimensions, [1.4, 0.8, 0.75]);
+  assert.throws(() => C.ajouterMeuble(salleMeublee(), "table", [9, 9]));
+  v = C.supprimer(v, t.id);
+  assert.equal(v.logement.meubles.length, 3);
+  v = C.supprimer(v, "B");
+  assert.deepEqual(v.logement.meubles.map((m) => m.id), ["lit1"]);
+  assert.deepEqual(C.verifierCoherence(v.logement), []);
+});
+
+// ---------- Sens d'ouverture des portes (10/11/2026) ----------
+test("sens d'une porte : par défaut gonds au début et ouverture à gauche ; inverser l'un ou l'autre", () => {
+  const v0 = salle();
+  let a = C.arcPorte(v0.logement, v0.logement.ouvertures[0]); // P1 sur M1 (0,0)→(4,0) : gauche = vers +y (dans la pièce)
+  procheP(a.pivot, [0.5, 0.1]); procheP(a.ferme, [1.3, 0.1]); procheP(a.ouvert, [0.5, 0.9]);
+  assert.equal(a.regle, false);
+  let v = C.inverserSens(v0, "P1", "charniere");
+  a = C.arcPorte(v.logement, v.logement.ouvertures[0]);
+  procheP(a.pivot, [1.3, 0.1]);
+  assert.deepEqual(v.logement.ouvertures[0].sens, { charniere: "fin", ouvre_vers: "gauche" });
+  v = C.inverserSens(v, "P1", "ouvre_vers");
+  a = C.arcPorte(v.logement, v.logement.ouvertures[0]);
+  procheP(a.pivot, [1.3, -0.1]); procheP(a.ouvert, [1.3, -0.9]);
+  assert.equal(a.regle, true);
+});
+
+test("sens par défaut : la porte s'ouvre vers la pièce, pas vers l'entrée ; une façade de placard n'a pas d'arc", () => {
+  const v = sallePieces();
+  v.logement.pieces[0].nom = "Entrée"; // A : x de 0,1 à 1,95 ; B « Bureau » : de 2,05 à 3,9
+  v.logement.ouvertures.push({ id: "P2", type: "porte", mur: "M5", position: 1.0, largeur: 0.8, hauteur: 2.04, allege: 0, statut: "estime", source: "atelya" });
+  // M5 (2,0)→(2,3) : sa gauche est vers −x (l'entrée), sa droite vers +x (le bureau) → s'ouvre à droite, vers le bureau
+  assert.equal(C.sensPorte(v.logement.ouvertures[2], v.logement).ouvre_vers, "droite");
+  const a = C.arcPorte(v.logement, v.logement.ouvertures[2]);
+  assert.ok(a.ouvert[0] > 2.0);
+  v.logement.ouvertures[2].largeur = 2.0;
+  assert.equal(C.arcPorte(v.logement, v.logement.ouvertures[2]), null);
 });

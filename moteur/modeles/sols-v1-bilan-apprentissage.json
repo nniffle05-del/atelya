@@ -1,0 +1,69 @@
+{
+ "vignettes_bibliotheque": 2720,
+ "vignettes_essais_appris": 620,
+ "vignettes_controle": 405,
+ "par_famille_controle": {
+  "lames": 198,
+  "point_de_hongrie": 28,
+  "batons_rompus": 44,
+  "carreaux": 135
+ },
+ "yeux": {
+  "vits14": {
+   "bibliotheque": {
+    "justesse_apprise": 1.0,
+    "vignettes_controle_justes": 0.975,
+    "par_famille": {
+     "lames": 1.0,
+     "point_de_hongrie": 1.0,
+     "batons_rompus": 1.0,
+     "carreaux": 0.926
+    },
+    "controle_surface_juste": 0.937,
+    "controle_m2": 209.1,
+    "controle_pieces_justes": "21/25"
+   },
+   "bibliotheque+essais": {
+    "justesse_apprise": 0.999,
+    "vignettes_controle_justes": 0.975,
+    "par_famille": {
+     "lames": 1.0,
+     "point_de_hongrie": 1.0,
+     "batons_rompus": 1.0,
+     "carreaux": 0.926
+    },
+    "controle_surface_juste": 0.963,
+    "controle_m2": 209.1,
+    "controle_pieces_justes": "21/25"
+   }
+  },
+  "vitb14": {
+   "bibliotheque": {
+    "justesse_apprise": 1.0,
+    "vignettes_controle_justes": 0.965,
+    "par_famille": {
+     "lames": 1.0,
+     "point_de_hongrie": 1.0,
+     "batons_rompus": 1.0,
+     "carreaux": 0.896
+    },
+    "controle_surface_juste": 0.903,
+    "controle_m2": 209.1,
+    "controle_pieces_justes": "20/25"
+   },
+   "bibliotheque+essais": {
+    "justesse_apprise": 0.999,
+    "vignettes_controle_justes": 0.97,
+    "par_famille": {
+     "lames": 1.0,
+     "point_de_hongrie": 1.0,
+     "batons_rompus": 1.0,
+     "carreaux": 0.911
+    },
+    "controle_surface_juste": 0.932,
+    "controle_m2": 209.1,
+    "controle_pieces_justes": "21/25"
+   }
+  }
+ }
+}

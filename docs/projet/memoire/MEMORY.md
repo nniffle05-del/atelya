@@ -1,5 +1,6 @@
 # Modélisation immobilière
 ## Personnes et règles
+- CHANGEMENT DE PLAN (NT, 2026-11-08) : au LANCEMENT, c'est CLAUDE (par l'API, pas l'abonnement) qui lit les plans, en pixels ; notre code calcule l'échelle ; Atelya fait tout le reste. Lecteur entraîné gardé en secours / second avis ; lot 2, essai 8, 105 vrais plans au second plan (accord NT pour reprendre). Étape en cours : brancher l'écran de vérification sur la lecture de Claude. Voir [plan-lancement-lecture-claude.md](plan-lancement-lecture-claude.md).
 - RÈGLE NT (2026-11-02) : pendant TOUT entraînement long sur le PC, SURVEILLER toutes les 30 min (lire les journaux, arrêter/corriger si ça dérive) au lieu d'attendre la fin. Cause : essai 7 a « cassé » à la 50e min et tourné 2 h pour rien.
 - RÈGLE NT (2026-11-02 21h20) : en cas de PLANTAGE (calcul, mesure, script), reprendre la main IMMÉDIATEMENT et corriger, SANS attendre que NT le demande (dans le respect des autres règles : pas d'installation sans accord, Mac = « vas-y » écrit).
 - BUT COMMUN (NT, 2026-11-01) : tout le projet doit être optimisé globalement ; finalité partagée = rendre Atelya très performant et vendable, une vraie solution sur le marché. Chaque fil doit choisir ce qui sert le plus ce but.

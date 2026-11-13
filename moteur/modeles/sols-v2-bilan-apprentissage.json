@@ -1,0 +1,51 @@
+{
+ "vignettes_bibliotheque": 2720,
+ "vignettes_essais_appris": 2612,
+ "vignettes_controle": 1771,
+ "vignettes_meuble": 844,
+ "yeux": {
+  "vits14": {
+   "4-familles": {
+    "justesse_apprise": 0.99,
+    "vignettes_controle_justes": 0.953,
+    "par_classe": {
+     "lames": 0.991,
+     "point_de_hongrie": 0.944,
+     "batons_rompus": 0.852,
+     "carreaux": 0.962
+    },
+    "controle_pieces_vides": {
+     "surface_juste": 0.96,
+     "m2": 209.1,
+     "pieces_justes": "21/25"
+    },
+    "controle_pieces_meublees": {
+     "surface_juste": 0.834,
+     "m2": 229.2,
+     "pieces_justes": "15/25"
+    }
+   },
+   "avec-meuble": {
+    "justesse_apprise": 0.986,
+    "vignettes_controle_justes": 0.903,
+    "par_classe": {
+     "lames": 0.981,
+     "point_de_hongrie": 0.93,
+     "batons_rompus": 0.852,
+     "carreaux": 0.953,
+     "meuble": 0.712
+    },
+    "controle_pieces_vides": {
+     "surface_juste": 0.935,
+     "m2": 209.1,
+     "pieces_justes": "21/25"
+    },
+    "controle_pieces_meublees": {
+     "surface_juste": 0.845,
+     "m2": 229.2,
+     "pieces_justes": "15/25"
+    }
+   }
+  }
+ }
+}

@@ -92,7 +92,8 @@ HACHURE_MIN = 40  # pixels : une marque gris clair qui continue si loin d'un cô
 LIGNE_FRANCHE = 0.5  # part du trait de cote qui doit être noire pour qu'on lui applique les règles des traits francs (un trait fin de PDF, adouci par le rendu, l'est à moitié)
 # « Murs extérieurs : 20 cm », « Cloisons : 7 cm » (le modèle de lecture abîme souvent les mots, pas les nombres).
 FORME_EPAISSEUR = re.compile(r"^\s*(murs?|cl\w*)\b\D*?(\d{1,2})\s*cm\b", re.IGNORECASE)
-FORME_HSP = re.compile(r"(?:hauteur\s+sous\s+plafond|h\.?\s*s\.?\s*p\.?)\D*(\d+[,.]\d+)", re.IGNORECASE)
+# « HSP 2,50 », mais aussi « HSP 3m » ou « HSP 3 » (nombre entier : app-001, 09/11/2026) ; « HSP 250 » (cm) sort des bornes.
+FORME_HSP = re.compile(r"(?:hauteur\s+sous\s+plafond|h\.?\s*s\.?\s*p\.?)\D*(\d+(?:[,.]\d+)?)", re.IGNORECASE)
 
 
 @dataclass
@@ -315,13 +316,18 @@ def _nombres_d_un_tableau(textes: list[TexteLu]) -> list[TexteLu]:
 
 
 def lire_hauteur_sous_plafond(textes: list[TexteLu]) -> float | None:
+    """La hauteur sous plafond écrite. Plusieurs valeurs (une par pièce, « HSP 3m » dans les chambres et « HSP 2,80 » sous les
+    faux plafonds des pièces d'eau) : la plus fréquente ; à égalité, la plus haute (les plus basses sont des faux plafonds locaux)."""
+    valeurs = []
     for t in textes:
         trouve = FORME_HSP.search(t.texte)
         if trouve:
             valeur = float(trouve.group(1).replace(",", "."))
             if 1.8 <= valeur <= 6.0:  # au-delà, ce n'est sûrement pas une hauteur sous plafond
-                return valeur
-    return None
+                valeurs.append(valeur)
+    if not valeurs:
+        return None
+    return max(set(valeurs), key=lambda v: (valeurs.count(v), v))
 
 
 def lire_epaisseurs(textes: list[TexteLu]) -> list[float]:

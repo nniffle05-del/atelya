@@ -125,7 +125,7 @@ def test_plan_lisible_en_json(logement):
     plan = json.loads(json.dumps(plan_de_construction(logement)))
     assert plan["schema"] == "construction/0.1"
     assert plan["projet_id"] == "CAS-TEST-00"
-    assert len(plan["briques"]) == 36
+    assert len(plan["briques"]) == 36 + 8  # + (12/11/2026) une dalle au-dessus du plafond et une sous le sol des 4 pièces
 
 
 def _donnees():
@@ -136,8 +136,8 @@ CAS_NON_GERES = {
     "deux ouvertures qui se chevauchent": lambda d: d["ouvertures"][3].update(
         mur="M_nord", position=2.00
     ),
-    "trois murs au même point": lambda d: d["murs"].append(
-        {"id": "M_trop", "debut": [-0.10, -0.10], "fin": [-1.10, -0.10], "epaisseur": 0.20,
+    "trois murs au même point, aucun dans le prolongement d'un autre": lambda d: d["murs"].append(
+        {"id": "M_trop", "debut": [-0.10, -0.10], "fin": [-1.10, -1.10], "epaisseur": 0.20,
          "statut": "ajoute", "source": "test"}
     ),
 }
@@ -247,3 +247,97 @@ def test_une_fenetre_qui_mord_sur_l_angle_est_raccourcie_pas_refusee():
     loin = _logement([("B", [1, 0], [1, 3], 0.9), ("A", [0, 0], [1, 0], 0.25)], [("F", "fenetre", "A", 0.0, 0.995)])
     with pytest.raises(ValueError):
         calculer_briques(loin)
+
+
+# ---------------------------------------------------------------- B1 : maquette sans jour (08/11/2026)
+
+def _b1_mur(id_, debut, fin, ep=0.20):
+    from moteur.logement import Mur
+    return Mur(id=id_, debut=debut, fin=fin, epaisseur=ep, statut="ajoute", source="test")
+
+
+def _b1_boite_pleine(log):
+    """Un studio de 4 × 3 m (intérieur), murs de 20 cm, en quatre murs fermés aux angles."""
+    return [_b1_mur("S", (-0.1, -0.1), (4.1, -0.1)), _b1_mur("E", (4.1, -0.1), (4.1, 3.1)),
+            _b1_mur("N", (4.1, 3.1), (-0.1, 3.1)), _b1_mur("O", (-0.1, 3.1), (-0.1, -0.1))]
+
+
+def _b1_logement(murs, pieces=(), ouvertures=()):
+    return Logement(schema="logement/0.1", projet_id="B1", hauteur_sous_plafond=2.5, murs=list(murs),
+                    ouvertures=list(ouvertures), pieces=list(pieces))
+
+
+def _b1_piece(contour, id_="sejour_1"):
+    from moteur.logement import Piece
+    return Piece(id=id_, nom="Séjour", contour=contour, statut="ajoute", source="test")
+
+
+def test_trois_murs_en_t_acceptes_sans_trou():
+    murs = [_b1_mur("O1", (0.0, 0.0), (0.0, 3.0)), _b1_mur("O2", (0.0, 3.0), (0.0, 6.0)), _b1_mur("C", (0.0, 3.0), (4.0, 3.0), 0.10)]
+    briques = calculer_briques(_b1_logement(murs))
+    boites = {b.element: boite(b) for b in briques if b.categorie == "mur"}
+    assert boites["O1"][1][1] == pytest.approx(3.0) and boites["O2"][0][1] == pytest.approx(3.0)  # le mur aligné passe
+    assert boites["C"][0][0] == pytest.approx(0.10)  # la cloison s'arrête sur la face du mur : ni jour, ni recouvrement
+
+
+def test_bouts_presque_confondus_reunis():
+    murs = _b1_boite_pleine(None)
+    murs[1] = _b1_mur("E", (4.12, -0.08), (4.1, 3.1))  # 2,8 cm à côté du coin
+    briques = calculer_briques(_b1_logement(murs))
+    sud = next(boite(b) for b in briques if b.element == "S")
+    est = next(boite(b) for b in briques if b.element == "E")
+    assert sud[1][0] >= est[0][0] - 1e-6 and est[0][1] <= sud[1][1] + 1e-6  # l'angle est fermé
+
+
+def test_cloison_arretee_avant_le_mur_prolongee_jusqu_a_sa_face():
+    murs = _b1_boite_pleine(None) + [_b1_mur("C", (2.0, 0.02), (2.0, 3.0), 0.10)]  # 2 cm avant la face du mur sud (y = 0)
+    briques = calculer_briques(_b1_logement(murs))
+    cloison = next(boite(b) for b in briques if b.element == "C")
+    assert cloison[0][1] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_sol_et_plafond_cales_sur_les_faces_des_murs():
+    contour = [(0.006, 0.004), (3.993, 0.004), (3.993, 2.995), (0.006, 2.995)]  # quelques mm en retrait des murs
+    briques = calculer_briques(_b1_logement(_b1_boite_pleine(None), [_b1_piece(contour)]))
+    for cat in ("sol", "plafond"):
+        b = next(b for b in briques if b.categorie == cat)
+        (x0, y0, _), (x1, y1, _) = boite(b)
+        assert (x0, y0, x1, y1) == pytest.approx((0.0, 0.0, 4.0, 3.0), abs=1e-6), cat
+
+
+def test_sol_loin_des_murs_non_deplace():
+    contour = [(0.5, 0.5), (3.5, 0.5), (3.5, 2.5), (0.5, 2.5)]  # à 50 cm des murs : ce n'est pas une imprécision
+    briques = calculer_briques(_b1_logement(_b1_boite_pleine(None), [_b1_piece(contour)]))
+    sol = next(b for b in briques if b.categorie == "sol")
+    assert boite(sol)[0][:2] == pytest.approx((0.5, 0.5))
+
+
+def test_ouverture_reste_en_place_quand_le_debut_du_mur_bouge():
+    from moteur.logement import Ouverture
+    murs = _b1_boite_pleine(None)
+    murs[0] = _b1_mur("S", (-0.12, -0.1), (4.1, -0.1))  # début 2 cm à côté du coin : réuni, le mur raccourcit de 1 cm
+    o = Ouverture(id="P", type="porte", mur="S", position=1.02, largeur=0.9, hauteur=2.04, statut="ajoute", source="test")
+    briques = calculer_briques(_b1_logement(murs, ouvertures=[o]))
+    linteau = next(boite(b) for b in briques if b.id == "S__linteau_P")
+    assert linteau[0][0] == pytest.approx(0.90, abs=1e-6)  # -0,12 + 1,02 : la porte n'a pas bougé dans la pièce
+
+
+def test_dalles_de_l_immeuble(logement):
+    """Chaque pièce a une dalle épaisse au-dessus de son plafond et sous son sol, qui déborde sur le haut des murs (plus de
+    fente de lumière aux jonctions murs / plafond, vue dans Unreal le 11/11/2026)."""
+    from moteur.geometrie import DALLE_DEBORD, DALLE_EPAISSEUR, calculer_briques, rectangles
+    briques = calculer_briques(logement)
+    dalles = [b for b in briques if b.categorie == "dalle"]
+    hsp = logement.hauteur_sous_plafond
+    hautes = [b for b in dalles if b.z_bas > hsp]
+    basses = [b for b in dalles if b.z_haut < 0]
+    assert len(hautes) == len(basses) == len(logement.pieces)
+    assert all(abs(b.z_haut - b.z_bas - DALLE_EPAISSEUR) < 1e-9 for b in dalles)
+    for b in hautes:  # chaque dalle déborde le plafond de sa pièce de DALLE_DEBORD de chaque côté
+        plafond = next(p for p in briques if p.id == f"plafond__{b.element}")
+        xs, ys = [p[0] for p in plafond.contour], [p[1] for p in plafond.contour]
+        assert min(p[0] for p in b.contour) <= min(xs) - DALLE_DEBORD + 1e-6
+        assert max(p[1] for p in b.contour) >= max(ys) + DALLE_DEBORD - 1e-6
+    # un séjour en L est découpé en rectangles qui le couvrent exactement
+    L = [[1.234, 6.953], [1.234, 2.672], [6.453, 2.672], [6.453, 0.0], [9.75, 0.0], [9.75, 4.688], [6.398, 4.688], [6.398, 6.953]]
+    assert rectangles(L) == [[6.453, 9.75, 0.0, 2.672], [1.234, 9.75, 2.672, 4.688], [1.234, 6.398, 4.688, 6.953]]

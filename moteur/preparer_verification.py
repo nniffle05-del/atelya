@@ -11,15 +11,20 @@ Sans lui, le dessin glisserait d'un demi-pixel de coloriage, soit plus d'un pixe
 Version 0.2.0 (08/11/2026) : un doute dont la place est déjà en pixels de l'image (`zone_px`, `blocs_px` : le doute
 « plusieurs_niveaux » de moteur.doutes 0.2.0, parties de l'image hors du logement lu) les garde tels quels ; avant, seule une
 zone en mètres (`zone_m`) était passée à l'écran, et l'écran n'aurait pas pu montrer où sont les niveaux non lus.
+
+Version 0.3.0 (08/11/2026, B2) : chaque pièce arrive avec ses plinthes (moteur.habillage.completer_plinthes) : la règle par
+défaut, marquée « ajoute », que la personne voit et peut changer dans la fiche de la pièce. Idem pour les portes de chaque
+placard (B2-2, completer_finitions).
 """
 from __future__ import annotations
 
 import numpy as np
 
 from moteur.coloriage import _rotation
+from moteur.habillage import completer_finitions
 from moteur.lecture_complete import PlanLu
 
-VERSION_PREPARATEUR = "0.2.0"
+VERSION_PREPARATEUR = "0.3.0"
 SCHEMA = "verification/0.1"
 ANGLE_NUL = 0.01  # degrés : en dessous, le traducteur ne tourne pas le coloriage
 
@@ -79,7 +84,8 @@ def doutes_de_construction(logement: dict) -> list[dict]:
     from moteur.logement import Logement
 
     try:
-        calculer_briques(Logement.model_validate(logement))
+        log = Logement.model_validate(logement)
+        briques = calculer_briques(log)
     except ValueError as e:
         message = str(e)
         trouve = re.search(r"l'ouverture (\S+)", message) or re.search(r"du mur (\S+)", message)
@@ -95,7 +101,18 @@ def doutes_de_construction(logement: dict) -> list[dict]:
         return [{"code": "construction", "element": element, "gravite": "fort", "raison": raison}]
     except Exception:  # noqa: BLE001 — un logement que le format refuse est déjà signalé ailleurs
         return []
-    return []
+    from moteur.controle_maquette import trous_a_signaler  # B1 : une zone fermée sans pièce ferait un trou dans la maquette
+
+    from moteur.controle_maquette import vides_remplis
+
+    remplis = [{"code": "vide_rempli", "element": None, "gravite": "faible",
+                "raison": f"petit espace fermé de {r['aire_m2']:.1f} m² sans pièce, rempli comme une gaine : placard ou WC oublié ?",
+                "zone_m": r["zone_m"]} for r in vides_remplis(briques)]
+    return remplis + [{"code": "zone_sans_piece", "element": None, "gravite": "fort",
+             "raison": f"zone fermée de {t['aire_m2']:.1f} m² sans pièce : pièce oubliée, terrasse ou partie commune ? "
+                       "(elle ferait un trou dans la 3D)",
+             "zone_m": [t["x"], t["y"], t["x"] + t["largeur"], t["y"] + t["hauteur"]]}
+            for t in trous_a_signaler(briques, log.hauteur_sous_plafond)]
 
 
 def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | None:
@@ -115,5 +132,5 @@ def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | No
             sortie["blocs_px"] = [[float(v) for v in b] for b in d["blocs_px"]]
         doutes.append(sortie)
     return {"schema": SCHEMA, "plan": nom_image, "calage": {"matrice": [[round(float(v), 10) for v in ligne] for ligne in M]},
-            "echelle": _echelle(g.echelle), "logement": g.logement, "doutes": doutes,
+            "echelle": _echelle(g.echelle), "logement": completer_finitions(g.logement), "doutes": doutes,
             "lecture": {"decision": plan.decision, "modele": g.modele, "aiguillage": plan.aiguillage, "preparateur": VERSION_PREPARATEUR}}

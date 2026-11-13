@@ -88,3 +88,26 @@ def test_carte_des_doutes():
     assert z and ex["decision"] == "a_verifier"
     x0, y0, x1, y1 = z[0]["zone_m"]
     assert 0.6 <= x0 <= 1.1 and 1.8 <= y0 <= 2.5  # (2,0 m ; 2,5 m) image → repère du logement
+
+
+def test_bloc_plein_et_facade_de_placard_ne_sont_pas_des_doutes_forts():
+    """10/11/2026 (test de bout en bout app-002) : une gaine lue comme un « mur » de 75 cm et la façade d'un placard lue comme
+    une « porte » de 2,7 m ne sont pas des erreurs de lecture."""
+    from moteur.doutes import controles_bon_sens
+    m = lambda i, a, b, e=0.1: {"id": i, "debut": a, "fin": b, "epaisseur": e, "statut": "estime", "source": "t"}  # noqa: E731
+    logement = {
+        "murs": [m("M1", [0, 0], [5, 0]), m("M2", [5, 0], [5, 3]), m("M3", [5, 3], [0, 3]), m("M4", [0, 3], [0, 0]),
+                 m("M5", [0, 0.6], [5, 0.6], 0.04),  # façade des placards
+                 m("G1", [4.0, 2.2], [5.0, 2.2], 0.75)],  # bloc plein 1 m × 75 cm : une gaine
+        "ouvertures": [{"id": "O1", "type": "porte", "mur": "M5", "position": 0.2, "largeur": 2.7, "hauteur": 2.04, "allege": 0,
+                        "statut": "estime", "source": "t"}],
+        "pieces": [{"id": "placard_1", "nom": "PL.", "contour": [[0.05, 0.05], [4.95, 0.05], [4.95, 0.58], [0.05, 0.58]]},
+                   {"id": "entree_1", "nom": "Entrée", "contour": [[0.05, 0.62], [4.95, 0.62], [4.95, 2.95], [0.05, 2.95]]}],
+    }
+    d = controles_bon_sens(logement)
+    codes = {(x["code"], x["gravite"]) for x in d}
+    assert ("bloc", "faible") in codes and ("epaisseur", "fort") not in codes
+    assert not any(x["code"] == "largeur_porte" for x in d)
+    # la même porte de 2,7 m entre deux pièces ordinaires reste un doute fort
+    logement["pieces"][0]["id"] = "chambre_1"
+    assert any(x["code"] == "largeur_porte" and x["gravite"] == "fort" for x in controles_bon_sens(logement))

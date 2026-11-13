@@ -152,7 +152,7 @@
       doutes.push(doute);
     };
 
-    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id));
+    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || []), ...(lg.meubles || [])].map((e) => e.id));
     for (const d of verification.doutes || []) {
       if (d.element != null && !ids.has(d.element)) continue; // élément supprimé entre-temps
       ajouter(d.element ?? null, d.raison || "à vérifier", d.zone_px ?? null, d.propositions || null, d);
@@ -219,7 +219,7 @@
   }
 
   function trouver(lg, id) {
-    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []]]) {
+    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []], ["meuble", lg.meubles || []]]) {
       const e = liste.find((x) => x.id === id);
       if (e) return { genre, e };
     }
@@ -227,7 +227,7 @@
   }
 
   function nouvelId(lg, prefixe) {
-    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id));
+    const ids = new Set([...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || []), ...(lg.meubles || [])].map((e) => e.id));
     let k = 1;
     while (ids.has(`${prefixe}${k}`)) k++;
     return `${prefixe}${k}`;
@@ -362,6 +362,624 @@
     return v;
   }
 
+  // ---------- Portes et fenêtres malléables à la souris (10/11/2026, demande NT : « rendre quelque chose de malléable ») ----------
+
+  const LARGEUR_MIN = 0.4; // m : une ouverture plus étroite n'est plus une porte
+  const AIMANT_OUVERTURE = 0.08; // m : un bord à moins de 8 cm d'un angle ou d'une autre ouverture s'y colle
+
+  /**
+   * Les morceaux LIBRES d'un mur, en mètres depuis son début : tout le mur sauf ses angles (la demi-épaisseur des murs qui
+   * s'y accrochent), l'endroit où un autre mur vient s'appuyer sur lui, et les autres ouvertures (sauf `sauf`).
+   */
+  function morceauxLibres(lg, mur, sauf) {
+    const { l } = axes(mur);
+    const pris = [];
+    for (const m of lg.murs) {
+      if (m.id === mur.id) continue;
+      for (const b of [m.debut, m.fin]) {
+        const pr = projection(b, mur.debut, mur.fin);
+        if (pr.dist <= mur.epaisseur / 2 + m.epaisseur / 2 + 0.02 && pr.t >= -m.epaisseur && pr.t <= l + m.epaisseur) {
+          pris.push([pr.t - m.epaisseur / 2, pr.t + m.epaisseur / 2]);
+        }
+      }
+    }
+    for (const o of lg.ouvertures || []) {
+      if (o.mur === mur.id && o.id !== sauf) pris.push([o.position, o.position + o.largeur]);
+    }
+    pris.sort((a, b) => a[0] - b[0]);
+    const libres = [];
+    let curseur = 0;
+    for (const [a, b] of pris) {
+      if (a > curseur + 1e-6) libres.push([curseur, Math.min(a, l)]);
+      curseur = Math.max(curseur, b);
+    }
+    if (curseur < l - 1e-6) libres.push([curseur, l]);
+    return libres.filter(([a, b]) => b - a > 1e-6);
+  }
+
+  /** Pose l'ouverture `o` (largeur fixée) au plus près de `debutVoulu` dans un morceau libre de `mur`, bords aimantés. */
+  function poserDansLibre(lg, mur, o, debutVoulu) {
+    const libres = morceauxLibres(lg, mur, o.id).filter(([a, b]) => b - a >= o.largeur - 1e-6);
+    if (!libres.length) throw new Error("pas assez de place libre sur ce mur pour cette ouverture");
+    const centre = debutVoulu + o.largeur / 2;
+    const distance = ([a, b]) => (centre < a ? a - centre : centre > b ? centre - b : 0);
+    const [a, b] = libres.reduce((x, y) => (distance(y) < distance(x) ? y : x));
+    let debut = Math.max(a, Math.min(b - o.largeur, debutVoulu));
+    if (debut - a < AIMANT_OUVERTURE) debut = a;
+    else if (b - (debut + o.largeur) < AIMANT_OUVERTURE) debut = b - o.largeur;
+    o.position = arrondi(debut, 3);
+  }
+
+  /**
+   * Fait glisser une ouverture jusqu'au point `p` (en m) : le long de son mur, ou sur un autre mur si le point en est
+   * nettement plus près (à moins de `tolerance` de ce mur et plus loin du sien). Elle ne déborde jamais dans un angle ni sur
+   * une autre ouverture ; ses bords s'aimantent aux angles et aux ouvertures voisines.
+   */
+  function deplacerOuverture(v0, id, p, tolerance = 0.3) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const o = (lg.ouvertures || []).find((x) => x.id === id);
+    if (!o) throw new Error(`ouverture inconnue : ${id}`);
+    let mur = lg.murs.find((m) => m.id === o.mur);
+    const surLeSien = projection(p, mur.debut, mur.fin).dist - mur.epaisseur / 2;
+    const proche = murLePlusProche(lg, p, tolerance);
+    if (proche && proche.id !== o.mur && surLeSien > tolerance) {
+      mur = lg.murs.find((m) => m.id === proche.id);
+      o.mur = mur.id;
+      o.largeur = arrondi(Math.min(o.largeur, Math.max(...morceauxLibres(lg, mur, o.id).map(([a, b]) => b - a), 0)), 3);
+      if (o.largeur < LARGEUR_MIN) throw new Error("pas assez de place libre sur ce mur pour cette ouverture");
+    }
+    poserDansLibre(lg, mur, o, projection(p, mur.debut, mur.fin).t - o.largeur / 2);
+    marquer(v, o);
+    return v;
+  }
+
+  /**
+   * Tire un bord d'une ouverture (bord 0 = côté début du mur, 1 = côté fin) jusqu'au point `p` : l'autre bord ne bouge pas,
+   * la largeur reste ≥ LARGEUR_MIN et l'ouverture dans son morceau libre ; le bord tiré s'aimante à l'angle ou à la voisine.
+   */
+  function etirerOuverture(v0, id, bord, p) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const o = (lg.ouvertures || []).find((x) => x.id === id);
+    if (!o) throw new Error(`ouverture inconnue : ${id}`);
+    const mur = lg.murs.find((m) => m.id === o.mur);
+    const libre = morceauxLibres(lg, mur, o.id).find(([a, b]) => a <= o.position + 1e-6 && o.position + o.largeur <= b + 1e-6)
+      || [o.position, o.position + o.largeur];
+    const t = projection(p, mur.debut, mur.fin).t;
+    let debut = o.position, fin = o.position + o.largeur;
+    if (bord === 0) {
+      debut = Math.max(libre[0], Math.min(fin - LARGEUR_MIN, t));
+      if (debut - libre[0] < AIMANT_OUVERTURE) debut = libre[0];
+    } else {
+      fin = Math.min(libre[1], Math.max(debut + LARGEUR_MIN, t));
+      if (libre[1] - fin < AIMANT_OUVERTURE) fin = libre[1];
+    }
+    o.position = arrondi(debut, 3);
+    o.largeur = arrondi(fin - debut, 3);
+    marquer(v, o);
+    return v;
+  }
+
+  // ---------- Murs alignés qui se chevauchent (10/11/2026) ----------
+
+  /**
+   * Deux murs presque PARALLÈLES (moins d'1°), presque sur la même ligne (moins d'une demi-épaisseur) et qui se RECOUVRENT
+   * (plus d'1 cm) ne sont qu'un : une lecture qui dessine deux fois le même mur, ou un mur rallongé par-dessus un autre. Il
+   * en reste un seul (le premier), couvrant les deux, de l'épaisseur la plus grande ; les ouvertures de l'autre passent dessus
+   * à leur vraie place. Deux murs alignés qui se touchent seulement bout à bout ne sont pas touchés.
+   */
+  function fusionnerMursAlignes(v0) {
+    let v = v0;
+    for (let tour = 0; tour < 200; tour++) {
+      const lg = v.logement;
+      let paire = null;
+      for (let i = 0; i < lg.murs.length && !paire; i++) {
+        const a = lg.murs[i], A = axes(a);
+        for (let j = i + 1; j < lg.murs.length; j++) {
+          const b = lg.murs[j], B = axes(b);
+          if (Math.abs(A.d[0] * B.d[1] - A.d[1] * B.d[0]) > Math.sin(Math.PI / 180)) continue;
+          const pb0 = projection(b.debut, a.debut, a.fin), pb1 = projection(b.fin, a.debut, a.fin);
+          const ecart = (q) => Math.abs((q[0] - a.debut[0]) * A.n[0] + (q[1] - a.debut[1]) * A.n[1]);
+          if (Math.max(ecart(b.debut), ecart(b.fin)) > Math.max(a.epaisseur, b.epaisseur) / 2) continue;
+          const tMin = Math.min(pb0.t, pb1.t), tMax = Math.max(pb0.t, pb1.t);
+          if (Math.min(A.l, tMax) - Math.max(0, tMin) <= 0.01) continue;
+          paire = { a, b, tMin, tMax, A };
+          break;
+        }
+      }
+      if (!paire) return v;
+      v = v === v0 ? copie(v0) : v;
+      const lg2 = v.logement;
+      const a = lg2.murs.find((m) => m.id === paire.a.id), b = lg2.murs.find((m) => m.id === paire.b.id);
+      const { A } = paire;
+      const de = Math.min(0, paire.tMin), a_ = Math.max(A.l, paire.tMax);
+      const point = (t) => [a.debut[0] + A.d[0] * t, a.debut[1] + A.d[1] * t];
+      // les ouvertures : positions réelles (bords en mètres) avant de toucher aux murs
+      const bordsAvant = new Map((lg2.ouvertures || []).filter((o) => o.mur === a.id || o.mur === b.id)
+        .map((o) => [o.id, bordsOuverture(lg2, o)]));
+      const nouveauDebut = point(de), nouvelleFin = point(a_);
+      a.debut = ar(nouveauDebut);
+      a.fin = ar(nouvelleFin);
+      a.epaisseur = Math.max(a.epaisseur, b.epaisseur);
+      lg2.murs = lg2.murs.filter((m) => m.id !== b.id);
+      for (const o of lg2.ouvertures || []) {
+        if (!bordsAvant.has(o.id)) continue;
+        const [p0, p1] = bordsAvant.get(o.id);
+        const t0 = projection(p0, a.debut, a.fin).t, t1 = projection(p1, a.debut, a.fin).t;
+        o.mur = a.id;
+        o.position = arrondi(Math.max(0, Math.min(t0, t1)), 3);
+      }
+      marquer(v, a);
+      v.verifies = (v.verifies || []).filter((id) => id !== b.id);
+    }
+    return v;
+  }
+
+  // ---------- Pièces malléables et limites invisibles (10/11/2026, NT : « redimensionner la pièce à la souris ») ----------
+
+  /** Les deux faces de chaque mur (segments en m), rallongées d'une demi-épaisseur pour rejoindre les angles. */
+  function facesDesMurs(lg) {
+    const faces = [];
+    for (const m of lg.murs) {
+      const { l, d, n } = axes(m);
+      const h = m.epaisseur / 2;
+      for (const s of [-1, 1]) {
+        const p = (t) => [m.debut[0] + d[0] * t + n[0] * s * h, m.debut[1] + d[1] * t + n[1] * s * h];
+        faces.push({ a: p(-h), b: p(l + h), d });
+      }
+    }
+    return faces;
+  }
+
+  function intersectionDroites(p, d1, q, d2) {
+    const det = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(det) < 1e-9) return null;
+    const t = ((q[0] - p[0]) * d2[1] - (q[1] - p[1]) * d2[0]) / det;
+    return [p[0] + d1[0] * t, p[1] + d1[1] * t];
+  }
+
+  /**
+   * Aimante un coin de pièce : sur un coin d'une autre pièce s'il est tout près, sinon sur la face intérieure d'un mur, et
+   * dans l'angle de deux faces s'il est près des deux.
+   */
+  function aimanterCoin(lg, p, rayon, saufPiece) {
+    let best = null;
+    for (const piece of lg.pieces || []) {
+      if (piece.id === saufPiece) continue;
+      for (const q of piece.contour) {
+        const dd = longueur(p, q);
+        if (dd < rayon && (!best || dd < best.d)) best = { d: dd, q };
+      }
+    }
+    if (best && best.d < rayon / 2) return ar(best.q);
+    const faces = facesDesMurs(lg).map((f) => ({ ...f, pr: projection(p, f.a, f.b) })).filter((f) => f.pr.dist < rayon)
+      .sort((x, y) => x.pr.dist - y.pr.dist);
+    if (!faces.length) return best ? ar(best.q) : ar(p);
+    const f1 = faces[0];
+    const sur = [f1.a[0] + f1.d[0] * f1.pr.tt, f1.a[1] + f1.d[1] * f1.pr.tt];
+    for (const f2 of faces.slice(1)) {
+      if (Math.abs(f1.d[0] * f2.d[1] - f1.d[1] * f2.d[0]) < Math.sin((10 * Math.PI) / 180)) continue;
+      const coin = intersectionDroites(f1.a, f1.d, f2.a, f2.d);
+      if (coin && longueur(coin, p) < rayon * 1.5) return ar(coin);
+    }
+    return ar(sur);
+  }
+
+  function pieceManuelle(v, id) {
+    v.contours_manuels = [...new Set([...(v.contours_manuels || []), id])];
+  }
+
+  /** Tire le coin n° k d'une pièce jusqu'au point p (aimanté). Le contour devient « fait à la main » : gardé au recalcul. */
+  function deplacerCoinPiece(v0, id, k, p, rayon = 0.15) {
+    const v = copie(v0);
+    const piece = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!piece) throw new Error(`pièce inconnue : ${id}`);
+    piece.contour[k] = aimanterCoin(v.logement, p, rayon, id);
+    if (surfacePolygone(piece.contour) < 0.2) throw new Error("la pièce deviendrait trop petite");
+    pieceManuelle(v, id);
+    marquer(v, piece);
+    return v;
+  }
+
+  /**
+   * Pousse le côté n° k d'une pièce (du coin k au coin k+1) parallèlement à lui-même jusqu'au point p ; il se colle sur la face
+   * d'un mur parallèle à moins de `rayon`.
+   */
+  function deplacerCotePiece(v0, id, k, p, rayon = 0.15) {
+    const v = copie(v0);
+    const piece = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!piece) throw new Error(`pièce inconnue : ${id}`);
+    const c = piece.contour, a = c[k], b = c[(k + 1) % c.length];
+    const l = longueur(a, b);
+    if (l < 1e-6) return v0;
+    const d = [(b[0] - a[0]) / l, (b[1] - a[1]) / l], n = [-d[1], d[0]];
+    let s = (p[0] - a[0]) * n[0] + (p[1] - a[1]) * n[1];
+    let meilleur = rayon;
+    for (const f of facesDesMurs(v.logement)) {
+      if (Math.abs(d[0] * f.d[1] - d[1] * f.d[0]) > Math.sin((2 * Math.PI) / 180)) continue;
+      const sf = (f.a[0] - a[0]) * n[0] + (f.a[1] - a[1]) * n[1];
+      if (Math.abs(sf - s) < meilleur) { meilleur = Math.abs(sf - s); s = sf; }
+    }
+    c[k] = ar([a[0] + n[0] * s, a[1] + n[1] * s]);
+    c[(k + 1) % c.length] = ar([b[0] + n[0] * s, b[1] + n[1] * s]);
+    if (surfacePolygone(c) < 0.2) throw new Error("la pièce deviendrait trop petite");
+    pieceManuelle(v, id);
+    marquer(v, piece);
+    return v;
+  }
+
+  function distanceAuContour(p, contour) {
+    let d = Infinity;
+    for (let i = 0; i < contour.length; i++) d = Math.min(d, projection(p, contour[i], contour[(i + 1) % contour.length]).dist);
+    return d;
+  }
+
+  /** Ce qui cloche dans le contour d'une pièce : un mur qui la traverse, une autre pièce qu'elle chevauche. */
+  function alertesPiece(lg, id) {
+    const piece = (lg.pieces || []).find((x) => x.id === id);
+    if (!piece) return [];
+    const alertes = [];
+    for (const m of lg.murs) {
+      const { l, d } = axes(m);
+      for (let t = m.epaisseur; t <= l - m.epaisseur; t += 0.1) {
+        const q = [m.debut[0] + d[0] * t, m.debut[1] + d[1] * t];
+        if (dansPolygone(q, piece.contour) && distanceAuContour(q, piece.contour) > m.epaisseur / 2 + 0.03) {
+          alertes.push("elle passe à travers un mur");
+          break;
+        }
+      }
+      if (alertes.length) break;
+    }
+    const xs = piece.contour.map((q) => q[0]), ys = piece.contour.map((q) => q[1]);
+    for (const autre of lg.pieces || []) {
+      if (autre.id === id) continue;
+      let n = 0;
+      for (let x = Math.min(...xs) + 0.05; x < Math.max(...xs); x += 0.1) {
+        for (let y = Math.min(...ys) + 0.05; y < Math.max(...ys); y += 0.1) {
+          if (dansPolygone([x, y], piece.contour) && dansPolygone([x, y], autre.contour)) n++;
+        }
+      }
+      if (n * 0.01 >= 0.1) alertes.push(`elle chevauche « ${autre.nom} » sur ${arrondi(n * 0.01, 1)} m²`);
+    }
+    return alertes;
+  }
+
+  /**
+   * Une LIMITE INVISIBLE entre deux pièces d'un même espace ouvert (séjour et coin nuit sans cloison) : elle compte comme une
+   * cloison pour le calcul des pièces, mais n'est pas un mur (rien n'est construit en 3D). Bouts aimantés aux murs.
+   */
+  function ajouterLimite(v0, a, b, rayon = 0.15) {
+    const v = copie(v0);
+    const p = aimanterCoin(v.logement, a, rayon), q = aimanterCoin(v.logement, b, rayon);
+    if (longueur(p, q) < 0.3) throw new Error("limite trop courte");
+    v.limites = [...(v.limites || []), { debut: p, fin: q }];
+    return apresMurs(v).v;
+  }
+
+  function supprimerLimite(v0, k) {
+    const v = copie(v0);
+    v.limites = (v.limites || []).filter((_, i) => i !== k);
+    return apresMurs(v).v;
+  }
+
+  // ---------- Meubles à l'écran (10/11/2026) : voir, déplacer, tourner, taille, type, ajouter, supprimer ----------
+
+  // Les catégories de moteur/meubles.py (CATEGORIES), dans le même ordre (test : tests/test_ecran_verification.py).
+  const MEUBLES = {
+    canape: "Canapé", fauteuil: "Fauteuil", chaise: "Chaise", tabouret_haut: "Tabouret haut", table_basse: "Table basse",
+    table_d_appoint: "Table d'appoint", table: "Table de repas", bureau: "Bureau", chaise_de_bureau: "Chaise de bureau",
+    lit: "Lit", lit_superpose: "Lit superposé ou mezzanine", table_de_chevet: "Table de chevet", commode: "Commode",
+    rangement: "Meuble de rangement", etagere_cubes: "Étagère à cases", bibliotheque: "Bibliothèque", meuble_tv: "Meuble télé",
+    banc: "Banc", tapis: "Tapis", lampadaire: "Lampadaire", lampe: "Lampe à poser", suspension: "Suspension",
+    tableau: "Tableau", miroir: "Miroir", horloge: "Horloge murale", plante: "Plante", coussin: "Coussin", vase: "Vase",
+    meuble_cuisine_bas: "Meubles bas de cuisine", meuble_cuisine_haut: "Meubles hauts de cuisine",
+    colonne_cuisine: "Colonne de cuisine (four, frigo)", ilot: "Îlot de cuisine", caisson: "Caisson, cloison meuble",
+    placard: "Placard, dressing", television: "Télévision",
+  };
+  // Taille d'un meuble courant (largeur, profondeur, hauteur en m) et hauteur du bas pour ceux qui sont au mur ou au plafond.
+  const TAILLES_MEUBLES = {
+    canape: [2.1, 0.9, 0.85], fauteuil: [0.75, 0.8, 0.85], chaise: [0.45, 0.5, 0.85], table: [1.4, 0.8, 0.75],
+    table_basse: [1.0, 0.6, 0.4], bureau: [1.2, 0.6, 0.75], lit: [1.6, 2.05, 1.0], table_de_chevet: [0.45, 0.4, 0.55],
+    commode: [1.0, 0.5, 0.85], rangement: [1.2, 0.45, 0.9], bibliotheque: [0.9, 0.35, 1.9], meuble_tv: [1.6, 0.4, 0.5],
+    tapis: [2.0, 1.4, 0.02], meuble_cuisine_bas: [2.4, 0.6, 0.9], meuble_cuisine_haut: [2.4, 0.35, 0.7],
+    colonne_cuisine: [0.6, 0.6, 2.1], ilot: [1.8, 0.9, 0.9], placard: [1.8, 0.6, 2.4], television: [1.2, 0.08, 0.7],
+    tableau: [0.8, 0.04, 0.6], miroir: [0.6, 0.04, 0.9],
+  };
+  const ALTITUDES_MEUBLES = { tableau: 1.3, miroir: 1.1, horloge: 1.6, meuble_cuisine_haut: 1.45, television: 0.6 };
+
+  /** L'emprise au sol d'un meuble : rectangle tourné ; « face » = la direction de son avant (0° = +x, 90° = +y). */
+  function empreinteMeuble(m) {
+    const a = (m.face * Math.PI) / 180;
+    const av = [Math.cos(a), Math.sin(a)], cote = [-Math.sin(a), Math.cos(a)];
+    const [l, p] = m.dimensions;
+    return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sl, sp]) => [
+      m.position[0] + (sl * l) / 2 * cote[0] + (sp * p) / 2 * av[0],
+      m.position[1] + (sl * l) / 2 * cote[1] + (sp * p) / 2 * av[1],
+    ]);
+  }
+
+  /** Le meuble sous le point (le plus petit d'abord : une chaise posée sur un tapis se choisit). */
+  function meubleSous(lg, p) {
+    const sous = (lg.meubles || []).filter((m) => dansPolygone(p, empreinteMeuble(m)));
+    sous.sort((a, b) => a.dimensions[0] * a.dimensions[1] - b.dimensions[0] * b.dimensions[1]);
+    return sous.length ? sous[0] : null;
+  }
+
+  function pieceDuPoint(lg, p) {
+    return (lg.pieces || []).find((x) => dansPolygone(p, x.contour)) || null;
+  }
+
+  /**
+   * Fait glisser un meuble de `delta` (m). S'il arrive dos contre un mur (moins de `rayon`), il s'y colle ; il change de pièce
+   * s'il passe dans une autre.
+   */
+  function deplacerMeuble(v0, id, delta, rayon = 0.15) {
+    const v = copie(v0);
+    const m = (v.logement.meubles || []).find((x) => x.id === id);
+    if (!m) throw new Error(`meuble inconnu : ${id}`);
+    const pos = [m.position[0] + delta[0], m.position[1] + delta[1]];
+    const a = (m.face * Math.PI) / 180, av = [Math.cos(a), Math.sin(a)];
+    const dos = [pos[0] - av[0] * m.dimensions[1] / 2, pos[1] - av[1] * m.dimensions[1] / 2];
+    let meilleur = rayon, decalage = null;
+    for (const f of facesDesMurs(v.logement)) {
+      if (Math.abs(av[0] * f.d[0] + av[1] * f.d[1]) > Math.sin((5 * Math.PI) / 180)) continue; // face parallèle au dos
+      const pr = projection(dos, f.a, f.b);
+      if (pr.dist < meilleur && pr.t >= 0 && pr.t <= longueur(f.a, f.b)) {
+        const s = (f.a[0] - dos[0]) * av[0] + (f.a[1] - dos[1]) * av[1];
+        meilleur = pr.dist;
+        decalage = s;
+      }
+    }
+    if (decalage !== null) { pos[0] += av[0] * decalage; pos[1] += av[1] * decalage; }
+    m.position = ar(pos);
+    const piece = pieceDuPoint(v.logement, m.position);
+    if (piece) m.piece = piece.id;
+    marquer(v, m);
+    m.statut = "mesure";
+    return v;
+  }
+
+  /** La poignée de rotation : devant le meuble, à 30 cm de son avant. */
+  function poigneeRotation(m) {
+    const a = (m.face * Math.PI) / 180;
+    const d = m.dimensions[1] / 2 + 0.3;
+    return [m.position[0] + Math.cos(a) * d, m.position[1] + Math.sin(a) * d];
+  }
+
+  /** Tourne un meuble pour que son avant regarde le point p : par crans de 15°, et pile à l'angle droit à moins de 7°. */
+  function tournerMeuble(v0, id, p) {
+    const v = copie(v0);
+    const m = (v.logement.meubles || []).find((x) => x.id === id);
+    if (!m) throw new Error(`meuble inconnu : ${id}`);
+    let face = (Math.atan2(p[1] - m.position[1], p[0] - m.position[0]) * 180) / Math.PI;
+    const droit = Math.round(face / 90) * 90;
+    face = Math.abs(face - droit) <= 7 ? droit : Math.round(face / 15) * 15;
+    m.face = arrondi(((face + 540) % 360) - 180, 1);
+    marquer(v, m);
+    m.statut = "mesure";
+    return v;
+  }
+
+  /** Change la catégorie, les dimensions [largeur, profondeur, hauteur], la face ou l'altitude d'un meuble. */
+  function modifierMeuble(v0, id, champs) {
+    const v = copie(v0);
+    const m = (v.logement.meubles || []).find((x) => x.id === id);
+    if (!m) throw new Error(`meuble inconnu : ${id}`);
+    if (champs.categorie && champs.categorie !== m.categorie) {
+      if (!MEUBLES[champs.categorie]) throw new Error(`catégorie inconnue : ${champs.categorie}`);
+      m.categorie = champs.categorie;
+      delete m.modele; // un autre meuble : Atelya rechoisira le modèle 3D
+      if (champs.categorie !== "lit") delete m.literie;
+    }
+    if (champs.dimensions) {
+      if (champs.dimensions.some((x) => !(x > 0))) throw new Error("les dimensions doivent être des nombres positifs");
+      m.dimensions = champs.dimensions.map((x) => arrondi(x, 3));
+    }
+    if (champs.face != null) m.face = arrondi(champs.face, 1);
+    if (champs.altitude != null) m.altitude = arrondi(Math.max(0, champs.altitude), 3);
+    if (m.altitude + m.dimensions[2] > v.logement.hauteur_sous_plafond + 1e-6) throw new Error("le meuble dépasserait le plafond");
+    marquer(v, m);
+    m.statut = "mesure";
+    return v;
+  }
+
+  /** Ajoute un meuble de taille courante au point p (dans une pièce), l'avant vers le milieu de la pièce. */
+  function ajouterMeuble(v0, categorie, p) {
+    const v = copie(v0);
+    const lg = v.logement;
+    const piece = pieceDuPoint(lg, p);
+    if (!piece) throw new Error("cliquez à l'intérieur d'une pièce");
+    if (!MEUBLES[categorie]) throw new Error(`catégorie inconnue : ${categorie}`);
+    const c = centrePolygone(piece.contour);
+    const face = longueur(c, p) > 0.05 ? arrondi((Math.atan2(c[1] - p[1], c[0] - p[0]) * 180) / Math.PI, 1) : 0;
+    const m = { id: nouvelId(lg, "meuble_v"), categorie, piece: piece.id, position: ar(p), face,
+      dimensions: (TAILLES_MEUBLES[categorie] || [0.8, 0.5, 0.8]).slice(), altitude: ALTITUDES_MEUBLES[categorie] || 0,
+      statut: "mesure", source: "verification", confiance: 1 };
+    lg.meubles = [...(lg.meubles || []), m];
+    v.verifies = [...(v.verifies || []), m.id];
+    return v;
+  }
+
+  // ---------- Murs : redresser, épaisseur à la poignée (10/11/2026) ----------
+
+  const PRESQUE_DROIT_DEG = 5; // un mur à moins de 5° de l'horizontale ou de la verticale peut être redressé
+
+  /** L'écart (degrés) d'un mur à l'horizontale ou à la verticale la plus proche. */
+  function ecartDroit(mur) {
+    const a = (Math.atan2(mur.fin[1] - mur.debut[1], mur.fin[0] - mur.debut[0]) * 180) / Math.PI;
+    const r = ((a % 90) + 90) % 90;
+    return Math.min(r, 90 - r);
+  }
+
+  /**
+   * Rend un mur presque droit exactement horizontal ou vertical, en le tournant autour de son milieu ; les bouts des murs qui
+   * s'y accrochaient suivent ; ses portes gardent leur place le long du mur.
+   */
+  function redresserMur(v0, id) {
+    const mur = v0.logement.murs.find((m) => m.id === id);
+    if (!mur) throw new Error(`mur inconnu : ${id}`);
+    const e = ecartDroit(mur);
+    if (e < 1e-6) return v0;
+    if (e > PRESQUE_DROIT_DEG) throw new Error(`ce mur penche de ${arrondi(e, 1)}° : c'est sans doute un vrai mur en biais`);
+    const v = copie(v0);
+    const m = v.logement.murs.find((x) => x.id === id);
+    const milieu = [(m.debut[0] + m.fin[0]) / 2, (m.debut[1] + m.fin[1]) / 2];
+    const l = longueur(m.debut, m.fin) / 2;
+    const horizontal = Math.abs(m.fin[0] - m.debut[0]) >= Math.abs(m.fin[1] - m.debut[1]);
+    const s = horizontal ? Math.sign(m.fin[0] - m.debut[0]) || 1 : Math.sign(m.fin[1] - m.debut[1]) || 1;
+    const nouveau = {
+      debut: horizontal ? [milieu[0] - s * l, milieu[1]] : [milieu[0], milieu[1] - s * l],
+      fin: horizontal ? [milieu[0] + s * l, milieu[1]] : [milieu[0], milieu[1] + s * l],
+    };
+    for (const bout of ["debut", "fin"]) {
+      const ancien = m[bout];
+      for (const autre of v.logement.murs) {
+        if (autre.id === id) continue;
+        for (const b2 of ["debut", "fin"]) if (longueur(autre[b2], ancien) < Math.max(0.03, m.epaisseur / 2)) autre[b2] = ar(nouveau[bout]);
+      }
+      m[bout] = ar(nouveau[bout]);
+    }
+    marquer(v, m);
+    return v;
+  }
+
+  /** Redresse tous les murs presque droits (moins de PRESQUE_DROIT_DEG) ; les vrais murs en biais ne bougent pas. */
+  function redresserTousLesMurs(v0) {
+    let v = v0;
+    for (const m of v0.logement.murs) {
+      const e = ecartDroit(m);
+      if (e > 1e-6 && e <= PRESQUE_DROIT_DEG) v = redresserMur(v, m.id);
+    }
+    return v;
+  }
+
+  /** La poignée d'épaisseur d'un mur : au milieu d'une de ses faces. */
+  function poigneeEpaisseur(mur) {
+    const { l, d, n } = axes(mur);
+    return [mur.debut[0] + d[0] * l / 2 + n[0] * mur.epaisseur / 2, mur.debut[1] + d[1] * l / 2 + n[1] * mur.epaisseur / 2];
+  }
+
+  /** Épaisseur réglée en tirant la poignée jusqu'au point p : deux fois la distance de p à l'axe (de 3 à 80 cm, au cm). */
+  function epaisseurDepuisPoignee(mur, p) {
+    const { n } = axes(mur);
+    const s = Math.abs((p[0] - mur.debut[0]) * n[0] + (p[1] - mur.debut[1]) * n[1]);
+    return arrondi(Math.min(0.8, Math.max(0.03, 2 * s)), 2);
+  }
+
+  /** La pièce reprend le contour calculé depuis les murs (on oublie la retouche à la main). */
+  function oublierContourManuel(v0, id) {
+    const v = copie(v0);
+    v.contours_manuels = (v.contours_manuels || []).filter((x) => x !== id);
+    return apresMurs(v).v;
+  }
+
+  /** La limite sous le point p (n°), ou -1. */
+  function limiteSous(v, p, tolerance) {
+    return (v.limites || []).findIndex((lim) => projection(p, lim.debut, lim.fin).dist <= tolerance);
+  }
+
+  /**
+   * Ce que l'écran fait SEUL après chaque changement de murs (règle NT n° 21 : le bon résultat sans bouton à penser) :
+   * murs alignés qui se chevauchent fusionnés, puis pièces recalculées depuis les murs (noms, types, sols, plinthes gardés ;
+   * une pièce qui n'est plus fermée est gardée telle quelle et signalée). Rend {v, ouvertes, reunies, nouvelles}.
+   * Les pièces recalculées ne sont PAS marquées « vérifiées » : ce n'est pas une personne qui les a regardées.
+   */
+  function apresMurs(v0) {
+    const f = fusionnerMursAlignes(v0);
+    const r = piecesRecalculees(f);
+    const v = f === v0 ? copie(v0) : f;
+    v.logement.pieces = r.pieces;
+    return { v, ouvertes: r.ouvertes, reunies: r.reunies, nouvelles: r.nouvelles };
+  }
+
+  /** Les pièces recalculées depuis les murs ET les limites invisibles ; une pièce retouchée à la main garde son contour. */
+  function piecesRecalculees(v) {
+    const r = piecesDepuisMurs(v.logement, v.limites || []);
+    const manuels = new Set(v.contours_manuels || []);
+    if (manuels.size) {
+      const avant = new Map((v.logement.pieces || []).map((p) => [p.id, p]));
+      for (const id of manuels) {
+        const ancienne = avant.get(id);
+        if (!ancienne) continue;
+        const i = r.pieces.findIndex((p) => p.id === id);
+        if (i >= 0) r.pieces[i] = { ...r.pieces[i], contour: ancienne.contour.map((q) => q.slice()) };
+        else r.pieces.push(copie(ancienne));
+      }
+    }
+    return r;
+  }
+
+  // ---------- Sens d'ouverture des portes (10/11/2026) ----------
+
+  const LARGEUR_PORTE_ARC = 1.3; // m : au-delà, c'est une façade de placard ou une baie, pas une porte qui pivote
+
+  /** Plus une pièce est « de passage » (entrée, dégagement), moins une porte s'ouvre vers elle. */
+  function intimite(nom) {
+    const n = sansAccents(nom || "").toLowerCase();
+    if (/entree|degagement|deg\b|couloir|palier|hall|circulation/.test(n)) return 0;
+    if (/sejour|salon|living|salle a manger/.test(n)) return 1;
+    return 2;
+  }
+
+  /**
+   * Le sens d'une porte : celui réglé ; sinon le défaut le plus courant en France : gonds au début du mur, et la porte s'ouvre
+   * VERS LA PIÈCE (pas vers l'entrée ni le dégagement). `regle` dit si une personne l'a choisi.
+   */
+  function sensPorte(o, lg) {
+    let defaut = "gauche";
+    const mur = lg && lg.murs.find((m) => m.id === o.mur);
+    if (mur && !(o.sens && o.sens.ouvre_vers)) {
+      const { d, n } = axes(mur);
+      const t = o.position + o.largeur / 2;
+      const cote = (signe) => {
+        const q = [mur.debut[0] + d[0] * t + n[0] * signe * (mur.epaisseur / 2 + 0.3), mur.debut[1] + d[1] * t + n[1] * signe * (mur.epaisseur / 2 + 0.3)];
+        const piece = (lg.pieces || []).find((x) => dansPolygone(q, x.contour));
+        return piece ? intimite(piece.nom) : -1;
+      };
+      if (cote(-1) > cote(1)) defaut = "droite";
+    }
+    return { charniere: (o.sens && o.sens.charniere) || "debut", ouvre_vers: (o.sens && o.sens.ouvre_vers) || defaut, regle: !!o.sens };
+  }
+
+  /** Inverse les gonds (« charniere ») ou le côté d'ouverture (« ouvre_vers ») d'une porte. */
+  function inverserSens(v0, id, quoi) {
+    const v = copie(v0);
+    const o = (v.logement.ouvertures || []).find((x) => x.id === id);
+    if (!o) throw new Error(`ouverture inconnue : ${id}`);
+    const s = sensPorte(o, v.logement);
+    if (quoi === "charniere") s.charniere = s.charniere === "debut" ? "fin" : "debut";
+    else s.ouvre_vers = s.ouvre_vers === "gauche" ? "droite" : "gauche";
+    o.sens = { charniere: s.charniere, ouvre_vers: s.ouvre_vers };
+    marquer(v, o);
+    return v;
+  }
+
+  /** L'arc d'ouverture d'une porte (en m) : le pivot (gonds), le bout du battant fermé et le bout du battant ouvert. */
+  function arcPorte(lg, o) {
+    const mur = lg.murs.find((m) => m.id === o.mur);
+    if (!mur) return null;
+    if (o.largeur > LARGEUR_PORTE_ARC) return null; // façade de placard, baie : pas d'arc
+    const { d, n } = axes(mur);
+    const s = sensPorte(o, lg);
+    const cote = s.ouvre_vers === "gauche" ? 1 : -1;
+    const face = (t) => [mur.debut[0] + d[0] * t + n[0] * cote * mur.epaisseur / 2,
+      mur.debut[1] + d[1] * t + n[1] * cote * mur.epaisseur / 2];
+    const tGonds = s.charniere === "debut" ? o.position : o.position + o.largeur;
+    const tBout = s.charniere === "debut" ? o.position + o.largeur : o.position;
+    const pivot = face(tGonds);
+    return { pivot, ferme: face(tBout), ouvert: [pivot[0] + n[0] * cote * o.largeur, pivot[1] + n[1] * cote * o.largeur], regle: s.regle };
+  }
+
+  /** Les deux bords d'une ouverture, en mètres (pour dessiner ses poignées). */
+  function bordsOuverture(lg, o) {
+    const mur = lg.murs.find((m) => m.id === o.mur);
+    if (!mur) return null;
+    const { d } = axes(mur);
+    const a = [mur.debut[0] + d[0] * o.position, mur.debut[1] + d[1] * o.position];
+    return [a, [a[0] + d[0] * o.largeur, a[1] + d[1] * o.largeur]];
+  }
+
   function modifierMur(v0, id, champs) {
     const v = copie(v0);
     const m = v.logement.murs.find((x) => x.id === id);
@@ -377,6 +995,135 @@
     if (!p) throw new Error(`pièce inconnue : ${id}`);
     if (!nom || !nom.trim()) throw new Error("le nom ne peut pas être vide");
     p.nom = nom.trim();
+    // Ce qu'Atelya avait supposé d'après l'ancien nom (sol, plinthes, portes de placard) est oublié : il le supposera de nouveau
+    // d'après le nouveau nom (un « Bureau » devenu « Salle d'eau » n'a pas de parquet). Ce que la personne a choisi reste.
+    for (const k of ["sol", "plinthes", "placard", "corniche"]) if (p[k] && p[k].statut === "ajoute") delete p[k];
+    marquer(v, p);
+    return v;
+  }
+
+  const CHOIX_PLINTHES = ["bois", "carrelage", "aucune"];
+  const CHOIX_CORNICHE = ["moulure", "simple", "aucune"];
+
+  /** La corniche d'une pièce (moulure du plafond), choisie par la personne : « moulure », « simple » ou « aucune ». */
+  function reglerCorniche(v0, id, choix) {
+    if (!CHOIX_CORNICHE.includes(choix)) throw new Error(`corniche inconnue : ${choix}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.corniche = { choix, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
+
+  /** Les plinthes d'une pièce, choisies par la personne (B2) : « bois », « carrelage » ou « aucune ». */
+  function reglerPlinthes(v0, id, choix) {
+    if (!CHOIX_PLINTHES.includes(choix)) throw new Error(`plinthes inconnues : ${choix}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.plinthes = { choix, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
+
+  // B2-3 : les sols qu'Atelya sait poser (même liste, même ordre que moteur/matieres.py ; un test le vérifie).
+  const SOLS = {
+    parquet_chene_lames: "Parquet chêne, lames droites",
+    parquet_batons_rompus: "Parquet bâtons rompus",
+    point_de_hongrie: "Parquet point de Hongrie",
+    stratifie: "Stratifié",
+    chene_clair_moderne: "Chêne clair moderne",
+    chene_grise: "Chêne grisé",
+    chene_noeuds: "Chêne à nœuds, larges lames",
+    chene_clair_photo: "Chêne clair, larges lames",
+    chene_naturel_photo: "Chêne naturel",
+    vieux_parquet: "Vieux parquet",
+    hongrie_naturel: "Point de Hongrie naturel",
+    hongrie_grise: "Point de Hongrie grisé",
+    batons_rompus_clair: "Bâtons rompus clair",
+    batons_rompus_tres_clair: "Bâtons rompus très clair",
+    carrelage_interieur: "Carrelage beige",
+    carreaux_ciment: "Carreaux de ciment",
+    tomettes: "Tomettes",
+    damier_pierre: "Damier de pierre",
+    pierre_beige: "Dalles de pierre beige",
+    parquet_diagonal: "Parquet posé en diagonale",
+    parquet_rectangulaire: "Parquet à fines lames",
+    lames_parquet_1: "Parquet à lames brunes",
+    lames_parquet_2: "Parquet à lames miel",
+    parquet_use: "Parquet usé",
+    lames_bois: "Plancher à lames courtes",
+    stratifie_2: "Stratifié (2)",
+    lames_foncees_2: "Lames de bois foncées",
+    ciment_motifs_1: "Carreaux décorés bleus (1)",
+    ciment_motifs_2: "Carreaux décorés bleus (2)",
+    ciment_motifs_3: "Carreaux décorés bleus (3)",
+    ciment_motifs_4: "Carreaux décorés bleus (4)",
+    ciment_motifs_5: "Carreaux décorés bleus (5)",
+    ciment_motifs_6: "Carreaux décorés bleus (6)",
+    damier_marbre_noir_blanc: "Damier de marbre noir et blanc",
+    damier_marbre_jaune: "Damier de marbre clair et ocre",
+    marbre_motif_noir_blanc: "Grands carreaux de marbre noir et blanc",
+    marbre_motif_bleu: "Marbre bleu nuit et gris",
+    damier_marbre: "Petit damier noir et blanc",
+    mosaique_hexa_blanche: "Mosaïque hexagonale blanche",
+    mosaique_hexa_noire: "Mosaïque hexagonale noire",
+    tomettes_hexa_orange: "Tomettes hexagonales orange",
+    tomettes_hexa_brunes: "Tomettes hexagonales brunes",
+    granito_beige: "Granito beige",
+    granito_beige_2: "Granito beige (2)",
+    granito_blanc: "Granito blanc",
+    granito_gris: "Granito gris",
+    granito_colore: "Granito à éclats colorés",
+    granito_colore_2: "Granito à gros éclats",
+    pierre_damier_claire: "Pierre claire",
+    marbre_dalles: "Dalles de marbre noir et beige",
+    grands_carreaux_gris: "Grandes dalles grises",
+    carrelage_blanc_moderne: "Carrelage blanc moderne",
+    pastilles_rondes: "Pastilles rondes noires",
+    pastilles_rondes_2: "Pastilles rondes grèges",
+    mosaique_marbre: "Mosaïque de marbre brune",
+    carreaux_longs_blancs: "Carreaux longs blancs",
+    carreaux_carres: "Petits carreaux sombres",
+    granit: "Dalles de granit",
+    vieux_carrelage: "Vieux carrelage",
+    carreaux_cubes: "Carreaux de ciment en cubes (losanges)",
+    petits_carreaux_clairs: "Petits carreaux clairs, 10 cm",
+  };
+
+  /** Le sol d'une pièce, choisi par la personne. */
+  function reglerSol(v0, id, matiere) {
+    if (!(matiere in SOLS)) throw new Error(`sol inconnu : ${matiere}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.sol = { matiere, statut: "mesure", source: "verification", confiance: 1 };
+    marquer(v, p);
+    return v;
+  }
+
+  const CHOIX_PLACARD = ["coulissantes", "battantes", "aucune"];
+  // Même règle que moteur/habillage.py (est_placard) : le nom dit placard, et c'est petit (un grand dressing est une pièce).
+  const MOTS_PLACARD = /placard|rangement|dressing|penderie/;
+  const PLACARD_MAX = 4.0; // m²
+
+  function sansAccents(texte) {
+    return texte.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  /** Cette pièce est-elle un placard (portes à choisir) ? */
+  function estPlacard(p) {
+    return !!p.placard || (MOTS_PLACARD.test(sansAccents(p.nom || "")) && surfacePolygone(p.contour) <= PLACARD_MAX);
+  }
+
+  /** Les portes d'un placard, choisies par la personne (B2-2) : « coulissantes », « battantes » ou « aucune ». */
+  function reglerPlacard(v0, id, choix) {
+    if (!CHOIX_PLACARD.includes(choix)) throw new Error(`portes de placard inconnues : ${choix}`);
+    const v = copie(v0);
+    const p = (v.logement.pieces || []).find((x) => x.id === id);
+    if (!p) throw new Error(`pièce inconnue : ${id}`);
+    p.placard = { choix, statut: "mesure", source: "verification", confiance: 1 };
     marquer(v, p);
     return v;
   }
@@ -393,7 +1140,10 @@
       lg.ouvertures = (lg.ouvertures || []).filter((o) => o.mur !== id);
     } else if (t.genre === "ouverture") {
       lg.ouvertures = lg.ouvertures.filter((o) => o.id !== id);
+    } else if (t.genre === "meuble") {
+      lg.meubles = lg.meubles.filter((m) => m.id !== id);
     } else {
+      lg.meubles = (lg.meubles || []).filter((m) => m.piece !== id); // une pièce supprimée emporte ses meubles
       lg.pieces = lg.pieces.filter((p) => p.id !== id);
     }
     return v;
@@ -773,7 +1523,7 @@
    * la pièce qu'elle recouvre le plus. Une ancienne pièce qui n'est plus fermée (il manque un mur) reste telle quelle et
    * est signalée dans `ouvertes`. Rend {pieces, ouvertes, reunies, nouvelles}.
    */
-  function piecesDepuisMurs(lg) {
+  function piecesDepuisMurs(lg, limites = []) {
     const tous = lg.murs.flatMap((m) => polygoneMur(m));
     const x0 = Math.min(...tous.map((q) => q[0])), y0 = Math.min(...tous.map((q) => q[1]));
     const x1 = Math.max(...tous.map((q) => q[0])), y1 = Math.max(...tous.map((q) => q[1]));
@@ -799,6 +1549,7 @@
     };
     let murs = new Uint8Array(l * h);
     for (const m of lg.murs) remplir(murs, polygoneMur(m));
+    for (const lim of limites) remplir(murs, polygoneMur({ debut: lim.debut, fin: lim.fin, epaisseur: Math.max(0.03, c * 1.5) }));
     murs = voisinageGrille(murs, l, h, 1); // bouche les jours minuscules entre deux murs qui se touchent presque
 
     // Numérote les espaces vides ; celui qui touche le bord de la grille est l'extérieur.
@@ -922,7 +1673,7 @@
   /** Remplace les pièces par celles que dessinent les murs. Le détail reste calculable par piecesDepuisMurs. */
   function recalculerPieces(v0) {
     const v = copie(v0);
-    const r = piecesDepuisMurs(v.logement);
+    const r = piecesRecalculees(v);
     const ids = new Set(r.pieces.map((p) => p.id));
     v.logement.pieces = r.pieces;
     v.verifies = [...new Set([...(v.verifies || []), ...ids])];
@@ -1021,7 +1772,7 @@
     doutes = doutes.filter((x) => x.code !== "plusieurs_niveaux");
     if (options.fermeture) {
       // Après un recalcul des pièces : ce qui n'est pas fermé, montré à son endroit exact, avant tout le reste.
-      for (const f of piecesDepuisMurs(lg).fuites) {
+      for (const f of piecesDepuisMurs(lg, v.limites || []).fuites) {
         const cle = `fuite|${f.piece}`;
         if (resolus.has(cle)) continue;
         const situe = f.a !== null;
@@ -1145,7 +1896,9 @@
       } else if (nb === 1) {
         const d = ds.find((x) => x.element);
         const t = trouver(lg, d.element);
-        texte = d.code === "epaisseur" ? `L'épaisseur de ${nomSimple(lg, d.element)} paraît inhabituelle.` : `Atelya n'est pas sûr de ${nomSimple(lg, d.element)}. Existe-t-il vraiment sur le plan ?`;
+        texte = d.code === "epaisseur" ? `L'épaisseur de ${nomSimple(lg, d.element)} paraît inhabituelle.`
+          : d.code === "bloc" ? `${nomSimple(lg, d.element)} est un bloc plein : sans doute une gaine technique ou un poteau. C'est bien ça ?`
+          : `Atelya n'est pas sûr de ${nomSimple(lg, d.element)}. Existe-t-il vraiment sur le plan ?`;
         if (t && t.genre === "mur" && longueur(t.e.debut, t.e.fin) < MUR_COURT) texte = "Ce mur est très court : vrai mur, ou simple tache ?";
         actions = [{ libelle: "C'est juste", action: { type: "regler" } }, { libelle: "Le supprimer", action: { type: "supprimer_tout" }, danger: true }];
       } else {
@@ -1270,6 +2023,8 @@
         if (projection(p, a, b).dist <= tolerance) return { genre: "ouverture", id: o.id };
       }
     }
+    const meuble = meubleSous(lg, p);
+    if (meuble) return { genre: "meuble", id: meuble.id };
     let meilleur = null;
     for (const m of lg.murs) {
       const dist = projection(p, m.debut, m.fin).dist - m.epaisseur / 2;
@@ -1313,7 +2068,7 @@
   /** Les incohérences qui empêcheraient le moteur de lire le logement.json (vide si tout va bien). */
   function verifierCoherence(lg) {
     const erreurs = [];
-    const tous = [...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || [])].map((e) => e.id);
+    const tous = [...lg.murs, ...(lg.ouvertures || []), ...(lg.pieces || []), ...(lg.meubles || [])].map((e) => e.id);
     const doublons = [...new Set(tous.filter((id, i) => tous.indexOf(id) !== i))].sort();
     if (doublons.length) erreurs.push(`identifiants en double : ${doublons.join(", ")}`);
     if (!lg.murs.length) erreurs.push("aucun mur");
@@ -1351,6 +2106,11 @@
       if (p.surface != null && Math.abs(p.surface - surfacePolygone(p.contour)) > 0.01) {
         erreurs.push(`la pièce ${p.id} annonce ${p.surface.toFixed(2)} m² mais son contour mesure ${surfacePolygone(p.contour).toFixed(2)} m²`);
       }
+    }
+    const pieces = new Set((lg.pieces || []).map((p) => p.id));
+    for (const m of lg.meubles || []) { // mêmes règles que Meuble dans moteur/logement.py
+      if (m.piece != null && !pieces.has(m.piece)) erreurs.push(`le meuble ${m.id} est dans une pièce inconnue : ${m.piece}`);
+      if ((m.altitude || 0) + m.dimensions[2] > lg.hauteur_sous_plafond + 1e-9) erreurs.push(`le meuble ${m.id} dépasse le plafond`);
     }
     return erreurs;
   }
@@ -1421,8 +2181,50 @@
     ajouterMur,
     ajouterOuverture,
     modifierOuverture,
+    deplacerOuverture,
+    etirerOuverture,
+    bordsOuverture,
+    sensPorte,
+    inverserSens,
+    arcPorte,
+    morceauxLibres,
+    fusionnerMursAlignes,
+    apresMurs,
+    deplacerCoinPiece,
+    deplacerCotePiece,
+    alertesPiece,
+    ajouterLimite,
+    supprimerLimite,
+    limiteSous,
+    oublierContourManuel,
+    redresserMur,
+    MEUBLES,
+    TAILLES_MEUBLES,
+    empreinteMeuble,
+    meubleSous,
+    deplacerMeuble,
+    poigneeRotation,
+    tournerMeuble,
+    modifierMeuble,
+    ajouterMeuble,
+    redresserTousLesMurs,
+    ecartDroit,
+    poigneeEpaisseur,
+    epaisseurDepuisPoignee,
+    PRESQUE_DROIT_DEG,
+    aimanterCoin,
+    LARGEUR_MIN,
     modifierMur,
     renommerPiece,
+    reglerPlinthes,
+    CHOIX_PLINTHES,
+    reglerCorniche,
+    CHOIX_CORNICHE,
+    reglerSol,
+    SOLS,
+    reglerPlacard,
+    CHOIX_PLACARD,
+    estPlacard,
     supprimer,
     confirmer,
     resoudre,

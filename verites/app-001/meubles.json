@@ -1,0 +1,1098 @@
+{
+ "note": "Meubles d'app-001 vus sur les photos de l'annonce (B4, 09/11/2026), relevés par Claude à la main avec les caméras calées de l'étape 4 (verites/app-001/cameras-photos.json) : pieds des meubles reportés au sol en mètres, puis boîtes 3D redessinées sur les photos jusqu'à tomber sur les vrais meubles. Format = champ « meubles » de logement.json (moteur/logement.py, Meuble). position = milieu du pied ; face = direction de l'avant (0 = +x/est, 90 = +y/nord) ; dimensions = largeur (le long de l'avant), profondeur, hauteur ; couleur sRGB vue. Rideaux (09/11/2026) : voilages blancs au séjour (O10, O11), rideaux beiges en chambre 1 (O8), voilage et rideaux mauves en chambre 2 (O9) ; cuisine et entrée sans rideaux.",
+ "meubles": [
+  {
+   "id": "canape",
+   "categorie": "canape",
+   "piece": "sejour_1",
+   "position": [
+    8.52,
+    4.8
+   ],
+   "face": 0,
+   "dimensions": [
+    2.7,
+    0.9,
+    0.85
+   ],
+   "couleur": [
+    178,
+    178,
+    175
+   ],
+   "statut": "estime",
+   "source": "photos 01, 03"
+  },
+  {
+   "id": "tableau_canape",
+   "categorie": "tableau",
+   "piece": "sejour_1",
+   "position": [
+    8.09,
+    5.3
+   ],
+   "face": 0,
+   "dimensions": [
+    1.75,
+    0.04,
+    0.9
+   ],
+   "couleur": [
+    110,
+    150,
+    185
+   ],
+   "statut": "estime",
+   "source": "photo 03",
+   "altitude": 1.45
+  },
+  {
+   "id": "table_basse",
+   "categorie": "table_basse",
+   "piece": "sejour_1",
+   "position": [
+    9.8,
+    5.35
+   ],
+   "face": 0,
+   "dimensions": [
+    1.5,
+    0.75,
+    0.42
+   ],
+   "couleur": [
+    150,
+    105,
+    65
+   ],
+   "statut": "estime",
+   "source": "photos 01, 02, 03"
+  },
+  {
+   "id": "table_appoint",
+   "categorie": "table_d_appoint",
+   "piece": "sejour_1",
+   "position": [
+    8.55,
+    6.65
+   ],
+   "face": 0,
+   "dimensions": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photo 03"
+  },
+  {
+   "id": "tapis_rond",
+   "categorie": "tapis",
+   "piece": "sejour_1",
+   "position": [
+    10.3,
+    7.7
+   ],
+   "face": 0,
+   "dimensions": [
+    2.0,
+    2.0,
+    0.02
+   ],
+   "couleur": [
+    228,
+    222,
+    208
+   ],
+   "statut": "estime",
+   "source": "photo 02"
+  },
+  {
+   "id": "fauteuil_1",
+   "categorie": "fauteuil",
+   "piece": "sejour_1",
+   "position": [
+    11.5,
+    7.55
+   ],
+   "face": -80,
+   "dimensions": [
+    0.75,
+    0.8,
+    0.85
+   ],
+   "couleur": [
+    215,
+    170,
+    45
+   ],
+   "statut": "estime",
+   "source": "photos 01, 02"
+  },
+  {
+   "id": "fauteuil_2",
+   "categorie": "fauteuil",
+   "piece": "sejour_1",
+   "position": [
+    10.8,
+    7.75
+   ],
+   "face": -80,
+   "dimensions": [
+    0.75,
+    0.8,
+    0.85
+   ],
+   "couleur": [
+    215,
+    170,
+    45
+   ],
+   "statut": "estime",
+   "source": "photos 01, 02"
+  },
+  {
+   "id": "fauteuil_3",
+   "categorie": "fauteuil",
+   "piece": "sejour_1",
+   "position": [
+    9.75,
+    3.2
+   ],
+   "face": 45,
+   "dimensions": [
+    0.75,
+    0.8,
+    0.85
+   ],
+   "couleur": [
+    215,
+    170,
+    45
+   ],
+   "statut": "estime",
+   "source": "photos 01, 02, 03"
+  },
+  {
+   "id": "caisson_bleu",
+   "categorie": "caisson",
+   "piece": "sejour_1",
+   "position": [
+    12.0,
+    4.85
+   ],
+   "face": 135,
+   "dimensions": [
+    1.8,
+    0.45,
+    2.55
+   ],
+   "couleur": [
+    70,
+    90,
+    140
+   ],
+   "statut": "estime",
+   "source": "photos 01, 02, 03, 07 : posé en biais, télé vers le nord-ouest ; le photographe de la photo 07 se tient derrière"
+  },
+  {
+   "id": "meuble_tv",
+   "categorie": "meuble_tv",
+   "piece": "sejour_1",
+   "position": [
+    11.699,
+    5.151
+   ],
+   "face": 135,
+   "dimensions": [
+    1.5,
+    0.4,
+    0.45
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photos 01, 03"
+  },
+  {
+   "id": "television",
+   "categorie": "television",
+   "piece": "sejour_1",
+   "position": [
+    11.806,
+    5.044
+   ],
+   "face": 135,
+   "dimensions": [
+    1.25,
+    0.06,
+    0.72
+   ],
+   "couleur": [
+    20,
+    20,
+    22
+   ],
+   "statut": "estime",
+   "source": "photos 01, 03",
+   "altitude": 0.47
+  },
+  {
+   "id": "bibliotheque",
+   "categorie": "bibliotheque",
+   "piece": "sejour_1",
+   "position": [
+    10.35,
+    2.5
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.3,
+    2.05
+   ],
+   "couleur": [
+    160,
+    115,
+    70
+   ],
+   "statut": "estime",
+   "source": "photos 01, 03"
+  },
+  {
+   "id": "lampadaire",
+   "categorie": "lampadaire",
+   "piece": "sejour_1",
+   "position": [
+    9.15,
+    2.95
+   ],
+   "face": 45,
+   "dimensions": [
+    0.4,
+    0.4,
+    1.6
+   ],
+   "couleur": [
+    200,
+    195,
+    185
+   ],
+   "statut": "estime",
+   "source": "photo 03"
+  },
+  {
+   "id": "suspension_salon",
+   "categorie": "suspension",
+   "piece": "sejour_1",
+   "position": [
+    9.9,
+    5.4
+   ],
+   "face": 0,
+   "dimensions": [
+    1.6,
+    1.6,
+    0.8
+   ],
+   "couleur": [
+    30,
+    30,
+    30
+   ],
+   "statut": "estime",
+   "source": "photos 01, 02, 03",
+   "altitude": 2.2
+  },
+  {
+   "id": "table_repas",
+   "categorie": "table",
+   "piece": "sejour_1",
+   "position": [
+    13.65,
+    2.0
+   ],
+   "face": 90,
+   "dimensions": [
+    1.9,
+    0.95,
+    0.75
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photo 04"
+  },
+  {
+   "id": "chaise_1",
+   "categorie": "chaise",
+   "piece": "sejour_1",
+   "position": [
+    12.9,
+    2.75
+   ],
+   "face": -90,
+   "dimensions": [
+    0.5,
+    0.55,
+    0.82
+   ],
+   "couleur": [
+    170,
+    172,
+    175
+   ],
+   "statut": "estime",
+   "source": "photo 04"
+  },
+  {
+   "id": "chaise_2",
+   "categorie": "chaise",
+   "piece": "sejour_1",
+   "position": [
+    14.4,
+    2.75
+   ],
+   "face": -90,
+   "dimensions": [
+    0.5,
+    0.55,
+    0.82
+   ],
+   "couleur": [
+    170,
+    172,
+    175
+   ],
+   "statut": "estime",
+   "source": "photo 04"
+  },
+  {
+   "id": "chaise_3",
+   "categorie": "chaise",
+   "piece": "sejour_1",
+   "position": [
+    12.9,
+    1.25
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.55,
+    0.82
+   ],
+   "couleur": [
+    170,
+    172,
+    175
+   ],
+   "statut": "estime",
+   "source": "photo 04"
+  },
+  {
+   "id": "chaise_4",
+   "categorie": "chaise",
+   "piece": "sejour_1",
+   "position": [
+    14.4,
+    1.25
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.55,
+    0.82
+   ],
+   "couleur": [
+    170,
+    172,
+    175
+   ],
+   "statut": "estime",
+   "source": "photo 04"
+  },
+  {
+   "id": "rangement_repas",
+   "categorie": "placard",
+   "piece": "sejour_1",
+   "position": [
+    14.95,
+    1.9
+   ],
+   "face": 180,
+   "dimensions": [
+    3.2,
+    0.42,
+    2.3
+   ],
+   "couleur": [
+    225,
+    215,
+    195
+   ],
+   "statut": "estime",
+   "source": "photo 04 (cases bois et blanches : bloc clair)"
+  },
+  {
+   "id": "suspension_repas",
+   "categorie": "suspension",
+   "piece": "sejour_1",
+   "position": [
+    13.65,
+    2.0
+   ],
+   "face": 0,
+   "dimensions": [
+    0.5,
+    0.5,
+    0.9
+   ],
+   "couleur": [
+    30,
+    30,
+    30
+   ],
+   "statut": "estime",
+   "source": "photo 04",
+   "altitude": 2.1
+  },
+  {
+   "id": "colonnes_cuisine",
+   "categorie": "colonne_cuisine",
+   "piece": "sejour_1",
+   "position": [
+    9.38,
+    9.85
+   ],
+   "face": 0,
+   "dimensions": [
+    1.6,
+    0.6,
+    2.45
+   ],
+   "couleur": [
+    165,
+    167,
+    170
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "cuisine_bas",
+   "categorie": "meuble_cuisine_bas",
+   "piece": "sejour_1",
+   "position": [
+    11.5,
+    10.94
+   ],
+   "face": -90,
+   "dimensions": [
+    3.6,
+    0.6,
+    0.9
+   ],
+   "couleur": [
+    165,
+    167,
+    170
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "cuisine_haut",
+   "categorie": "meuble_cuisine_haut",
+   "piece": "sejour_1",
+   "position": [
+    11.15,
+    11.06
+   ],
+   "face": -90,
+   "dimensions": [
+    2.9,
+    0.35,
+    0.85
+   ],
+   "couleur": [
+    168,
+    170,
+    173
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06",
+   "altitude": 1.55
+  },
+  {
+   "id": "ilot",
+   "categorie": "ilot",
+   "piece": "sejour_1",
+   "position": [
+    11.8,
+    9.62
+   ],
+   "face": -90,
+   "dimensions": [
+    2.4,
+    0.65,
+    0.88
+   ],
+   "couleur": [
+    170,
+    172,
+    175
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "plan_ilot",
+   "categorie": "ilot",
+   "piece": "sejour_1",
+   "position": [
+    11.8,
+    9.55
+   ],
+   "face": -90,
+   "dimensions": [
+    2.6,
+    0.9,
+    0.04
+   ],
+   "couleur": [
+    242,
+    242,
+    240
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06",
+   "altitude": 0.88
+  },
+  {
+   "id": "tabouret_1",
+   "categorie": "tabouret_haut",
+   "piece": "sejour_1",
+   "position": [
+    10.9,
+    8.95
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.5,
+    1.0
+   ],
+   "couleur": [
+    200,
+    150,
+    40
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "tabouret_2",
+   "categorie": "tabouret_haut",
+   "piece": "sejour_1",
+   "position": [
+    11.55,
+    8.95
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.5,
+    1.0
+   ],
+   "couleur": [
+    200,
+    150,
+    40
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "tabouret_3",
+   "categorie": "tabouret_haut",
+   "piece": "sejour_1",
+   "position": [
+    12.2,
+    8.95
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.5,
+    1.0
+   ],
+   "couleur": [
+    200,
+    150,
+    40
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "tabouret_4",
+   "categorie": "tabouret_haut",
+   "piece": "sejour_1",
+   "position": [
+    12.85,
+    8.95
+   ],
+   "face": 90,
+   "dimensions": [
+    0.5,
+    0.5,
+    1.0
+   ],
+   "couleur": [
+    200,
+    150,
+    40
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06"
+  },
+  {
+   "id": "suspension_ilot_1",
+   "categorie": "suspension",
+   "piece": "sejour_1",
+   "position": [
+    11.0,
+    9.62
+   ],
+   "face": 0,
+   "dimensions": [
+    0.35,
+    0.35,
+    0.9
+   ],
+   "couleur": [
+    30,
+    30,
+    30
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06",
+   "altitude": 2.1
+  },
+  {
+   "id": "suspension_ilot_2",
+   "categorie": "suspension",
+   "piece": "sejour_1",
+   "position": [
+    11.8,
+    9.62
+   ],
+   "face": 0,
+   "dimensions": [
+    0.35,
+    0.35,
+    0.9
+   ],
+   "couleur": [
+    30,
+    30,
+    30
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06",
+   "altitude": 2.1
+  },
+  {
+   "id": "suspension_ilot_3",
+   "categorie": "suspension",
+   "piece": "sejour_1",
+   "position": [
+    12.6,
+    9.62
+   ],
+   "face": 0,
+   "dimensions": [
+    0.35,
+    0.35,
+    0.9
+   ],
+   "couleur": [
+    30,
+    30,
+    30
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06",
+   "altitude": 2.1
+  },
+  {
+   "id": "cases_cuisine",
+   "categorie": "etagere_cubes",
+   "piece": "sejour_1",
+   "position": [
+    13.76,
+    7.93
+   ],
+   "face": -145,
+   "dimensions": [
+    1.47,
+    0.39,
+    0.77
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photos 05, 06, 07 (contre le pan coupé)"
+  },
+  {
+   "id": "meuble_entree",
+   "categorie": "rangement",
+   "piece": "sejour_1",
+   "position": [
+    14.65,
+    5.75
+   ],
+   "face": -90,
+   "dimensions": [
+    1.0,
+    0.42,
+    0.95
+   ],
+   "couleur": [
+    185,
+    145,
+    105
+   ],
+   "statut": "estime",
+   "source": "photo 07"
+  },
+  {
+   "id": "banc_entree",
+   "categorie": "banc",
+   "piece": "sejour_1",
+   "position": [
+    16.85,
+    4.85
+   ],
+   "face": 180,
+   "dimensions": [
+    0.9,
+    0.3,
+    0.45
+   ],
+   "couleur": [
+    25,
+    25,
+    28
+   ],
+   "statut": "estime",
+   "source": "photo 07"
+  },
+  {
+   "id": "horloge",
+   "categorie": "horloge",
+   "piece": "sejour_1",
+   "position": [
+    17.02,
+    4.85
+   ],
+   "face": 180,
+   "dimensions": [
+    1.0,
+    0.06,
+    1.0
+   ],
+   "couleur": [
+    40,
+    35,
+    30
+   ],
+   "statut": "estime",
+   "source": "photo 07",
+   "altitude": 1.25
+  },
+  {
+   "id": "lit_1",
+   "categorie": "lit",
+   "piece": "chambre_1",
+   "position": [
+    2.46,
+    4.13
+   ],
+   "face": 180,
+   "dimensions": [
+    1.6,
+    2.1,
+    1.0
+   ],
+   "couleur": [
+    215,
+    205,
+    190
+   ],
+   "statut": "estime",
+   "source": "photo 08"
+  },
+  {
+   "id": "chevet_1",
+   "categorie": "table_de_chevet",
+   "piece": "chambre_1",
+   "position": [
+    3.3,
+    5.25
+   ],
+   "face": 180,
+   "dimensions": [
+    0.5,
+    0.4,
+    0.55
+   ],
+   "couleur": [
+    35,
+    35,
+    38
+   ],
+   "statut": "estime",
+   "source": "photo 08"
+  },
+  {
+   "id": "placard_chambre_1",
+   "categorie": "placard",
+   "piece": "chambre_1",
+   "position": [
+    0.3,
+    4.9
+   ],
+   "face": 0,
+   "dimensions": [
+    3.0,
+    0.6,
+    2.6
+   ],
+   "couleur": [
+    200,
+    185,
+    165
+   ],
+   "statut": "estime",
+   "source": "photo 08",
+   "description": "placard aux portes beiges, poignées verticales (photo 08)"
+  },
+  {
+   "id": "tapis_etoiles",
+   "categorie": "tapis",
+   "piece": "chambre_2",
+   "position": [
+    5.25,
+    4.6
+   ],
+   "face": 0,
+   "dimensions": [
+    1.6,
+    1.2,
+    0.02
+   ],
+   "couleur": [
+    170,
+    170,
+    172
+   ],
+   "statut": "estime",
+   "source": "photos 10, 11"
+  },
+  {
+   "id": "lit_superpose",
+   "categorie": "lit_superpose",
+   "piece": "chambre_2",
+   "position": [
+    6.6,
+    7.07
+   ],
+   "face": -90,
+   "dimensions": [
+    2.1,
+    1.0,
+    1.6
+   ],
+   "couleur": [
+    200,
+    175,
+    140
+   ],
+   "statut": "estime",
+   "source": "photo 11"
+  },
+  {
+   "id": "armoire_2",
+   "categorie": "placard",
+   "piece": "chambre_2",
+   "position": [
+    3.95,
+    3.8
+   ],
+   "face": 0,
+   "dimensions": [
+    2.0,
+    0.6,
+    2.3
+   ],
+   "couleur": [
+    205,
+    170,
+    130
+   ],
+   "statut": "estime",
+   "source": "photos 10, 11",
+   "description": "armoire en bois clair, deux portes miroir au milieu (photo 11)"
+  },
+  {
+   "id": "bureau_2",
+   "categorie": "bureau",
+   "piece": "chambre_2",
+   "position": [
+    7.39,
+    5.0
+   ],
+   "face": 180,
+   "dimensions": [
+    1.3,
+    0.6,
+    0.75
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photo 10"
+  },
+  {
+   "id": "chaise_bureau_2",
+   "categorie": "chaise_de_bureau",
+   "piece": "chambre_2",
+   "position": [
+    6.8,
+    5.0
+   ],
+   "face": 0,
+   "dimensions": [
+    0.55,
+    0.55,
+    0.85
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photo 10"
+  },
+  {
+   "id": "bureau_3",
+   "categorie": "bureau",
+   "piece": "chambre_2",
+   "position": [
+    4.9,
+    2.95
+   ],
+   "face": 90,
+   "dimensions": [
+    1.2,
+    0.6,
+    0.75
+   ],
+   "couleur": [
+    240,
+    240,
+    238
+   ],
+   "statut": "estime",
+   "source": "photo 10"
+  },
+  {
+   "id": "suspension_2",
+   "categorie": "suspension",
+   "piece": "chambre_2",
+   "position": [
+    5.5,
+    4.9
+   ],
+   "face": 0,
+   "dimensions": [
+    0.5,
+    0.5,
+    0.9
+   ],
+   "couleur": [
+    235,
+    225,
+    210
+   ],
+   "statut": "estime",
+   "source": "photos 10, 11",
+   "altitude": 2.1
+  }
+ ],
+ "rideaux": {
+  "O10": {
+   "voilage": [
+    245,
+    245,
+    242
+   ],
+   "rideaux": null,
+   "statut": "estime",
+   "source": "photos 01, 02, 03 (voilages blancs tirés)"
+  },
+  "O11": {
+   "voilage": [
+    245,
+    245,
+    242
+   ],
+   "rideaux": null,
+   "statut": "estime",
+   "source": "photo 04 (voilages blancs tirés)"
+  },
+  "O8": {
+   "voilage": null,
+   "rideaux": [
+    190,
+    160,
+    120
+   ],
+   "statut": "estime",
+   "source": "photo 08 (rideaux beiges ouverts)"
+  },
+  "O9": {
+   "voilage": [
+    245,
+    245,
+    242
+   ],
+   "rideaux": [
+    150,
+    105,
+    125
+   ],
+   "statut": "estime",
+   "source": "photo 10 (voilage blanc et rideaux mauves)"
+  }
+ }
+}

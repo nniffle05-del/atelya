@@ -1,0 +1,1322 @@
+{
+ "note": "Caméras des photos de l'annonce d'app-001 (B2 temps 2, étape 4, 09/11/2026), retrouvées par Claude à la main : repères relevés sur chaque photo (pixels de la photo, 1206 px de large), places dans le logement en mètres (repère de ..\\atelya\\lectures-claude\\app-001\\logement-sols.json), caméra ajustée par moteur/camera_photo.py. Photo 09 non calable : montage de deux gros plans (douche, vasque) sans angle de mur, plafond ni pied de mur visible.",
+ "photos": "../atelya/photos-clients/app-001/photos",
+ "non_calees": {
+  "photo-09": "montage de deux gros plans, aucune arête de la pièce visible"
+ },
+ "cameras": {
+  "photo-01": {
+   "camera": {
+    "x": 9.114,
+    "y": 6.669,
+    "z": 0.867,
+    "cap": -46.194,
+    "tangage": 0.0,
+    "f": 486.886,
+    "u0": 603.0,
+    "v0": 383.625
+   },
+   "largeur": 1206,
+   "hauteur": 804,
+   "qualite": "moyenne",
+   "ecart_moyen_px": 5.9,
+   "note": "Le caisson bleu (meuble absent de la maquette) cache presque tout ; appareil bas (0,87 m : le haut du dossier du fauteuil et le plateau de la table tombent sur l'horizon).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      8.07,
+      2.62,
+      2.85
+     ],
+     "b": [
+      10.66,
+      2.62,
+      2.85
+     ],
+     "p1": [
+      850,
+      128
+     ],
+     "p2": [
+      1195,
+      12
+     ],
+     "quoi": "tringle des rideaux de la fenêtre sud O10 (hauteur supposée 2,85 m)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      8.07,
+      2.62,
+      0
+     ],
+     "b": [
+      10.66,
+      2.62,
+      0
+     ],
+     "p1": [
+      885,
+      500
+     ],
+     "p2": [
+      1030,
+      528
+     ],
+     "quoi": "pied des rideaux = pied du mur sud"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      10.66,
+      2.95,
+      0
+     ],
+     "b": [
+      10.66,
+      2.95,
+      3
+     ],
+     "p1": [
+      793,
+      250
+     ],
+     "p2": [
+      793,
+      480
+     ],
+     "quoi": "bord avant gauche de la bibliothèque, contre le coin du retour de mur (vu photo 03)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.15,
+      0
+     ],
+     "b": [
+      14.44,
+      6.15,
+      3
+     ],
+     "p1": [
+      186,
+      230
+     ],
+     "p2": [
+      186,
+      480
+     ],
+     "quoi": "montant sud de la porte de la courette (hypothèse : porte au milieu de M8)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.95,
+      0
+     ],
+     "b": [
+      14.44,
+      6.95,
+      3
+     ],
+     "p1": [
+      38,
+      230
+     ],
+     "p2": [
+      38,
+      490
+     ],
+     "quoi": "montant nord de la porte de la courette (même hypothèse)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.15,
+      0
+     ],
+     "b": [
+      14.44,
+      6.95,
+      0
+     ],
+     "p1": [
+      50,
+      496
+     ],
+     "p2": [
+      180,
+      484
+     ],
+     "quoi": "bas de la porte de la courette"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.33,
+      0.02,
+      0
+     ],
+     "b": [
+      15.16,
+      0.02,
+      0
+     ],
+     "p1": [
+      665,
+      441
+     ],
+     "p2": [
+      740,
+      439
+     ],
+     "quoi": "pied du mur sud du coin repas (bas du buffet)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.33,
+      0.02,
+      3
+     ],
+     "b": [
+      15.16,
+      0.02,
+      3
+     ],
+     "p1": [
+      610,
+      256
+     ],
+     "p2": [
+      750,
+      254
+     ],
+     "quoi": "haut du mur sud du coin repas"
+    }
+   ]
+  },
+  "photo-02": {
+   "camera": {
+    "x": 10.0,
+    "y": 9.827,
+    "z": 1.2,
+    "cap": -56.486,
+    "tangage": 0.0,
+    "f": 486.715,
+    "u0": 603.0,
+    "v0": 380.228
+   },
+   "largeur": 1206,
+   "hauteur": 804,
+   "qualite": "approchée",
+   "ecart_moyen_px": 10.1,
+   "note": "Recul mal fixé par les repères (x de 9,6 à 10,4 m pour le même écart) : x pris à 10,0 m, hauteur 1,20 m et focale imposées. La fenêtre O5 tombe au bord gauche (contrôle indépendant).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      13.42,
+      8.59,
+      0
+     ],
+     "b": [
+      13.42,
+      8.59,
+      3
+     ],
+     "p1": [
+      248,
+      220
+     ],
+     "p2": [
+      248,
+      380
+     ],
+     "quoi": "cadre gauche de la fenêtre O6 (position mesurée sur la photo 07)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.0,
+      7.76,
+      0
+     ],
+     "b": [
+      14.0,
+      7.76,
+      3
+     ],
+     "p1": [
+      310,
+      220
+     ],
+     "p2": [
+      310,
+      380
+     ],
+     "quoi": "cadre droit de la fenêtre O6 (mesuré sur la photo 07)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      7.43,
+      0
+     ],
+     "b": [
+      14.44,
+      7.43,
+      3
+     ],
+     "p1": [
+      350,
+      300
+     ],
+     "p2": [
+      350,
+      460
+     ],
+     "quoi": "montant nord de la porte de la courette (mesuré sur la photo 07)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.7,
+      0
+     ],
+     "b": [
+      14.44,
+      6.7,
+      3
+     ],
+     "p1": [
+      421,
+      300
+     ],
+     "p2": [
+      421,
+      460
+     ],
+     "quoi": "montant sud de la porte de la courette (mesuré sur la photo 07)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      10.66,
+      2.95,
+      0
+     ],
+     "b": [
+      10.66,
+      2.95,
+      3
+     ],
+     "p1": [
+      862,
+      300
+     ],
+     "p2": [
+      862,
+      450
+     ],
+     "quoi": "bord de la bibliothèque"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.7,
+      2.04
+     ],
+     "b": [
+      14.44,
+      7.43,
+      2.04
+     ],
+     "p1": [
+      350,
+      290
+     ],
+     "p2": [
+      420,
+      300
+     ],
+     "quoi": "haut de la porte de la courette (porte standard 2,04 m)"
+    }
+   ]
+  },
+  "photo-03": {
+   "camera": {
+    "x": 11.577,
+    "y": 7.926,
+    "z": 1.319,
+    "cap": -117.737,
+    "tangage": 0.0,
+    "f": 620.522,
+    "u0": 603.0,
+    "v0": 323.024
+   },
+   "largeur": 1206,
+   "hauteur": 802,
+   "qualite": "bonne",
+   "ecart_moyen_px": 3.5,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      8.07,
+      2.65,
+      0
+     ],
+     "b": [
+      8.07,
+      2.65,
+      3
+     ],
+     "p1": [
+      668,
+      175
+     ],
+     "p2": [
+      668,
+      360
+     ],
+     "quoi": "angle mur des fenêtres / mur du canapé (sud-ouest)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      10.66,
+      2.65,
+      0
+     ],
+     "b": [
+      10.66,
+      2.65,
+      3
+     ],
+     "p1": [
+      402,
+      150
+     ],
+     "p2": [
+      402,
+      380
+     ],
+     "quoi": "coin du retour de mur, derrière la bibliothèque"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      8.07,
+      2.65,
+      3
+     ],
+     "b": [
+      10.66,
+      2.65,
+      3
+     ],
+     "p1": [
+      420,
+      121
+     ],
+     "p2": [
+      660,
+      158
+     ],
+     "quoi": "haut du mur des fenêtres"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      10.68,
+      1.61,
+      0
+     ],
+     "b": [
+      12.33,
+      0.02,
+      0
+     ],
+     "p1": [
+      250,
+      456
+     ],
+     "p2": [
+      385,
+      452
+     ],
+     "quoi": "pied du pan coupé (bas des rideaux)"
+    }
+   ]
+  },
+  "photo-04": {
+   "camera": {
+    "x": 12.885,
+    "y": 4.941,
+    "z": 1.2,
+    "cap": -81.012,
+    "tangage": 0.0,
+    "f": 540.0,
+    "u0": 603.0,
+    "v0": 358.626
+   },
+   "largeur": 1206,
+   "hauteur": 806,
+   "qualite": "moyenne",
+   "ecart_moyen_px": 0.0,
+   "note": "Focale imposée (540 px). En vrai le mur des fenêtres part presque à angle droit du mur du fond et ses fenêtres sont bien plus grandes ; la maquette a un pan coupé à 45° avec une porte-fenêtre de 1,2 m.",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      15.16,
+      0.02,
+      0
+     ],
+     "b": [
+      15.16,
+      0.02,
+      3
+     ],
+     "p1": [
+      450,
+      180
+     ],
+     "p2": [
+      450,
+      480
+     ],
+     "quoi": "angle rangements / mur du fond (sud-est)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.33,
+      0.02,
+      0
+     ],
+     "b": [
+      12.33,
+      0.02,
+      3
+     ],
+     "p1": [
+      752,
+      170
+     ],
+     "p2": [
+      752,
+      480
+     ],
+     "quoi": "angle mur du fond / pan coupé"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.33,
+      0.02,
+      3
+     ],
+     "b": [
+      15.16,
+      0.02,
+      3
+     ],
+     "p1": [
+      455,
+      172
+     ],
+     "p2": [
+      700,
+      158
+     ],
+     "quoi": "haut du mur du fond"
+    }
+   ]
+  },
+  "photo-05": {
+   "camera": {
+    "x": 10.169,
+    "y": 7.117,
+    "z": 1.333,
+    "cap": 65.777,
+    "tangage": 0.0,
+    "f": 519.622,
+    "u0": 603.0,
+    "v0": 302.152
+   },
+   "largeur": 1206,
+   "hauteur": 804,
+   "qualite": "bonne",
+   "ecart_moyen_px": 8.0,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      9.08,
+      11.24,
+      0
+     ],
+     "b": [
+      9.08,
+      11.24,
+      3
+     ],
+     "p1": [
+      186,
+      100
+     ],
+     "p2": [
+      186,
+      480
+     ],
+     "quoi": "angle nord-ouest de la cuisine (derrière la colonne du réfrigérateur)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.35,
+      11.24,
+      0
+     ],
+     "b": [
+      13.35,
+      11.24,
+      3
+     ],
+     "p1": [
+      722,
+      160
+     ],
+     "p2": [
+      722,
+      470
+     ],
+     "quoi": "angle nord-est de la cuisine (à côté de la fenêtre O5)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.35,
+      8.63,
+      0
+     ],
+     "b": [
+      13.35,
+      8.63,
+      3
+     ],
+     "p1": [
+      1045,
+      100
+     ],
+     "p2": [
+      1045,
+      520
+     ],
+     "quoi": "angle mur est / pan coupé (cubes blancs)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.35,
+      11.24,
+      0
+     ],
+     "b": [
+      13.35,
+      8.63,
+      0
+     ],
+     "p1": [
+      905,
+      525
+     ],
+     "p2": [
+      1040,
+      556
+     ],
+     "quoi": "pied du mur est de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.08,
+      11.24,
+      2.8
+     ],
+     "b": [
+      13.35,
+      11.24,
+      2.8
+     ],
+     "p1": [
+      320,
+      76
+     ],
+     "p2": [
+      700,
+      150
+     ],
+     "quoi": "haut des meubles hauts = plafond de la cuisine (2,80 m)"
+    }
+   ]
+  },
+  "photo-06": {
+   "camera": {
+    "x": 9.875,
+    "y": 7.371,
+    "z": 1.085,
+    "cap": 49.69,
+    "tangage": 0.0,
+    "f": 539.995,
+    "u0": 603.0,
+    "v0": 361.665
+   },
+   "largeur": 1206,
+   "hauteur": 806,
+   "qualite": "bonne",
+   "ecart_moyen_px": 9.9,
+   "note": "Fenêtres O5 et O6 à leur place (contrôle).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      13.35,
+      11.24,
+      0
+     ],
+     "b": [
+      13.35,
+      11.24,
+      3
+     ],
+     "p1": [
+      624,
+      170
+     ],
+     "p2": [
+      624,
+      370
+     ],
+     "quoi": "angle nord-est de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.35,
+      8.63,
+      0
+     ],
+     "b": [
+      13.35,
+      8.63,
+      3
+     ],
+     "p1": [
+      912,
+      80
+     ],
+     "p2": [
+      912,
+      400
+     ],
+     "quoi": "angle mur est / pan coupé"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.35,
+      11.24,
+      2.8
+     ],
+     "b": [
+      13.35,
+      8.63,
+      2.8
+     ],
+     "p1": [
+      630,
+      158
+     ],
+     "p2": [
+      905,
+      77
+     ],
+     "quoi": "haut du mur est (plafond de la cuisine 2,80 m)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.08,
+      11.24,
+      2.8
+     ],
+     "b": [
+      13.35,
+      11.24,
+      2.8
+     ],
+     "p1": [
+      195,
+      62
+     ],
+     "p2": [
+      610,
+      200
+     ],
+     "quoi": "haut des meubles hauts"
+    }
+   ]
+  },
+  "photo-07": {
+   "camera": {
+    "x": 12.275,
+    "y": 4.535,
+    "z": 1.368,
+    "cap": 36.905,
+    "tangage": 0.0,
+    "f": 531.386,
+    "u0": 603.0,
+    "v0": 311.361
+   },
+   "largeur": 1206,
+   "hauteur": 804,
+   "qualite": "bonne",
+   "ecart_moyen_px": 6.7,
+   "note": "Porte palière à sa place (contrôle). Mesuré sur cette photo : le mur de la porte de la courette va jusqu'à y = 7,64 m (maquette 7,09), porte de 73 cm entre y = 6,70 et 7,43 ; la fenêtre O7 commence à l'angle (maquette : 75 cm plus loin).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.02,
+      0
+     ],
+     "b": [
+      14.44,
+      6.02,
+      3
+     ],
+     "p1": [
+      632,
+      50
+     ],
+     "p2": [
+      632,
+      520
+     ],
+     "quoi": "angle mur de la porte de la courette / mur de la fenêtre O7"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.05,
+      6.0,
+      0
+     ],
+     "b": [
+      17.05,
+      6.0,
+      3
+     ],
+     "p1": [
+      792,
+      130
+     ],
+     "p2": [
+      792,
+      470
+     ],
+     "quoi": "angle mur de la fenêtre O7 / mur à l'horloge"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.05,
+      6.0,
+      0
+     ],
+     "b": [
+      17.05,
+      4.18,
+      0
+     ],
+     "p1": [
+      805,
+      476
+     ],
+     "p2": [
+      1175,
+      534
+     ],
+     "quoi": "pied du mur à l'horloge"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.05,
+      6.0,
+      3
+     ],
+     "b": [
+      17.05,
+      4.18,
+      3
+     ],
+     "p1": [
+      800,
+      122
+     ],
+     "p2": [
+      1150,
+      40
+     ],
+     "quoi": "haut du mur à l'horloge"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.44,
+      6.02,
+      3
+     ],
+     "b": [
+      17.05,
+      6.0,
+      3
+     ],
+     "p1": [
+      640,
+      5
+     ],
+     "p2": [
+      785,
+      118
+     ],
+     "quoi": "haut du mur de la fenêtre O7"
+    }
+   ]
+  },
+  "photo-08": {
+   "camera": {
+    "x": 0.964,
+    "y": 6.618,
+    "z": 1.208,
+    "cap": -60.898,
+    "tangage": 0.0,
+    "f": 514.737,
+    "u0": 603.0,
+    "v0": 338.4
+   },
+   "largeur": 1206,
+   "hauteur": 808,
+   "qualite": "bonne",
+   "ecart_moyen_px": 4.5,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      3.51,
+      2.63,
+      0
+     ],
+     "b": [
+      3.51,
+      2.63,
+      3
+     ],
+     "p1": [
+      570,
+      160
+     ],
+     "p2": [
+      570,
+      450
+     ],
+     "quoi": "angle sud-est de la chambre 1"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.6,
+      2.63,
+      0
+     ],
+     "b": [
+      0.6,
+      2.63,
+      3
+     ],
+     "p1": [
+      958,
+      90
+     ],
+     "p2": [
+      958,
+      500
+     ],
+     "quoi": "face de l'armoire (environ 60 cm) contre le mur sud"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      3.51,
+      7.57,
+      3
+     ],
+     "b": [
+      3.51,
+      2.63,
+      3
+     ],
+     "p1": [
+      340,
+      5
+     ],
+     "p2": [
+      560,
+      145
+     ],
+     "quoi": "haut du mur de la tête de lit"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0,
+      2.63,
+      3
+     ],
+     "b": [
+      3.51,
+      2.63,
+      3
+     ],
+     "p1": [
+      950,
+      62
+     ],
+     "p2": [
+      580,
+      138
+     ],
+     "quoi": "haut du mur des fenêtres"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0,
+      2.63,
+      0
+     ],
+     "b": [
+      3.51,
+      2.63,
+      0
+     ],
+     "p1": [
+      855,
+      512
+     ],
+     "p2": [
+      945,
+      516
+     ],
+     "quoi": "pied des rideaux"
+    }
+   ]
+  },
+  "photo-10": {
+   "camera": {
+    "x": 3.824,
+    "y": 6.384,
+    "z": 1.236,
+    "cap": -49.828,
+    "tangage": 0.0,
+    "f": 593.828,
+    "u0": 603.0,
+    "v0": 384.854
+   },
+   "largeur": 1206,
+   "hauteur": 802,
+   "qualite": "bonne",
+   "ecart_moyen_px": 6.8,
+   "note": "Photo prise depuis la porte du dégagement.",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      7.69,
+      2.63,
+      0
+     ],
+     "b": [
+      7.69,
+      2.63,
+      3
+     ],
+     "p1": [
+      545,
+      190
+     ],
+     "p2": [
+      545,
+      560
+     ],
+     "quoi": "angle sud-est de la chambre 2"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      7.69,
+      7.57,
+      3
+     ],
+     "b": [
+      7.69,
+      2.63,
+      3
+     ],
+     "p1": [
+      100,
+      40
+     ],
+     "p2": [
+      540,
+      182
+     ],
+     "quoi": "haut du mur est (bureaux)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      3.65,
+      2.63,
+      3
+     ],
+     "b": [
+      7.69,
+      2.63,
+      3
+     ],
+     "p1": [
+      552,
+      183
+     ],
+     "p2": [
+      1000,
+      52
+     ],
+     "quoi": "haut du mur de la fenêtre"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      3.65,
+      2.63,
+      0
+     ],
+     "b": [
+      7.69,
+      2.63,
+      0
+     ],
+     "p1": [
+      610,
+      550
+     ],
+     "p2": [
+      890,
+      585
+     ],
+     "quoi": "pied des rideaux"
+    }
+   ]
+  },
+  "photo-11": {
+   "camera": {
+    "x": 6.513,
+    "y": 2.973,
+    "z": 1.2,
+    "cap": 126.613,
+    "tangage": 0.0,
+    "f": 520.0,
+    "u0": 603.0,
+    "v0": 434.89
+   },
+   "largeur": 1206,
+   "hauteur": 804,
+   "qualite": "bonne",
+   "ecart_moyen_px": 1.1,
+   "note": "Hauteur (1,20 m) et focale imposées ; la porte du dégagement tombe sur la vraie porte (contrôle).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      4.84,
+      7.57,
+      0
+     ],
+     "b": [
+      4.84,
+      7.57,
+      3
+     ],
+     "p1": [
+      758,
+      230
+     ],
+     "p2": [
+      758,
+      560
+     ],
+     "quoi": "angle du décroché / mur nord (lit superposé)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.84,
+      7.57,
+      3
+     ],
+     "b": [
+      7.69,
+      7.57,
+      3
+     ],
+     "p1": [
+      765,
+      236
+     ],
+     "p2": [
+      1200,
+      132
+     ],
+     "quoi": "haut du mur nord"
+    },
+    {
+     "type": "point",
+     "p": [
+      4.84,
+      7.57,
+      0
+     ],
+     "uv": [
+      758,
+      568
+     ],
+     "quoi": "pied de cet angle"
+    },
+    {
+     "type": "point",
+     "p": [
+      4.84,
+      7.57,
+      3
+     ],
+     "uv": [
+      758,
+      233
+     ],
+     "quoi": "haut de cet angle"
+    }
+   ]
+  },
+  "photo-12": {
+   "camera": {
+    "x": 5.077,
+    "y": 9.466,
+    "z": 1.35,
+    "cap": 90.0,
+    "tangage": 0.0,
+    "f": 562.742,
+    "u0": 603.0,
+    "v0": 230.246
+   },
+   "largeur": 1206,
+   "hauteur": 804,
+   "qualite": "bonne",
+   "ecart_moyen_px": 0.9,
+   "note": "Pied du mur du fond horizontal sur la photo : appareil face au mur (cap 90° imposé).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      3.75,
+      11.24,
+      0
+     ],
+     "b": [
+      3.75,
+      11.24,
+      3
+     ],
+     "p1": [
+      182,
+      0
+     ],
+     "p2": [
+      182,
+      500
+     ],
+     "quoi": "angle nord-ouest de la salle de bains"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.84,
+      11.24,
+      0
+     ],
+     "b": [
+      5.84,
+      11.24,
+      3
+     ],
+     "p1": [
+      845,
+      0
+     ],
+     "p2": [
+      845,
+      380
+     ],
+     "quoi": "angle nord-est (carrelage / mur rouge)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      3.75,
+      11.24,
+      0
+     ],
+     "b": [
+      5.84,
+      11.24,
+      0
+     ],
+     "p1": [
+      465,
+      657
+     ],
+     "p2": [
+      715,
+      660
+     ],
+     "quoi": "pied du mur du fond (bas du muret)"
+    }
+   ]
+  }
+ }
+}

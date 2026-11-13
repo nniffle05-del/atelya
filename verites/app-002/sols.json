@@ -1,0 +1,113 @@
+{
+ "note": "Sols d'app-002 (EXAMEN), vérité faite par Claude AVANT tout passage d'Atelya (10/11/2026) : matière vue sur les photos de l'annonce, une seule matière par pièce (aucune zone d'un autre sol vue). « couleur_visee » = couleur du sol SUR LES PHOTOS (CIELAB), mesurée sur les photos calées prises dans la pièce : points du sol projetés sur la photo, à plus de 25 cm des murs, hors meubles de la vérité (marge 30 cm) et hors sol caché par un meuble, filtre « bois » (parquets) ou « clair peu coloré » (carrelages), médiane robuste (moteur.reconnaitre_sols.couleur_du_sol), puis moyenne des photos. Dégagement, WC, salle de bains et placards : sol jamais vu, non renseigné. Chambres : couleur mesurée sur des zones choisies à la main (voir « mesure »).",
+ "photos": "../atelya/photos-clients/app-002/photos",
+ "bibliotheque": "../atelya/bibliotheque/matieres",
+ "pieces": {
+  "sejour_1": {
+   "matiere": "chene_naturel_photo",
+   "source": "photos 01, 03, 04, 05, 07 (parquet chêne en lames larges, posé dans la longueur ; même sol dans l'ancienne chambre 1)",
+   "couleur_visee": {
+    "L": 58.0,
+    "a": 10.6,
+    "b": 24.7,
+    "photos": {
+     "photo-04": [
+      55.0,
+      7.8,
+      17.4
+     ],
+     "photo-01": [
+      67.1,
+      13.4,
+      32.8
+     ],
+     "photo-03": [
+      49.4,
+      12.3,
+      24.2
+     ],
+     "photo-05": [
+      59.2,
+      11.0,
+      25.6
+     ],
+     "photo-07": [
+      59.3,
+      8.4,
+      23.7
+     ]
+    }
+   }
+  },
+  "entree_1": {
+   "matiere": "chene_naturel_photo",
+   "source": "photo 02 (même parquet que le séjour)",
+   "couleur_visee": {
+    "L": 42.5,
+    "a": 11.0,
+    "b": 25.0,
+    "photos": {
+     "photo-02": [
+      42.5,
+      11.0,
+      25.0
+     ]
+    }
+   }
+  },
+  "cuisine_1": {
+   "matiere": "pierre_beige",
+   "source": "photos 08, 09 (grands carreaux beige clair, environ 60 × 60 cm, joints fins)",
+   "couleur_visee": {
+    "L": 62.1,
+    "a": 2.1,
+    "b": 14.3,
+    "photos": {
+     "photo-09": [
+      62.1,
+      2.1,
+      14.3
+     ]
+    }
+   }
+  },
+  "chambre_1": {
+   "matiere": "chene_naturel_photo",
+   "source": "photo 10 (parquet chêne en lames, comme le séjour)",
+   "couleur_visee": {
+    "L": 51.6,
+    "a": 10.3,
+    "b": 16.5,
+    "photos": {
+     "photo-10": [
+      51.6,
+      10.3,
+      16.5
+     ]
+    },
+    "mesure": "zone de parquet choisie à la main sur la photo 10 (entre le pouf et le lit, pixels 285-385 × 600-760) : la mesure automatique ne trouve pas assez de sol libre (pièce encombrée)"
+   }
+  },
+  "chambre_2": {
+   "matiere": "chene_naturel_photo",
+   "source": "photos 14, 15 (parquet chêne en lames, comme le séjour)",
+   "couleur_visee": {
+    "L": 46.8,
+    "a": 7.3,
+    "b": 15.4,
+    "photos": {
+     "photo-14": [
+      46.8,
+      7.3,
+      15.4
+     ]
+    },
+    "mesure": "zones de parquet choisies à la main sur la photo 14 (à droite du lit et en bas à gauche) ; la photo 15 ne montre qu'un coin de parquet dans l'ombre du lit (L 28,6), écartée"
+   }
+  },
+  "salle_d_eau_1": {
+   "matiere": "pierre_beige",
+   "source": "photos 12, 13 (non calées : grands carreaux beige, comme les murs)"
+  }
+ }
+}

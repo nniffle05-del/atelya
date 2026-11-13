@@ -1,0 +1,259 @@
+r"""Brique photos : apprendre à l'œil (DINOv2) à reconnaître la famille d'un sol mis à plat (09/11/2026).
+
+    ..\atelya\.venv\Scripts\python.exe outils\habillage\apprendre_sols.py ..\atelya\b2\brique-photos-essais ^
+        ..\atelya\modeles-sols [--oeil vits14 vitb14]
+
+Deux sources d'exemples, jamais les photos d'app-001 (l'EXAMEN) :
+1. les photos de la bibliothèque de matières (CC0), découpées en vignettes d'1 m et ABÎMÉES exprès pour ressembler à un sol mis
+   à plat depuis une vraie photo : flou du lointain (étiré dans un sens), détails perdus, couleur et lumière décalées, reflet de
+   fenêtre, bruit, compression, et parfois un objet qui cache une partie du sol ;
+2. les photos d'essai rendues par Blender (outils/habillage/photos_d_essai.py) : les logements fr-021, fr-024, fr-026 et fr-030
+   servent à apprendre, fr-031 et fr-038 au CONTRÔLE (jamais appris), pour choisir le réglage sans tricher.
+Les matières dessinées d'après les photos d'app-001 (carreaux_cubes, petits_carreaux_clairs) sont écartées des exemples.
+
+Écrit dans le dossier de sortie : sols-<oeil>.pt (le classificateur et ses notes) et bilan-apprentissage.json.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import random
+import re
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from moteur.images import lire_image  # noqa: E402
+from moteur.matieres import CALCULEES, NOMS_SOLS  # noqa: E402
+from moteur.oeil_dinov2 import charger, empreintes  # noqa: E402
+from moteur.reconnaitre_sols import (CLASSES_AVEC_MEUBLE, FAMILLES, MEUBLE, VIGNETTE_M, VIGNETTE_PX,  # noqa: E402
+                                     Classifieur, famille, matieres_verite, noter, reconnaitre, vignettes)
+from moteur.sol_a_plat import photos_a_plat  # noqa: E402
+
+RACINE = Path(__file__).resolve().parents[2]
+BIBLIOTHEQUE = RACINE.parent / "atelya" / "bibliotheque" / "matieres"
+DESSINEES_D_APRES_APP001 = {"carreaux_cubes", "petits_carreaux_clairs"}
+LOGEMENTS_CONTROLE = ("fr-031", "fr-038")
+PAR_MATIERE = 160
+SEUIL_MEUBLE, SEUIL_SOL = 0.6, 0.1  # part de meuble dans la moitié centrale d'une vignette
+
+
+# ---------------------------------------------------------------- 1. vignettes de la bibliothèque, abîmées
+def abimer(v: np.ndarray, alea: random.Random) -> np.ndarray:
+    """Rend une vignette propre (vue de dessus parfaite) semblable à un sol mis à plat depuis une photo d'annonce."""
+    v = v.astype(np.float32)
+    n = v.shape[0]
+    # détails perdus (sol vu de loin) puis flou étiré dans un sens (le sol écrasé par la perspective)
+    if alea.random() < 0.8:
+        f = alea.uniform(1.0, 4.0)
+        petit = cv2.resize(v, (max(8, int(n / f)), max(8, int(n / (f * alea.uniform(1.0, 2.5))))), interpolation=cv2.INTER_AREA)
+        v = cv2.resize(petit, (n, n), interpolation=cv2.INTER_LINEAR)
+    if alea.random() < 0.6:
+        k = alea.choice([3, 5, 7, 9])
+        noyau = np.zeros((k, k), np.float32)
+        noyau[k // 2, :] = 1.0 / k
+        rot = cv2.getRotationMatrix2D((k / 2 - 0.5, k / 2 - 0.5), alea.uniform(0, 180), 1.0)
+        v = cv2.filter2D(v, -1, cv2.warpAffine(noyau, rot, (k, k)))
+    # couleur et lumière : teinte, clarté, contraste, dégradé de lumière, reflet de fenêtre
+    chaud = alea.gauss(0, 0.08)  # lumière plus chaude ou plus froide (rouge contre bleu), plus un petit écart par couleur
+    v = v * np.array([math.exp(chaud + alea.gauss(0, 0.04)), math.exp(alea.gauss(0, 0.04)),
+                      math.exp(-chaud + alea.gauss(0, 0.04))], np.float32) * alea.uniform(0.6, 1.3)
+    v = 255.0 * (np.clip(v, 0, 255) / 255.0) ** alea.uniform(0.75, 1.3)
+    a = alea.uniform(0, 2 * math.pi)
+    yy, xx = np.mgrid[0:n, 0:n] / n - 0.5
+    v = v * (1 + alea.uniform(0, 0.5) * (xx * math.cos(a) + yy * math.sin(a)))[..., None]
+    if alea.random() < 0.3:
+        b = alea.uniform(0, math.pi)
+        d = np.abs(xx * math.cos(b) + yy * math.sin(b) - alea.uniform(-0.3, 0.3))
+        v = v + alea.uniform(40, 140) * np.exp(-(d / alea.uniform(0.04, 0.15)) ** 2)[..., None]
+    # un objet qui cache un morceau du sol (pied de meuble, tapis, ombre)
+    if alea.random() < 0.3:
+        pts = np.array([[alea.uniform(0, n), alea.uniform(0, n)] for _ in range(alea.randint(3, 6))], np.int32)
+        masque = np.zeros((n, n), np.uint8)
+        cv2.fillPoly(masque, [cv2.convexHull(pts)], 1)
+        couleur = np.array([alea.uniform(20, 240)] * 3) * np.array([alea.uniform(0.8, 1.2) for _ in range(3)])
+        v[masque > 0] = couleur
+    v = v + np.random.default_rng(alea.randint(0, 10 ** 9)).normal(0, alea.uniform(0, 6), v.shape)
+    v = np.clip(v, 0, 255).astype(np.uint8)
+    ok, jpg = cv2.imencode(".jpg", v, [cv2.IMWRITE_JPEG_QUALITY, alea.randint(45, 92)])
+    return cv2.imdecode(jpg, cv2.IMREAD_UNCHANGED)
+
+
+def vignettes_bibliotheque(alea: random.Random, par_matiere: int = PAR_MATIERE):
+    infos = json.loads((BIBLIOTHEQUE / "matieres.json").read_text(encoding="utf-8"))
+    images, etiquettes = [], []
+    for matiere in NOMS_SOLS:
+        if matiere in CALCULEES or matiere in DESSINEES_D_APRES_APP001 or matiere not in infos:
+            continue
+        texture = lire_image(BIBLIOTHEQUE / matiere / "couleur.jpg")
+        if texture is None:
+            continue
+        texture = cv2.cvtColor(texture, cv2.COLOR_BGR2RGB)
+        h, w = texture.shape[:2]
+        px_par_m = w / infos[matiere]["taille_image_m"][0]
+        # les matières se répètent sans raccord visible : assez de copies pour la plus grande vignette tournée (une matière
+        # de 30 cm, comme les pastilles rondes, demande plus de 3 copies : plantage du 09/11/2026)
+        copies = int(np.ceil(VIGNETTE_M / 0.8 * px_par_m * 1.45 / min(h, w))) + 1
+        grand = np.tile(texture, (copies, copies, 1))
+        for _ in range(par_matiere):
+            echelle = alea.uniform(0.8, 1.25)
+            cote = int(VIGNETTE_M / echelle * px_par_m)
+            angle = alea.choice([0, 90, 0, 90, alea.uniform(0, 180)])
+            large = int(cote * 1.45)
+            l0, c0 = alea.randint(0, copies * h - large - 1), alea.randint(0, copies * w - large - 1)
+            bout = grand[l0:l0 + large, c0:c0 + large]
+            rot = cv2.getRotationMatrix2D((large / 2, large / 2), angle, 1.0)
+            bout = cv2.warpAffine(bout, rot, (large, large))
+            m = (large - cote) // 2
+            propre = cv2.resize(bout[m:m + cote, m:m + cote], (VIGNETTE_PX, VIGNETTE_PX), interpolation=cv2.INTER_AREA)
+            images.append(abimer(propre, alea))
+            etiquettes.append(matiere)
+        print(f"  bibliothèque : {matiere} ({famille(matiere)})", flush=True)
+    return np.stack(images), np.array(etiquettes)
+
+
+# ---------------------------------------------------------------- 2. vignettes des photos d'essai (Blender)
+def nom_du_logement(tirage: str) -> str:
+    """« fr-031-t2 » ou « fr-031-m1 » (meublé) → « fr-031 »."""
+    return re.sub(r"-[tm]\d+$", "", tirage)
+
+
+def vignettes_essais(dossier: Path, journal=lambda *_: None):
+    """Vignettes des photos d'essai mises à plat, étiquetées par la matière du sol (vignettes à cheval sur deux familles
+    écartées) ou « meuble » : sur les tirages meublés, le masque des meubles (masques\\masque-<photo>.png, blanc = meuble)
+    est mis à plat comme la photo ; plus de SEUIL_MEUBLE de la moitié centrale couverte → « meuble », moins de SEUIL_SOL →
+    sol, entre les deux → écartée. Rend (images, étiquettes, logement de chaque vignette, tirage)."""
+    from moteur.camera_photo import camera_depuis_dict
+    from moteur.sol_a_plat import emprise_du_logement, mettre_a_plat, piece_de_l_appareil
+    images, etiquettes, logements, tirages = [], [], [], []
+    for t in sorted(p for p in dossier.iterdir() if (p / "cameras-photos.json").is_file()):
+        releve = json.loads((t / "cameras-photos.json").read_text(encoding="utf-8"))
+        logement = json.loads((t / "logement.json").read_text(encoding="utf-8"))
+        if not (t / "rendus").is_dir():
+            continue
+        avec_masques = (t / "masques").is_dir()
+        emprise = emprise_du_logement(logement)
+        for nom, _, vue in photos_a_plat(releve, logement, RACINE, journal=journal):
+            masque = None
+            if avec_masques:
+                brut = lire_image(t / "masques" / f"masque-{nom}.png", cv2.IMREAD_GRAYSCALE)
+                if brut is None:
+                    raise FileNotFoundError(t / "masques" / f"masque-{nom}.png")
+                cam = camera_depuis_dict(releve["cameras"][nom]["camera"])
+                piece, point = piece_de_l_appareil(cam, logement["pieces"])
+                masque = mettre_a_plat(np.repeat(brut[..., None], 3, axis=2), cam, piece["contour"], emprise, vue.resolution,
+                                       point_de_vue=point).image[..., 0].astype(np.float32) / 255.0
+            v, centres, _ = vignettes(vue.image, vue.finesse, vue.resolution, pas_m=0.35)  # moins serré qu à la reconnaissance : mémoire
+            d = int(VIGNETTE_M / 4 / vue.resolution)
+            for image, (l, c) in zip(v, centres):
+                l, c = int(l), int(c)
+                part = float(masque[l - d:l + d, c - d:c + d].mean()) if masque is not None else 0.0
+                if part > SEUIL_MEUBLE:
+                    etiquette = MEUBLE
+                elif part > SEUIL_SOL:
+                    continue
+                else:
+                    # la matière aux 9 points de la moitié centrale de la vignette : tous pareils, sinon vignette écartée
+                    ll, cc = np.meshgrid([l - d, l, l + d], [c - d, c, c + d])
+                    X, Y = vue.vers_sol(ll.ravel(), cc.ravel())
+                    m = set(matieres_verite(logement, X, Y))
+                    if len(m) != 1 or "" in m or m & DESSINEES_D_APRES_APP001:
+                        continue
+                    etiquette = m.pop()
+                images.append(image)
+                etiquettes.append(etiquette)
+                logements.append(nom_du_logement(t.name))
+                tirages.append(t.name)
+    return np.stack(images), np.array(etiquettes), np.array(logements), np.array(tirages)
+
+
+# ---------------------------------------------------------------- 3. carte des sols d'un tirage et note
+def noter_tirage(t: Path, oeil, clf: Classifieur) -> dict:
+    """L'enchaînement complet d'Atelya (moteur.reconnaitre_sols.reconnaitre) sur un tirage, noté contre sa vérité."""
+    releve = json.loads((t / "cameras-photos.json").read_text(encoding="utf-8"))
+    logement = json.loads((t / "logement.json").read_text(encoding="utf-8"))
+    note = noter(reconnaitre(releve, logement, RACINE, oeil, clf), logement)
+    return {"m2": note.get("surface_jugee_m2", 0.0), "juste": note.get("surface_juste") or 0.0,
+            "pieces_justes": note.get("pieces_justes", "0/0")}
+
+
+def resumer(cartes: list[dict]) -> dict:
+    m2 = sum(c["m2"] for c in cartes)
+    pj = [c["pieces_justes"].split("/") for c in cartes]
+    return {"surface_juste": round(sum(c["m2"] * c["juste"] for c in cartes) / max(m2, 1e-9), 3), "m2": round(m2, 1),
+            "pieces_justes": f"{sum(int(a) for a, _ in pj)}/{sum(int(b) for _, b in pj)}"}
+
+
+def etiquette_vers_classe(e: str, classes) -> int:
+    return classes.index(MEUBLE if e == MEUBLE else famille(e))
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Apprendre à l'œil la famille d'un sol mis à plat (et « meuble »)")
+    ap.add_argument("essais", type=Path)
+    ap.add_argument("sortie", type=Path)
+    ap.add_argument("--oeil", nargs="+", default=["vits14"])
+    ap.add_argument("--graine", type=int, default=7)
+    args = ap.parse_args()
+    alea = random.Random(args.graine)
+    np.random.seed(args.graine)
+    torch.manual_seed(args.graine)
+    args.sortie.mkdir(parents=True, exist_ok=True)
+    debut = time.time()
+    print("Vignettes de la bibliothèque…", flush=True)
+    img_b, mat_b = vignettes_bibliotheque(alea)
+    print(f"  {len(img_b)} vignettes ({time.time() - debut:.0f} s)", flush=True)
+    print("Vignettes des photos d'essai…", flush=True)
+    img_e, mat_e, log_e, tir_e = vignettes_essais(args.essais)
+    controle = np.isin(log_e, LOGEMENTS_CONTROLE)
+    print(f"  {len(img_e)} vignettes dont {controle.sum()} de contrôle, {(mat_e == MEUBLE).sum()} « meuble » "
+          f"({time.time() - debut:.0f} s)", flush=True)
+    tirages_controle = [t for t in sorted(args.essais.iterdir())
+                        if nom_du_logement(t.name) in LOGEMENTS_CONTROLE and (t / "rendus").is_dir()]
+    bilan = {"vignettes_bibliotheque": int(len(img_b)), "vignettes_essais_appris": int((~controle).sum()),
+             "vignettes_controle": int(controle.sum()), "vignettes_meuble": int((mat_e == MEUBLE).sum()), "yeux": {}}
+    for nom in args.oeil:
+        oeil = charger(nom)
+        e_b, e_e = empreintes(oeil, img_b), empreintes(oeil, img_e)
+        print(f"[{nom}] empreintes faites ({time.time() - debut:.0f} s)", flush=True)
+        resultats = {}
+        for reglage, classes in (("4-familles", FAMILLES), ("avec-meuble", CLASSES_AVEC_MEUBLE)):
+            garde = np.array([e != MEUBLE or MEUBLE in classes for e in mat_e])
+            y_b = np.array([etiquette_vers_classe(m, classes) for m in mat_b])
+            y_e = np.array([etiquette_vers_classe(m, classes) if g else -1 for m, g in zip(mat_e, garde)])
+            appr = ~controle & garde
+            X, y = np.concatenate([e_b, e_e[appr]]), np.concatenate([y_b, y_e[appr]])
+            clf = Classifieur(X.shape[1], classes, nom)
+            appris = clf.apprendre(X, y)
+            ctl = controle & garde
+            p = clf.probabilites(e_e[ctl]).argmax(1)
+            par_classe = {c: round(float((p[y_e[ctl] == i] == i).mean()), 3) if (y_e[ctl] == i).any() else None
+                          for i, c in enumerate(classes)}
+            vides = resumer([noter_tirage(t, oeil, clf) for t in tirages_controle if "-t" in t.name[-3:]])
+            meubles = resumer([noter_tirage(t, oeil, clf) for t in tirages_controle if "-m" in t.name[-3:]])
+            r = {"justesse_apprise": round(appris, 3), "vignettes_controle_justes": round(float((p == y_e[ctl]).mean()), 3),
+                 "par_classe": par_classe, "controle_pieces_vides": vides, "controle_pieces_meublees": meubles}
+            print(f"[{nom}] {reglage} : {r}", flush=True)
+            resultats[reglage] = r
+            torch.save({**clf.etat(), "sources": "bibliotheque+essais(+meubles)", "controle": r},
+                       args.sortie / f"sols-{nom}-{reglage}.pt")
+        bilan["yeux"][nom] = resultats
+        del oeil
+        torch.cuda.empty_cache()
+    (args.sortie / "bilan-apprentissage.json").write_text(json.dumps(bilan, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"FINI en {time.time() - debut:.0f} s", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as e:
+        print(f"PLANTÉ : {type(e).__name__} : {e}", flush=True)
+        raise

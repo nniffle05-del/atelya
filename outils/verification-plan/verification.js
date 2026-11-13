@@ -24,6 +24,8 @@
     doute: "#ea580c",
     douteFond: "rgba(234, 88, 12, 0.22)",
     choisi: "#7c3aed",
+    meuble: "#92400e",
+    meubleFond: "rgba(180, 120, 60, 0.30)",
   };
   const NOMS_OUVERTURES = { porte: "Porte", fenetre: "Fenêtre", porte_fenetre: "Porte-fenêtre" };
   const CONSIGNES = {
@@ -34,6 +36,8 @@
     couper: "Cliquez sur un mur, là où il faut le couper. Vous pourrez ajuster au centimètre.",
     morceau: "Cliquez sur un mur au début du morceau à enlever, puis à sa fin. Vous pourrez ajuster au centimètre.",
     relier: "Cliquez sur le bout d'un mur, puis sur le bout de l'autre.",
+    meuble: "Cliquez dans une pièce pour y poser un meuble, puis choisissez ce que c'est dans sa fiche.",
+    limite: "Une limite SANS mur entre deux pièces d'un même espace : cliquez ses deux bouts (ils se collent aux murs). Cliquez sur une limite existante pour l'enlever.",
   };
   const VISEE = 8; // pixels d'écran : à quelle distance un clic « touche » un élément
 
@@ -105,7 +109,10 @@
       message("Fichier de vérification refusé : " + erreurs.join(" ; "), true);
       return;
     }
-    etat.v = verification;
+    // Dès l'ouverture, les zones coloriées collent aux murs (règle NT n° 21) : murs alignés fusionnés, pièces recalculées.
+    let depart = verification;
+    try { depart = C.apresMurs(verification).v; } catch (e) { depart = verification; }
+    etat.v = depart;
     etat.image = image;
     etat.historique = [];
     etat.refaire = [];
@@ -116,8 +123,8 @@
     etat.fermeture = false;
     etat.mesure = null;
     etat.deplacementPropose = null;
-    etat.references.set(verification, empreinteMurs(verification));
-    etat.depart_lecture = verification;
+    etat.references.set(depart, empreinteMurs(depart));
+    etat.depart_lecture = depart;
     $("accueil").style.display = "none";
     message("");
     recalculer();
@@ -283,6 +290,41 @@
     }
   }
 
+  /**
+   * Une correction qui touche aux MURS : ensuite, sans rien demander, les murs alignés qui se chevauchent sont fusionnés et
+   * les pièces recalculées depuis les murs (noms, types, sols gardés). Si une pièce n'est plus fermée, on le dit.
+   */
+  /** « Rendre droit » : pour un mur à moins de 5° de l'horizontale ou de la verticale, et pour tous ceux-là d'un coup. */
+  function boutonsRedresser(mur) {
+    const e = C.ecartDroit(mur);
+    if (e < 0.05 || e > C.PRESQUE_DROIT_DEG) return [];
+    const un = el("button", { class: "bouton", texte: `Rendre droit (il penche de ${formatM(e, 1)}°)` });
+    un.addEventListener("click", () => corrigerMurs((x) => C.redresserMur(x, mur.id), "Mur redressé ; les murs qui s'y accrochaient ont suivi."));
+    const tous = el("button", { class: "bouton", texte: "Redresser tous les murs presque droits" });
+    tous.addEventListener("click", () => corrigerMurs((x) => C.redresserTousLesMurs(x), "Murs presque droits redressés (les vrais murs en biais n'ont pas bougé)."));
+    return [el("div", { class: "ligne" }, un), el("div", { class: "ligne" }, tous)];
+  }
+
+  function corrigerMurs(correction, texte) {
+    let suite = "";
+    const ok = corriger((x) => {
+      const y = correction(x);
+      if (y === x) return x;
+      const r = C.apresMurs(y);
+      suite = r.ouvertes.length ? ` Attention : ${r.ouvertes.join(", ")} n'est plus fermée — un mur manque (voir le point en haut).`
+        : (r.nouvelles ? ` ${r.nouvelles} nouvelle(s) pièce(s).` : "") + (r.reunies ? ` ${r.reunies} pièce(s) réunie(s) à une voisine.` : "");
+      return r.v;
+    }, texte);
+    if (ok) {
+      etat.fermeture = true;
+      etat.references.set(etat.v, empreinteMurs(etat.v));
+      if (suite) message((texte || "") + suite, suite.includes("Attention"));
+      recalculer();
+      rafraichir();
+    }
+    return ok;
+  }
+
   function annuler() {
     if (!etat.historique.length) return;
     etat.refaire.push(etat.v);
@@ -399,7 +441,7 @@
 
   function trouverElement(id) {
     const lg = etat.v.logement;
-    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []]]) {
+    for (const [genre, liste] of [["mur", lg.murs], ["ouverture", lg.ouvertures || []], ["piece", lg.pieces || []], ["meuble", lg.meubles || []]]) {
       const e = liste.find((x) => x.id === id);
       if (e) return { genre, e };
     }
@@ -470,6 +512,42 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+    // Le sens d'ouverture des portes : le battant ouvert et son arc (pointillés tant que personne ne l'a réglé).
+    for (const o of v.logement.ouvertures || []) {
+      if (o.type !== "porte") continue;
+      const a = C.arcPorte(v.logement, o);
+      if (!a) continue;
+      const [pv, pf, po] = [a.pivot, a.ferme, a.ouvert].map(px);
+      const r = Math.hypot(pf[0] - pv[0], pf[1] - pv[1]);
+      const a1 = Math.atan2(pf[1] - pv[1], pf[0] - pv[0]), a2 = Math.atan2(po[1] - pv[1], po[0] - pv[0]);
+      let delta = a2 - a1;
+      while (delta > Math.PI) delta -= 2 * Math.PI;
+      while (delta < -Math.PI) delta += 2 * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(pv[0], pv[1]);
+      ctx.lineTo(po[0], po[1]);
+      ctx.arc(pv[0], pv[1], r, a2, a1, delta > 0);
+      ctx.lineWidth = 1.2 * trait;
+      ctx.strokeStyle = COULEURS.porte;
+      ctx.setLineDash(a.regle ? [] : [4 * trait, 3 * trait]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Les meubles : leur emprise au sol, l'avant en trait épais.
+    for (const m of v.logement.meubles || []) {
+      const coins = C.empreinteMeuble(m).map(px);
+      chemin(coins);
+      ctx.fillStyle = COULEURS.meubleFond;
+      ctx.fill();
+      ctx.lineWidth = (etat.choisi === m.id ? 2.5 : 1.2) * trait;
+      ctx.strokeStyle = etat.choisi === m.id ? COULEURS.choisi : COULEURS.meuble;
+      ctx.stroke();
+      ctx.beginPath(); // l'avant : le côté entre les coins 2 et 3 (vers « face »)
+      ctx.moveTo(coins[2][0], coins[2][1]);
+      ctx.lineTo(coins[3][0], coins[3][1]);
+      ctx.lineWidth = 3 * trait;
+      ctx.stroke();
+    }
 
     // Le point en cours : ses éléments entourés d'orange, et sa zone s'il n'est lié à aucun élément.
     for (const e of [...f.murs, ...f.ouvertures, ...f.pieces]) {
@@ -535,7 +613,49 @@
       ctx.stroke();
     };
     const murChoisi = etat.outil === "choisir" && etat.choisi && v.logement.murs.find((m) => m.id === etat.choisi);
-    if (murChoisi) { rond(murChoisi.debut, COULEURS.choisi); rond(murChoisi.fin, COULEURS.choisi); }
+    if (murChoisi) {
+      rond(murChoisi.debut, COULEURS.choisi);
+      rond(murChoisi.fin, COULEURS.choisi);
+      rond(C.poigneeEpaisseur(murChoisi), "#f59e0b", 4); // à tirer pour changer l'épaisseur
+    }
+    // Les limites invisibles (pas des murs) : pointillés violets.
+    for (const lim of v.limites || []) {
+      const [la, lb] = [lim.debut, lim.fin].map(px);
+      ctx.beginPath();
+      ctx.moveTo(la[0], la[1]);
+      ctx.lineTo(lb[0], lb[1]);
+      ctx.lineWidth = 3 * trait;
+      ctx.strokeStyle = "#7c3aed";
+      ctx.setLineDash([8 * trait, 6 * trait]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (etat.outil === "limite" && etat.depart) rond(etat.depart, "#7c3aed", 6);
+    const meubleChoisi = etat.outil === "choisir" && etat.choisi && (v.logement.meubles || []).find((q) => q.id === etat.choisi);
+    if (meubleChoisi) { // le rond devant le meuble : à tourner autour de lui
+      const [mc, pr] = [meubleChoisi.position, C.poigneeRotation(meubleChoisi)].map(px);
+      ctx.beginPath();
+      ctx.moveTo(mc[0], mc[1]);
+      ctx.lineTo(pr[0], pr[1]);
+      ctx.lineWidth = 1.5 * trait;
+      ctx.strokeStyle = COULEURS.choisi;
+      ctx.stroke();
+      rond(C.poigneeRotation(meubleChoisi), COULEURS.choisi, 6);
+    }
+    const pieceChoisie = etat.outil === "choisir" && etat.choisi && (v.logement.pieces || []).find((q) => q.id === etat.choisi);
+    if (pieceChoisie) { // coins (gros ronds) et milieux des côtés (petits ronds) : à tirer pour redimensionner la pièce
+      const c = pieceChoisie.contour;
+      c.forEach((q, k) => {
+        const r2 = c[(k + 1) % c.length];
+        rond([(q[0] + r2[0]) / 2, (q[1] + r2[1]) / 2], "#93c5fd", 4);
+      });
+      for (const q of c) rond(q, COULEURS.choisi, 5);
+    }
+    const ouvertureChoisie = etat.outil === "choisir" && etat.choisi && (v.logement.ouvertures || []).find((o) => o.id === etat.choisi);
+    if (ouvertureChoisie) { // ses deux bords : à tirer pour changer la largeur
+      const bords = C.bordsOuverture(v.logement, ouvertureChoisie);
+      if (bords) { rond(bords[0], COULEURS.choisi, 5); rond(bords[1], COULEURS.choisi, 5); }
+    }
     if (etat.outil === "relier") {
       for (const m of v.logement.murs) { rond(m.debut, "#94a3b8", 4); rond(m.fin, "#94a3b8", 4); }
       if (etat.relier) rond(etat.relier.point, COULEURS.choisi, 7);
@@ -715,6 +835,7 @@
     if (!t) return "Élément";
     if (t.genre === "piece") return `La pièce « ${t.e.nom} »`;
     if (t.genre === "ouverture") return `${NOMS_OUVERTURES[t.e.type]}`;
+    if (t.genre === "meuble") return C.MEUBLES[t.e.categorie] || "Le meuble";
     return "Le mur";
   }
 
@@ -899,7 +1020,7 @@
       sec.append(el("h2", { texte: "Couper ce mur" }), el("p", { texte: `Il mesure ${formatM(l)} m. Tapez la position, ou cliquez ailleurs sur le mur.` }),
         ...champ("f-t1", 0, `Distance depuis le bout ${nomBout} (m)`),
         el("button", { class: "bouton principal", id: "couper-ici", texte: "Couper ici", onclick: () => {
-          if (corriger((x) => C.couperMur(x, tr.id, tr.t[0]), "Mur coupé en deux : chaque morceau se retouche à part.")) changerOutil("choisir");
+          if (corrigerMurs((x) => C.couperMur(x, tr.id, tr.t[0]), "Mur coupé en deux : chaque morceau se retouche à part.")) changerOutil("choisir");
         } }));
       return;
     }
@@ -911,7 +1032,7 @@
     sec.append(el("p", { texte: `Morceau de ${formatM(Math.abs(tr.t[1] - tr.t[0]))} m, sur un mur de ${formatM(l)} m.` }),
       ...champ("f-t1", 0, `Début, depuis le bout ${nomBout} (m)`), ...champ("f-t2", 1, `Fin, depuis le bout ${nomBout} (m)`),
       el("button", { class: "bouton principal", id: "enlever-ici", texte: "Enlever ce morceau", onclick: () => {
-        if (corriger((x) => C.enleverMorceau(x, tr.id, tr.t[0], tr.t[1]), "Morceau de mur enlevé.")) changerOutil("choisir");
+        if (corrigerMurs((x) => C.enleverMorceau(x, tr.id, tr.t[0], tr.t[1]), "Morceau de mur enlevé.")) changerOutil("choisir");
       } }));
   }
 
@@ -972,8 +1093,91 @@
       avec.addEventListener("change", () => {
         if (avec.value && corriger((x) => C.fusionnerPieces(x, [e.id, avec.value], e.nom), "Pièces réunies.")) rafraichir();
       });
-      fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre, el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
+      // B2 : les plinthes de la pièce. Atelya les suppose (règle par défaut) ou les voit sur une photo ; la personne tranche.
+      const NOMS_PLINTHES = { bois: "Plinthes en bois", carrelage: "Plinthes en carrelage (comme le sol)", aucune: "Pas de plinthes" };
+      const plinthes = el("select", { id: "f-plinthes" },
+        ...(e.plinthes ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        ...C.CHOIX_PLINTHES.map((k) => el("option", { value: k, texte: NOMS_PLINTHES[k] })));
+      plinthes.value = e.plinthes ? e.plinthes.choix : "";
+      plinthes.addEventListener("change", () => {
+        if (plinthes.value) corriger((x) => C.reglerPlinthes(x, e.id, plinthes.value), `${NOMS_PLINTHES[plinthes.value]}.`);
+      });
+      const origineDe = (f) => !f ? "" : f.statut === "mesure" ? "Choisi à l'écran."
+        : f.statut === "estime" ? `Vu par Atelya sur la photo (${f.source}).`
+        : "Supposé par Atelya : personne ne l'a vu. À changer si besoin.";
+      const origine = origineDe(e.plinthes);
+      // B2 temps 2 : la corniche (moulure du plafond), même principe que les plinthes.
+      const NOMS_CORNICHE = { moulure: "Corniche moulurée (gradins)", simple: "Corniche simple (une bande)", aucune: "Pas de corniche" };
+      const corniche = el("select", { id: "f-corniche" },
+        ...(e.corniche ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        ...C.CHOIX_CORNICHE.map((k) => el("option", { value: k, texte: NOMS_CORNICHE[k] })));
+      corniche.value = e.corniche ? e.corniche.choix : "";
+      corniche.addEventListener("change", () => {
+        if (corniche.value) corriger((x) => C.reglerCorniche(x, e.id, corniche.value), `${NOMS_CORNICHE[corniche.value]}.`);
+      });
+      // B2-2 : les portes d'un placard, même principe que les plinthes.
+      const placard = [];
+      if (C.estPlacard(e)) {
+        const NOMS_PLACARD = { coulissantes: "Portes coulissantes", battantes: "Portes battantes (comme une armoire)", aucune: "Pas de portes (placard ouvert)" };
+        const portes = el("select", { id: "f-placard" },
+          ...(e.placard ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+          ...C.CHOIX_PLACARD.map((k) => el("option", { value: k, texte: NOMS_PLACARD[k] })));
+        portes.value = e.placard ? e.placard.choix : "";
+        portes.addEventListener("change", () => {
+          if (portes.value) corriger((x) => C.reglerPlacard(x, e.id, portes.value), `${NOMS_PLACARD[portes.value]}.`);
+        });
+        placard.push(el("label", { texte: "Portes du placard" }), portes, el("p", { class: "aide", texte: origineDe(e.placard) }));
+      }
+      // B2-3 : le sol de la pièce.
+      const sol = el("select", { id: "f-sol" },
+        ...(e.sol ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        ...Object.entries(C.SOLS).map(([k, n]) => el("option", { value: k, texte: n })));
+      sol.value = e.sol ? e.sol.matiere : "";
+      sol.addEventListener("change", () => {
+        if (sol.value) corriger((x) => C.reglerSol(x, e.id, sol.value), `Sol : ${C.SOLS[sol.value]}.`);
+      });
+      const manuelle = (etat.v.contours_manuels || []).includes(e.id);
+      const alertesP = C.alertesPiece(etat.v.logement, e.id);
+      const contourBouton = el("button", { class: "bouton", texte: "Revenir au contour calculé depuis les murs" });
+      contourBouton.addEventListener("click", () => corriger((x) => C.oublierContourManuel(x, e.id), "Contour recalculé depuis les murs."));
+      fiche.append(el("p", { class: "info", texte: "À la souris : tirez un coin (gros rond) ou poussez un côté (petit rond au milieu) ; "
+          + "ils se collent contre les murs. Pour couper un espace ouvert en deux pièces sans mur : ✎ Outils → Une limite." }),
+        ...(alertesP.length ? [el("p", { class: "erreur", texte: "Attention : " + alertesP.join(" ; ") + "." })] : []),
+        ...(manuelle ? [el("div", { class: "ligne" }, contourBouton)] : []));
+      fiche.append(el("label", { texte: "Nom de la pièce" }), liste, libre,
+        el("label", { texte: "Sol" }), sol, el("p", { class: "aide", texte: origineDe(e.sol) }),
+        el("label", { texte: "Plinthes (la planche au pied des murs)" }), plinthes, el("p", { class: "aide", texte: origine }), ...placard,
+        el("label", { texte: "Corniche (la moulure autour du plafond)" }), corniche, el("p", { class: "aide", texte: origineDe(e.corniche) }),
+        el("label", { texte: "Une seule pièce avec une autre ?" }), avec,
         el("div", { class: "ligne" }, supprimerBouton("Supprimer cette pièce")));
+    } else if (genre === "meuble") {
+      $("choix-titre").textContent = C.MEUBLES[e.categorie] || "Meuble";
+      const cat = el("select", { id: "f-categorie" }, ...Object.entries(C.MEUBLES).map(([k, n]) => el("option", { value: k, texte: n })));
+      cat.value = e.categorie;
+      cat.addEventListener("change", () => {
+        etat.categorieNouveau = cat.value;
+        const taille = C.TAILLES_MEUBLES[cat.value];
+        corriger((x) => C.modifierMeuble(x, e.id, { categorie: cat.value, ...(taille ? { dimensions: taille.slice() } : {}) }),
+          `C'est : ${C.MEUBLES[cat.value]}.`);
+      });
+      const champs = ["Largeur", "Profondeur", "Hauteur"].map((nom, i) => {
+        const c = el("input", { type: "text", value: formatM(e.dimensions[i]) });
+        c.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter") return;
+          const d = e.dimensions.slice();
+          d[i] = lireNombre(c.value);
+          corriger((x) => C.modifierMeuble(x, e.id, { dimensions: d }), `${nom} : ${formatM(d[i])} m.`);
+        });
+        return [el("label", { texte: `${nom} (m), puis Entrée` }), c];
+      }).flat();
+      const tourner = (pas) => corriger((x) => C.modifierMeuble(x, e.id, { face: ((e.face + pas + 540) % 360) - 180 }), "Meuble tourné.");
+      fiche.append(el("p", { class: "info", texte: "À la souris : faites-le glisser (dos contre un mur, il s'y colle) ; "
+          + "tournez-le avec le rond violet devant lui. Le trait épais est son avant." }),
+        el("label", { texte: "C'est…" }), cat, ...champs,
+        el("div", { class: "ligne" },
+          el("button", { class: "bouton", texte: "↺ 90°", onclick: () => tourner(90) }),
+          el("button", { class: "bouton", texte: "↻ 90°", onclick: () => tourner(-90) })),
+        el("div", { class: "ligne" }, supprimerBouton("Supprimer ce meuble")));
     } else if (genre === "ouverture") {
       $("choix-titre").textContent = `${NOMS_OUVERTURES[e.type]} de ${formatM(e.largeur)} m`;
       const type = el("select", { id: "f-type" }, ...Object.entries(NOMS_OUVERTURES).map(([k, n]) => el("option", { value: k, texte: n })));
@@ -987,7 +1191,14 @@
         corriger((x) => C.modifierOuverture(x, e.id, { largeur: l, position: p }), "Mesures corrigées.");
       };
       for (const champ of [larg, pos]) champ.addEventListener("keydown", (ev) => ev.key === "Enter" && appliquer());
-      fiche.append(el("label", { texte: "C'est…" }), type,
+      fiche.append(el("p", { class: "info", texte: "À la souris : faites-la glisser le long du mur (ou jusqu'à un autre mur) ; "
+          + "tirez un des ronds à ses bords pour changer sa largeur. Elle se colle seule contre un angle à moins de 8 cm." }),
+        el("label", { texte: "C'est…" }), type,
+        ...(e.type === "porte" ? [el("label", { texte: "Sens d'ouverture (l'arc vert sur le plan)" }), el("div", { class: "ligne" },
+          el("button", { class: "bouton", texte: "⇆ Gonds de l'autre côté",
+            onclick: () => corriger((x) => C.inverserSens(x, e.id, "charniere"), "Gonds passés de l'autre côté.") }),
+          el("button", { class: "bouton", texte: "⇅ S'ouvre de l'autre côté",
+            onclick: () => corriger((x) => C.inverserSens(x, e.id, "ouvre_vers"), "La porte s'ouvre maintenant de l'autre côté.") }))] : []),
         el("label", { texte: "Largeur en mètres, puis Entrée" }), larg,
         el("details", {}, el("summary", { texte: "La déplacer le long du mur" }), el("label", { texte: "Distance depuis le bout du mur (m), puis Entrée" }), pos),
         el("div", { class: "ligne" }, supprimerBouton("Supprimer")));
@@ -998,7 +1209,7 @@
       const ep = el("input", { type: "text", id: "f-epaisseur", value: formatM(e.epaisseur) });
       const pasEpaisseur = (delta) => {
         const n = Math.round((e.epaisseur + delta) * 1000) / 1000;
-        if (n >= 0.02) corriger((x) => C.modifierMur(x, e.id, { epaisseur: n }), `Épaisseur : ${formatM(n)} m.`);
+        if (n >= 0.02) corrigerMurs((x) => C.modifierMur(x, e.id, { epaisseur: n }), `Épaisseur : ${formatM(n)} m.`);
       };
       const lue = () => {
         const n = lireNombre(cote.value);
@@ -1008,7 +1219,7 @@
       ep.addEventListener("keydown", (ev) => {
         if (ev.key !== "Enter") return;
         const n = lireNombre(ep.value);
-        if (n > 0) corriger((x) => C.modifierMur(x, e.id, { epaisseur: n }), "Épaisseur corrigée.");
+        if (n > 0) corrigerMurs((x) => C.modifierMur(x, e.id, { epaisseur: n }), "Épaisseur corrigée.");
       });
       fiche.append(el("label", { texte: "Sa vraie longueur d'après le plan (m)" }), cote,
         el("div", { class: "ligne" },
@@ -1020,7 +1231,9 @@
         el("div", { class: "reglage" },
           el("button", { class: "bouton", id: "f-ep-moins", texte: "−", title: "1 cm de moins", onclick: () => pasEpaisseur(-0.01) }), ep,
           el("button", { class: "bouton", id: "f-ep-plus", texte: "+", title: "1 cm de plus", onclick: () => pasEpaisseur(0.01) })),
-        el("p", { class: "info", texte: "Pour le rallonger : tirez un des ronds à ses bouts. Pour le déplacer : faites-le glisser." }),
+        el("p", { class: "info", texte: "Pour le rallonger : tirez un des ronds à ses bouts. Pour le déplacer : faites-le glisser. "
+          + "Pour changer son épaisseur : tirez le petit rond orange au milieu de sa face." }),
+        ...boutonsRedresser(e),
         el("div", { class: "ligne" },
           el("button", { class: "bouton", texte: "Le couper", onclick: () => changerOutil("couper") }),
           el("button", { class: "bouton", texte: "Enlever un morceau", onclick: () => changerOutil("morceau") })),
@@ -1042,7 +1255,7 @@
       const cm = lireNombre(champ.value);
       if (!(cm > 0)) return message("Tapez le déplacement en centimètres, par exemple 10.", true);
       const k = (signe * cm) / 100;
-      if (corriger((x) => C.deplacerMur(x, e.id, [n[0] * k, n[1] * k]), `Mur déplacé de ${cm} cm.`)) etat.deplacementPropose = null;
+      if (corrigerMurs((x) => C.deplacerMur(x, e.id, [n[0] * k, n[1] * k]), `Mur déplacé de ${cm} cm.`)) etat.deplacementPropose = null;
       rafraichir();
     };
     const boutons = [[positif, 1], [negatif, -1]].sort((u, w) => (u[0] < w[0] ? -1 : 1));
@@ -1058,7 +1271,8 @@
   function supprimerChoisi() {
     if (!etat.choisi) return;
     const nom = nomDe(etat.choisi);
-    if (corriger((x) => C.supprimer(x, etat.choisi), `${nom} : supprimé.`)) etat.choisi = null;
+    const estMur = etat.v.logement.murs.some((m) => m.id === etat.choisi);
+    if ((estMur ? corrigerMurs : corriger)((x) => C.supprimer(x, etat.choisi), `${nom} : supprimé.`)) etat.choisi = null;
     rafraichir();
   }
 
@@ -1110,7 +1324,7 @@
     if (etat.outil === "mur") {
       const q = C.aimanter(lg, p, etat.depart, metresPour(VISEE * 1.5, p));
       if (!etat.depart) { etat.depart = q; dessiner(); return; }
-      if (corriger((x) => C.ajouterMur(x, etat.depart, q, epaisseurNouveauMur()), "Mur ajouté (cloison de 10 cm).")) {
+      if (corrigerMurs((x) => C.ajouterMur(x, etat.depart, q, epaisseurNouveauMur()), "Mur ajouté (cloison de 10 cm).")) {
         etat.choisi = etat.v.logement.murs[etat.v.logement.murs.length - 1].id;
         changerOutil("choisir");
       }
@@ -1144,10 +1358,14 @@
       if (!b) return message(etat.relier ? "Cliquez sur le bout de l'autre mur." : "Cliquez sur le bout d'un mur (un des petits ronds).", true);
       if (!etat.relier) { etat.relier = b; message("Cliquez maintenant sur le bout de l'autre mur."); dessiner(); return; }
       const a = etat.relier;
-      if (corriger((x) => C.relierMurs(x, a.id, a.bout, b.id, b.bout), "Murs reliés.")) changerOutil("choisir");
+      if (corrigerMurs((x) => C.relierMurs(x, a.id, a.bout, b.id, b.bout), "Murs reliés.")) changerOutil("choisir");
       return;
     }
     const murOuvert = etat.choisi && lg.murs.find((m) => m.id === etat.choisi);
+    if (murOuvert && etat.outil === "choisir" && C.longueur(p, C.poigneeEpaisseur(murOuvert)) <= metresPour(VISEE, p)) {
+      etat.glisse = { genre: "epaisseur", id: murOuvert.id, bouge: false };
+      return;
+    }
     if (murOuvert) {
       const rayon = metresPour(VISEE * 1.5, p);
       for (const bout of ["debut", "fin"]) {
@@ -1157,10 +1375,58 @@
         }
       }
     }
+    if (etat.outil === "meuble") {
+      if (corriger((x) => C.ajouterMeuble(x, etat.categorieNouveau || "commode", p), "Meuble posé : choisissez ce que c'est dans sa fiche.")) {
+        const ms = etat.v.logement.meubles;
+        changerOutil("choisir");
+        etat.choisi = ms[ms.length - 1].id;
+        rafraichir();
+      }
+      return;
+    }
+    const meubleOuvert = etat.choisi && (lg.meubles || []).find((q) => q.id === etat.choisi);
+    if (meubleOuvert && etat.outil === "choisir" && C.longueur(p, C.poigneeRotation(meubleOuvert)) <= metresPour(VISEE * 1.3, p)) {
+      etat.glisse = { genre: "rotation", id: meubleOuvert.id, bouge: false };
+      return;
+    }
+    if (etat.outil === "limite") {
+      const k = C.limiteSous(etat.v, p, tol);
+      if (k >= 0 && !etat.depart) {
+        corriger((x) => C.supprimerLimite(x, k), "Limite enlevée : les deux pièces n'en font plus qu'une.");
+        return;
+      }
+      if (!etat.depart) { etat.depart = C.aimanterCoin(lg, p, metresPour(VISEE * 1.5, p)); dessiner(); return; }
+      const a = etat.depart;
+      etat.depart = null;
+      if (corriger((x) => C.ajouterLimite(x, a, p, metresPour(VISEE * 1.5, p)),
+        "Limite ajoutée : l'espace est partagé en deux pièces (sans mur). Donnez un nom à la nouvelle pièce.")) changerOutil("choisir");
+      return;
+    }
+    const pieceOuverte = etat.choisi && (lg.pieces || []).find((q) => q.id === etat.choisi);
+    if (pieceOuverte && etat.outil === "choisir") {
+      const c = pieceOuverte.contour, rayon = metresPour(VISEE * 1.2, p);
+      const k = c.findIndex((q) => C.longueur(p, q) <= rayon);
+      if (k >= 0) { etat.glisse = { genre: "coin", id: pieceOuverte.id, k, bouge: false }; return; }
+      const m = c.findIndex((q, i) => { const r2 = c[(i + 1) % c.length]; return C.longueur(p, [(q[0] + r2[0]) / 2, (q[1] + r2[1]) / 2]) <= rayon; });
+      if (m >= 0) { etat.glisse = { genre: "cote", id: pieceOuverte.id, k: m, bouge: false }; return; }
+    }
+    const ouvertureOuverte = etat.choisi && (lg.ouvertures || []).find((o) => o.id === etat.choisi);
+    if (ouvertureOuverte) {
+      const bords = C.bordsOuverture(lg, ouvertureOuverte);
+      const rayon = metresPour(VISEE * 1.2, p);
+      for (const bord of [0, 1]) {
+        if (bords && C.longueur(p, bords[bord]) <= rayon) {
+          etat.glisse = { genre: "bord", id: ouvertureOuverte.id, bord, bouge: false };
+          return;
+        }
+      }
+    }
     const sous = C.elementSous(lg, p, tol);
     if (sous) {
       etat.choisi = sous.id;
       if (sous.genre === "mur") etat.glisse = { genre: "mur", id: sous.id, depart: p, bouge: false };
+      if (sous.genre === "ouverture") etat.glisse = { genre: "ouverture", id: sous.id, depart: p, bouge: false };
+      if (sous.genre === "meuble") etat.glisse = { genre: "meuble", id: sous.id, depart: p, bouge: false };
       rafraichir();
     } else {
       etat.choisi = null;
@@ -1189,6 +1455,42 @@
       } catch (e) {
         g.erreur = e.message; // on garde l'aperçu précédent
       }
+    } else if (g && g.genre === "meuble") {
+      const delta = [p[0] - g.depart[0], p[1] - g.depart[1]];
+      if (Math.hypot(...delta) > metresPour(3, p)) g.bouge = true;
+      if (g.bouge) {
+        g.delta = delta;
+        g.rayon = metresPour(VISEE * 1.5, p);
+        try { etat.apercu = C.deplacerMeuble(etat.v, g.id, delta, g.rayon); } catch (e) { /* aperçu précédent */ }
+      }
+    } else if (g && g.genre === "rotation") {
+      g.bouge = true;
+      g.point = p;
+      try { etat.apercu = C.tournerMeuble(etat.v, g.id, p); } catch (e) { /* aperçu précédent */ }
+    } else if (g && g.genre === "epaisseur") {
+      g.bouge = true;
+      const mur = etat.v.logement.murs.find((m) => m.id === g.id);
+      g.epaisseur = C.epaisseurDepuisPoignee(mur, p);
+      try { etat.apercu = C.modifierMur(etat.v, g.id, { epaisseur: g.epaisseur }); } catch (e) { /* aperçu précédent */ }
+      message(`Épaisseur : ${Math.round(g.epaisseur * 100)} cm`);
+    } else if (g && (g.genre === "coin" || g.genre === "cote")) {
+      g.bouge = true;
+      try {
+        const rayon = metresPour(VISEE * 1.5, p);
+        etat.apercu = g.genre === "coin" ? C.deplacerCoinPiece(etat.v, g.id, g.k, p, rayon) : C.deplacerCotePiece(etat.v, g.id, g.k, p, rayon);
+        g.point = p;
+        g.rayon = rayon;
+      } catch (e) { /* on garde l'aperçu précédent */ }
+    } else if (g && (g.genre === "ouverture" || g.genre === "bord")) {
+      if (g.genre === "bord" || C.longueur(p, g.depart) > metresPour(3, p)) g.bouge = true;
+      if (g.bouge) {
+        try {
+          etat.apercu = g.genre === "bord" ? C.etirerOuverture(etat.v, g.id, g.bord, p)
+            : C.deplacerOuverture(etat.v, g.id, p, metresPour(VISEE * 2, p));
+          g.point = p;
+          g.erreur = null;
+        } catch (e) { g.erreur = e.message; } // on garde l'aperçu précédent
+      }
     } else if (g && g.genre === "mur") {
       const delta = [p[0] - g.depart[0], p[1] - g.depart[1]];
       if (Math.hypot(...delta) > metresPour(3, p)) g.bouge = true;
@@ -1206,10 +1508,28 @@
     etat.accroche = null;
     if (g && g.genre === "bout") {
       if (g.erreur) message(g.erreur, true);
-      if (g.point) corriger((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
+      if (g.point) corrigerMurs((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
       else dessiner();
+    } else if (g && g.genre === "meuble" && g.bouge && g.delta) {
+      corriger((x) => C.deplacerMeuble(x, g.id, g.delta, g.rayon), "Meuble déplacé (il se colle dos au mur s'il en est tout près).");
+    } else if (g && g.genre === "rotation" && g.bouge && g.point) {
+      corriger((x) => C.tournerMeuble(x, g.id, g.point), "Meuble tourné.");
+    } else if (g && g.genre === "epaisseur" && g.bouge && g.epaisseur) {
+      corrigerMurs((x) => C.modifierMur(x, g.id, { epaisseur: g.epaisseur }), `Épaisseur du mur : ${Math.round(g.epaisseur * 100)} cm.`);
+    } else if (g && (g.genre === "coin" || g.genre === "cote") && g.bouge && g.point) {
+      const faire = g.genre === "coin" ? (x) => C.deplacerCoinPiece(x, g.id, g.k, g.point, g.rayon) : (x) => C.deplacerCotePiece(x, g.id, g.k, g.point, g.rayon);
+      if (corriger(faire, "Pièce redimensionnée à la main (ce contour sera gardé).")) {
+        const alertes = C.alertesPiece(etat.v.logement, g.id);
+        if (alertes.length) message("Attention : " + alertes.join(" ; ") + ".", true);
+      }
+    } else if (g && g.genre === "ouverture" && g.bouge && g.point) {
+      if (g.erreur) message(g.erreur, true);
+      corriger((x) => C.deplacerOuverture(x, g.id, g.point, metresPour(VISEE * 2, g.point)),
+        "Ouverture déplacée (elle reste dans le mur, sans déborder dans un angle).");
+    } else if (g && g.genre === "bord" && g.bouge && g.point) {
+      corriger((x) => C.etirerOuverture(x, g.id, g.bord, g.point), "Largeur de l'ouverture changée.");
     } else if (g && g.genre === "mur" && g.bouge && g.delta) {
-      corriger((x) => C.deplacerMur(x, g.id, g.delta), "Mur déplacé (les murs et pièces qui le touchent ont suivi).");
+      corrigerMurs((x) => C.deplacerMur(x, g.id, g.delta), "Mur déplacé (les murs et pièces qui le touchent ont suivi).");
     } else dessiner();
   }
 
@@ -1297,7 +1617,7 @@
   }));
   function refairePieces() {
     if (!etat.v) return;
-    const r = C.piecesDepuisMurs(etat.v.logement);
+    const r = C.piecesDepuisMurs(etat.v.logement, etat.v.limites || []);
     const parties = [`${r.pieces.length} pièce(s)`];
     if (r.reunies) parties.push(`${r.reunies} réunie(s) à une voisine`);
     if (r.nouvelles) parties.push(`${r.nouvelles} nouvelle(s)`);

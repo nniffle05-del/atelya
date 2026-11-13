@@ -1,0 +1,250 @@
+{
+ "schema": "verite-plan/0.1",
+ "version": "0.1.0",
+ "image": "plan.png",
+ "largeur": 1100,
+ "hauteur": 670,
+ "px_par_m": 49.8,
+ "echelle_inconnue": false,
+ "echelle_source": "plan sans cotes : surface annoncée 124 m² = somme des 10 pièces (133,47 m² à 48 px/m -> 49,8 px/m) ; contrôle : passages de porte 30-35 px = 0,60-0,70 m (portes standard de 63 et 73 cm) ; porte d'entrée double 1,22 m",
+ "origine_px": [
+  51.0,
+  605.0
+ ],
+ "types_pieces": {
+  "sejour_1": "sejour",
+  "chambre_1": "chambre",
+  "chambre_2": "chambre",
+  "salle_d_eau_1": "salle_d_eau",
+  "salle_d_eau_2": "salle_d_eau",
+  "wc_1": "wc",
+  "wc_2": "wc",
+  "degagement_1": "degagement",
+  "buanderie_1": "buanderie",
+  "placard_1": "placard"
+ },
+ "murs_px": [
+  [
+   42.5,
+   152.0,
+   225.0,
+   152.0,
+   15.0
+  ],
+  [
+   42.5,
+   488.0,
+   42.5,
+   152.0,
+   15.0
+  ],
+  [
+   42.5,
+   488.0,
+   577.0,
+   488.0,
+   17.0
+  ],
+  [
+   225.0,
+   152.0,
+   225.0,
+   37.0,
+   15.0
+  ],
+  [
+   225.0,
+   37.0,
+   735.0,
+   37.0,
+   14.0
+  ],
+  [
+   735.0,
+   172.0,
+   735.0,
+   37.0,
+   16.0
+  ],
+  [
+   781.0,
+   238.0,
+   735.0,
+   172.0,
+   15.0
+  ],
+  [
+   779.0,
+   289.0,
+   779.0,
+   238.0,
+   4.0
+  ],
+  [
+   779.0,
+   289.0,
+   911.0,
+   289.0,
+   18.0
+  ],
+  [
+   911.0,
+   405.0,
+   911.0,
+   289.0,
+   16.0
+  ],
+  [
+   820.0,
+   405.0,
+   911.0,
+   405.0,
+   14.0
+  ],
+  [
+   820.0,
+   614.0,
+   820.0,
+   405.0,
+   17.0
+  ],
+  [
+   652.0,
+   614.0,
+   820.0,
+   614.0,
+   18.0
+  ],
+  [
+   577.0,
+   541.0,
+   652.0,
+   614.0,
+   17.0
+  ],
+  [
+   577.0,
+   541.0,
+   577.0,
+   488.0,
+   17.0
+  ],
+  [
+   446.0,
+   160.0,
+   446.0,
+   37.0,
+   17.0
+  ],
+  [
+   446.0,
+   488.0,
+   446.0,
+   219.0,
+   15.0
+  ],
+  [
+   225.0,
+   158.0,
+   446.0,
+   158.0,
+   5.0
+  ],
+  [
+   347.5,
+   158.0,
+   347.5,
+   37.0,
+   5.0
+  ],
+  [
+   407.0,
+   158.0,
+   407.0,
+   126.0,
+   3.0
+  ],
+  [
+   407.0,
+   126.0,
+   446.0,
+   126.0,
+   4.0
+  ],
+  [
+   502.0,
+   219.0,
+   502.0,
+   37.0,
+   5.0
+  ],
+  [
+   446.0,
+   158.5,
+   502.0,
+   158.5,
+   6.0
+  ],
+  [
+   446.0,
+   219.0,
+   505.0,
+   219.0,
+   8.0
+  ],
+  [
+   233.0,
+   488.0,
+   233.0,
+   152.0,
+   6.0
+  ],
+  [
+   182.0,
+   224.0,
+   182.0,
+   152.0,
+   4.0
+  ],
+  [
+   42.5,
+   224.0,
+   233.0,
+   224.0,
+   5.0
+  ],
+  [
+   233.0,
+   285.0,
+   290.0,
+   285.0,
+   4.0
+  ],
+  [
+   290.0,
+   285.0,
+   290.0,
+   225.0,
+   4.0
+  ],
+  [
+   290.0,
+   225.0,
+   446.0,
+   225.0,
+   6.0
+  ]
+ ],
+ "incertain": [
+  "Plan basse définition (capture de téléphone, ~1100 px de large) : positions à ±1-2 px, soit ±2-4 cm",
+  "HSP : 3 m écrit dans le séjour et les chambres ; 2,80 m (« HSP 2.8m ») dans la salle de bains, le dégagement et la cuisine (faux plafonds) ; le format n'a qu'une hauteur : 3 m partout",
+  "Fenêtres du séjour et des chambres (façade sud) : posées en portes-fenêtres (hautes fenêtres d'immeuble ancien vues sur les photos 03, 04, 08, 10) ; le plan ne les distingue pas des fenêtres",
+  "Accès à la salle d'eau (douche) : aucune porte dessinée ; le mur vers la chambre 1 est plus fin entre x 104 et 140 -> porte supposée là (porte coulissante ?), donc salle d'eau ouverte sur la chambre 1",
+  "Caisson bleu autour de la télévision (photos 01-03) et rangements le long du mur est (trait x 790) : meubles, non tracés",
+  "Palier, escalier, ascenseur et courettes : hors logement, non tracés (demande de NT)",
+  "Cuisine, séjour, salle à manger et entrée = UN SEUL espace ouvert (aucune cloison ni porte sur le plan) ; le trait fin y 222 et le pointillé y 241 = bord du plafond plus bas de la cuisine (HSP 2,80, poutre visible photo 02), pas un mur",
+  "Petit mur fin x 779 (y 238-289) au fond d'un renfoncement : simple trait sur le plan, aucune porte dessinée (la photo 07 semble montrer une porte blanche : à confirmer, le plan fait foi)",
+  "Pièce entre la salle de bains et le WC 2 (« Rangement ») : usage inconnu (buanderie ? dressing ?) ; traits fins x 370 et x 407 = meubles (pas des murs), pointillé y 57 = étagère haute",
+  "Accès à la salle d'eau : seule la porte dessinée en trait fin dans le mur de la chambre 1 (x 104-140, porte coulissante probable) ; dans le WC, le triangle bleu = lave-mains d'angle, pas une porte"
+ ]
+}

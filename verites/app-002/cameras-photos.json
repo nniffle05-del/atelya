@@ -1,0 +1,1700 @@
+{
+ "note": "Caméras des photos de l'annonce d'app-002 (EXAMEN), retrouvées par Claude à la main (10/11/2026) : repères relevés sur chaque photo (pixels), places dans le logement en mètres (verites/app-002/logement.json), caméra ajustée par moteur/camera_photo.py.",
+ "photos": "../atelya/photos-clients/app-002/photos",
+ "fichier": "{nom}.jpg",
+ "cameras": {
+  "photo-04": {
+   "camera": {
+    "x": 3.477,
+    "y": 2.035,
+    "z": 1.101,
+    "cap": 92.815,
+    "tangage": 0.0,
+    "f": 575.438,
+    "u0": 603.0,
+    "v0": 395.91
+   },
+   "largeur": 1206,
+   "hauteur": 792,
+   "qualite": "bonne",
+   "ecart_moyen_px": 3.3,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0
+     ],
+     "b": [
+      1.23,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      373,
+      260
+     ],
+     "p2": [
+      373,
+      520
+     ],
+     "quoi": "coin nord-ouest du séjour (mur de la baie / mur du buffet)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      986,
+      250
+     ],
+     "p2": [
+      986,
+      520
+     ],
+     "quoi": "coin nord-est (mur du buffet / mur du tableau)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      826,
+      300
+     ],
+     "p2": [
+      826,
+      480
+     ],
+     "quoi": "montant gauche de la porte vers l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.28,
+      6.95,
+      0
+     ],
+     "b": [
+      6.28,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      973,
+      300
+     ],
+     "p2": [
+      973,
+      480
+     ],
+     "quoi": "montant droit de la porte vers l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      2.04
+     ],
+     "b": [
+      6.28,
+      6.95,
+      2.04
+     ],
+     "p1": [
+      832,
+      288
+     ],
+     "p2": [
+      968,
+      288
+     ],
+     "quoi": "haut de la porte vers l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      4.0,
+      0
+     ],
+     "b": [
+      1.23,
+      6.95,
+      0
+     ],
+     "p1": [
+      100,
+      655
+     ],
+     "p2": [
+      330,
+      541
+     ],
+     "quoi": "pied du mur de la baie ouest"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      0
+     ],
+     "p1": [
+      385,
+      527
+     ],
+     "p2": [
+      965,
+      517
+     ],
+     "quoi": "pied du mur du buffet (fond)"
+    }
+   ]
+  },
+  "photo-01": {
+   "camera": {
+    "x": 1.881,
+    "y": 2.746,
+    "z": 1.223,
+    "cap": 50.303,
+    "tangage": 0.0,
+    "f": 557.171,
+    "u0": 603.0,
+    "v0": 350.124
+   },
+   "largeur": 1206,
+   "hauteur": 751,
+   "qualite": "bonne",
+   "ecart_moyen_px": 2.8,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      683,
+      215
+     ],
+     "p2": [
+      683,
+      495
+     ],
+     "quoi": "coin nord-est de la salle à manger (mur du buffet / mur du tableau)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      887,
+      190
+     ],
+     "p2": [
+      887,
+      495
+     ],
+     "quoi": "coin du mur du tableau / mur nord de l ancienne chambre 1"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      4.69,
+      0
+     ],
+     "b": [
+      9.75,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      1013,
+      222
+     ],
+     "p2": [
+      1013,
+      470
+     ],
+     "quoi": "coin nord-est de l ancienne chambre 1 (derrière la bibliothèque)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      580,
+      262
+     ],
+     "p2": [
+      580,
+      400
+     ],
+     "quoi": "montant gauche de la porte vers l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.28,
+      6.95,
+      0
+     ],
+     "b": [
+      6.28,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      666,
+      262
+     ],
+     "p2": [
+      666,
+      400
+     ],
+     "quoi": "montant droit de la porte vers l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      0
+     ],
+     "p1": [
+      30,
+      580
+     ],
+     "p2": [
+      225,
+      547
+     ],
+     "quoi": "pied du mur du buffet"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      0
+     ],
+     "p1": [
+      850,
+      500
+     ],
+     "p2": [
+      884,
+      502
+     ],
+     "quoi": "pied du mur du tableau"
+    }
+   ]
+  },
+  "photo-03": {
+   "camera": {
+    "x": 1.382,
+    "y": 6.691,
+    "z": 1.203,
+    "cap": -37.897,
+    "tangage": 0.0,
+    "f": 669.317,
+    "u0": 603.0,
+    "v0": 363.611
+   },
+   "largeur": 1206,
+   "hauteur": 779,
+   "qualite": "bonne",
+   "ecart_moyen_px": 3.3,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      407,
+      215
+     ],
+     "p2": [
+      407,
+      520
+     ],
+     "quoi": "bout du mur du tableau (coin avec le mur nord de l ancienne chambre 1)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.45,
+      2.67,
+      0
+     ],
+     "b": [
+      6.45,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      605,
+      240
+     ],
+     "p2": [
+      605,
+      435
+     ],
+     "quoi": "coin sud-est de la salle à manger (baie sud / ancienne chambre 1)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.81,
+      2.67,
+      0
+     ],
+     "b": [
+      5.81,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      662,
+      265
+     ],
+     "p2": [
+      662,
+      440
+     ],
+     "quoi": "bord est de la baie sud"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      2.25,
+      2.67,
+      0
+     ],
+     "b": [
+      2.25,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      1162,
+      180
+     ],
+     "p2": [
+      1162,
+      553
+     ],
+     "quoi": "bord ouest de la baie sud"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      0
+     ],
+     "p1": [
+      100,
+      563
+     ],
+     "p2": [
+      395,
+      522
+     ],
+     "quoi": "pied du mur du tableau"
+    }
+   ]
+  },
+  "photo-05": {
+   "camera": {
+    "x": 7.182,
+    "y": 2.717,
+    "z": 1.067,
+    "cap": 150.523,
+    "tangage": 0.0,
+    "f": 599.316,
+    "u0": 603.0,
+    "v0": 368.005
+   },
+   "largeur": 1206,
+   "hauteur": 777,
+   "qualite": "bonne",
+   "ecart_moyen_px": 1.7,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      2.67,
+      0
+     ],
+     "b": [
+      1.23,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      257,
+      235
+     ],
+     "p2": [
+      257,
+      495
+     ],
+     "quoi": "coin sud-ouest de la salle à manger"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0
+     ],
+     "b": [
+      1.23,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      668,
+      270
+     ],
+     "p2": [
+      668,
+      480
+     ],
+     "quoi": "coin nord-ouest (mur de la fenêtre / mur du buffet)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      1018,
+      240
+     ],
+     "p2": [
+      1018,
+      520
+     ],
+     "quoi": "montant gauche (ouest) de la porte vers l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      0
+     ],
+     "p1": [
+      945,
+      519
+     ],
+     "p2": [
+      1012,
+      528
+     ],
+     "quoi": "pied du mur du buffet"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      2.67,
+      0
+     ],
+     "b": [
+      1.23,
+      6.95,
+      0
+     ],
+     "p1": [
+      445,
+      476
+     ],
+     "p2": [
+      530,
+      470
+     ],
+     "quoi": "pied du mur ouest (sous la commode)"
+    }
+   ]
+  },
+  "photo-07": {
+   "camera": {
+    "x": 8.291,
+    "y": 0.078,
+    "z": 1.186,
+    "cap": 94.463,
+    "tangage": 0.0,
+    "f": 590.915,
+    "u0": 603.0,
+    "v0": 327.898
+   },
+   "largeur": 1206,
+   "hauteur": 782,
+   "qualite": "bonne",
+   "ecart_moyen_px": 1.1,
+   "note": "",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      413,
+      180
+     ],
+     "p2": [
+      413,
+      490
+     ],
+     "quoi": "bout du mur nord de l ancienne chambre 1 (coin vers la salle à manger)"
+    },
+    {
+     "type": "point",
+     "p": [
+      9.75,
+      4.69,
+      2.38
+     ],
+     "uv": [
+      842,
+      172
+     ],
+     "quoi": "angle nord-est sous la corniche (2,38 m supposé)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      2.38
+     ],
+     "b": [
+      9.75,
+      4.69,
+      2.38
+     ],
+     "p1": [
+      420,
+      176
+     ],
+     "p2": [
+      830,
+      172
+     ],
+     "quoi": "bas de la corniche du mur nord"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      0.0,
+      2.38
+     ],
+     "b": [
+      9.75,
+      4.69,
+      2.38
+     ],
+     "p1": [
+      990,
+      48
+     ],
+     "p2": [
+      870,
+      150
+     ],
+     "quoi": "bas de la corniche du mur est"
+    }
+   ]
+  },
+  "photo-02": {
+   "camera": {
+    "x": 6.993,
+    "y": 7.365,
+    "z": 1.658,
+    "cap": 165.956,
+    "tangage": 0.0,
+    "f": 377.238,
+    "u0": 603.0,
+    "v0": 306.869
+   },
+   "largeur": 1206,
+   "hauteur": 796,
+   "qualite": "moyenne",
+   "ecart_moyen_px": 6.6,
+   "note": "Prise depuis la porte palière ouverte (le battant en bois à droite).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      5.06,
+      7.25,
+      0
+     ],
+     "b": [
+      5.06,
+      7.25,
+      2.5
+     ],
+     "p1": [
+      472,
+      245
+     ],
+     "p2": [
+      472,
+      580
+     ],
+     "quoi": "montant sud de la porte de la cuisine (fond)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.06,
+      7.91,
+      0
+     ],
+     "b": [
+      5.06,
+      7.91,
+      2.5
+     ],
+     "p1": [
+      627,
+      240
+     ],
+     "p2": [
+      627,
+      580
+     ],
+     "quoi": "montant nord de la porte de la cuisine (fond)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.06,
+      7.25,
+      2.04
+     ],
+     "b": [
+      5.06,
+      7.91,
+      2.04
+     ],
+     "p1": [
+      482,
+      232
+     ],
+     "p2": [
+      620,
+      232
+     ],
+     "quoi": "linteau de la porte de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.28,
+      7.12,
+      0
+     ],
+     "b": [
+      6.28,
+      7.12,
+      2.5
+     ],
+     "p1": [
+      358,
+      150
+     ],
+     "p2": [
+      358,
+      700
+     ],
+     "quoi": "bord est du passage vers le séjour"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      7.12,
+      0
+     ],
+     "b": [
+      5.14,
+      7.12,
+      2.5
+     ],
+     "p1": [
+      460,
+      240
+     ],
+     "p2": [
+      460,
+      585
+     ],
+     "quoi": "bord ouest du passage vers le séjour"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.11,
+      8.64,
+      0
+     ],
+     "b": [
+      5.11,
+      8.64,
+      2.5
+     ],
+     "p1": [
+      735,
+      190
+     ],
+     "p2": [
+      735,
+      585
+     ],
+     "quoi": "angle du fond, côté placard"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.11,
+      8.64,
+      0
+     ],
+     "b": [
+      7.92,
+      8.64,
+      0
+     ],
+     "p1": [
+      760,
+      615
+     ],
+     "p2": [
+      860,
+      760
+     ],
+     "quoi": "bas des portes du placard de l entrée"
+    }
+   ]
+  },
+  "photo-08": {
+   "camera": {
+    "x": 5.157,
+    "y": 7.556,
+    "z": 1.368,
+    "cap": 150.531,
+    "tangage": 0.0,
+    "f": 684.945,
+    "u0": 603.0,
+    "v0": 365.357
+   },
+   "largeur": 1206,
+   "hauteur": 779,
+   "qualite": "approchée",
+   "ecart_moyen_px": 10.6,
+   "note": "Prise depuis la porte de la cuisine (battant ouvert à gauche), vers la fenêtre ; position imposée dans l encadrement.",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      0.0,
+      7.12,
+      0
+     ],
+     "b": [
+      0.0,
+      7.12,
+      2.5
+     ],
+     "p1": [
+      150,
+      170
+     ],
+     "p2": [
+      150,
+      450
+     ],
+     "quoi": "angle sud-ouest de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.0,
+      9.3,
+      0
+     ],
+     "b": [
+      0.0,
+      9.3,
+      2.5
+     ],
+     "p1": [
+      462,
+      150
+     ],
+     "p2": [
+      462,
+      430
+     ],
+     "quoi": "angle nord-ouest de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.0,
+      7.55,
+      0
+     ],
+     "b": [
+      0.0,
+      7.55,
+      2.5
+     ],
+     "p1": [
+      207,
+      240
+     ],
+     "p2": [
+      207,
+      435
+     ],
+     "quoi": "bord sud de la fenêtre de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.0,
+      9.16,
+      0
+     ],
+     "b": [
+      0.0,
+      9.16,
+      2.5
+     ],
+     "p1": [
+      455,
+      240
+     ],
+     "p2": [
+      455,
+      435
+     ],
+     "quoi": "bord nord de la fenêtre de la cuisine"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.0,
+      7.55,
+      0.95
+     ],
+     "b": [
+      0.0,
+      9.16,
+      0.95
+     ],
+     "p1": [
+      210,
+      440
+     ],
+     "p2": [
+      452,
+      440
+     ],
+     "quoi": "bas de la fenêtre (allège 0,95 m)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.0,
+      7.55,
+      2.2
+     ],
+     "b": [
+      0.0,
+      9.16,
+      2.2
+     ],
+     "p1": [
+      210,
+      232
+     ],
+     "p2": [
+      452,
+      232
+     ],
+     "quoi": "haut de la fenêtre (2,20 m)"
+    }
+   ]
+  },
+  "photo-14": {
+   "camera": {
+    "x": 13.158,
+    "y": 4.307,
+    "z": 0.921,
+    "cap": -59.047,
+    "tangage": 0.0,
+    "f": 554.462,
+    "u0": 603.0,
+    "v0": 391.51
+   },
+   "largeur": 1206,
+   "hauteur": 786,
+   "qualite": "bonne",
+   "ecart_moyen_px": 5.1,
+   "note": "Chambre 3 (porte à l extrémité ouest du mur nord), vers la baie sud.",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      15.2,
+      0.0,
+      0
+     ],
+     "b": [
+      15.2,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      652,
+      215
+     ],
+     "p2": [
+      652,
+      480
+     ],
+     "quoi": "angle sud-est de la chambre 3"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0
+     ],
+     "b": [
+      12.64,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      1040,
+      180
+     ],
+     "p2": [
+      1040,
+      540
+     ],
+     "quoi": "angle sud-ouest de la chambre 3"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.72,
+      0.0,
+      0
+     ],
+     "b": [
+      14.72,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      718,
+      245
+     ],
+     "p2": [
+      718,
+      488
+     ],
+     "quoi": "bord est de la baie"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.77,
+      0.0,
+      0
+     ],
+     "b": [
+      12.77,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      1000,
+      215
+     ],
+     "p2": [
+      1000,
+      515
+     ],
+     "quoi": "bord ouest de la baie"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      15.2,
+      0.0,
+      0
+     ],
+     "b": [
+      15.2,
+      4.75,
+      0
+     ],
+     "p1": [
+      160,
+      690
+     ],
+     "p2": [
+      60,
+      730
+     ],
+     "quoi": "pied du mur est"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0
+     ],
+     "b": [
+      12.64,
+      4.75,
+      0
+     ],
+     "p1": [
+      1080,
+      620
+     ],
+     "p2": [
+      1180,
+      760
+     ],
+     "quoi": "pied du mur ouest"
+    }
+   ]
+  },
+  "photo-15": {
+   "camera": {
+    "x": 15.024,
+    "y": 3.979,
+    "z": 0.825,
+    "cap": -124.822,
+    "tangage": 0.0,
+    "f": 588.423,
+    "u0": 603.0,
+    "v0": 401.105
+   },
+   "largeur": 1206,
+   "hauteur": 779,
+   "qualite": "bonne",
+   "ecart_moyen_px": 4.4,
+   "note": "Chambre 3, depuis le coin nord-est, vers la baie sud (appareil contre le mur est).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      15.2,
+      0.0,
+      0
+     ],
+     "b": [
+      15.2,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      150,
+      110
+     ],
+     "p2": [
+      150,
+      500
+     ],
+     "quoi": "angle sud-est de la chambre 3"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0
+     ],
+     "b": [
+      12.64,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      570,
+      200
+     ],
+     "p2": [
+      570,
+      470
+     ],
+     "quoi": "angle sud-ouest de la chambre 3"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.72,
+      0.0,
+      0
+     ],
+     "b": [
+      14.72,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      258,
+      190
+     ],
+     "p2": [
+      258,
+      500
+     ],
+     "quoi": "bord est de la baie"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.77,
+      0.0,
+      0
+     ],
+     "b": [
+      12.77,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      545,
+      205
+     ],
+     "p2": [
+      545,
+      485
+     ],
+     "quoi": "bord ouest de la baie"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      15.2,
+      0.0,
+      2.5
+     ],
+     "b": [
+      12.64,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      160,
+      100
+     ],
+     "p2": [
+      565,
+      188
+     ],
+     "quoi": "haut du mur sud (sous la corniche)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0
+     ],
+     "b": [
+      12.64,
+      4.75,
+      0
+     ],
+     "p1": [
+      975,
+      612
+     ],
+     "p2": [
+      1200,
+      690
+     ],
+     "quoi": "pied du mur ouest"
+    }
+   ]
+  },
+  "photo-10": {
+   "camera": {
+    "x": 12.494,
+    "y": 4.056,
+    "z": 1.218,
+    "cap": -126.333,
+    "tangage": 0.0,
+    "f": 598.251,
+    "u0": 603.0,
+    "v0": 357.834
+   },
+   "largeur": 1206,
+   "hauteur": 772,
+   "qualite": "bonne",
+   "ecart_moyen_px": 2.2,
+   "note": "Chambre 2 (radiateur à droite de la baie, étagères à gauche), depuis la porte, vers la baie sud.",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      9.89,
+      0.0,
+      0
+     ],
+     "b": [
+      9.89,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      569,
+      228
+     ],
+     "p2": [
+      569,
+      400
+     ],
+     "quoi": "angle sud-ouest de la chambre 2"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      11.98,
+      0.0,
+      0
+     ],
+     "b": [
+      11.98,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      270,
+      235
+     ],
+     "p2": [
+      270,
+      520
+     ],
+     "quoi": "bord est de la baie"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      10.03,
+      0.0,
+      0
+     ],
+     "b": [
+      10.03,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      546,
+      240
+     ],
+     "p2": [
+      546,
+      420
+     ],
+     "quoi": "bord ouest de la baie"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.89,
+      0.0,
+      0
+     ],
+     "b": [
+      9.89,
+      4.75,
+      0
+     ],
+     "p1": [
+      985,
+      668
+     ],
+     "p2": [
+      1200,
+      748
+     ],
+     "quoi": "pied du mur ouest"
+    }
+   ]
+  },
+  "photo-09": {
+   "camera": {
+    "x": 0.288,
+    "y": 7.916,
+    "z": 1.011,
+    "cap": 39.086,
+    "tangage": 0.0,
+    "f": 594.253,
+    "u0": 603.0,
+    "v0": 390.757
+   },
+   "largeur": 1206,
+   "hauteur": 777,
+   "qualite": "approchée",
+   "ecart_moyen_px": 2.0,
+   "note": "Cuisine, depuis le coin de l évier, vers la porte de l entrée (mur est) ; plan de travail supposé à 90 cm et 62 cm du mur ; repères surtout sur un mur, angle de la gaine pris 18 cm plus au sud que le contour (sinon l appareil sort de la cuisine) : place à ±30 cm.",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      4.92,
+      8.5,
+      0
+     ],
+     "b": [
+      4.92,
+      8.5,
+      2.5
+     ],
+     "p1": [
+      972,
+      175
+     ],
+     "p2": [
+      972,
+      545
+     ],
+     "quoi": "angle de la gaine et du mur est (gaine du plan à ±20 cm)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.92,
+      7.91,
+      0
+     ],
+     "b": [
+      4.92,
+      7.91,
+      2.5
+     ],
+     "p1": [
+      1088,
+      215
+     ],
+     "p2": [
+      1088,
+      550
+     ],
+     "quoi": "bord nord de la porte de l entrée"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.92,
+      8.5,
+      0
+     ],
+     "b": [
+      4.92,
+      7.12,
+      0
+     ],
+     "p1": [
+      978,
+      549
+     ],
+     "p2": [
+      1082,
+      553
+     ],
+     "quoi": "pied du mur est"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.92,
+      8.5,
+      2.5
+     ],
+     "b": [
+      4.92,
+      7.12,
+      2.5
+     ],
+     "p1": [
+      985,
+      165
+     ],
+     "p2": [
+      1200,
+      123
+     ],
+     "quoi": "haut du mur est"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      0.6,
+      8.68,
+      0.9
+     ],
+     "b": [
+      3.9,
+      8.68,
+      0.9
+     ],
+     "p1": [
+      230,
+      488
+     ],
+     "p2": [
+      770,
+      423
+     ],
+     "quoi": "bord avant du plan de travail (90 cm, 62 cm du mur nord)"
+    }
+   ]
+  }
+ },
+ "non_calees": {
+  "photo-06": {
+   "raison": "aucune position cohérente : les repères tombent sur le seul mur du fond (baie) ; essais depuis l ancienne chambre 1 et depuis la porte du dégagement : appareil hors de la pièce ou écart 10 px. Plan peut-être inexact à cet endroit (largeur de la baie O14, profondeur de la pièce).",
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      0.0,
+      0
+     ],
+     "b": [
+      9.75,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      757,
+      250
+     ],
+     "p2": [
+      757,
+      505
+     ],
+     "quoi": "coin sud-est de l ancienne chambre 1 (mur du canapé / mur de la baie)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.25,
+      0.0,
+      0
+     ],
+     "b": [
+      9.25,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      803,
+      280
+     ],
+     "p2": [
+      803,
+      495
+     ],
+     "quoi": "bord est de la baie de l ancienne chambre 1"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.89,
+      0.0,
+      0
+     ],
+     "b": [
+      6.89,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      1112,
+      240
+     ],
+     "p2": [
+      1112,
+      520
+     ],
+     "quoi": "bord ouest de la baie de l ancienne chambre 1"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      0.0,
+      0
+     ],
+     "b": [
+      9.75,
+      0.0,
+      0
+     ],
+     "p1": [
+      810,
+      498
+     ],
+     "p2": [
+      1010,
+      516
+     ],
+     "quoi": "bas de la baie (sol)"
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      0.0,
+      0
+     ],
+     "b": [
+      9.75,
+      4.69,
+      0
+     ],
+     "p1": [
+      705,
+      520
+     ],
+     "p2": [
+      752,
+      508
+     ],
+     "quoi": "pied du mur est (derrière le canapé)"
+    }
+   ]
+  },
+  "photo-11": {
+   "raison": "chambre 2 vue vers le mur ouest : un seul mur visible, son pied caché par le lit, le coin nord caché par l armoire encastrée (profondeur inconnue sur le plan) ; pas assez de repères sûrs. Le sol n y est presque pas visible.",
+   "reperes": []
+  },
+  "photo-12": {
+   "raison": "salle d eau (douche + meuble vasque) : pièce étroite, coins cachés par la paroi de douche, le meuble et la porte ; sol presque invisible ; pas de repère sûr à relier au plan.",
+   "reperes": []
+  },
+  "photo-13": {
+   "raison": "salle d eau (douche + meuble vasque) : pièce étroite, coins cachés par la paroi de douche, le meuble et la porte ; sol presque invisible ; pas de repère sûr à relier au plan.",
+   "reperes": []
+  }
+ }
+}

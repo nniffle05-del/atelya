@@ -1,0 +1,352 @@
+{
+ "note": "Sols d'app-001 vus sur les photos de l'annonce (B2 temps 2, étape 3, 09/11/2026), validés par NT : entre séjour et cuisine DEUX sols, point de Hongrie jusqu'à l'îlot (chaises comprises), carreaux de ciment en cubes après l'îlot côté évier, limite parallèle aux meubles de cuisine ; entrée et passage en lames droites jusqu'à la cuisine. Contours en mètres, repère du logement traduit (..\\atelya\\lectures-claude\\app-001\\logement.json). Corniches moulurées vues sur les photos 07, 08 et 11 (NT : « la jonction des murs est trop brute »). RÉVISION du 09/11/2026 (accord NT) : d'après les caméras calées de l'étape 4, la bande devant l'îlot (sous les chaises) et le passage jusqu'à l'entrée sont en LAMES DROITES (avant : point de Hongrie) ; jointure en biais vue sur la photo 02 ; avancée des cubes devant le bout de l'îlot placée à ±0,3 m (photos 05 et 06 en désaccord). Zones découpées en morceaux convexes (règle du format). « couleur_visee » = couleur du parquet SUR LES PHOTOS (CIELAB : L clarté 0-100, a rouge, b jaune), médiane des pixels « bois » de la zone sur chaque photo (tapis, meubles gris et murs écartés par un filtre de couleur), puis moyenne des photos ; sert à noter la brique photos et à régler la teinte de la maquette en « jour voilé ». Mesuré : maquette en jour voilé point de Hongrie L≈39 a≈19 contre L≈52 a≈12 sur les photos (trop foncé, trop rouge).",
+ "photos": "../atelya/photos-clients/app-001/photos",
+ "bibliotheque": "../atelya/bibliotheque/matieres",
+ "pieces": {
+  "sejour_1": {
+   "matiere": "point_de_hongrie",
+   "echelle": 1.13,
+   "source": "photos 01 à 04 (couleur mesurée sur la 04 ; la 03 est faussée par le reflet des fenêtres)",
+   "photo": "photo-04.png",
+   "zone_sol": [
+    0.05,
+    0.35,
+    0.86,
+    0.98
+   ],
+   "zone_mur_blanc": [
+    0.52,
+    0.6,
+    0.08,
+    0.28
+   ],
+   "zones": [
+    {
+     "contour": [
+      [
+       8.9,
+       9.3
+      ],
+      [
+       13.54,
+       9.3
+      ],
+      [
+       13.54,
+       11.7
+      ],
+      [
+       8.9,
+       11.7
+      ]
+     ],
+     "matiere": "carreaux_cubes",
+     "source": "photos 05, 06 : côté évier de l'îlot (limite au pied de l'îlot côté chaises)"
+    },
+    {
+     "contour": [
+      [
+       8.9,
+       9.23
+      ],
+      [
+       10.7,
+       8.75
+      ],
+      [
+       11.1,
+       9.3
+      ],
+      [
+       8.9,
+       9.3
+      ]
+     ],
+     "matiere": "carreaux_cubes",
+     "source": "révisé le 09/11/2026 (brique photos) : avancée des cubes devant le bout de l'îlot (photos 05 et 06 en désaccord de ~0,3 m : limite moyenne)"
+    },
+    {
+     "contour": [
+      [
+       13.54,
+       4.02
+      ],
+      [
+       21.0,
+       4.02
+      ],
+      [
+       21.0,
+       12.3
+      ],
+      [
+       13.54,
+       12.3
+      ]
+     ],
+     "matiere": "chene_clair_photo",
+     "echelle": 0.32,
+     "photo": "photo-07.png",
+     "zone_sol": [
+      0.3,
+      0.7,
+      0.8,
+      0.97
+     ],
+     "zone_mur_blanc": [
+      0.29,
+      0.335,
+      0.12,
+      0.45
+     ],
+     "source": "photo 07 (entrée et passage jusqu'à la cuisine)",
+     "couleur_visee": {
+      "L": 50.4,
+      "a": 15.3,
+      "b": 31.9,
+      "photos": {
+       "photo-05": [
+        48.6,
+        15.8,
+        32.7
+       ],
+       "photo-06": [
+        47.1,
+        14.3,
+        30.5
+       ],
+       "photo-07": [
+        55.5,
+        15.9,
+        32.4
+       ]
+      }
+     }
+    },
+    {
+     "contour": [
+      [
+       10.6,
+       8.35
+      ],
+      [
+       13.54,
+       4.6
+      ],
+      [
+       13.54,
+       9.3
+      ],
+      [
+       11.1,
+       9.3
+      ],
+      [
+       10.7,
+       8.75
+      ]
+     ],
+     "matiere": "chene_clair_photo",
+     "echelle": 0.32,
+     "photo": "photo-07.png",
+     "zone_sol": [
+      0.3,
+      0.7,
+      0.8,
+      0.97
+     ],
+     "zone_mur_blanc": [
+      0.29,
+      0.335,
+      0.12,
+      0.45
+     ],
+     "source": "révisé le 09/11/2026 (brique photos) : passage en lames entre l'îlot, le caisson bleu et l'entrée (photos 02, 05, 06, 07, 01) ; jointure en biais avec le point de Hongrie vue sur la photo 02 (frise), placée à ±0,3-0,5 m",
+     "couleur_visee": {
+      "L": 50.4,
+      "a": 15.3,
+      "b": 31.9,
+      "photos": {
+       "photo-05": [
+        48.6,
+        15.8,
+        32.7
+       ],
+       "photo-06": [
+        47.1,
+        14.3,
+        30.5
+       ],
+       "photo-07": [
+        55.5,
+        15.9,
+        32.4
+       ]
+      }
+     }
+    },
+    {
+     "contour": [
+      [
+       8.9,
+       8.6
+      ],
+      [
+       10.6,
+       8.35
+      ],
+      [
+       10.7,
+       8.75
+      ],
+      [
+       8.9,
+       9.23
+      ]
+     ],
+     "matiere": "chene_clair_photo",
+     "echelle": 0.32,
+     "photo": "photo-07.png",
+     "zone_sol": [
+      0.3,
+      0.7,
+      0.8,
+      0.97
+     ],
+     "zone_mur_blanc": [
+      0.29,
+      0.335,
+      0.12,
+      0.45
+     ],
+     "source": "révisé le 09/11/2026 (brique photos) : lames devant l'îlot, sous les chaises (photos 05, 06) ; limite côté séjour non vue (au-delà du bas des photos)",
+     "couleur_visee": {
+      "L": 50.4,
+      "a": 15.3,
+      "b": 31.9,
+      "photos": {
+       "photo-05": [
+        48.6,
+        15.8,
+        32.7
+       ],
+       "photo-06": [
+        47.1,
+        14.3,
+        30.5
+       ],
+       "photo-07": [
+        55.5,
+        15.9,
+        32.4
+       ]
+      }
+     }
+    }
+   ],
+   "corniche": {
+    "choix": "moulure",
+    "source": "photo 07 (entrée)"
+   },
+   "couleur_visee": {
+    "L": 52.5,
+    "a": 12.2,
+    "b": 27.4,
+    "photos": {
+     "photo-01": [
+      51.6,
+      11.4,
+      27.1
+     ],
+     "photo-03": [
+      50.0,
+      10.3,
+      23.6
+     ],
+     "photo-04": [
+      56.0,
+      14.9,
+      31.3
+     ]
+    }
+   }
+  },
+  "chambre_1": {
+   "matiere": "chene_clair_photo",
+   "echelle": 0.32,
+   "source": "photo 08",
+   "photo": "photo-08.png",
+   "zone_sol": [
+    0.1,
+    0.45,
+    0.86,
+    0.97
+   ],
+   "zone_mur_blanc": [
+    0.05,
+    0.25,
+    0.1,
+    0.35
+   ],
+   "corniche": {
+    "choix": "moulure",
+    "source": "photo 08"
+   },
+   "couleur_visee": {
+    "L": 50.2,
+    "a": 16.1,
+    "b": 31.4,
+    "photos": {
+     "photo-08": [
+      50.2,
+      16.1,
+      31.4
+     ]
+    }
+   }
+  },
+  "chambre_2": {
+   "matiere": "chene_clair_photo",
+   "echelle": 0.32,
+   "source": "photos 10, 11",
+   "photo": "photo-11.png",
+   "zone_sol": [
+    0.0,
+    0.2,
+    0.86,
+    0.97
+   ],
+   "zone_mur_blanc": [
+    0.36,
+    0.52,
+    0.15,
+    0.35
+   ],
+   "corniche": {
+    "choix": "moulure",
+    "source": "photo 11"
+   },
+   "couleur_visee": {
+    "L": 50.8,
+    "a": 16.2,
+    "b": 31.6,
+    "photos": {
+     "photo-10": [
+      53.1,
+      15.1,
+      31.3
+     ],
+     "photo-11": [
+      48.5,
+      17.3,
+      31.9
+     ]
+    }
+   }
+  },
+  "salle_d_eau_1": {
+   "matiere": "petits_carreaux_clairs",
+   "source": "photo 12"
+  }
+ }
+}
