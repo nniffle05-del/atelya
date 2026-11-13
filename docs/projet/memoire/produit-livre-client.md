@@ -524,3 +524,25 @@ le réglerait vraiment ; NT ne veut ni message de relance au client, ni caméra 
 Tests : coût du regard, et vol avec / sans l'exception des cadrages (`tests/test_vide_dehors.py`). Films :
 `..\atelya\b2\app-002\unreal\film\vide-cadrages(-avant-apres).mp4` (versions 1 et 2 : `evite-le-vide*`, `vide-evite-dose*`).
 **FUSION DANS `main` (13/11/2026, accord NT « fais ce que tu penses être le mieux ») :** toute la branche `etape-ecran-lecture-claude` (108 commits, jusqu'à l'étape 6 de la cinématique) fusionnée dans `main` (f0a49c8) et POUSSÉE sur GitHub. Étape suivante conseillée à NT : caméras des photos calées seules, dans une nouvelle conversation.
+
+**CAMÉRAS DES PHOTOS CALÉES SEULES : PREMIERS ESSAIS, PAS ENCORE AU POINT (13/11/2026 soir, branche `etape-cameras-seules`, NT absent : « tu peux le faire ici »).**
+But : retrouver sans la main d'où chaque photo du client a été prise (aujourd'hui `cameras-photos.json` est relevé à la main).
+Corrigé disponible : 22 photos calées à la main (11 app-001, 11 app-002). Prototype NON branché, gardé dans
+`pc/essais-cameras-seules/` (lancer avec `PYTHONPATH=.;pc/essais-cameras-seules`).
+(A) Lignes de la photo (LSD d'OpenCV, + image contrastée pour le blanc sur blanc) → points de fuite → horizon, focale, angle du
+regard par rapport aux murs. app-002 : angle retrouvé à ≤ 5° sur 8/11 ; focale à ± 20 % seulement ; app-001 (parquets à motifs,
+beaucoup de meubles) : angle bon sur 5/11.
+(B) Place de l'appareil par essais : grille de 25 cm dans toutes les pièces × 4 orientations × 3 hauteurs ; la 3D (plafond, pied
+des murs, hauts de portes et fenêtres, appuis, angles, montants) projetée et comparée aux lignes de la photo (cartes de distance
+par orientation), puis ajustement fin. CE QUI MARCHE : parti d'une place approximative, l'ajustement fin colle très bien (séjour
+photo-04 : plafond, porte, angles au pixel près). CE QUI NE MARCHE PAS : choisir la bonne place parmi toutes. app-002 : 2/11 puis
+3/11 bien placées (< 0,5 m et < 8°) avec une note « dans les deux sens » (3D expliquée par la photo ET lignes hautes de la photo
+expliquées par la 3D). Causes : (1) les lignes des meubles trompent la note (un WC ou une salle d'eau « gagne ») ; la BONNE place,
+ajustée, a une note plus basse (0,18-0,37) que la fausse gagnante (0,32-0,42) : c'est la note qui est insuffisante, pas la
+recherche ; (2) pièces JUMELLES (chambres 1 et 2 d'app-002, même forme) : la géométrie seule ne peut pas les distinguer ;
+(3) le corrigé à la main a lui-même ~0,5 m d'incertitude en recul (3 caméras tombent hors de la pièce, dans le mur ou la fenêtre).
+PISTE SUIVANTE (non faite) : ajouter du SENS avant la géométrie : OWLv2 (déjà en service) reconnaît bien les meubles sur ces
+photos (lit → chambre, canapé / table → séjour, rangées de placards → cuisine : vérifié sur les 22 photos) → ne chercher que dans
+les pièces de ce type ; en revanche OWLv2 voit MAL les fenêtres (note ≤ 0,36, la grande baie du séjour absente) : il faudra un
+autre repérage des vitres (zones très claires) ; masque du sol de `sols_photos` contre le sol prévu. Atelya doit savoir dire « pas
+réussi » (écart entre la 1re et la 2e note, pièces jumelles) et alors ne pas utiliser la photo pour la vue.
