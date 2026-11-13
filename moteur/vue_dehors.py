@@ -30,7 +30,8 @@ import numpy as np
 
 from moteur import camera_photo
 
-DISTANCE_M = 35.0  # distance des immeubles d'en face, par défaut. app-002 (12/11/2026) : ~20 m pour le plus proche, ~55 m pour
+DISTANCE_M = 35.0  # distance des immeubles d'en face, par défaut (pour un côté que moteur/distance_dehors.py ne sait pas mesurer
+# sur les photos, étape 6 du 13/11/2026). app-002 (12/11/2026) : ~20 m pour le plus proche, ~55 m pour
 # les plus lointains (hauteur des étages sur les photos 14 et 15), ~29 m côté ouest (photo 8) ; à 40 m la vue rendue depuis la
 # place de la photo 15 retrouve sa composition, à 21 m les photos se mêlaient mal. Seul le décalage en marchant en dépend.
 PAS_M = 0.03  # taille d'un point de la toile (une photo d'annonce donne ~3 cm par pixel à cette distance)

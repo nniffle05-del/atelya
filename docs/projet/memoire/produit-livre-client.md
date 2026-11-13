@@ -410,3 +410,31 @@ balcon du SÉJOUR = MURET PLEIN (photo 03 ; erreur de relevé corrigée, `genre:
 `vraie-vue-balcons2.mp4` (+ `-avant-apres`) : dehors presque blanc 89 -> 26 %, couleur 0,004 -> 0,051, détail 0,6 -> 3,7 crans, murs
 inchangés (trop clairs / sombres =, écart médian -0,012 -> -0,029). NT : « j'aime beaucoup ». Qui fait quoi (question de NT) : Atelya
 construit, peint le décor et tourne seul ; relevés à la main par Claude pour app-002 : balcons, caméras des photos, distance 35 m.
+**Étape 6 (13/11/2026) : la DISTANCE des immeubles d'en face mesurée SEULE sur les photos (accord NT « Oui » aux deux façons).**
+`moteur/distance_dehors.py` 0.1.0, branché dans `outils/unreal/vue_dehors_photos.py` (donc dans `balade_unreal --photos`) : sans
+`--distance`, chaque côté prend sa distance mesurée, sinon garde `vue_dehors.DISTANCE_M` (35 m) ; `--distance` impose l'ancien
+comportement. Sorties : `distances-dehors.json` (détail par côté et par photo) et `distances-etages.jpg` (étages trouvés dessinés :
+vert retenu, orange écarté). FAÇON 1 « les étages d'en face » (retenue) : étage = 3 m (HAUTEUR_ETAGE_M) ; pour chaque distance
+essayée (8-120 m), la caméra calée dit de combien de pixels descendre d'un étage ; on corrèle les TRAITS HORIZONTAUX de la vue avec
+eux-mêmes un étage plus bas (et deux étages quand la fenêtre en montre assez), bande de 120 px par bande (une photo voit souvent un
+immeuble proche à droite et des lointains à gauche). Pièges trouvés en route : (1) le motif « haut + bas de fenêtre » fait prendre un
+demi-étage pour un étage (distance doublée) → corrélation de l'image décalée plutôt que spectre du profil ; (2) les traits de NOTRE
+façade (barre d'appui 0,8-1,2 m d'une porte-fenêtre, lisse des garde-corps, haut du muret) se retrouvaient entre eux → retirés
+(+ 8 px) et les lignes continues sur toute une bande ôtées ; (3) la barre d'appui d'une fenêtre était cherchée sur le plan de TOUTES
+les fenêtres du côté (vidait le haut de la vue de la chambre 15) → seulement dans la largeur de l'ouverture ; (4) avec trop peu de
+partie commune (< 35 % de la bande), faux immeubles à 9-14 m ; (5) une lamelle de fenêtre au bord d'une photo ne mesure rien
+(largeur ≥ 50 px). PRUDENCE : une mesure n'est RETENUE que si la même photo donne la même distance (±10 %) dans deux bandes qui ne
+se recouvrent pas ; côté = moyenne en 1/D des retenues, bornée 12-80 m. FAÇON 2 « accord des photos » (essayée, ÉCARTÉE) : sur
+app-002 aucune distance où les photos s'accordent (corrélations ≤ 0,1-0,2) : elles voient presque toujours des immeubles différents
+(chambre 14 l'immeuble proche, 15 les lointains, 10 la télé devant), et le calage à 3-10 px près brouille le détail.
+RÉSULTATS app-002 (mesures à la main : ouest ~29 m, sud ~20 m le proche / ~55 m les lointains) : OUEST 34,2 m MESURÉ (cuisine,
+4 bandes 33,4-35,3 m ; contrôle à l'œil : traits sur les étages ; écart à la main surtout l'étage supposé à 3 m, immeuble moderne
+~2,8 m → ~32 m) ; SUD NON MESURÉ → 35 m (chambre 14 : 47-48 m = demi-étages d'un immeuble à ~20 m qui alterne balcons et fenêtres,
+non confirmé ; chambre 15 : immeubles anciens trop petits et irréguliers ; couloir : faux 9 m écarté ; chambre 10 : 44 et 93 m qui
+se contredisent). app-001 (voilages) : non mesuré partout (une bande isolée à 20 m derrière un voilage, écartée). Plans fabriqués
+(façade dessinée à distance connue) : 15, 20, 30, 45, 60 m retrouvés à < 1 %. 5 s de calcul par logement. AVANT / APRÈS : ouest
+35 → 34,2 m, sud inchangé : les immeubles glissent ~2 % plus vite à l'ouest, invisible ; film non refait (identique à
+`vraie-vue-balcons2.mp4`). Images : `..\atelya\b2\app-002\unreal\distance-dehors\` (`etape6-etages-comptes.jpg`). LIMITES : une
+toile plate par côté (ne peut pas être à 20 m ET 55 m) ; étage supposé 3 m (±10 %) ; il faut ≥ 1,5 étage net et régulier dans une
+fenêtre ; dépend du calage des photos (fait à la main pour app-002). Pistes : demander au client une photo de la vue prise près de
+la vitre (plusieurs étages nets) ; une toile par fenêtre ou par pièce à sa propre distance ; caméra calée seule (en réserve).

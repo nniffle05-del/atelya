@@ -381,6 +381,12 @@ construits dans Unreal (`poser_balcons`) ; app-002 : deux balcons du plan. app-0
 NT veut la distance la plus juste ; à faire : distance des immeubles mesurée seule, caméras des photos calées seules, balcons dans
 Blender et lus sur le plan. app-001 : voilages, pas de vue. Détail : fin de `produit-livre-client.md`.
 
+**ÉTAPE 6 : DISTANCE des immeubles d'en face mesurée seule (13/11/2026)** : `moteur/distance_dehors.py` (les étages d'en face, 3 m,
+retrouvés en faisant glisser la vue d'un étage ; mesure retenue seulement si deux endroits séparés d'une même photo s'accordent),
+branché par défaut dans `vue_dehors_photos` (côté non mesuré = 35 m). app-002 : ouest 34,2 m mesuré (main ~29), sud NON mesuré
+(piège du demi-étage chambre 14, immeubles anciens trop petits) ; app-001 non mesuré (voilages) ; « accord des photos » écarté (les
+photos voient des immeubles différents). Film inchangé (écart invisible). Détail : fin de `produit-livre-client.md`.
+
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
 **Restes d'A2** (non prioritaires) :

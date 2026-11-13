@@ -3,6 +3,11 @@
 
     python outils/unreal/vue_dehors_photos.py <logement.json> <cameras-photos.json> <dossier de sortie> [--distance 35]
 
+Distance des immeubles d'en face : MESURÉE SEULE sur les photos, côté par côté (moteur/distance_dehors.py : les étages d'en
+face, étape 6, 13/11/2026) ; un côté non mesuré garde la distance par défaut (vue_dehors.DISTANCE_M) ; --distance l'impose
+partout (ancien comportement). Le détail est dans <sortie>/distances-dehors.json, les étages trouvés dessinés sur les photos
+dans <sortie>/distances-etages.jpg.
+
 <cameras-photos.json> : la caméra de chaque photo du client (moteur/camera_photo.py ; « photos » = dossier des photos,
 « fichier » = modèle de nom, « cameras » = {nom: {camera, qualite, …}}). Les meubles posés devant les fenêtres (chaises, télé…)
 sont repérés par OWLv2 (moteur/owlv2.py, déjà en service pour les meubles) et écartés : ils ne sont pas peints sur la vue ;
@@ -21,7 +26,7 @@ import numpy as np
 
 RACINE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RACINE))
-from moteur import camera_photo, vue_dehors  # noqa: E402
+from moteur import camera_photo, distance_dehors, vue_dehors  # noqa: E402
 from moteur.images import lire_image  # noqa: E402
 
 SEUIL_MEUBLES = 0.2
@@ -68,6 +73,30 @@ def meubles_devant(photos: dict[str, Path], cache: Path) -> dict[str, list]:
     return boites
 
 
+def mesurer_distances(logement: dict, photos: list[dict], sortie: Path) -> dict:
+    """Distance de chaque côté mesurée sur les photos (distance_dehors) ; écrit distances-dehors.json et la planche
+    distances-etages.jpg (étages trouvés dessinés : vert = retenu, orange = seul, écarté)."""
+    mesure = distance_dehors.mesurer_logement(logement, photos)
+    (sortie / "distances-dehors.json").write_text(json.dumps(
+        {"version": distance_dehors.VERSION, "hauteur_etage_m": distance_dehors.HAUTEUR_ETAGE_M,
+         "par_defaut_m": vue_dehors.DISTANCE_M, "cotes": mesure}, indent=1, ensure_ascii=False), encoding="utf-8")
+    vignettes = []
+    for ph in photos:
+        ms = [m for r in mesure.values() for m in r["par_photo"].get(ph["nom"], [])]
+        if ms:
+            im = distance_dehors.dessiner(ph["image"], ms, ph["cam"])
+            cv2.putText(im, ph["nom"], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+            vignettes.append(cv2.resize(im, (603, int(im.shape[0] * 603 / im.shape[1]))))
+    if vignettes:
+        h = max(v.shape[0] for v in vignettes)
+        vignettes = [np.pad(v, ((0, h - v.shape[0]), (0, 0), (0, 0))) for v in vignettes]
+        if len(vignettes) % 2:
+            vignettes.append(np.zeros_like(vignettes[0]))
+        planche = np.vstack([np.hstack(vignettes[i:i + 2]) for i in range(0, len(vignettes), 2)])
+        cv2.imencode(".jpg", cv2.cvtColor(planche, cv2.COLOR_RGB2BGR))[1].tofile(str(sortie / "distances-etages.jpg"))
+    return mesure
+
+
 def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: float | None = None) -> list[dict]:
     """Fabrique les toiles et renvoie la liste des vues à poser dans Unreal ([] si aucune photo ne voit dehors)."""
     logement = json.loads(logement_json.read_text(encoding="utf-8"))
@@ -78,17 +107,25 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
     ouvertures = vue_dehors.ouvertures_vitrees(logement)
     murs = vue_dehors.murs_et_trous(logement)
     photos = []
+    pour_mesure = []
     for nom, chemin in fichiers.items():
         c = cameras["cameras"][nom]
         rvb = cv2.cvtColor(lire_image(str(chemin)), cv2.COLOR_BGR2RGB)
+        pour_mesure.append({"nom": nom, "image": rvb, "cam": camera_photo.camera_depuis_dict(c["camera"]),
+                            "qualite": c.get("qualite", "bonne"), "caches": caches.get(nom, []),
+                            "ecart_px": float(c.get("ecart_moyen_px", 3.0))})
         ph = vue_dehors.preparer_photo(rvb, camera_photo.camera_depuis_dict(c["camera"]), ouvertures, c.get("qualite", "bonne"),
                                        murs, caches.get(nom, []), ecart_px=float(c.get("ecart_moyen_px", 3.0)),
                                        balcons=logement.get("balcons"))
         if ph is not None:
             ph["nom"] = nom
             photos.append(ph)
+    distances, mesure = distance, {}
+    if distance is None:
+        mesure = mesurer_distances(logement, pour_mesure, sortie)
+        distances = {cote: m["distance_m"] for cote, m in mesure.items() if m["distance_m"] is not None}
     vues, bilan, apercus = [], [], []
-    toiles = vue_dehors.facades(logement, distance)
+    toiles = vue_dehors.facades(logement, distances)
     for f, rue in zip(toiles, vue_dehors.rues(toiles)):
         r = vue_dehors.composer(f, photos)
         if r["couverte"] <= 0:
@@ -102,7 +139,10 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
             cv2.imencode(".png", cv2.cvtColor(res["rvba"], cv2.COLOR_RGBA2BGRA))[1].tofile(str(png))
             vues.append({**vue_dehors.vers_unreal(plan), "id": plan["id"], "image": png.as_posix(),
                          "force": vue_dehors.FORCE_TOILE})
-            bilan.append({"cote": plan["id"], "distance_m": plan["distance"], "fenetres": plan["fenetres"],
+            bilan.append({"cote": plan["id"], "distance_m": plan["distance"],
+                          "distance": ("imposée" if distance is not None
+                                       else mesure.get(f["id"], {}).get("statut", "non_mesuree")),
+                          "fenetres": plan["fenetres"],
                           "part_couverte": res["couverte"], "photos": res["parts"]})
             a = res["rvba"][..., 3:4] / 255.0
             apercus.append((res["rvba"][..., :3] * a + np.array([60, 60, 60]) * (1 - a)).astype(np.uint8))
@@ -121,12 +161,13 @@ def main() -> None:
     p.add_argument("logement")
     p.add_argument("cameras")
     p.add_argument("sortie")
-    p.add_argument("--distance", type=float, default=None, help=f"distance des immeubles d'en face (défaut {vue_dehors.DISTANCE_M} m)")
+    p.add_argument("--distance", type=float, default=None, help="impose la distance des immeubles d'en face partout (défaut : mesurée sur les photos, "
+                   f"{vue_dehors.DISTANCE_M} m pour un côté non mesuré)")
     a = p.parse_args()
     vues = preparer(Path(a.logement), Path(a.cameras), Path(a.sortie), a.distance)
     bilan = json.loads((Path(a.sortie) / "vues-dehors.json").read_text(encoding="utf-8"))["bilan"]
     for b in bilan:
-        print(f"{b['cote']} : {b['distance_m']} m, fenêtres {b['fenetres']}, couverte {b['part_couverte']}, photos {b['photos']}")
+        print(f"{b['cote']} : {b['distance_m']} m ({b['distance']}), fenêtres {b['fenetres']}, couverte {b['part_couverte']}, photos {b['photos']}")
     print(f"{len(vues)} toile(s) dans {a.sortie}")
 
 
