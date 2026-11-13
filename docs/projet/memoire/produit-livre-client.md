@@ -472,3 +472,20 @@ RÉSULTAT (13/11/2026) : film `..\atelya\b2\app-002\unreal\film\distance-mesuree
 ~2×). Plus de bande blanche, de coin bleuté ni de rectangle gris. 887 tests verts (sans celui d'Edge, qui échoue sans navigateur).
 Reste : pâles bandes verticales entre deux photos (déjà là avant), objets intérieurs (appliques) peints sur le décor ouest (déjà là
 avant, calage des photos 04/05), étage supposé 3 m.
+**Étape 6, après avis NT (13/11/2026) : « des fois la caméra s'avance et on voit qu'en dessous il n'y a rien » ; « tout doit être
+autogéré par Atelya ».** Cause : sous la vue, le pied des immeubles et la rue (jamais vus par des photos prises d'un étage) =
+grande surface grise unie ; dans la cuisine, la correction des rectangles laissait une « colline » grise. (1)
+`vue_dehors.prolonger_les_etages` : les immeubles d'en face PROLONGÉS jusqu'à la rue par leurs PROPRES étages (chaque ligne
+reprend la ligne un étage plus haut, 3 m = `distance_dehors.HAUTEUR_ETAGE_M`, colonne par colonne ; colonnes montrant ≥ 1 étage
+entier) ; les trous internes aussi. Rien d'inventé (règle NT : jamais une rue inventée ; la rue reste unie). (2)
+`derriere_un_garde_corps` (+ `composer(…, balcons, ouvertures)`) : ce que les photos voient À TRAVERS un garde-corps (verre,
+barreaux, lisse : jusqu'à hauteur + 0,25 m, MARGE_LISSE_M) ou la barre d'appui d'une porte-fenêtre (0,75-1,25 m sur la face
+extérieure) n'est plus peint : c'est NOTRE façade (vue deux fois avec le garde-corps construit) ; recopiée d'étage en étage elle
+faisait une barre sombre à chaque étage. (3) `fondre_le_bas` ne fond plus que ce qui n'est ni vu ni prolongé (`_plein`).
+REFUSÉ PAR NT (13/11/2026, film `etages-prolonges`) : « ça se voit que tu as dupliqué, la vue n'est plus fidèle aux photos ».
+Les étages recopiés vers le bas (`prolonger_les_etages`) et le retrait de ce qui est vu à travers les garde-corps
+(`derriere_un_garde_corps`) sont RETIRÉS du code (retour à l'état du commit ba04075, film de référence `distance-mesuree.mp4`).
+RÈGLE : le décor ne montre QUE ce que les photos montrent, à sa place ; jamais de contenu recopié, répété ou fabriqué pour
+combler ce qu'elles ne voient pas. Le manque sous la vue (« en dessous il n'y a rien » quand la caméra s'avance) reste ouvert :
+pistes fidèles = une photo de la vue prise par le client près de la vitre en regardant vers le bas ; une caméra du film qui ne
+plonge pas vers ce que les photos ne montrent pas (le réalisateur sait ce que le décor couvre).
