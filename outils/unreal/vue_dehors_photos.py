@@ -120,32 +120,59 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
         if ph is not None:
             ph["nom"] = nom
             photos.append(ph)
-    distances, mesure = distance, {}
+    distances, mesure, marches = distance, {}, None
     if distance is None:
         mesure = mesurer_distances(logement, pour_mesure, sortie)
         distances = {cote: m["distance_m"] for cote, m in mesure.items() if m["distance_m"] is not None}
+        # un côté aux immeubles à plusieurs distances : décor qui SUIT LA RUE (une toile par distance, en biais entre deux)
+        marches = {cote: m["marches"] for cote, m in mesure.items() if len(m.get("marches") or []) >= 2}
     vues, bilan, apercus = [], [], []
-    toiles = vue_dehors.facades(logement, distances)
-    for f, rue in zip(toiles, vue_dehors.rues(toiles)):
-        r = vue_dehors.composer(f, photos)
-        if r["couverte"] <= 0:
+    toiles = vue_dehors.facades(logement, distances, marches)
+    immeubles = [t for t in toiles if t["genre"] == "immeubles"]
+    rues = {r["id"]: r for r in vue_dehors.rues(toiles)}
+
+    def ecrire(plan, res, f):
+        png = sortie / f"toile-{plan['id']}.png"
+        cv2.imencode(".png", cv2.cvtColor(res["rvba"], cv2.COLOR_RGBA2BGRA))[1].tofile(str(png))
+        vues.append({**vue_dehors.vers_unreal(plan), "id": plan["id"], "image": png.as_posix(), "force": vue_dehors.FORCE_TOILE})
+        bilan.append({"cote": plan["id"], "distance_m": plan["distance"],
+                      "distance": ("imposée" if distance is not None
+                                   else mesure.get(f["cote"], {}).get("statut", "non_mesuree")),
+                      "fenetres": plan["fenetres"], "part_couverte": res["couverte"], "photos": res["parts"]})
+        a = res["rvba"][..., 3:4] / 255.0
+        apercus.append((res["rvba"][..., :3] * a + np.array([60, 60, 60]) * (1 - a)).astype(np.uint8))
+
+    couleurs, faits = {}, {}
+    for f in immeubles:
+        # une photo ne peint pas sur une toile ce qui est caché derrière une autre toile du même côté (décor qui suit la rue)
+        ecrans = [g for g in immeubles if g["cote"] == f["cote"] and g is not f]
+        r = vue_dehors.composer(f, photos, ecrans=ecrans)
+        faits[f["id"]] = r
+        if r["couverte"] > 0:
+            couleurs[f["id"]] = np.median(r["_couleur"][r["_vu"]], axis=0)
+    # la RUE au pied des immeubles d'en face : sol au niveau de la rue, UNIE (les photos ne voient pas la chaussée ; ce qu'elles
+    # montrent sous les fenêtres est le sol des BALCONS, qui collé sur la rue y faisait des plaques beiges, 13/11/2026), d'UNE
+    # seule couleur par côté (moyenne des pieds des toiles vues, pondérée par leur part vue) : avec un décor qui suit la rue,
+    # une couleur par toile faisait des coins de teintes différentes
+    rue_cote = {}
+    for cote in {f["cote"] for f in immeubles}:
+        cs = [(vue_dehors.couleur_de_la_rue(f, faits[f["id"]]), faits[f["id"]]["couverte"] * f["longueur_u"])
+              for f in immeubles if f["cote"] == cote and faits[f["id"]]["couverte"] > 0]
+        if cs:
+            rue_cote[cote] = (np.sum([c * w for c, w in cs], axis=0) / sum(w for _, w in cs)).astype(np.float32)
+    for f in immeubles:
+        r = faits[f["id"]]
+        if f["cote"] not in rue_cote:
             continue
-        # la toile des immeubles d'en face, puis la RUE à ses pieds (sol au niveau de la rue, couleur du bas de la vraie vue)
-        # rue UNIE : les photos ne voient pas la chaussée ; ce qu'elles montrent sous les fenêtres est le sol des BALCONS (absents
-        # de la maquette), qui collé sur la rue y faisait des plaques beiges (13/11/2026)
-        r_rue = vue_dehors.composer(rue, [], defaut=vue_dehors.couleur_de_la_rue(f, r))
-        for plan, res in ((f, r), (rue, r_rue)):
-            png = sortie / f"toile-{plan['id']}.png"
-            cv2.imencode(".png", cv2.cvtColor(res["rvba"], cv2.COLOR_RGBA2BGRA))[1].tofile(str(png))
-            vues.append({**vue_dehors.vers_unreal(plan), "id": plan["id"], "image": png.as_posix(),
-                         "force": vue_dehors.FORCE_TOILE})
-            bilan.append({"cote": plan["id"], "distance_m": plan["distance"],
-                          "distance": ("imposée" if distance is not None
-                                       else mesure.get(f["id"], {}).get("statut", "non_mesuree")),
-                          "fenetres": plan["fenetres"],
-                          "part_couverte": res["couverte"], "photos": res["parts"]})
-            a = res["rvba"][..., 3:4] / 255.0
-            apercus.append((res["rvba"][..., :3] * a + np.array([60, 60, 60]) * (1 - a)).astype(np.uint8))
+        if r["couverte"] <= 0:
+            # une toile qu'aucune photo ne voit : couleur unie de ses voisines (sinon un trou dans la rue)
+            voisines = [couleurs[g["id"]] for g in immeubles if g["cote"] == f["cote"] and g["id"] in couleurs]
+            r = vue_dehors.composer(f, [], defaut=np.median(voisines, axis=0))
+        else:
+            r = vue_dehors.fondre_le_bas(r, f, rue_cote[f["cote"]])
+        rue = rues[f["id"].replace("facade-", "rue-")]
+        ecrire(f, r, f)
+        ecrire(rue, vue_dehors.composer(rue, [], defaut=rue_cote[f["cote"]]), f)
     (sortie / "vues-dehors.json").write_text(json.dumps({"vues": vues, "bilan": bilan,
                                                           "photos_utilisees": [p["nom"] for p in photos]},
                                                          indent=1, ensure_ascii=False), encoding="utf-8")

@@ -173,3 +173,75 @@ def test_rue_au_pied_de_la_facade():
     assert np.allclose(P[..., 2], vd.Z_BAS_M) and P[..., 1].max() < -0.1 and P[..., 1].min() > -20.2
     u = vd.vers_unreal(sud)
     assert u["normale_vers_logement"] == [0.0, -0.0, 1.0] or np.allclose(u["normale_vers_logement"], [0, 0, 1])
+
+
+def test_decor_qui_suit_la_rue():
+    """Côté sud mesuré à deux distances (étape 6) : une toile droite par endroit mesuré, un pan en biais entre les deux ; le
+    coin de rue ne coupe que le bout tourné vers l'autre côté."""
+    log = _logement()
+    marches = {"facade-sud": [{"u0": -12.0, "u1": -8.0, "distance_m": 15.0}, {"u0": -2.0, "u1": 2.0, "distance_m": 40.0}]}
+    fs = vd.facades(log, {"facade-ouest": 30.0}, marches)
+    sud = [f for f in fs if f.get("cote") == "facade-sud"]
+    assert [f["id"] for f in sud] == ["facade-sud-1", "facade-sud-2", "facade-sud-3"]
+    a, biais, b = sud
+    assert abs(a["u1"] - (-8.0)) < 1e-9 and abs(b["u0"] - (-2.0)) < 1e-9  # chaque endroit mesuré garde sa distance
+    assert abs(a["decalage"] - 15.1) < 1e-9 and abs(b["decalage"] - 40.1) < 1e-9
+    # le pan en biais relie le bout de la toile proche (x = 8, y = -15,1) au début de la lointaine (x = 2, y = -40,1)
+    assert biais.get("biais") and abs(biais["longueur_u"] - np.hypot(6.0, 25.0)) < 1e-6
+    bout = biais["origine"][:2] + biais["axe_u"][:2] * biais["longueur_u"]
+    assert np.allclose(biais["origine"][:2], [8.0, -15.1]) and np.allclose(bout, [2.0, -40.1])
+    assert biais["n"] @ np.array([0.0, -1.0]) > 0  # tourné vers le dehors
+    # le coin avec l'ouest (u croît vers l'ouest au sud) ne coupe que la toile du bout ouest (b), à x = -30,1
+    ouest = next(f for f in fs if f["id"] == "facade-ouest")
+    assert abs(b["u1"] - 30.1) < 1e-6 and a["u0"] < -30
+    assert abs(ouest["u0"] - (-40.1)) < 1e-6  # l'ouest s'arrête sur la toile lointaine du sud
+    # une rue par toile, celle du pan en biais jusqu'au plus loin des deux
+    rs = {r["id"]: r for r in vd.rues(fs)}
+    assert sorted(rs) == ["rue-ouest", "rue-sud-1", "rue-sud-2", "rue-sud-3"]
+    assert abs(rs["rue-sud-2"]["longueur_v"] - 40.0) < 1e-9 and abs(rs["rue-sud-2"]["longueur_u"] - 6.0) < 1e-9
+
+
+def test_photo_ne_peint_pas_derriere_une_toile_plus_proche():
+    log = _logement()
+    marches = {"facade-sud": [{"u0": -12.0, "u1": -8.0, "distance_m": 15.0}, {"u0": -2.0, "u1": 2.0, "distance_m": 40.0}]}
+    fs = vd.facades(log, 30.0, marches)
+    proche = next(f for f in fs if f["id"] == "facade-sud-1")
+    cam = _camera_piece_a()  # x = 2
+    # vu au travers de la toile proche (le rayon coupe y = -15,1 à x ≈ 9,4 : u ≈ -9,4, dans la toile proche) / pas caché
+    P = np.array([[[20.0, -40.1, 5.0], [-2.0, -40.1, 5.0]]], np.float32)
+    cache = vd.caches_par_les_marches(P, cam, [proche])
+    assert cache[0, 0] and not cache[0, 1]
+
+
+def test_bas_de_la_toile_fondu_dans_la_rue():
+    """Sous la dernière ligne vue par les photos, la toile passe à la couleur de la rue (pas de coin bleuté au bord net)."""
+    log = _logement()
+    ouv = vd.ouvertures_vitrees(log)
+    image = np.full((700, 1000, 3), 200, np.uint8)
+    image[:, :, 2] = 240  # dehors bleuté
+    ph = vd.preparer_photo(image, _camera_piece_a(), ouv, "bonne", vd.murs_et_trous(log), ecart_px=1.0)
+    ph["nom"] = "p"
+    sud = next(f for f in vd.facades(log, 15.0) if f["id"] == "facade-sud")
+    r = vd.composer(sud, [ph], pas=0.1)
+    gris = np.full(3, 0.2, np.float32)
+    r = vd.fondre_le_bas(r, sud, gris)
+    assert np.allclose(r["_couleur"][-1], gris, atol=1e-4)  # tout en bas : la rue
+    vu = r["_vu"]
+    i, j = np.argwhere(vu)[0]
+    assert not np.allclose(r["_couleur"][i, j], gris)  # ce que la photo voit est gardé
+
+
+def test_bas_fondu_sans_rectangle_dans_un_trou_etroit():
+    """Une colonne étroite vue seulement en haut (montant, meuble) ne fait pas de rectangle gris : la ligne vue la plus basse
+    est prise sur plusieurs mètres de large."""
+    sud = next(f for f in vd.facades(_logement(), 15.0) if f["id"] == "facade-sud")
+    h, w = 100, 400
+    vu = np.zeros((h, w), bool)
+    vu[20:80, 50:350] = True
+    vu[60:80, 200:205] = False  # trou étroit : ces colonnes ne sont vues que jusqu'à la ligne 59
+    couleur = np.full((h, w, 3), 0.8, np.float32)
+    r = {"_vu": vu, "_couleur": couleur.copy(), "rvba": np.zeros((h, w, 4), np.uint8)}
+    sud = dict(sud, longueur_v=10.0)  # 0,1 m par ligne
+    r = vd.fondre_le_bas(r, sud, np.full(3, 0.2, np.float32))
+    assert np.allclose(r["_couleur"][70, 202], 0.8)  # le trou garde la couleur vue autour
+    assert np.allclose(r["_couleur"][99, 202], 0.2, atol=1e-3)  # tout en bas : la rue

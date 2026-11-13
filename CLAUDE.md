@@ -385,7 +385,7 @@ Blender et lus sur le plan. app-001 : voilages, pas de vue. Détail : fin de `pr
 retrouvés en faisant glisser la vue d'un étage ; mesure retenue seulement si deux endroits séparés d'une même photo s'accordent),
 branché par défaut dans `vue_dehors_photos` (côté non mesuré = 35 m). app-002 : ouest 34,2 m mesuré (main ~29), sud NON mesuré
 (piège du demi-étage chambre 14, immeubles anciens trop petits) ; app-001 non mesuré (voilages) ; « accord des photos » écarté (les
-photos voient des immeubles différents). Film inchangé (écart invisible). Détail : fin de `produit-livre-client.md`.
+photos voient des immeubles différents). SUITE (NT « creuse ») : second avis d'une AUTRE photo qui voit le même endroit de la rue → sud mesuré : immeuble proche 24 m, lointains 44 m ; décor qui SUIT LA RUE (une toile par distance, pan en biais entre les deux ; la marche franche faisait une bande blanche). Détail : fin de `produit-livre-client.md`.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

@@ -438,3 +438,37 @@ se contredisent). app-001 (voilages) : non mesuré partout (une bande isolée à
 toile plate par côté (ne peut pas être à 20 m ET 55 m) ; étage supposé 3 m (±10 %) ; il faut ≥ 1,5 étage net et régulier dans une
 fenêtre ; dépend du calage des photos (fait à la main pour app-002). Pistes : demander au client une photo de la vue prise près de
 la vitre (plusieurs étages nets) ; une toile par fenêtre ou par pièce à sa propre distance ; caméra calée seule (en réserve).
+**Étape 6, suite (13/11/2026, NT « creuse si ça permet d'améliorer ») : SECOND AVIS d'une autre photo + décor EN MARCHES.**
+(1) `distance_dehors.second_avis` : une mesure seule dans sa photo est confirmée si une AUTRE photo, prise sur les pixels qui voient
+le MÊME endroit de la rue (empreinte u0..u1 × z0..z1 de la bande, sur le décor à la distance mesurée), retrouve les étages à 10 %
+près (distances essayées 0,55-1,8 × D, partie commune ≥ 15 % admise car l'endroit est déjà désigné). Largeur minimale de bande
+50 → 30 px (le séjour 03 ne voit qu'une lamelle de l'immeuble proche). app-002 SUD désormais MESURÉ en deux « marches » : immeuble
+proche 23,8 m (séjour 03, confirmé par la chambre 14 à 24,8-25,8 m ; à la main ~20 m), lointains 44,4 m (chambre 10, confirmé par
+la 15 à 44,4 m ; à la main ~55 m) ; le faux 47 m de la 14 et le faux 9 m du couloir ne sont confirmés par personne. Ouest 34,2 m
+inchangé ; app-001 toujours non mesuré. (2) `vue_dehors.facades(…, marches)` : un côté à ≥ 2 marches = une toile par distance
+(« facade-sud-1/-2 », champ « cote », bouts « bout0/bout1 »), coupées à mi-chemin entre deux endroits mesurés ; JOINT entre deux
+marches (genre « joint », façade de côté de l'immeuble qui avance, peint par les photos ou de la couleur de la marche proche) ;
+coin de rue seulement entre les bouts qui se font face ; une rue par marche ; `composer(…, ecrans)` + `caches_par_les_marches` :
+une photo ne peint pas sur une marche lointaine ce qui est derrière une marche proche. Pourquoi des marches : un décor unique à
+la moyenne (31 m) ne gagnait rien (simulation sur la balade du film, Full HD, vérité = mesures à la main : immeuble proche décalé
+de 9 px en médiane / 113 px pour 10 % des images à 35 m, 7 / 91 à 31 m, 3 / 40 en marches 24/44 ; lointains 27 / 45, 36 / 60,
+12 / 20).
+CORRECTION du même jour : la marche franche (JOINT perpendiculaire) n'était vue par AUCUNE photo → peinte unie → BANDE BLANCHE
+verticale au milieu de la vue du séjour dans le film (`vol-jour_soleil-marches`, 18 s). Remplacée par un décor qui SUIT LA RUE :
+chaque endroit mesuré garde sa distance sur toute sa largeur (toile droite), et entre deux endroits mesurés une toile EN BIAIS
+les relie (« facade-sud-2 », champ `biais`, sa rue = rectangle jusqu'au plus loin) ; les photos voient ce pan et le peignent
+(app-002 : 38 % du pan peint par les 4 photos du sud). Écrans : toutes les autres toiles du même côté.
+2e CORRECTION (film `vol-jour_soleil-biais`, chambres 21-46 s) : coin BLEUTÉ au bord en diagonale en bas des fenêtres = le pied
+des toiles (hauteur de rue, jamais vu par les photos prises d'un étage) prolongé du verre bleuté des garde-corps, contre la rue
+grise. `vue_dehors.fondre_le_bas` : sous la dernière ligne vue de chaque colonne, la toile passe à la couleur de la rue en 1,5 m
+(FONDU_BAS_M) ; UNE couleur de rue par côté (moyenne des pieds des toiles vues, pondérée par leur part vue).
+3e CORRECTION (film `vol-jour_soleil-rue`) : RECTANGLES GRIS verticaux dans la vue (séjour 18 s, chambre 46 s) : une colonne
+étroite vue seulement en haut (montant, meuble) commençait le fondu vers la rue trop haut. La ligne vue la plus basse est prise
+sur 6 m de large (maximum glissant puis adouci, LARGEUR_BAS_M). Film final : `vol-jour_soleil-rue2`.
+RÉSULTAT (13/11/2026) : film `..\atelya\b2\app-002\unreal\film\distance-mesuree.mp4` (même vol que `vraie-vue-balcons2`, 46 s,
+17,5 min de calcul) + `distance-mesuree-avant-apres.mp4` ; images `..\atelya\b2\app-002\unreal\distance-dehors\`
+(`decor-vu-de-dessus.png`, `avant-apres-zoom.jpg`). Images fixes : écart moyen 0,24/255 (médiane), murs et lumière inchangés
+(dehors presque blanc 26 → 27 %) ; le gain est dans le MOUVEMENT (simulation ci-dessus : immeuble proche ~3× moins décalé, lointains
+~2×). Plus de bande blanche, de coin bleuté ni de rectangle gris. 887 tests verts (sans celui d'Edge, qui échoue sans navigateur).
+Reste : pâles bandes verticales entre deux photos (déjà là avant), objets intérieurs (appliques) peints sur le décor ouest (déjà là
+avant, calage des photos 04/05), étage supposé 3 m.

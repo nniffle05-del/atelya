@@ -100,10 +100,23 @@ def ouvertures_vitrees(logement: dict) -> list[dict]:
     return res
 
 
-def facades(logement: dict, distances: dict | float | None = None) -> list[dict]:
+def _bout_vers(f: dict, g: dict) -> bool:
+    """La toile f est-elle le bout de son côté tourné vers le côté de g (là où les deux côtés se rencontrent) ?"""
+    mu = float(g["n"] @ f["u"])
+    return f.get("bout1", True) if mu > 0 else f.get("bout0", True)
+
+
+def facades(logement: dict, distances: dict | float | None = None, marches: dict | None = None) -> list[dict]:
     """Les toiles : une par direction de dehors (normales à moins de 20° regroupées). `distances` : {id: m} ou un nombre.
     Chaque toile : normale `n` (vers le dehors), axe horizontal `u` (la droite de qui regarde dehors), `decalage` (le plan est
-    {p : p·n = decalage}), étendue [u0, u1] × [z0, z1] ; les toiles voisines se coupent à leur rencontre (coin de rue)."""
+    {p : p·n = decalage}), étendue [u0, u1] × [z0, z1] ; les toiles voisines se coupent à leur rencontre (coin de rue).
+
+    `marches` ({id du côté : [{u0, u1, distance_m}, …]}, moteur/distance_dehors.py, étape 6 du 13/11/2026) : quand un côté a
+    des immeubles à plusieurs distances (app-002 sud : un immeuble proche à ~24 m, des lointains à ~44 m), son décor SUIT LA
+    RUE : une toile droite par endroit mesuré, à sa distance (id « facade-sud-1 », « -3 »… ; « cote » = le côté), et entre deux
+    endroits mesurés une toile EN BIAIS qui les relie (« facade-sud-2 », « biais »). Les photos voient ce pan en biais et le
+    peignent ; une marche franche (joint perpendiculaire, essai du 13/11/2026) n'était vue par aucune photo : bande unie au
+    milieu de la vue du séjour."""
     ouv = ouvertures_vitrees(logement)
     groupes: list[list[dict]] = []
     for o in ouv:
@@ -123,15 +136,58 @@ def facades(logement: dict, distances: dict | float | None = None) -> list[dict]
         mur = max(float(o["a"] @ n) + o["epaisseur"] / 2 for o in g)
         u = np.array([n[1], -n[0]])
         proj = tous @ u
-        res.append({"id": ident, "n": n, "u": u, "distance": float(d), "decalage": mur + float(d),
-                    "u0": float(proj.min() - max(ETENDUE_M, 2 * float(d))), "u1": float(proj.max() + max(ETENDUE_M, 2 * float(d))),
-                    "z0": Z_BAS_M, "z1": Z_HAUT_M, "fenetres": [o["id"] for o in g]})
-    for f in res:  # coin de rue : chaque toile s'arrête à la rencontre d'une autre (du côté du logement)
+        ms = sorted((marches or {}).get(ident) or [], key=lambda m: (m["u0"] + m["u1"]) / 2)
+        if len(ms) < 2:
+            ms = [{"distance_m": float(d)}]
+        dmax = max(float(m["distance_m"]) for m in ms)
+        u0_cote = float(proj.min() - max(ETENDUE_M, 2 * dmax))
+        u1_cote = float(proj.max() + max(ETENDUE_M, 2 * dmax))
+        # bouts des toiles droites : chaque endroit mesuré garde sa distance sur toute sa largeur ; entre deux endroits, le
+        # pan en biais (s'ils se touchent ou se chevauchent : pan de 1 m centré entre leurs milieux)
+        fins, debuts = [], []
+        for a, b in zip(ms, ms[1:]):
+            if a["u1"] < b["u0"] - 1.0:
+                fins.append(float(a["u1"]))
+                debuts.append(float(b["u0"]))
+            else:
+                mi = ((a["u0"] + a["u1"]) / 2 + (b["u0"] + b["u1"]) / 2) / 2
+                fins.append(float(mi - 0.5))
+                debuts.append(float(mi + 0.5))
+        droites = []
+        for k, m in enumerate(ms):
+            dk = float(m["distance_m"])
+            droites.append({"cote": ident, "n": n, "u": u, "distance": dk, "decalage": mur + dk,
+                            "u0": u0_cote if k == 0 else debuts[k - 1], "u1": u1_cote if k == len(ms) - 1 else fins[k],
+                            "z0": Z_BAS_M, "z1": Z_HAUT_M, "fenetres": [o["id"] for o in g],
+                            "bout0": k == 0, "bout1": k == len(ms) - 1})
+        cote = []
+        for k, t in enumerate(droites):
+            cote.append(t)
+            if k + 1 < len(droites):
+                b = droites[k + 1]
+                A = n * t["decalage"] + u * t["u1"]
+                B = n * b["decalage"] + u * b["u0"]
+                axe = (B - A) / np.linalg.norm(B - A)
+                nb = np.array([axe[1], -axe[0]])
+                if nb @ n < 0:
+                    nb = -nb
+                cote.append({"cote": ident, "biais": True, "n": nb, "u": axe, "decalage": float(nb @ A),
+                             "u0": float(A @ axe), "u1": float(B @ axe),
+                             "distance": round((t["distance"] + b["distance"]) / 2, 2),
+                             "distances": [t["distance"], b["distance"]], "z0": Z_BAS_M, "z1": Z_HAUT_M,
+                             "fenetres": [o["id"] for o in g], "bout0": False, "bout1": False,
+                             # sa rue : le rectangle du côté, de notre façade jusqu'au plus loin des deux toiles
+                             "rue": {"n": n, "u": u, "mur": mur, "u0": t["u1"], "u1": b["u0"],
+                                     "profondeur": max(t["distance"], b["distance"])}})
+        for k, t in enumerate(cote):
+            t["id"] = ident if len(cote) == 1 else f"{ident}-{k + 1}"
+        res.extend(cote)
+    for f in res:  # coin de rue : le bout de chaque côté s'arrête sur le bout de l'autre côté (du côté du logement)
         for g in res:
-            if g is f:
+            if g.get("cote") == f.get("cote"):
                 continue
             mu = float(g["n"] @ f["u"])
-            if abs(mu) < 1e-3:
+            if abs(mu) < 1e-3 or not _bout_vers(f, g) or not _bout_vers(g, f):
                 continue
             borne = (g["decalage"] - f["decalage"] * float(g["n"] @ f["n"])) / mu
             if mu > 0:
@@ -152,14 +208,25 @@ def rues(toiles: list[dict]) -> list[dict]:
     la rue du premier côté va jusqu'à la toile de l'autre ; celle de l'autre s'arrête au pied de notre façade (pas de
     recouvrement)."""
     res = []
+    toiles = [t for t in toiles if t.get("genre", "immeubles") == "immeubles"]
     for i, f in enumerate(toiles):
+        if f.get("biais"):
+            r = f["rue"]
+            base = r["n"] * r["mur"] + r["u"] * r["u0"]
+            res.append({"id": f["id"].replace("facade-", "rue-"), "cote": f["cote"], "genre": "rue", "n": r["n"], "u": r["u"],
+                        "distance": r["profondeur"], "decalage": r["mur"] + r["profondeur"], "u0": r["u0"], "u1": r["u1"],
+                        "z0": Z_BAS_M, "z1": Z_BAS_M, "fenetres": f["fenetres"],
+                        "origine": np.array([base[0], base[1], Z_BAS_M]),
+                        "axe_u": np.array([r["u"][0], r["u"][1], 0.0]), "axe_v": np.array([r["n"][0], r["n"][1], 0.0]),
+                        "longueur_u": r["u1"] - r["u0"], "longueur_v": r["profondeur"]})
+            continue
         mur = f["decalage"] - f["distance"]
         u0, u1 = f["u0"], f["u1"]
         for j, g in enumerate(toiles):
-            if g is f:
+            if g is f or g.get("cote") == f.get("cote", f["id"]) and g.get("cote") is not None:
                 continue
             mu = float(g["n"] @ f["u"])
-            if abs(mu) < 1e-3:
+            if abs(mu) < 1e-3 or not _bout_vers(f, g) or not _bout_vers(g, f):
                 continue
             limite = g["decalage"] if j > i else g["decalage"] - g["distance"]
             borne = (limite - mur * float(g["n"] @ f["n"])) / mu
@@ -168,7 +235,8 @@ def rues(toiles: list[dict]) -> list[dict]:
             else:
                 u0 = max(u0, borne)
         base = f["n"] * mur + f["u"] * u0
-        res.append({"id": f["id"].replace("facade-", "rue-"), "genre": "rue", "n": f["n"], "u": f["u"],
+        res.append({"id": f["id"].replace("facade-", "rue-"), "cote": f.get("cote", f["id"]), "genre": "rue",
+                    "n": f["n"], "u": f["u"],
                     "distance": f["distance"], "decalage": f["decalage"], "u0": u0, "u1": u1, "z0": Z_BAS_M, "z1": Z_BAS_M,
                     "fenetres": f["fenetres"], "origine": np.array([base[0], base[1], Z_BAS_M]),
                     "axe_u": np.array([f["u"][0], f["u"][1], 0.0]), "axe_v": np.array([f["n"][0], f["n"][1], 0.0]),
@@ -474,7 +542,25 @@ def _remplir(couleur: np.ndarray, poids: np.ndarray) -> np.ndarray:
     return rempli
 
 
-def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = True, defaut=None) -> dict:
+def caches_par_les_marches(P: np.ndarray, cam, ecrans) -> np.ndarray:
+    """Pour chaque point P (H, L, 3) d'une toile : une toile PLUS PROCHE du même côté (`ecrans`, décor en marches) se
+    trouve-t-elle entre l'appareil de la photo et P ? Ce que la photo montre là est l'immeuble proche : il ne doit pas être
+    peint sur l'immeuble lointain."""
+    c = np.array(cam[:3], np.float32)
+    r = P - c
+    cache = np.zeros(P.shape[:2], bool)
+    for g in ecrans:
+        n3 = np.array([g["n"][0], g["n"][1], 0.0], np.float32)
+        u3 = np.array([g["u"][0], g["u"][1], 0.0], np.float32)
+        den = r @ n3
+        t = (float(g["decalage"]) - float(c @ n3)) / np.where(np.abs(den) > 1e-6, den, 1e-6)
+        q = c + t[..., None] * r
+        uq, zq = q @ u3, q[..., 2]
+        cache |= (t > 0) & (t < 0.999) & (uq >= g["u0"]) & (uq <= g["u1"]) & (zq >= g["z0"]) & (zq <= g["z1"])
+    return cache
+
+
+def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = True, defaut=None, ecrans=()) -> dict:
     """L'image de la toile `f` : RVBA (sRVB 8 bits ; RVB = clarté avant pellicule / FORCE_TOILE ; A = la toile est vue par au
     moins une photo, fondu vers « rien » ailleurs), la part de la toile couverte et la part prise à chaque photo.
 
@@ -485,6 +571,8 @@ def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = Tr
     vues = []
     for ph in photos:
         c, w = echantillonner(ph, P)
+        if ecrans and float(w.max()) > 0:
+            w = np.where(caches_par_les_marches(P, ph["cam"], ecrans), 0.0, w).astype(np.float32)
         if float(w.max()) <= 0:
             continue
         _, _, prof = projeter_tableau(P, ph["cam"])
@@ -534,6 +622,38 @@ def couleur_de_la_rue(toile: dict, r: dict) -> np.ndarray:
     m = np.median(c[choix], axis=0)
     # GRIS NEUTRE de même clarté (une chaussée ; la teinte du bas de la vue venait du verre bleuté des garde-corps : rue lavande)
     return np.full(3, float(m @ np.array([0.2126, 0.7152, 0.0722])), np.float32)
+
+
+FONDU_BAS_M = 1.5  # sous ce que les photos voient, le bas d'une toile passe à la couleur de la rue sur cette hauteur
+LARGEUR_BAS_M = 6.0  # la ligne vue la plus basse est prise sur cette largeur de toile (pas colonne par colonne)
+
+
+def fondre_le_bas(r: dict, toile: dict, couleur_rue) -> dict:
+    """Le BAS d'une toile d'immeubles qu'aucune photo ne voit (le pied des immeubles, à hauteur de rue : les photos prises
+    d'un étage voient par-dessus le garde-corps) prend la couleur de la rue, en fondu sous la dernière ligne vue de chaque
+    colonne. Sinon le prolongement flou de ce qui est vu (souvent le verre bleuté d'un garde-corps) faisait un coin bleuté au
+    bord net contre la rue grise, surtout avec un décor qui suit la rue (étape 6, 13/11/2026). Modifie et renvoie `r`."""
+    vu, c = r.get("_vu"), r.get("_couleur")
+    if vu is None or c is None or not vu.any():
+        return r
+    hauteur, largeur = vu.shape
+    lignes = np.arange(hauteur)
+    vues = vu.any(0)
+    dernier = np.where(vues, hauteur - 1 - np.argmax(vu[::-1], axis=0), -1).astype(float)
+    cols = np.arange(largeur)
+    dernier = np.interp(cols, cols[vues], dernier[vues])  # colonnes non vues : comme leurs voisines vues
+    pas = toile["longueur_v"] / hauteur
+    # la plus basse ligne vue sur LARGEUR_BAS_M de large, adoucie : une colonne étroite vue seulement en haut (derrière un
+    # montant de fenêtre, un meuble) faisait sinon un rectangle gris de haut en bas (film du 13/11/2026)
+    k_l = max(3, int(round(LARGEUR_BAS_M / pas)) | 1)
+    dernier = cv2.dilate(dernier.astype(np.float32)[None, :], np.ones((1, k_l), np.uint8))[0]
+    dernier = cv2.GaussianBlur(dernier[None, :], (0, 0), k_l / 4)[0]
+    k = max(1.0, FONDU_BAS_M / pas)
+    a = np.clip((lignes[:, None] - dernier[None, :]) / k, 0.0, 1.0)[..., None]
+    c = c * (1 - a) + np.asarray(couleur_rue, np.float32)[None, None, :] * a
+    r["_couleur"] = c.astype(np.float32)
+    r["rvba"] = np.dstack([_srgb(c / FORCE_TOILE), r["rvba"][..., 3]])
+    return r
 
 
 def vers_unreal(f: dict) -> dict:

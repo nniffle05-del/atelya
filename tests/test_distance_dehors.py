@@ -70,8 +70,8 @@ def test_ciel_vide_non_mesure():
     assert r["statut"] == "non_mesuree" and r["distance_m"] is None
 
 
-def _m(c0, d, accord=0.4):
-    return {"colonne0": c0, "colonne1": c0 + 120, "distance_m": d, "accord": accord, "pixels": 5000}
+def _m(c0, d, accord=0.4, u0=0.0, u1=5.0):
+    return {"colonne0": c0, "colonne1": c0 + 120, "distance_m": d, "accord": accord, "pixels": 5000, "u0": u0, "u1": u1}
 
 
 def test_confirmation_par_deux_bandes_separees():
@@ -88,3 +88,40 @@ def test_choisir_moyenne_et_bornes():
     assert loin["distance_m"] == dd.BORNES_M[1] and loin["brute_m"] > 100
     seul = dd.choisir({"a": {"mesures": [_m(0, 30.0)], "qualite": "bonne"}})
     assert seul["statut"] == "non_mesuree"
+
+
+def test_second_avis_d_une_autre_photo():
+    # une mesure seule dans sa photo, confirmée par une autre photo (second_avis) : retenue
+    m = _m(0, 30.0)
+    m["confirmee_par"] = "b"
+    r = dd.choisir({"a": {"mesures": [m], "qualite": "bonne"}})
+    assert r["statut"] == "mesuree" and r["marches"][0]["photos"] == ["a", "b"]
+
+
+def test_second_avis_retrouve_la_facade_vue_d_ailleurs():
+    """La même façade (20 m) photographiée de deux endroits : une bande de la 1re photo est confirmée par la 2e."""
+    log = _logement()
+    toile = next(t for t in vd.facades(log, 35.0) if t["id"] == "facade-sud")
+    ouv, murs = vd.ouvertures_vitrees(log), vd.murs_et_trous(log)
+    cam_b = [1.6, 2.0, 1.3, -80.0, 0.0, 600.0, 600.0, 400.0]
+    global CAM
+    img_a = _photo(20.0)
+    sauve, CAM = CAM, cam_b
+    try:
+        img_b = _photo(20.0, graine=1)
+    finally:
+        CAM = sauve
+    ms = dd.mesurer_photo(img_a, CAM, toile, ouv, murs)
+    ctx_b = dd.preparer_vue(img_b, cam_b, toile, ouv, murs)
+    avis = [dd.second_avis(m, ctx_b) for m in ms]
+    assert any(a is not None and abs(a["distance_m"] - 20.0) < 2.0 for a in avis)
+    # à une fausse distance (le double), la 2e photo ne confirme pas
+    faux = dict(ms[0], distance_m=40.0)
+    assert dd.second_avis(faux, ctx_b) is None
+
+
+def test_marches_deux_distances_sur_un_cote():
+    r = dd.choisir({"a": {"mesures": [_m(0, 24.0, u0=-22, u1=-15), _m(200, 24.5, u0=-20, u1=-14)], "qualite": "bonne"},
+                    "b": {"mesures": [_m(0, 44.0, u0=0, u1=9), _m(200, 45.0, u0=2, u1=10)], "qualite": "bonne"}})
+    assert [m["distance_m"] for m in r["marches"]] == [24.2, 44.5]
+    assert r["marches"][0]["u1"] == -14 and r["marches"][1]["u0"] == 0
