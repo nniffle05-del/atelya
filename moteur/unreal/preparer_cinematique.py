@@ -898,7 +898,7 @@ def main():
         raise RuntimeError(f"PLANTÉ : moteur « {moteur} » inconnu ({MOTEURS})")
     ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"))
     if ciel == "physique" and reglage.get("dehors", True):
-        poser_dehors(racine, centre, invisible=bool(reglage.get("vues_dehors")))
+        poser_dehors(racine, centre, invisible=bool(reglage.get("vues_dehors")) and not reglage.get("dehors_visible", False))
     ciel_photo, materiau_ciel = None, None
     if reglage.get("ciel_photo"):
         materiau_ciel, ciel_photo = poser_ciel_photo(racine, ambiance, fiche, reglage["ciel_photo"])

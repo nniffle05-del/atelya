@@ -34,8 +34,9 @@ DISTANCE_M = 35.0  # distance des immeubles d'en face, par défaut. app-002 (12/
 # les plus lointains (hauteur des étages sur les photos 14 et 15), ~29 m côté ouest (photo 8) ; à 40 m la vue rendue depuis la
 # place de la photo 15 retrouve sa composition, à 21 m les photos se mêlaient mal. Seul le décalage en marchant en dépend.
 PAS_M = 0.03  # taille d'un point de la toile (une photo d'annonce donne ~3 cm par pixel à cette distance)
-Z_BAS_M = -40.0  # la toile descend bien sous la rue (logement supposé au 2e étage, rue à -6 m) : la caméra du film, plus haute et
-# plus près des vitres que l'appareil des photos, plonge par le bas des fenêtres beaucoup plus bas que ce que les photos voient
+Z_BAS_M = -6.0  # la toile part du NIVEAU DE LA RUE (logement supposé au 2e étage, comme le sol du dehors d'Unreal) : en dessous,
+# c'est la rue elle-même, un sol horizontal entre notre façade et les immeubles d'en face (NT, 13/11/2026 : « le décor à une
+# distance plus juste » ; une toile descendue à -40 m mettait la rue sur un mur vertical à 35 m)
 Z_HAUT_M = 26.0
 ETENDUE_M = 25.0  # la toile dépasse le logement de chaque côté d'au moins ETENDUE_M et de 2 × sa distance (vues en biais)
 RETRAIT_M = 0.12  # l'ouverture est rétrécie d'autant (dormant et ouvrant de la vraie fenêtre : 0,07 laissait le rail du haut)
@@ -136,22 +137,54 @@ def facades(logement: dict, distances: dict | float | None = None) -> list[dict]
                 f["u1"] = min(f["u1"], borne)
             else:
                 f["u0"] = max(f["u0"], borne)
+    for f in res:
+        base = f["n"] * f["decalage"] + f["u"] * f["u0"]
+        f.update({"genre": "immeubles", "origine": np.array([base[0], base[1], f["z1"]]),
+                  "axe_u": np.array([f["u"][0], f["u"][1], 0.0]), "axe_v": np.array([0.0, 0.0, -1.0]),
+                  "longueur_u": f["u1"] - f["u0"], "longueur_v": f["z1"] - f["z0"]})
+    return res
+
+
+def rues(toiles: list[dict]) -> list[dict]:
+    """La RUE devant chaque côté : un sol horizontal au niveau de la rue (Z_BAS_M), du pied de notre façade jusqu'au pied de
+    sa toile (les immeubles d'en face). Image : colonnes le long de la façade (comme la toile), lignes en s'éloignant. Au coin,
+    la rue du premier côté va jusqu'à la toile de l'autre ; celle de l'autre s'arrête au pied de notre façade (pas de
+    recouvrement)."""
+    res = []
+    for i, f in enumerate(toiles):
+        mur = f["decalage"] - f["distance"]
+        u0, u1 = f["u0"], f["u1"]
+        for j, g in enumerate(toiles):
+            if g is f:
+                continue
+            mu = float(g["n"] @ f["u"])
+            if abs(mu) < 1e-3:
+                continue
+            limite = g["decalage"] if j > i else g["decalage"] - g["distance"]
+            borne = (limite - mur * float(g["n"] @ f["n"])) / mu
+            if mu > 0:
+                u1 = min(u1, borne)
+            else:
+                u0 = max(u0, borne)
+        base = f["n"] * mur + f["u"] * u0
+        res.append({"id": f["id"].replace("facade-", "rue-"), "genre": "rue", "n": f["n"], "u": f["u"],
+                    "distance": f["distance"], "decalage": f["decalage"], "u0": u0, "u1": u1, "z0": Z_BAS_M, "z1": Z_BAS_M,
+                    "fenetres": f["fenetres"], "origine": np.array([base[0], base[1], Z_BAS_M]),
+                    "axe_u": np.array([f["u"][0], f["u"][1], 0.0]), "axe_v": np.array([f["n"][0], f["n"][1], 0.0]),
+                    "longueur_u": u1 - u0, "longueur_v": f["distance"]})
     return res
 
 
 def points_toile(f: dict, pas: float = PAS_M) -> tuple[np.ndarray, int, int]:
-    """Points 3D (H, L, 3) au centre de chaque point de l'image de la toile ; ligne 0 = en haut, colonne 0 = côté u0."""
-    largeur = max(1, int(math.ceil((f["u1"] - f["u0"]) / pas)))
-    hauteur = max(1, int(math.ceil((f["z1"] - f["z0"]) / pas)))
-    us = f["u0"] + (np.arange(largeur) + 0.5) * pas
-    zs = f["z1"] - (np.arange(hauteur) + 0.5) * pas
-    base = f["n"] * f["decalage"]
-    xy = base[None, :] + us[:, None] * f["u"][None, :]
-    P = np.empty((hauteur, largeur, 3), np.float32)
-    P[..., 0] = xy[None, :, 0]
-    P[..., 1] = xy[None, :, 1]
-    P[..., 2] = zs[:, None]
-    return P, largeur, hauteur
+    """Points 3D (H, L, 3) au centre de chaque point de l'image d'un plan (toile des immeubles ou rue) : origine = coin de
+    l'image (ligne 0, colonne 0), colonnes le long de `axe_u`, lignes le long de `axe_v`."""
+    largeur = max(1, int(math.ceil(f["longueur_u"] / pas)))
+    hauteur = max(1, int(math.ceil(f["longueur_v"] / pas)))
+    a = (np.arange(largeur) + 0.5) * pas
+    b = (np.arange(hauteur) + 0.5) * pas
+    P = (np.asarray(f["origine"], np.float32)[None, None, :] + a[None, :, None] * np.asarray(f["axe_u"], np.float32)
+         + b[:, None, None] * np.asarray(f["axe_v"], np.float32))
+    return P.astype(np.float32), largeur, hauteur
 
 
 def projeter_tableau(P: np.ndarray, cam) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -395,7 +428,7 @@ def _remplir(couleur: np.ndarray, poids: np.ndarray) -> np.ndarray:
     return rempli
 
 
-def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = True) -> dict:
+def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = True, defaut=None) -> dict:
     """L'image de la toile `f` : RVBA (sRVB 8 bits ; RVB = clarté avant pellicule / FORCE_TOILE ; A = la toile est vue par au
     moins une photo, fondu vers « rien » ailleurs), la part de la toile couverte et la part prise à chaque photo.
 
@@ -412,8 +445,11 @@ def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = Tr
         nettete = float(ph["cam"][5]) / np.maximum(prof, 0.5)  # pixels de la photo par mètre de toile
         vues.append((ph.get("nom"), c, w, w * nettete))
     if not vues:
-        vide = np.zeros((hauteur, largeur, 4), np.uint8)
-        return {"rvba": vide, "largeur": largeur, "hauteur": hauteur, "couverte": 0.0, "parts": {}}
+        image = np.zeros((hauteur, largeur, 4), np.uint8)
+        if remplir and defaut is not None:  # aucune photo ne voit ce plan : couleur unie `defaut` (avant pellicule)
+            image[..., :3] = _srgb(np.asarray(defaut, np.float32) / FORCE_TOILE)[None, None, :]
+            image[..., 3] = 255
+        return {"rvba": image, "largeur": largeur, "hauteur": hauteur, "couverte": 0.0, "parts": {}, "_couleur": None}
     notes = np.stack([v[3] for v in vues])
     gagnant = notes.argmax(0)
     vu = notes.max(0) > 0
@@ -435,14 +471,30 @@ def composer(f: dict, photos: list[dict], pas: float = PAS_M, remplir: bool = Tr
     loin = cv2.distanceTransform((~vu).astype(np.uint8), cv2.DIST_L2, 5)
     alpha = np.ones_like(loin) if remplir else np.clip(1.0 - loin / k, 0.0, 1.0)
     rvba = np.dstack([_srgb(rempli / FORCE_TOILE), np.round(alpha * 255).astype(np.uint8)])
-    return {"rvba": rvba, "largeur": largeur, "hauteur": hauteur, "couverte": round(float(vu.mean()), 4), "parts": parts}
+    return {"rvba": rvba, "largeur": largeur, "hauteur": hauteur, "couverte": round(float(vu.mean()), 4), "parts": parts,
+            "_couleur": rempli, "_vu": vu}
+
+
+def couleur_de_la_rue(toile: dict, r: dict) -> np.ndarray:
+    """Couleur unie (avant pellicule) de la rue devant une toile : médiane de ce que les photos montrent dans les 2 m du bas de
+    la toile (pied des immeubles d'en face, trottoir, bas des arbres) ; à défaut, de tout ce qu'elles montrent."""
+    vu, c = r.get("_vu"), r.get("_couleur")
+    if vu is None or not vu.any():
+        return np.array([0.18, 0.18, 0.18], np.float32)
+    lignes = int(round(2.0 / (toile["longueur_v"] / vu.shape[0])))
+    bas = vu.copy()
+    bas[:-lignes] = False
+    choix = bas if bas.sum() > 50 else vu
+    m = np.median(c[choix], axis=0)
+    # GRIS NEUTRE de même clarté (une chaussée ; la teinte du bas de la vue venait du verre bleuté des garde-corps : rue lavande)
+    return np.full(3, float(m @ np.array([0.2126, 0.7152, 0.0722])), np.float32)
 
 
 def vers_unreal(f: dict) -> dict:
-    """La toile en coordonnées d'Unreal (cm ; X = 100 x, Y = −100 y, Z = 100 z) : coin haut-gauche de l'image, axes de l'image
-    (u vers la droite, v vers le bas), taille ; normale tournée vers le logement."""
-    tl = f["n"] * f["decalage"] + f["u"] * f["u0"]
-    return {"coin": [100 * float(tl[0]), -100 * float(tl[1]), 100 * f["z1"]],
-            "axe_u": [float(f["u"][0]), -float(f["u"][1]), 0.0], "axe_v": [0.0, 0.0, -1.0],
-            "normale_vers_logement": [-float(f["n"][0]), float(f["n"][1]), 0.0],
-            "largeur_cm": 100 * (f["u1"] - f["u0"]), "hauteur_cm": 100 * (f["z1"] - f["z0"])}
+    """Le plan en coordonnées d'Unreal (cm ; X = 100 x, Y = −100 y, Z = 100 z) : coin de l'image (ligne 0, colonne 0), axes de
+    l'image (u : colonnes, v : lignes), taille ; normale (face tournée vers le logement pour une toile, vers le ciel pour la rue)."""
+    o, au, av = (np.asarray(f[k], float) for k in ("origine", "axe_u", "axe_v"))
+    n = np.array([0.0, 0.0, 1.0]) if f.get("genre") == "rue" else np.array([-f["n"][0], -f["n"][1], 0.0])
+    unr = lambda v, k=1.0: [k * float(v[0]), -k * float(v[1]), k * float(v[2])]
+    return {"coin": unr(o, 100.0), "axe_u": unr(au), "axe_v": unr(av), "normale_vers_logement": unr(n),
+            "largeur_cm": 100 * float(f["longueur_u"]), "hauteur_cm": 100 * float(f["longueur_v"])}

@@ -7,7 +7,7 @@
 « fichier » = modèle de nom, « cameras » = {nom: {camera, qualite, …}}). Les meubles posés devant les fenêtres (chaises, télé…)
 sont repérés par OWLv2 (moteur/owlv2.py, déjà en service pour les meubles) et écartés : ils ne sont pas peints sur la vue ;
 le repérage est gardé dans <sortie>/meubles-devant-fenetres.json (refait seulement si les photos changent).
-Sorties : <sortie>/toile-<côté>.png (RVBA) et <sortie>/vues-dehors.json (la liste à donner à Unreal : coin, axes, taille, image,
+Sorties : <sortie>/toile-<côté>.png (RVBA : immeubles d'en face « facade-… » et rue à leurs pieds « rue-… ») et <sortie>/vues-dehors.json (la liste à donner à Unreal : coin, axes, taille, image,
 force ; moteur/unreal/preparer_cinematique.poser_vues_dehors) + une planche toiles.jpg pour l'œil.
 """
 import argparse
@@ -87,17 +87,24 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
             ph["nom"] = nom
             photos.append(ph)
     vues, bilan, apercus = [], [], []
-    for f in vue_dehors.facades(logement, distance):
+    toiles = vue_dehors.facades(logement, distance)
+    for f, rue in zip(toiles, vue_dehors.rues(toiles)):
         r = vue_dehors.composer(f, photos)
         if r["couverte"] <= 0:
             continue
-        png = sortie / f"toile-{f['id']}.png"
-        cv2.imencode(".png", cv2.cvtColor(r["rvba"], cv2.COLOR_RGBA2BGRA))[1].tofile(str(png))
-        vues.append({**vue_dehors.vers_unreal(f), "id": f["id"], "image": png.as_posix(), "force": vue_dehors.FORCE_TOILE})
-        bilan.append({"cote": f["id"], "distance_m": f["distance"], "fenetres": f["fenetres"], "part_couverte": r["couverte"],
-                      "photos": r["parts"]})
-        a = r["rvba"][..., 3:4] / 255.0
-        apercus.append((r["rvba"][..., :3] * a + np.array([60, 60, 60]) * (1 - a)).astype(np.uint8))
+        # la toile des immeubles d'en face, puis la RUE à ses pieds (sol au niveau de la rue, couleur du bas de la vraie vue)
+        # rue UNIE : les photos ne voient pas la chaussée ; ce qu'elles montrent sous les fenêtres est le sol des BALCONS (absents
+        # de la maquette), qui collé sur la rue y faisait des plaques beiges (13/11/2026)
+        r_rue = vue_dehors.composer(rue, [], defaut=vue_dehors.couleur_de_la_rue(f, r))
+        for plan, res in ((f, r), (rue, r_rue)):
+            png = sortie / f"toile-{plan['id']}.png"
+            cv2.imencode(".png", cv2.cvtColor(res["rvba"], cv2.COLOR_RGBA2BGRA))[1].tofile(str(png))
+            vues.append({**vue_dehors.vers_unreal(plan), "id": plan["id"], "image": png.as_posix(),
+                         "force": vue_dehors.FORCE_TOILE})
+            bilan.append({"cote": plan["id"], "distance_m": plan["distance"], "fenetres": plan["fenetres"],
+                          "part_couverte": res["couverte"], "photos": res["parts"]})
+            a = res["rvba"][..., 3:4] / 255.0
+            apercus.append((res["rvba"][..., :3] * a + np.array([60, 60, 60]) * (1 - a)).astype(np.uint8))
     (sortie / "vues-dehors.json").write_text(json.dumps({"vues": vues, "bilan": bilan,
                                                           "photos_utilisees": [p["nom"] for p in photos]},
                                                          indent=1, ensure_ascii=False), encoding="utf-8")
