@@ -28,7 +28,7 @@ import cv2
 import numpy as np
 import torch
 
-from . import da3, moge
+from . import da3, fuites, moge
 from .oeil_dinov2 import ECART, MOYENNE, charger as charger_oeil, empreintes
 
 VERSION = "0.1.0"
@@ -36,6 +36,8 @@ PAS = 0.2                                   # une place possible tous les 20 cm
 HAUT_DES_MURS = 2.1                         # au-dessus : ni portes ni meubles, on y mesure la distance du mur
 ECHELLES = (0.72, 0.8, 0.88, 0.96, 1.04)    # MoGe-2 voit souvent trop profond : on essaie plusieurs tailles
 LIMITES = (0.68, 1.08)
+ECHELLES_ZOOM_JUSTE = (0.86, 0.93, 1.0, 1.07, 1.14)  # zoom donné par les lignes de fuite : plus de profondeur à corriger
+LIMITES_ZOOM_JUSTE = (0.82, 1.18)
 A_FEN, B_FEN, P_SOL = 0.6, 0.2, 0.3         # poids des fenêtres vues / attendues, et du « creux jusqu'au sol »
 ECHELLES_BLOC = (0.85, 0.92, 1.0, 1.08, 1.16)
 JEU_M, JEU_DEG = 2, 4                       # jeu laissé à chaque photo dans son bloc : cases de 20 cm, degrés
@@ -43,6 +45,7 @@ L_TYPE, L_COUV, L_DOUBLE, L_MEME, SEUIL_MEME = 1.0, 0.15, 0.5, 0.4, 0.6
 PRINCIPALES = ("sejour", "chambre", "cuisine")
 SEUIL_INTRUS = 0.4                          # part d'accord en dessous de laquelle deux photos ne montrent pas le même lieu
 MARGE_SURE = 0.4                            # « sûre » : changer de pièce ferait perdre au moins autant
+CAP_FUITES = 12.0                           # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
 
@@ -152,6 +155,23 @@ def grille(plan: dict) -> np.ndarray:
     return G[(piece_de(plan, G) >= 0) & (_dist_seg(G, plan["A"], plan["B"]).min(1) > 0.06)]
 
 
+def sens_des_murs(plan: dict) -> float:
+    """La direction dominante des murs du plan, en degrés entre 0 et 90 (0 = murs le long des axes du plan)."""
+    d = plan["B"] - plan["A"]
+    a = np.arctan2(d[:, 1], d[:, 0]) * 4  # un mur et son voisin à l'équerre comptent pour la même direction
+    w = np.hypot(d[:, 0], d[:, 1])
+    return float(np.degrees(np.arctan2((w * np.sin(a)).sum(), (w * np.cos(a)).sum())) / 4 % 90)
+
+
+def cap_par_fuites(cap: float, fu: dict | None, sens: float) -> float:
+    """Le cap trouvé par le calage (au degré près), remplacé par celui des lignes de fuite (au dixième de degré) quand la
+    photo en a de nettes et que les deux sont d'accord à CAP_FUITES près (les fuites ne connaissent le cap qu'à 90° près)."""
+    if not fu or not fu["oriente"]:
+        return cap
+    ecart = (fu["alpha"] + sens - cap + 45) % 90 - 45
+    return cap + ecart if abs(ecart) <= CAP_FUITES else cap
+
+
 # ================================================================ la photo
 def verticale(normales: np.ndarray, masque: np.ndarray) -> np.ndarray:
     """Le « haut » dans le repère de l'appareil (x droite, y bas, z devant), d'après les surfaces horizontales."""
@@ -174,9 +194,9 @@ def _pic(v, pas=0.02):
     return float(b[h.argmax()] + pas / 2)
 
 
-def mesurer(modele_moge, rgb: np.ndarray) -> dict:
-    """MoGe-2 sur une photo : points en mètres, inclinaison des surfaces, zoom, et le « haut »."""
-    r = moge.lire(modele_moge, rgb)
+def mesurer(modele_moge, rgb: np.ndarray, focale_px: float | None = None) -> dict:
+    """MoGe-2 sur une photo : points en mètres, inclinaison des surfaces, zoom (trouvé, ou imposé), et le « haut »."""
+    r = moge.lire(modele_moge, rgb, focale_px=focale_px)
     m = {"points": r["points"].astype(np.float32), "normales": r["normales"].astype(np.float32), "masque": r["masque"],
          "focale_px": float(r["focale_px"])}
     m["haut"] = verticale(m["normales"], m["masque"])
@@ -304,7 +324,7 @@ def _note(xp, rm, rp, creux, sol, sorte, appui):
 
 
 @torch.no_grad()
-def notes_sur_le_plan(tirs_plan, pr: dict, appareil: str) -> tuple[np.ndarray, np.ndarray]:
+def notes_sur_le_plan(tirs_plan, pr: dict, appareil: str, echelles=ECHELLES) -> tuple[np.ndarray, np.ndarray]:
     """Note de la photo pour chaque place de la grille et chaque cap (0 à 359°) : (n, 360), et l'échelle retenue."""
     tour, tsorte, tappui = tirs_plan
     ip = torch.from_numpy(pr["phi"].astype(np.int64)).to(appareil)
@@ -316,7 +336,7 @@ def notes_sur_le_plan(tirs_plan, pr: dict, appareil: str) -> tuple[np.ndarray, n
     for c0 in range(0, 360, lot):
         idx = (torch.arange(c0, min(360, c0 + lot), device=appareil)[:, None] + ip[None]) % 360
         rp, so, ap = tour[:, idx], tsorte[:, idx], tappui[:, idx]
-        for k, e in enumerate(ECHELLES):
+        for k, e in enumerate(echelles):
             v = _note(torch, rm * e, rp, creux, sol, so, ap)
             mieux = v > N[:, c0:c0 + lot]
             N[:, c0:c0 + lot] = torch.where(mieux, v, N[:, c0:c0 + lot])
@@ -324,7 +344,7 @@ def notes_sur_le_plan(tirs_plan, pr: dict, appareil: str) -> tuple[np.ndarray, n
     return N.cpu().numpy(), E.cpu().numpy()
 
 
-def regler(plan: dict, pr: dict, cam: np.ndarray) -> tuple[np.ndarray, float]:
+def regler(plan: dict, pr: dict, cam: np.ndarray, limites=LIMITES) -> tuple[np.ndarray, float]:
     """Réglage fin d'une place (x, y, cap, échelle) : petits pas tant que la note monte."""
     creux, sol = pr["creux"].astype(np.int64), pr["sol"].astype(np.int64)
 
@@ -339,7 +359,7 @@ def regler(plan: dict, pr: dict, cam: np.ndarray) -> tuple[np.ndarray, float]:
         for i in range(4):
             for sg in (-1, 1):
                 c = cam.copy(); c[i] += sg * pas[i]
-                if i == 3 and not LIMITES[0] <= c[3] <= LIMITES[1]:
+                if i == 3 and not limites[0] <= c[3] <= limites[1]:
                     continue
                 v = f(c)
                 if v > best + 1e-6:
@@ -545,12 +565,16 @@ class Outils:
         self.fenetres = Fenetres()
 
 
-def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None) -> dict:
+def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None,
+          zoom_par_fuites: bool = False) -> dict:
     """logement : le logement lu (pièces, murs, ouvertures) ; photos : {nom: photo RGB}.
     → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc"}},
        "non_calees": {nom: raison}}. Seules les photos « sure » : True doivent servir aux sols et aux meubles.
     fenetres_de : {nom: carte « fenêtre ou non »} toute faite, pour les ESSAIS seulement (noter la chaîne sur les photos qui
-    ont servi à apprendre la couche des fenêtres, avec une carte apprise sans elles)."""
+    ont servi à apprendre la couche des fenêtres, avec une carte apprise sans elles).
+    zoom_par_fuites : EN RÉSERVE (15/11/2026), pas en service. Zoom et cap donnés par les lignes de fuite (moteur/fuites.py)
+    quand les photos du lot s'accordent. app-003 : écart médian 0,53 → 0,46 m, pire 1,45 → 0,98 m ; mais app-002 : meubles
+    retrouvés 19 → 16 sur 30 (sols 87,9 → 91,3 %) : recul, donc non mis en service (règle 8)."""
     o = outils or Outils()
     plan = plan_du_logement(logement)
     G = grille(plan); pg = piece_de(plan, G)
@@ -559,16 +583,22 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     tp = tuple(torch.from_numpy(np.ascontiguousarray(t)).to(o.appareil) for t in tirs(plan, G, np.arange(360.0)))
     tp = (tp[0].float(), tp[1].to(torch.int8), tp[2].bool())
 
+    # le zoom : celui des lignes de fuite quand les photos du lot s'accordent (moteur/fuites.py), sinon celui de MoGe-2
+    fu = {nom: {**fuites.mesurer(rgb), "largeur": rgb.shape[1]} for nom, rgb in photos.items()} if zoom_par_fuites else {}
+    zoom = fuites.zoom_du_lot(fu) if fu else None
+    journal(f"  zoom par les lignes de fuite : {'%.3f × la largeur' % zoom if zoom else 'pas net, on garde celui de MoGe-2'}")
+    sens = sens_des_murs(plan)
+    echelles, limites = (ECHELLES_ZOOM_JUSTE, LIMITES_ZOOM_JUSTE) if zoom else (ECHELLES, LIMITES)
     mes, prof, types, R, T, Er, non = {}, {}, {}, {}, {}, {}, {}
     for nom, rgb in photos.items():
-        mes[nom] = mesurer(o.moge, rgb)
+        mes[nom] = mesurer(o.moge, rgb, zoom * rgb.shape[1] if zoom else None)
         fen = fenetres_de[nom] if fenetres_de and nom in fenetres_de else o.fenetres.proba(Fenetres.carres(o.oeil, rgb))
         pr = profil(mes[nom], plan["hsp"], fen)
         if pr is None:
             non[nom] = "trop peu de murs visibles"; journal(f"  {nom} : trop peu de murs visibles, photo laissée de côté"); continue
         prof[nom] = pr
         types[nom] = indices_des_meubles(o.pds.brut(f"caler/{id(photos)}/{nom}", rgb)["objets"])
-        N, E = notes_sur_le_plan(tp, pr, o.appareil)
+        N, E = notes_sur_le_plan(tp, pr, o.appareil, echelles)
         fac = np.array([_facteur(types[nom], plan["ids"][p]) for p in pg], np.float32)
         R[nom] = np.zeros((*forme, 360), np.float32); R[nom][ij[:, 1], ij[:, 0]] = N * fac[:, None]
         Er[nom] = np.zeros((*forme, 360), np.uint8); Er[nom][ij[:, 1], ij[:, 0]] = E
@@ -597,7 +627,7 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
         for n, (ix, iy, k) in ou.items():
             x, y, k2, v = place(n, ix, iy, k, JEU_M if jeu else 0, JEU_DEG if jeu else 0)
             ok = v > 0 and P[y, x] >= 0
-            c["photos"][n] = {"cam": [float(orig[0] + x * PAS), float(orig[1] + y * PAS), float(k2), float(ECHELLES[int(Er[n][y, x, k2])]) if ok else 1.0],
+            c["photos"][n] = {"cam": [float(orig[0] + x * PAS), float(orig[1] + y * PAS), float(k2), float(echelles[int(Er[n][y, x, k2])]) if ok else 1.0],
                               "note": v, "piece": plan["ids"][P[y, x]] if ok else "hors du plan"}
         return c
 
@@ -652,9 +682,10 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                 non[n] = "aucune place ne colle au plan"; continue
             # (essayé le 14/11/2026 puis retiré : laisser la photo chercher seule sa meilleure place dans un rayon plus large
             #  autour du bloc DÉGRADE : app-001 5 → 3 photos à peu près placées ; le bloc est le meilleur guide)
-            c2, _ = regler(plan, prof[n], cam.copy())  # réglage fin, gardé s'il reste près de la place du bloc
+            c2, _ = regler(plan, prof[n], cam.copy(), limites)  # réglage fin, gardé s'il reste près de la place du bloc
             if math.hypot(*(c2[:2] - cam[:2])) < 0.6 and abs((c2[2] - cam[2] + 180) % 360 - 180) < 10:
                 cam = c2
+            cam[2] = cap_par_fuites(float(cam[2]), fu.get(n), sens)
             ip = piece_de(plan, cam[None, :2])[0]
             if ip < 0:
                 non[n] = "placée hors des pièces"; continue
