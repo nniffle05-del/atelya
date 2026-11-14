@@ -552,6 +552,28 @@ def poser_bloc(T: dict, rel: dict, noms: list[str], combien: int = 40) -> list[d
 
 
 # ================================================================ la chaîne entière
+def _affiner(plan, o, rgb, fen, zoom, cam, fu, sens):
+    """La place dans la pièce DÉJÀ choisie, refaite avec le zoom des lignes de fuite : la photo est remesurée à ce zoom, puis
+    on cherche autour de la place trouvée (9 départs, 0,5 m) celle qui colle le mieux au plan, sans changer de pièce ni
+    s'éloigner de plus de 1,5 m."""
+    pr = profil(mesurer(o.moge, rgb, zoom * rgb.shape[1]), plan["hsp"], fen)
+    if pr is None:
+        return cam
+    piece = piece_de(plan, cam[None, :2])[0]
+    meilleur = (-1.0, cam)
+    for dx in (0.0, -0.5, 0.5):
+        for dy in (0.0, -0.5, 0.5):
+            c0 = np.array([cam[0] + dx, cam[1] + dy, cam[2], 1.0])
+            if piece_de(plan, c0[None, :2])[0] != piece:
+                continue
+            c, v = regler(plan, pr, c0, LIMITES_ZOOM_JUSTE)
+            if v > meilleur[0] and piece_de(plan, c[None, :2])[0] == piece and math.hypot(*(c[:2] - cam[:2])) < 1.5                     and abs((c[2] - cam[2] + 180) % 360 - 180) < 10:
+                meilleur = (v, c)
+    c = meilleur[1].copy()
+    c[2] = cap_par_fuites(float(c[2]), fu, sens)
+    return c
+
+
 class Outils:
     """Les réseaux dont la chaîne a besoin, chargés une fois : MoGe-2, Depth Anything 3, l'œil DINOv2 ViT-B/14, OWLv2."""
 
@@ -566,15 +588,17 @@ class Outils:
 
 
 def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None,
-          zoom_par_fuites: bool = False) -> dict:
+          zoom_par_fuites: bool | str = False) -> dict:
     """logement : le logement lu (pièces, murs, ouvertures) ; photos : {nom: photo RGB}.
     → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc"}},
        "non_calees": {nom: raison}}. Seules les photos « sure » : True doivent servir aux sols et aux meubles.
     fenetres_de : {nom: carte « fenêtre ou non »} toute faite, pour les ESSAIS seulement (noter la chaîne sur les photos qui
     ont servi à apprendre la couche des fenêtres, avec une carte apprise sans elles).
-    zoom_par_fuites : EN RÉSERVE (15/11/2026), pas en service. Zoom et cap donnés par les lignes de fuite (moteur/fuites.py)
-    quand les photos du lot s'accordent. app-003 : écart médian 0,53 → 0,46 m, pire 1,45 → 0,98 m ; mais app-002 : meubles
-    retrouvés 19 → 16 sur 30 (sols 87,9 → 91,3 %) : recul, donc non mis en service (règle 8)."""
+    zoom_par_fuites : EN RÉSERVE (14/11/2026 nuit), pas en service. Zoom et cap donnés par les lignes de fuite
+    (moteur/fuites.py) quand les photos du lot s'accordent. True = dès la mesure des photos : app-003 écart médian 0,53 → 0,46 m,
+    pire 1,45 → 0,98 m, mais app-002 chambres jumelles échangées et dites « sûres », meubles 19 → 16 sur 30. "fin" = pièces
+    choisies comme avant, zoom juste seulement pour affiner la place : app-003 médiane 0,46 m (séjour 0,10 à 0,39 m), app-002
+    meubles inchangés (19/30, écart moyen 0,35 → 0,30 m) mais sols 87,9 → 82,6 % : recul, donc non mis en service (règle 8)."""
     o = outils or Outils()
     plan = plan_du_logement(logement)
     G = grille(plan); pg = piece_de(plan, G)
@@ -585,7 +609,9 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
 
     # le zoom : celui des lignes de fuite quand les photos du lot s'accordent (moteur/fuites.py), sinon celui de MoGe-2
     fu = {nom: {**fuites.mesurer(rgb), "largeur": rgb.shape[1]} for nom, rgb in photos.items()} if zoom_par_fuites else {}
-    zoom = fuites.zoom_du_lot(fu) if fu else None
+    zoom_fin = fuites.zoom_du_lot(fu) if fu else None
+    zoom = None if zoom_par_fuites == "fin" else zoom_fin  # « fin » : pièces choisies comme avant, zoom juste pour la place seulement
+    fens = {}
     journal(f"  zoom par les lignes de fuite : {'%.3f × la largeur' % zoom if zoom else 'pas net, on garde celui de MoGe-2'}")
     sens = sens_des_murs(plan)
     echelles, limites = (ECHELLES_ZOOM_JUSTE, LIMITES_ZOOM_JUSTE) if zoom else (ECHELLES, LIMITES)
@@ -593,6 +619,7 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     for nom, rgb in photos.items():
         mes[nom] = mesurer(o.moge, rgb, zoom * rgb.shape[1] if zoom else None)
         fen = fenetres_de[nom] if fenetres_de and nom in fenetres_de else o.fenetres.proba(Fenetres.carres(o.oeil, rgb))
+        fens[nom] = fen
         pr = profil(mes[nom], plan["hsp"], fen)
         if pr is None:
             non[nom] = "trop peu de murs visibles"; journal(f"  {nom} : trop peu de murs visibles, photo laissée de côté"); continue
@@ -685,11 +712,14 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
             c2, _ = regler(plan, prof[n], cam.copy(), limites)  # réglage fin, gardé s'il reste près de la place du bloc
             if math.hypot(*(c2[:2] - cam[:2])) < 0.6 and abs((c2[2] - cam[2] + 180) % 360 - 180) < 10:
                 cam = c2
-            cam[2] = cap_par_fuites(float(cam[2]), fu.get(n), sens)
+            if zoom_fin:  # le cap des fuites seulement quand les photos du lot s'accordent (sinon pièces biscornues : app-001)
+                cam[2] = cap_par_fuites(float(cam[2]), fu.get(n), sens)
+            if zoom_par_fuites == "fin" and zoom_fin:
+                cam = _affiner(plan, o, photos[n], fens[n], zoom_fin, cam, fu.get(n), sens)
             ip = piece_de(plan, cam[None, :2])[0]
             if ip < 0:
                 non[n] = "placée hors des pièces"; continue
-            H, W = photos[n].shape[:2]; f = mes[n]["focale_px"]; haut = mes[n]["haut"]
+            H, W = photos[n].shape[:2]; f = zoom_fin * W if (zoom_par_fuites == "fin" and zoom_fin) else mes[n]["focale_px"]; haut = mes[n]["haut"]
             sortie["cameras"][n] = {
                 "camera": {"x": round(float(cam[0]), 3), "y": round(float(cam[1]), 3), "z": round(float(np.clip(prof[n]["z"], 0.3, plan["hsp"] - 0.2)), 3),
                            "cap": round(float((cam[2] + 180) % 360 - 180), 2), "tangage": 0.0, "f": round(f, 2), "u0": W / 2,

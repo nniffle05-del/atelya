@@ -43,7 +43,7 @@ def main():
     photos, modele = outil.lire_photos(dossier)
     o = cp.Outils()
     for variante in (sys.argv[1:] or ["sans", "avec"]):
-        r = cp.caler(logement, photos, outils=o, journal=lambda *a: None, zoom_par_fuites=variante != "sans")
+        r = cp.caler(logement, photos, outils=o, journal=lambda *a: None, zoom_par_fuites={"sans": False, "avec": True, "fin": "fin"}[variante])
         sures = sum(1 for d in r["cameras"].values() if d["sure"])
         print(f"\n--- {variante} le zoom des lignes de fuite : {sures} photos sûres sur {len(photos)}")
         for n, d in r["cameras"].items():
