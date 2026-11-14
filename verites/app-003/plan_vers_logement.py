@@ -66,9 +66,8 @@ if __name__ == "__main__":
         d, f = ((axe, a - 11), (axe, b + 11)) if sens == "v" else ((a - 11, axe), (b + 11, axe))
         murs.append({"id": f"M{i}", "debut": m(*d), "fin": m(*f), "epaisseur": 0.2, "statut": "estime", "source": "verite_claude"})
         ouvertures.append({"id": f"O{i}", "type": genre, "mur": f"M{i}", "position": round(11 * E, 3), "largeur": round((b - a) * E, 3),
-                           "hauteur": hauteur, "allege": allege, "statut": "estime", "source": "verite_claude", "note": note})
+                           "hauteur": hauteur, "allege": allege, "statut": "estime", "source": "verite_claude"})  # (la note reste ici : le format du logement n'en veut pas)
     logement = {"schema": "logement/0.1", "projet_id": "app-003", "unites": "m", "hauteur_sous_plafond": HSP,
-                "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle d'après la surface de 145 m² donnée par NT ; hauteur sous plafond estimée d'après les photos ; relevé partiel (un mur par ouverture).",
                 "murs": murs, "ouvertures": ouvertures,
                 "pieces": [{"id": i, "nom": n, "contour": [m(*p) for p in c], "statut": "estime", "source": "verite_claude"} for i, n, c in PIECES]}
     sortie = Path(__file__).resolve().parent / "logement.json"
