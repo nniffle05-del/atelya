@@ -1,0 +1,1053 @@
+{
+ "schema": "logement/0.1",
+ "projet_id": "app-003",
+ "unites": "m",
+ "hauteur_sous_plafond": 3.1,
+ "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle estimée d'après les portes ; relevé partiel (un mur par ouverture).",
+ "murs": [
+  {
+   "id": "M1",
+   "debut": [
+    4.675,
+    15.482
+   ],
+   "fin": [
+    4.675,
+    13.447
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M2",
+   "debut": [
+    4.675,
+    12.54
+   ],
+   "fin": [
+    4.675,
+    10.34
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M3",
+   "debut": [
+    11.467,
+    15.812
+   ],
+   "fin": [
+    13.117,
+    15.812
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M4",
+   "debut": [
+    21.065,
+    14.932
+   ],
+   "fin": [
+    21.065,
+    12.54
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M5",
+   "debut": [
+    21.918,
+    11.633
+   ],
+   "fin": [
+    21.918,
+    8.553
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M6",
+   "debut": [
+    4.675,
+    8.415
+   ],
+   "fin": [
+    4.675,
+    6.353
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M7",
+   "debut": [
+    1.21,
+    5.473
+   ],
+   "fin": [
+    3.465,
+    5.473
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M8",
+   "debut": [
+    0.193,
+    5.473
+   ],
+   "fin": [
+    0.193,
+    3.547
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M9",
+   "debut": [
+    10.945,
+    2.365
+   ],
+   "fin": [
+    10.945,
+    0.357
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M10",
+   "debut": [
+    5.527,
+    0.165
+   ],
+   "fin": [
+    7.205,
+    0.165
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M11",
+   "debut": [
+    11.027,
+    12.182
+   ],
+   "fin": [
+    11.027,
+    10.175
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M12",
+   "debut": [
+    14.768,
+    11.193
+   ],
+   "fin": [
+    14.768,
+    9.13
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M13",
+   "debut": [
+    12.072,
+    12.045
+   ],
+   "fin": [
+    13.75,
+    12.045
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M14",
+   "debut": [
+    13.393,
+    12.045
+   ],
+   "fin": [
+    14.96,
+    12.045
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M15",
+   "debut": [
+    14.768,
+    15.373
+   ],
+   "fin": [
+    14.768,
+    14.217
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M16",
+   "debut": [
+    16.17,
+    12.348
+   ],
+   "fin": [
+    19.718,
+    12.348
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M17",
+   "debut": [
+    11.027,
+    10.312
+   ],
+   "fin": [
+    11.027,
+    9.02
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M18",
+   "debut": [
+    9.46,
+    10.092
+   ],
+   "fin": [
+    11.22,
+    10.092
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M19",
+   "debut": [
+    11.467,
+    9.213
+   ],
+   "fin": [
+    13.998,
+    9.213
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M20",
+   "debut": [
+    4.867,
+    5.032
+   ],
+   "fin": [
+    6.298,
+    5.032
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M21",
+   "debut": [
+    4.675,
+    4.923
+   ],
+   "fin": [
+    4.675,
+    3.493
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M22",
+   "debut": [
+    4.923,
+    3.603
+   ],
+   "fin": [
+    6.298,
+    3.603
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M23",
+   "debut": [
+    8.498,
+    3.603
+   ],
+   "fin": [
+    9.928,
+    3.603
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "M24",
+   "debut": [
+    10.863,
+    3.547
+   ],
+   "fin": [
+    12.293,
+    3.547
+   ],
+   "epaisseur": 0.2,
+   "statut": "estime",
+   "source": "verite_claude"
+  }
+ ],
+ "ouvertures": [
+  {
+   "id": "O1",
+   "type": "porte_fenetre",
+   "mur": "M1",
+   "position": 0.302,
+   "largeur": 1.43,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "séjour, côté rue (ouest)"
+  },
+  {
+   "id": "O2",
+   "type": "porte_fenetre",
+   "mur": "M2",
+   "position": 0.302,
+   "largeur": 1.595,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "séjour, côté rue (ouest)"
+  },
+  {
+   "id": "O3",
+   "type": "fenetre",
+   "mur": "M3",
+   "position": 0.302,
+   "largeur": 1.045,
+   "hauteur": 1.5,
+   "allege": 0.9,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du haut (bureau)"
+  },
+  {
+   "id": "O4",
+   "type": "porte_fenetre",
+   "mur": "M4",
+   "position": 0.302,
+   "largeur": 1.788,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "cuisine"
+  },
+  {
+   "id": "O5",
+   "type": "fenetre",
+   "mur": "M5",
+   "position": 0.302,
+   "largeur": 2.475,
+   "hauteur": 2.0,
+   "allege": 0.6,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "salle à manger (radiateur dessous)"
+  },
+  {
+   "id": "O6",
+   "type": "porte_fenetre",
+   "mur": "M6",
+   "position": 0.302,
+   "largeur": 1.458,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du milieu"
+  },
+  {
+   "id": "O7",
+   "type": "porte_fenetre",
+   "mur": "M7",
+   "position": 0.302,
+   "largeur": 1.65,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre de gauche"
+  },
+  {
+   "id": "O8",
+   "type": "porte_fenetre",
+   "mur": "M8",
+   "position": 0.302,
+   "largeur": 1.32,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre de gauche"
+  },
+  {
+   "id": "O9",
+   "type": "porte_fenetre",
+   "mur": "M9",
+   "position": 0.302,
+   "largeur": 1.403,
+   "hauteur": 2.6,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du bas à droite (type supposé)"
+  },
+  {
+   "id": "O10",
+   "type": "fenetre",
+   "mur": "M10",
+   "position": 0.302,
+   "largeur": 1.073,
+   "hauteur": 1.0,
+   "allege": 1.2,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "salle de bains"
+  },
+  {
+   "id": "O11",
+   "type": "porte",
+   "mur": "M11",
+   "position": 0.302,
+   "largeur": 1.403,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "séjour / entrée (double)"
+  },
+  {
+   "id": "O12",
+   "type": "porte",
+   "mur": "M12",
+   "position": 0.302,
+   "largeur": 1.458,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "entrée / salle à manger (double)"
+  },
+  {
+   "id": "O13",
+   "type": "porte",
+   "mur": "M13",
+   "position": 0.302,
+   "largeur": 1.073,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "WC / entrée"
+  },
+  {
+   "id": "O14",
+   "type": "porte",
+   "mur": "M14",
+   "position": 0.302,
+   "largeur": 0.963,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du haut / entrée"
+  },
+  {
+   "id": "O15",
+   "type": "porte",
+   "mur": "M15",
+   "position": 0.302,
+   "largeur": 0.55,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du haut / SDE"
+  },
+  {
+   "id": "O16",
+   "type": "porte",
+   "mur": "M16",
+   "position": 0.302,
+   "largeur": 2.942,
+   "hauteur": 2.4,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "cuisine / salle à manger (grande ouverture sans porte)"
+  },
+  {
+   "id": "O17",
+   "type": "porte",
+   "mur": "M17",
+   "position": 0.302,
+   "largeur": 0.688,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "entrée / couloir"
+  },
+  {
+   "id": "O18",
+   "type": "porte",
+   "mur": "M18",
+   "position": 0.302,
+   "largeur": 1.155,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "séjour / couloir"
+  },
+  {
+   "id": "O19",
+   "type": "porte",
+   "mur": "M19",
+   "position": 0.302,
+   "largeur": 1.925,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "porte palière (entrée)"
+  },
+  {
+   "id": "O20",
+   "type": "porte",
+   "mur": "M20",
+   "position": 0.302,
+   "largeur": 0.825,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du milieu / couloir"
+  },
+  {
+   "id": "O21",
+   "type": "porte",
+   "mur": "M21",
+   "position": 0.302,
+   "largeur": 0.825,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre de gauche / couloir"
+  },
+  {
+   "id": "O22",
+   "type": "porte",
+   "mur": "M22",
+   "position": 0.302,
+   "largeur": 0.77,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "salle de bains / couloir"
+  },
+  {
+   "id": "O23",
+   "type": "porte",
+   "mur": "M23",
+   "position": 0.302,
+   "largeur": 0.825,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "chambre du bas à droite / couloir"
+  },
+  {
+   "id": "O24",
+   "type": "porte",
+   "mur": "M24",
+   "position": 0.302,
+   "largeur": 0.825,
+   "hauteur": 2.1,
+   "allege": 0.0,
+   "statut": "estime",
+   "source": "verite_claude",
+   "note": "WC / couloir (mur en biais sur le plan, mis droit)"
+  }
+ ],
+ "pieces": [
+  {
+   "id": "sejour_1",
+   "nom": "Séjour",
+   "contour": [
+    [
+     4.812,
+     15.73
+    ],
+    [
+     10.89,
+     15.73
+    ],
+    [
+     10.89,
+     10.092
+    ],
+    [
+     4.812,
+     10.092
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "sejour_2",
+   "nom": "Salle à manger",
+   "contour": [
+    [
+     14.877,
+     12.265
+    ],
+    [
+     20.983,
+     12.265
+    ],
+    [
+     20.983,
+     11.825
+    ],
+    [
+     21.863,
+     11.825
+    ],
+    [
+     21.863,
+     8.47
+    ],
+    [
+     21.038,
+     8.47
+    ],
+    [
+     21.038,
+     8.085
+    ],
+    [
+     14.877,
+     8.085
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "cuisine_1",
+   "nom": "Cuisine",
+   "contour": [
+    [
+     16.61,
+     15.73
+    ],
+    [
+     20.983,
+     15.73
+    ],
+    [
+     20.983,
+     12.43
+    ],
+    [
+     14.877,
+     12.43
+    ],
+    [
+     14.877,
+     14.465
+    ],
+    [
+     16.61,
+     14.465
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "salle_d_eau_1",
+   "nom": "SDE",
+   "contour": [
+    [
+     14.877,
+     15.73
+    ],
+    [
+     16.61,
+     15.73
+    ],
+    [
+     16.61,
+     14.465
+    ],
+    [
+     14.877,
+     14.465
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "chambre_1",
+   "nom": "Chambre (haut, bureau bleu)",
+   "contour": [
+    [
+     11.303,
+     15.73
+    ],
+    [
+     14.658,
+     15.73
+    ],
+    [
+     14.658,
+     12.127
+    ],
+    [
+     13.613,
+     12.127
+    ],
+    [
+     13.613,
+     13.2
+    ],
+    [
+     11.303,
+     13.2
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "wc_1",
+   "nom": "WC",
+   "contour": [
+    [
+     11.11,
+     13.035
+    ],
+    [
+     13.447,
+     13.035
+    ],
+    [
+     13.447,
+     12.1
+    ],
+    [
+     11.11,
+     12.1
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "entree_1",
+   "nom": "Entrée",
+   "contour": [
+    [
+     11.193,
+     11.99
+    ],
+    [
+     14.658,
+     11.99
+    ],
+    [
+     14.658,
+     9.295
+    ],
+    [
+     11.193,
+     9.295
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "degagement_1",
+   "nom": "Couloir",
+   "contour": [
+    [
+     9.625,
+     10.01
+    ],
+    [
+     10.918,
+     10.01
+    ],
+    [
+     10.918,
+     4.537
+    ],
+    [
+     12.018,
+     4.4
+    ],
+    [
+     12.018,
+     3.603
+    ],
+    [
+     4.84,
+     3.603
+    ],
+    [
+     4.84,
+     4.95
+    ],
+    [
+     6.27,
+     4.95
+    ],
+    [
+     6.27,
+     4.73
+    ],
+    [
+     9.625,
+     4.73
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "chambre_2",
+   "nom": "Chambre (milieu, enfants)",
+   "contour": [
+    [
+     4.812,
+     9.625
+    ],
+    [
+     8.635,
+     9.625
+    ],
+    [
+     8.635,
+     5.17
+    ],
+    [
+     4.812,
+     5.17
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "placard_1",
+   "nom": "Placard",
+   "contour": [
+    [
+     8.8,
+     9.625
+    ],
+    [
+     9.488,
+     9.625
+    ],
+    [
+     9.488,
+     4.867
+    ],
+    [
+     6.27,
+     4.867
+    ],
+    [
+     6.27,
+     5.115
+    ],
+    [
+     8.8,
+     5.115
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "chambre_3",
+   "nom": "Chambre (gauche, d'angle)",
+   "contour": [
+    [
+     0.33,
+     5.39
+    ],
+    [
+     4.537,
+     5.39
+    ],
+    [
+     4.537,
+     0.33
+    ],
+    [
+     0.33,
+     0.33
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "salle_d_eau_2",
+   "nom": "SDB",
+   "contour": [
+    [
+     4.867,
+     3.547
+    ],
+    [
+     6.985,
+     3.547
+    ],
+    [
+     6.985,
+     0.247
+    ],
+    [
+     4.867,
+     0.247
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "chambre_4",
+   "nom": "Chambre (bas, droite)",
+   "contour": [
+    [
+     7.178,
+     3.547
+    ],
+    [
+     10.588,
+     3.547
+    ],
+    [
+     10.588,
+     2.475
+    ],
+    [
+     10.863,
+     2.475
+    ],
+    [
+     10.863,
+     0.247
+    ],
+    [
+     7.975,
+     0.247
+    ],
+    [
+     7.975,
+     0.468
+    ],
+    [
+     7.178,
+     0.468
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  },
+  {
+   "id": "wc_2",
+   "nom": "WC",
+   "contour": [
+    [
+     11.11,
+     3.493
+    ],
+    [
+     12.045,
+     3.493
+    ],
+    [
+     12.045,
+     2.53
+    ],
+    [
+     11.11,
+     2.53
+    ]
+   ],
+   "statut": "estime",
+   "source": "verite_claude"
+  }
+ ]
+}
