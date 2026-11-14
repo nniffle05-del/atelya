@@ -3,6 +3,12 @@ r"""Brique photos : le sol de l'appartement vu de dessus, reconstitué depuis le
     ..\atelya\.venv\Scripts\python.exe outils\habillage\sols_photos.py a_plat verites\app-001\cameras-photos.json ^
         ..\atelya\lectures-claude\app-001\logement.json ..\atelya\b2\app-001\brique-photos [--verite verites\app-001\sols.json]
 
+Le 1er argument de chaque commande est une fiche de photos calées (à la main ou par Atelya) OU, depuis le 14/11/2026, le
+DOSSIER des photos du client : Atelya les cale alors SEUL (moteur/caler_photos.py), n'utilise que celles dont il est sûr et
+range sa fiche à côté de la sortie (cameras-photos-seul.json). Mesuré le 14/11/2026 (examens déjà vus) : sols justes sur
+80,7 % (app-001) et 87,9 % (app-002) de la surface jugée, comme avec les fiches à la main (83,6 % et 87,9 %), sur moins de
+surface (45,6 et 38,1 m² contre 74,9 et 43,9 : seules les photos sûres servent).
+
 Chaque photo calée (cameras-photos.json) est mise à plat sur le sol de la pièce où se tient l'appareil (moteur/sol_a_plat.py),
 puis toutes sont assemblées : chaque endroit du sol prend la photo qui le voit le plus finement. Écrit dans le dossier de sortie :
     sol-a-plat.png      le sol de tout l'appartement vu de dessus (1 cm par pixel), contours des pièces en rouge,
@@ -23,6 +29,9 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from moteur.images import ecrire_image  # noqa: E402
 from moteur.sol_a_plat import RESOLUTION_M, aire, assembler, photos_a_plat  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from caler_photos_seul import fiche_ou_photos  # noqa: E402
 
 RACINE = Path(__file__).resolve().parents[2]
 
@@ -76,8 +85,8 @@ def commande_reconnaitre(args) -> int:
 
     from moteur.oeil_dinov2 import charger
     from moteur.reconnaitre_sols import Classifieur, noter, reconnaitre
-    releve = json.loads(args.releve.read_text(encoding="utf-8"))
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
+    releve = fiche_ou_photos(args.releve, logement, (args.sortie if args.sortie.suffix == "" else args.sortie.parent) / "cameras-photos-seul.json")
     clf = Classifieur.depuis(torch.load(args.modele, weights_only=False))
     resultat = reconnaitre(releve, logement, RACINE, charger(clf.oeil), clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
     args.sortie.mkdir(parents=True, exist_ok=True)
@@ -111,8 +120,8 @@ def commande_logement(args) -> int:
     from moteur.logement import Logement
     from moteur.oeil_dinov2 import charger
     from moteur.reconnaitre_sols import Classifieur, prototypes_bibliotheque, reconnaitre, sols_vers_logement
-    releve = json.loads(args.releve.read_text(encoding="utf-8"))
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
+    releve = fiche_ou_photos(args.releve, logement, (args.sortie if args.sortie.suffix == "" else args.sortie.parent) / "cameras-photos-seul.json")
     for p in logement["pieces"]:  # on part d'un logement sans sols : Atelya ne voit pas la bonne réponse
         p.pop("sol", None)
         p["zones_sol"] = []
@@ -157,15 +166,15 @@ def main() -> int:
     g.add_argument("--sans-pas-du-sol", action="store_true", help="ne PAS écarter lits, canapés, rangements (ancien comportement)")
     args = ap.parse_args()
     for f in (args.releve, args.logement):
-        if not f.is_file():
-            print(f"PLANTÉ : fichier introuvable : {f}", flush=True)
+        if not f.exists():
+            print(f"PLANTÉ : introuvable : {f}", flush=True)
             return 2
     if args.commande == "reconnaitre":
         return commande_reconnaitre(args)
     if args.commande == "logement":
         return commande_logement(args)
-    releve = json.loads(args.releve.read_text(encoding="utf-8"))
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
+    releve = fiche_ou_photos(args.releve, logement, (args.sortie if args.sortie.suffix == "" else args.sortie.parent) / "cameras-photos-seul.json")
     trio = photos_a_plat(releve, logement, RACINE)
     noms, vues = [n for n, _, _ in trio], [v for _, _, v in trio]
     image, finesse, choix = assembler(vues)
