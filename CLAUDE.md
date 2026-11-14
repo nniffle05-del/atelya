@@ -117,6 +117,10 @@ détaillé correspondant avant d'agir.
   Tailles : base B/16 `model.safetensors` 619,92 Mo ; large L/14 1 750,52 Mo ; + `vocab.json` 1,06 Mo, `merges.txt` 0,52 Mo.
   Route sans installation : code réécrit dans Atelya (comme `oeil.py`), poids lus à la main (safetensors), pas de `transformers`.
   Téléchargement = accord écrit NT.
+- **MoGe-2 (Microsoft, profondeur en mètres d'une seule photo), lu le 14/11/2026** : OK commercial. Fichier LICENSE du dépôt lu en entier = MIT
+  (+ Apache 2.0 pour la partie DINOv2) ; poids `Ruicheng/moge-2-vitb-normal` MIT, 419 Mo, téléchargés avec l'accord écrit de NT dans
+  `..telya\modeles-externes\moge-2-vitb-normal`. Réécrit dans `moteur/moge.py`, aucune installation. Sert aux essais « caméras des photos
+  calées seules » (pas encore en service).
 - **UNREAL ENGINE 5 — CLUF lu EN ENTIER le 10/11/2026** (PDF de la page officielle fourni par NT, 44 p., rangé dans
   `..\atelya\licences\unreal-engine-eula-2026-11-10.pdf` ; sites d'Epic bloqués aux robots). Utilisable commercialement :
   (a) CINÉMATIQUE = « rendered video files » = Non-Engine Product (§4.a.i) : AUCUNE redevance, à quiconque ; (b) VISITE
