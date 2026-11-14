@@ -1,7 +1,8 @@
 """app-003 (EXAMEN jamais vu, reçu de NT le 14/11/2026) : le plan relevé à la main (par Claude, sur le plan de l'annonce) →
-verites/app-003/logement.json. Le plan n'a NI cotes NI surface : l'échelle est estimée d'après les portes (portes simples
-~30 px = 0,80 m ; portes doubles ~52 px = 1,43 m), soit 2,75 cm par pixel du plan (1206 × 627 px). La hauteur sous plafond
-n'est pas écrite : 3,10 m (immeuble ancien ; à recaler si NT donne la vraie). Faces INTÉRIEURES des pièces relevées en
+verites/app-003/logement.json. Le plan n'a pas de cotes. Échelle : la surface donnée par NT le 14/11/2026, 145 m², égale à la somme des pièces relevées →
+2,463 cm par pixel du plan (1206 × 627 px) ; portes simples ~30 px = 0,74 m, doubles ~52 px = 1,28 m. (Première estimation,
+d'après les portes seules : 2,75 cm par pixel, 181 m², soit 12 % trop grand.) La hauteur sous plafond n'est pas écrite :
+2,90 m = médiane de ce que MoGe-2 mesure sur les 19 photos (à remplacer si NT donne la vraie). Faces INTÉRIEURES des pièces relevées en
 pixels du plan (x vers la droite, y vers le bas), puis mises en mètres (y vers le haut).
 Relevé PARTIEL, suffisant pour caler les photos : pièces + ouvertures ; un petit mur est créé par ouverture (pas tous les murs).
 Règle de NT : rien d'inventé (aucune porte ni cloison absente du plan).
@@ -11,7 +12,7 @@ Règle de NT : rien d'inventé (aucune porte ni cloison absente du plan).
 import json
 from pathlib import Path
 
-E, X0, Y0, HSP = 0.0275, 200, 620, 3.10
+E, X0, Y0, HSP = 0.02463, 200, 620, 2.90
 
 
 def m(x, y):
@@ -38,7 +39,7 @@ PIECES = [  # id, nom du plan, contour en pixels
     ("chambre_4", "Chambre (bas, droite)", [(461, 491), (585, 491), (585, 530), (595, 530), (595, 611), (490, 611), (490, 603), (461, 603)]),
     ("wc_2", "WC", rect(604, 493, 638, 528)),
 ]
-PF, FEN, PORTE = ("porte_fenetre", 0.0, 2.6), ("fenetre", 0.9, 1.5), ("porte", 0.0, 2.1)
+PF, FEN, PORTE = ("porte_fenetre", 0.0, 2.5), ("fenetre", 0.9, 1.5), ("porte", 0.0, 2.1)
 OUVERTURES = [  # sens (v = mur vertical sur le plan, h = horizontal), axe du mur, début, fin (pixels), (type, allège, hauteur), note
     ("v", 370, 68, 120, PF, "séjour, côté rue (ouest)"), ("v", 370, 175, 233, PF, "séjour, côté rue (ouest)"),
     ("h", 45, 628, 666, FEN, "chambre du haut (bureau)"),
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         ouvertures.append({"id": f"O{i}", "type": genre, "mur": f"M{i}", "position": round(11 * E, 3), "largeur": round((b - a) * E, 3),
                            "hauteur": hauteur, "allege": allege, "statut": "estime", "source": "verite_claude", "note": note})
     logement = {"schema": "logement/0.1", "projet_id": "app-003", "unites": "m", "hauteur_sous_plafond": HSP,
-                "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle estimée d'après les portes ; relevé partiel (un mur par ouverture).",
+                "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle d'après la surface de 145 m² donnée par NT ; hauteur sous plafond estimée d'après les photos ; relevé partiel (un mur par ouverture).",
                 "murs": murs, "ouvertures": ouvertures,
                 "pieces": [{"id": i, "nom": n, "contour": [m(*p) for p in c], "statut": "estime", "source": "verite_claude"} for i, n, c in PIECES]}
     sortie = Path(__file__).resolve().parent / "logement.json"

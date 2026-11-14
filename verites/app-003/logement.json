@@ -2,18 +2,18 @@
  "schema": "logement/0.1",
  "projet_id": "app-003",
  "unites": "m",
- "hauteur_sous_plafond": 3.1,
- "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle estimée d'après les portes ; relevé partiel (un mur par ouverture).",
+ "hauteur_sous_plafond": 2.9,
+ "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle d'après la surface de 145 m² donnée par NT ; hauteur sous plafond estimée d'après les photos ; relevé partiel (un mur par ouverture).",
  "murs": [
   {
    "id": "M1",
    "debut": [
-    4.675,
-    15.482
+    4.187,
+    13.867
    ],
    "fin": [
-    4.675,
-    13.447
+    4.187,
+    12.044
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -22,12 +22,12 @@
   {
    "id": "M2",
    "debut": [
-    4.675,
-    12.54
+    4.187,
+    11.231
    ],
    "fin": [
-    4.675,
-    10.34
+    4.187,
+    9.261
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -36,12 +36,12 @@
   {
    "id": "M3",
    "debut": [
-    11.467,
-    15.812
+    10.271,
+    14.162
    ],
    "fin": [
-    13.117,
-    15.812
+    11.749,
+    14.162
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -50,12 +50,12 @@
   {
    "id": "M4",
    "debut": [
-    21.065,
-    14.932
+    18.867,
+    13.374
    ],
    "fin": [
-    21.065,
-    12.54
+    18.867,
+    11.231
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -64,12 +64,12 @@
   {
    "id": "M5",
    "debut": [
-    21.918,
-    11.633
+    19.63,
+    10.418
    ],
    "fin": [
-    21.918,
-    8.553
+    19.63,
+    7.66
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -78,12 +78,12 @@
   {
    "id": "M6",
    "debut": [
-    4.675,
-    8.415
+    4.187,
+    7.537
    ],
    "fin": [
-    4.675,
-    6.353
+    4.187,
+    5.69
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -92,12 +92,12 @@
   {
    "id": "M7",
    "debut": [
-    1.21,
-    5.473
+    1.084,
+    4.901
    ],
    "fin": [
-    3.465,
-    5.473
+    3.103,
+    4.901
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -106,12 +106,12 @@
   {
    "id": "M8",
    "debut": [
-    0.193,
-    5.473
+    0.172,
+    4.901
    ],
    "fin": [
-    0.193,
-    3.547
+    0.172,
+    3.177
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -120,12 +120,12 @@
   {
    "id": "M9",
    "debut": [
-    10.945,
-    2.365
+    9.803,
+    2.118
    ],
    "fin": [
-    10.945,
-    0.357
+    9.803,
+    0.32
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -134,12 +134,12 @@
   {
    "id": "M10",
    "debut": [
-    5.527,
-    0.165
+    4.951,
+    0.148
    ],
    "fin": [
-    7.205,
-    0.165
+    6.453,
+    0.148
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -148,12 +148,12 @@
   {
    "id": "M11",
    "debut": [
-    11.027,
-    12.182
+    9.877,
+    10.911
    ],
    "fin": [
-    11.027,
-    10.175
+    9.877,
+    9.113
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -162,12 +162,12 @@
   {
    "id": "M12",
    "debut": [
-    14.768,
-    11.193
+    13.226,
+    10.024
    ],
    "fin": [
-    14.768,
-    9.13
+    13.226,
+    8.177
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -176,12 +176,12 @@
   {
    "id": "M13",
    "debut": [
-    12.072,
-    12.045
+    10.813,
+    10.788
    ],
    "fin": [
-    13.75,
-    12.045
+    12.315,
+    10.788
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -190,12 +190,12 @@
   {
    "id": "M14",
    "debut": [
-    13.393,
-    12.045
+    11.995,
+    10.788
    ],
    "fin": [
-    14.96,
-    12.045
+    13.399,
+    10.788
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -204,12 +204,12 @@
   {
    "id": "M15",
    "debut": [
-    14.768,
-    15.373
+    13.226,
+    13.768
    ],
    "fin": [
-    14.768,
-    14.217
+    13.226,
+    12.734
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -218,12 +218,12 @@
   {
    "id": "M16",
    "debut": [
-    16.17,
-    12.348
+    14.482,
+    11.059
    ],
    "fin": [
-    19.718,
-    12.348
+    17.66,
+    11.059
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -232,12 +232,12 @@
   {
    "id": "M17",
    "debut": [
-    11.027,
-    10.312
+    9.877,
+    9.236
    ],
    "fin": [
-    11.027,
-    9.02
+    9.877,
+    8.079
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -246,12 +246,12 @@
   {
    "id": "M18",
    "debut": [
-    9.46,
-    10.092
+    8.473,
+    9.039
    ],
    "fin": [
-    11.22,
-    10.092
+    10.049,
+    9.039
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -260,12 +260,12 @@
   {
    "id": "M19",
    "debut": [
-    11.467,
-    9.213
+    10.271,
+    8.251
    ],
    "fin": [
-    13.998,
-    9.213
+    12.537,
+    8.251
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -274,12 +274,12 @@
   {
    "id": "M20",
    "debut": [
-    4.867,
-    5.032
+    4.36,
+    4.507
    ],
    "fin": [
-    6.298,
-    5.032
+    5.64,
+    4.507
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -288,12 +288,12 @@
   {
    "id": "M21",
    "debut": [
-    4.675,
-    4.923
+    4.187,
+    4.409
    ],
    "fin": [
-    4.675,
-    3.493
+    4.187,
+    3.128
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -302,12 +302,12 @@
   {
    "id": "M22",
    "debut": [
-    4.923,
-    3.603
+    4.409,
+    3.227
    ],
    "fin": [
-    6.298,
-    3.603
+    5.64,
+    3.227
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -316,12 +316,12 @@
   {
    "id": "M23",
    "debut": [
-    8.498,
-    3.603
+    7.611,
+    3.227
    ],
    "fin": [
-    9.928,
-    3.603
+    8.891,
+    3.227
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -330,12 +330,12 @@
   {
    "id": "M24",
    "debut": [
-    10.863,
-    3.547
+    9.729,
+    3.177
    ],
    "fin": [
-    12.293,
-    3.547
+    11.01,
+    3.177
    ],
    "epaisseur": 0.2,
    "statut": "estime",
@@ -347,9 +347,9 @@
    "id": "O1",
    "type": "porte_fenetre",
    "mur": "M1",
-   "position": 0.302,
-   "largeur": 1.43,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.281,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -359,9 +359,9 @@
    "id": "O2",
    "type": "porte_fenetre",
    "mur": "M2",
-   "position": 0.302,
-   "largeur": 1.595,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.429,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -371,8 +371,8 @@
    "id": "O3",
    "type": "fenetre",
    "mur": "M3",
-   "position": 0.302,
-   "largeur": 1.045,
+   "position": 0.271,
+   "largeur": 0.936,
    "hauteur": 1.5,
    "allege": 0.9,
    "statut": "estime",
@@ -383,9 +383,9 @@
    "id": "O4",
    "type": "porte_fenetre",
    "mur": "M4",
-   "position": 0.302,
-   "largeur": 1.788,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.601,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -395,8 +395,8 @@
    "id": "O5",
    "type": "fenetre",
    "mur": "M5",
-   "position": 0.302,
-   "largeur": 2.475,
+   "position": 0.271,
+   "largeur": 2.217,
    "hauteur": 2.0,
    "allege": 0.6,
    "statut": "estime",
@@ -407,9 +407,9 @@
    "id": "O6",
    "type": "porte_fenetre",
    "mur": "M6",
-   "position": 0.302,
-   "largeur": 1.458,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.305,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -419,9 +419,9 @@
    "id": "O7",
    "type": "porte_fenetre",
    "mur": "M7",
-   "position": 0.302,
-   "largeur": 1.65,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.478,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -431,9 +431,9 @@
    "id": "O8",
    "type": "porte_fenetre",
    "mur": "M8",
-   "position": 0.302,
-   "largeur": 1.32,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.182,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -443,9 +443,9 @@
    "id": "O9",
    "type": "porte_fenetre",
    "mur": "M9",
-   "position": 0.302,
-   "largeur": 1.403,
-   "hauteur": 2.6,
+   "position": 0.271,
+   "largeur": 1.256,
+   "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
    "source": "verite_claude",
@@ -455,8 +455,8 @@
    "id": "O10",
    "type": "fenetre",
    "mur": "M10",
-   "position": 0.302,
-   "largeur": 1.073,
+   "position": 0.271,
+   "largeur": 0.961,
    "hauteur": 1.0,
    "allege": 1.2,
    "statut": "estime",
@@ -467,8 +467,8 @@
    "id": "O11",
    "type": "porte",
    "mur": "M11",
-   "position": 0.302,
-   "largeur": 1.403,
+   "position": 0.271,
+   "largeur": 1.256,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -479,8 +479,8 @@
    "id": "O12",
    "type": "porte",
    "mur": "M12",
-   "position": 0.302,
-   "largeur": 1.458,
+   "position": 0.271,
+   "largeur": 1.305,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -491,8 +491,8 @@
    "id": "O13",
    "type": "porte",
    "mur": "M13",
-   "position": 0.302,
-   "largeur": 1.073,
+   "position": 0.271,
+   "largeur": 0.961,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -503,8 +503,8 @@
    "id": "O14",
    "type": "porte",
    "mur": "M14",
-   "position": 0.302,
-   "largeur": 0.963,
+   "position": 0.271,
+   "largeur": 0.862,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -515,8 +515,8 @@
    "id": "O15",
    "type": "porte",
    "mur": "M15",
-   "position": 0.302,
-   "largeur": 0.55,
+   "position": 0.271,
+   "largeur": 0.493,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -527,8 +527,8 @@
    "id": "O16",
    "type": "porte",
    "mur": "M16",
-   "position": 0.302,
-   "largeur": 2.942,
+   "position": 0.271,
+   "largeur": 2.635,
    "hauteur": 2.4,
    "allege": 0.0,
    "statut": "estime",
@@ -539,8 +539,8 @@
    "id": "O17",
    "type": "porte",
    "mur": "M17",
-   "position": 0.302,
-   "largeur": 0.688,
+   "position": 0.271,
+   "largeur": 0.616,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -551,8 +551,8 @@
    "id": "O18",
    "type": "porte",
    "mur": "M18",
-   "position": 0.302,
-   "largeur": 1.155,
+   "position": 0.271,
+   "largeur": 1.034,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -563,8 +563,8 @@
    "id": "O19",
    "type": "porte",
    "mur": "M19",
-   "position": 0.302,
-   "largeur": 1.925,
+   "position": 0.271,
+   "largeur": 1.724,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -575,8 +575,8 @@
    "id": "O20",
    "type": "porte",
    "mur": "M20",
-   "position": 0.302,
-   "largeur": 0.825,
+   "position": 0.271,
+   "largeur": 0.739,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -587,8 +587,8 @@
    "id": "O21",
    "type": "porte",
    "mur": "M21",
-   "position": 0.302,
-   "largeur": 0.825,
+   "position": 0.271,
+   "largeur": 0.739,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -599,8 +599,8 @@
    "id": "O22",
    "type": "porte",
    "mur": "M22",
-   "position": 0.302,
-   "largeur": 0.77,
+   "position": 0.271,
+   "largeur": 0.69,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -611,8 +611,8 @@
    "id": "O23",
    "type": "porte",
    "mur": "M23",
-   "position": 0.302,
-   "largeur": 0.825,
+   "position": 0.271,
+   "largeur": 0.739,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -623,8 +623,8 @@
    "id": "O24",
    "type": "porte",
    "mur": "M24",
-   "position": 0.302,
-   "largeur": 0.825,
+   "position": 0.271,
+   "largeur": 0.739,
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
@@ -638,20 +638,20 @@
    "nom": "Séjour",
    "contour": [
     [
-     4.812,
-     15.73
+     4.31,
+     14.088
     ],
     [
-     10.89,
-     15.73
+     9.753,
+     14.088
     ],
     [
-     10.89,
-     10.092
+     9.753,
+     9.039
     ],
     [
-     4.812,
-     10.092
+     4.31,
+     9.039
     ]
    ],
    "statut": "estime",
@@ -662,36 +662,36 @@
    "nom": "Salle à manger",
    "contour": [
     [
-     14.877,
-     12.265
+     13.325,
+     10.985
     ],
     [
-     20.983,
-     12.265
+     18.793,
+     10.985
     ],
     [
-     20.983,
-     11.825
+     18.793,
+     10.591
     ],
     [
-     21.863,
-     11.825
+     19.581,
+     10.591
     ],
     [
-     21.863,
-     8.47
+     19.581,
+     7.586
     ],
     [
-     21.038,
-     8.47
+     18.842,
+     7.586
     ],
     [
-     21.038,
-     8.085
+     18.842,
+     7.241
     ],
     [
-     14.877,
-     8.085
+     13.325,
+     7.241
     ]
    ],
    "statut": "estime",
@@ -702,28 +702,28 @@
    "nom": "Cuisine",
    "contour": [
     [
-     16.61,
-     15.73
+     14.877,
+     14.088
     ],
     [
-     20.983,
-     15.73
+     18.793,
+     14.088
     ],
     [
-     20.983,
-     12.43
+     18.793,
+     11.133
+    ],
+    [
+     13.325,
+     11.133
+    ],
+    [
+     13.325,
+     12.955
     ],
     [
      14.877,
-     12.43
-    ],
-    [
-     14.877,
-     14.465
-    ],
-    [
-     16.61,
-     14.465
+     12.955
     ]
    ],
    "statut": "estime",
@@ -734,20 +734,20 @@
    "nom": "SDE",
    "contour": [
     [
-     14.877,
-     15.73
-    ],
-    [
-     16.61,
-     15.73
-    ],
-    [
-     16.61,
-     14.465
+     13.325,
+     14.088
     ],
     [
      14.877,
-     14.465
+     14.088
+    ],
+    [
+     14.877,
+     12.955
+    ],
+    [
+     13.325,
+     12.955
     ]
    ],
    "statut": "estime",
@@ -758,28 +758,28 @@
    "nom": "Chambre (haut, bureau bleu)",
    "contour": [
     [
-     11.303,
-     15.73
+     10.123,
+     14.088
     ],
     [
-     14.658,
-     15.73
+     13.128,
+     14.088
     ],
     [
-     14.658,
-     12.127
+     13.128,
+     10.862
     ],
     [
-     13.613,
-     12.127
+     12.192,
+     10.862
     ],
     [
-     13.613,
-     13.2
+     12.192,
+     11.822
     ],
     [
-     11.303,
-     13.2
+     10.123,
+     11.822
     ]
    ],
    "statut": "estime",
@@ -790,20 +790,20 @@
    "nom": "WC",
    "contour": [
     [
-     11.11,
-     13.035
+     9.951,
+     11.675
     ],
     [
-     13.447,
-     13.035
+     12.044,
+     11.675
     ],
     [
-     13.447,
-     12.1
+     12.044,
+     10.837
     ],
     [
-     11.11,
-     12.1
+     9.951,
+     10.837
     ]
    ],
    "statut": "estime",
@@ -814,20 +814,20 @@
    "nom": "Entrée",
    "contour": [
     [
-     11.193,
-     11.99
+     10.024,
+     10.739
     ],
     [
-     14.658,
-     11.99
+     13.128,
+     10.739
     ],
     [
-     14.658,
-     9.295
+     13.128,
+     8.325
     ],
     [
-     11.193,
-     9.295
+     10.024,
+     8.325
     ]
    ],
    "statut": "estime",
@@ -838,44 +838,44 @@
    "nom": "Couloir",
    "contour": [
     [
-     9.625,
-     10.01
+     8.62,
+     8.965
     ],
     [
-     10.918,
-     10.01
+     9.778,
+     8.965
     ],
     [
-     10.918,
-     4.537
+     9.778,
+     4.064
     ],
     [
-     12.018,
-     4.4
+     10.763,
+     3.941
     ],
     [
-     12.018,
-     3.603
+     10.763,
+     3.227
     ],
     [
-     4.84,
-     3.603
+     4.335,
+     3.227
     ],
     [
-     4.84,
-     4.95
+     4.335,
+     4.433
     ],
     [
-     6.27,
-     4.95
+     5.616,
+     4.433
     ],
     [
-     6.27,
-     4.73
+     5.616,
+     4.236
     ],
     [
-     9.625,
-     4.73
+     8.62,
+     4.236
     ]
    ],
    "statut": "estime",
@@ -886,20 +886,20 @@
    "nom": "Chambre (milieu, enfants)",
    "contour": [
     [
-     4.812,
-     9.625
+     4.31,
+     8.62
     ],
     [
-     8.635,
-     9.625
+     7.734,
+     8.62
     ],
     [
-     8.635,
-     5.17
+     7.734,
+     4.63
     ],
     [
-     4.812,
-     5.17
+     4.31,
+     4.63
     ]
    ],
    "statut": "estime",
@@ -910,28 +910,28 @@
    "nom": "Placard",
    "contour": [
     [
-     8.8,
-     9.625
+     7.882,
+     8.62
     ],
     [
-     9.488,
-     9.625
+     8.497,
+     8.62
     ],
     [
-     9.488,
-     4.867
+     8.497,
+     4.36
     ],
     [
-     6.27,
-     4.867
+     5.616,
+     4.36
     ],
     [
-     6.27,
-     5.115
+     5.616,
+     4.581
     ],
     [
-     8.8,
-     5.115
+     7.882,
+     4.581
     ]
    ],
    "statut": "estime",
@@ -942,20 +942,20 @@
    "nom": "Chambre (gauche, d'angle)",
    "contour": [
     [
-     0.33,
-     5.39
+     0.296,
+     4.827
     ],
     [
-     4.537,
-     5.39
+     4.064,
+     4.827
     ],
     [
-     4.537,
-     0.33
+     4.064,
+     0.296
     ],
     [
-     0.33,
-     0.33
+     0.296,
+     0.296
     ]
    ],
    "statut": "estime",
@@ -966,20 +966,20 @@
    "nom": "SDB",
    "contour": [
     [
-     4.867,
-     3.547
+     4.36,
+     3.177
     ],
     [
-     6.985,
-     3.547
+     6.256,
+     3.177
     ],
     [
-     6.985,
-     0.247
+     6.256,
+     0.222
     ],
     [
-     4.867,
-     0.247
+     4.36,
+     0.222
     ]
    ],
    "statut": "estime",
@@ -990,36 +990,36 @@
    "nom": "Chambre (bas, droite)",
    "contour": [
     [
-     7.178,
-     3.547
+     6.428,
+     3.177
     ],
     [
-     10.588,
-     3.547
+     9.483,
+     3.177
     ],
     [
-     10.588,
-     2.475
+     9.483,
+     2.217
     ],
     [
-     10.863,
-     2.475
+     9.729,
+     2.217
     ],
     [
-     10.863,
-     0.247
+     9.729,
+     0.222
     ],
     [
-     7.975,
-     0.247
+     7.143,
+     0.222
     ],
     [
-     7.975,
-     0.468
+     7.143,
+     0.419
     ],
     [
-     7.178,
-     0.468
+     6.428,
+     0.419
     ]
    ],
    "statut": "estime",
@@ -1030,20 +1030,20 @@
    "nom": "WC",
    "contour": [
     [
-     11.11,
-     3.493
+     9.951,
+     3.128
     ],
     [
-     12.045,
-     3.493
+     10.788,
+     3.128
     ],
     [
-     12.045,
-     2.53
+     10.788,
+     2.266
     ],
     [
-     11.11,
-     2.53
+     9.951,
+     2.266
     ]
    ],
    "statut": "estime",
