@@ -44,7 +44,8 @@ if __name__ == "__main__":
             rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             t = time.time(); r = moge.lire(m, rgb); dt = time.time() - t
             np.savez_compressed(sortie / f"{app}-{nom}.npz", points=r["points"].astype(np.float16), masque=r["masque"],
-                                normales=r["normales"].astype(np.float16), focale=r["focale_px"])
+                                normales=r["normales"].astype(np.float16), focale=r["focale_px"],
+                                brut=r["brut"].astype(np.float32), masque_brut=r["masque_brut"], echelle=r["echelle"])
             k = c["camera"]
             haut = verticale(r)
             p, n, ok = r["points"][::4, ::4].reshape(-1, 3), r["normales"][::4, ::4].reshape(-1, 3), r["masque"][::4, ::4].ravel()
@@ -59,5 +60,5 @@ if __name__ == "__main__":
             ecrire_image(sortie / f"{app}-{nom}.jpg", cv2.resize(np.hstack([im, vis]), None, fx=0.5, fy=0.5))
     t = np.array(lignes)
     print("focale / main : médiane %.2f, écart |%%| médian %.0f %%" % (np.nanmedian(t[:, 0]), 100 * np.nanmedian(np.abs(t[:, 0] - 1))))
-    print("hauteur appareil − main : médiane %+.2f m, |écart| médian %.2f m" % (np.nanmedian(t[:, 1]), np.nanmedian(np.abs(t[:, 1]))))
+    print("hauteur appareil - main : médiane %+.2f m, |écart| médian %.2f m" % (np.nanmedian(t[:, 1]), np.nanmedian(np.abs(t[:, 1]))))
     print("plafond / plan : médiane %.2f, |écart| médian %.0f %%" % (np.nanmedian(t[:, 2]), 100 * np.nanmedian(np.abs(t[:, 2] - 1))))

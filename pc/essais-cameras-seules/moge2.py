@@ -6,6 +6,8 @@ import cv2, numpy as np
 from moteur.images import lire_image, ecrire_image
 import etape_b as eb
 from moge1 import verticale, pic
+from moteur import moge
+ZOOMS = (1.0, 0.9, 0.8, 0.7)  # la focale de MoGe-2 est souvent trop longue : on essaie plus grand angle
 
 src, sortie = Path(sys.argv[1]), Path(sys.argv[2]); sortie.mkdir(parents=True, exist_ok=True)
 PAS, BAS = 0.2, 2.1
@@ -112,7 +114,7 @@ def precis(mod, ph, rm, trou, cam):
         for i in range(4):
             for s in (-1, 1):
                 c = cam.copy(); c[i] += s * pas[i]
-                if i == 3 and not 0.85 <= c[3] <= 1.15:
+                if i == 3 and not 0.9 <= c[3] <= 1.1:
                     continue
                 v = f(c)
                 if v > best + 1e-6:
@@ -136,28 +138,36 @@ if __name__ == "__main__":
             k = c["camera"]; t0 = time.time()
             z = np.load(src / f"{app}-{nom}.npz")
             im = lire_image(Path(d["photos"]) / d.get("fichier", "{nom}.png").format(nom=nom))
-            pr = profil(z, mod["hsp"], cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)[::2, ::2] if __import__("os").environ.get("BLANC") else None)  # « blanc brûlé = vitre » : essayé, pire (4 → 2 / 22)
-            if pr is None or len(pr[0]) < 15:
+            z0 = {k_: z[k_] for k_ in z.files}; essais = []
+            for zoom in ZOOMS:
+                z = dict(z0) if zoom == 1.0 else {**z0, **moge.relire({"brut": z0["brut"], "masque_brut": z0["masque_brut"], "echelle": float(z0["echelle"]), "masque": z0["masque"]}, float(z0["focale"]) * zoom)}
+                z["focale"] = float(z0["focale"]) * zoom
+                pr = profil(z, mod["hsp"], cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)[::2, ::2] if __import__("os").environ.get("BLANC") else None)  # « blanc brûlé = vitre » : essayé, pire (4 → 2 / 22)
+                if pr is None or len(pr[0]) < 15:
+                    continue
+                ph, rm, trou, info = pr
+                ip = ph.astype(int)
+                ECH = (0.94, 1.0, 1.06)
+                notes = np.stack([np.stack([note(rm[None] * e, tour[:, (cap + ip) % 360], trou[None], tsorte[:, (cap + ip) % 360]) for cap in range(360)], 1) for e in ECH], 2)
+                ordre = np.argsort(notes.ravel())[::-1]
+                cands = []
+                for o in ordre[:20000]:
+                    g, reste = divmod(int(o), 360 * len(ECH)); cap, ie = divmod(reste, len(ECH))
+                    if all(np.hypot(*(G[g] - q[:2])) > 0.6 or abs((cap - q[2] + 180) % 360 - 180) > 20 for q in cands):
+                        cands.append(np.array([G[g][0], G[g][1], float(cap), ECH[ie]]))
+                    if len(cands) == 8:
+                        break
+                fins = sorted((precis(mod, ph, rm, trou, q) for q in cands), key=lambda x: -x[1])
+                essais.append((fins[0][1], zoom, fins, ph, rm, trou, info))
+            if not essais:
                 print(f"{app} {nom} : pas assez de murs vus"); bilan.append((np.nan, np.nan, 0, 0)); continue
-            ph, rm, trou, info = pr
-            ip = ph.astype(int)
-            ECH = (0.85, 0.92, 1.0, 1.08)
-            notes = np.stack([np.stack([note(rm[None] * e, tour[:, (cap + ip) % 360], trou[None], tsorte[:, (cap + ip) % 360]) for cap in range(360)], 1) for e in ECH], 2)
-            ordre = np.argsort(notes.ravel())[::-1]
-            cands = []
-            for o in ordre[:20000]:
-                g, reste = divmod(int(o), 360 * len(ECH)); cap, ie = divmod(reste, len(ECH))
-                if all(np.hypot(*(G[g] - q[:2])) > 0.6 or abs((cap - q[2] + 180) % 360 - 180) > 20 for q in cands):
-                    cands.append(np.array([G[g][0], G[g][1], float(cap), ECH[ie]]))
-                if len(cands) == 8:
-                    break
-            fins = sorted((precis(mod, ph, rm, trou, q) for q in cands), key=lambda x: -x[1])
+            _, zoom, fins, ph, rm, trou, info = max(essais, key=lambda e: e[0])
             cam, n1 = fins[0]; n2 = fins[1][1] if len(fins) > 1 else 0
             ecart = float(np.hypot(cam[0] - k["x"], cam[1] - k["y"])); dcap = float(abs((cam[2] - k["cap"] + 180) % 360 - 180))
             rang = next((i + 1 for i, (q, _) in enumerate(fins) if np.hypot(q[0] - k["x"], q[1] - k["y"]) < 0.6 and abs((q[2] - k["cap"] + 180) % 360 - 180) < 10), 0)
             pm = mod["ids"][eb.piece_de(mod, cam[None, :2])[0]]
             print(f"{app} {nom} [{c.get('qualite')}] écart {ecart:5.2f} m, cap {dcap:5.1f}°, dans {pm} | note {n1:.2f} (2e {n2:.2f}) | bonne place au rang {rang} | "
-                  f"hauteur {info['z']:.2f}/{k['z']:.2f}, échelle {info['ech']:.2f}×{cam[3]:.2f}, {len(ph)}° vus dont {int(trou.sum())}° à travers | {time.time() - t0:.0f} s", flush=True)
+                  f"hauteur {info['z']:.2f}/{k['z']:.2f}, zoom ×{zoom:.1f} ({[round(e[0], 2) for e in essais]}), échelle {info['ech']:.2f}×{cam[3]:.2f}, {len(ph)}° vus dont {int(trou.sum())}° à travers | {time.time() - t0:.0f} s", flush=True)
             bilan.append((ecart, dcap, rang, n1 - n2))
             # image de contrôle : le plan, les murs vus posés à la place trouvée (rouge) et à la place de la main (vert)
             E = 60; cc = np.concatenate(mod["pieces"]); o0 = cc.min(0) - 0.5; taille = ((cc.max(0) - o0 + 0.5) * E).astype(int)

@@ -200,15 +200,15 @@ class MoGe(nn.Module):
         return sorties
 
 
-def focale_et_decalage(uv: np.ndarray, xyz: np.ndarray) -> tuple[float, float]:
+def focale_et_decalage(uv: np.ndarray, xyz: np.ndarray, focale: float | None = None) -> tuple[float, float]:
     """Les points sortent du réseau à un recul près le long du regard : on cherche le recul (et le zoom) pour lesquels
     chaque point retombe sur son pixel. Une seule inconnue (le recul), le zoom s'en déduit ; recherche de Gauss-Newton
-    amortie (pas de scipy)."""
+    amortie (pas de scipy). `focale` donnée (relative à la demi-diagonale) : seul le recul est cherché."""
     uv, xy, z = uv.reshape(-1, 2).astype(np.float64), xyz[:, :2].astype(np.float64), xyz[:, 2].astype(np.float64)
 
     def ecart(d):
         p = xy / (z + d)[:, None]
-        f = (p * uv).sum() / max(np.square(p).sum(), 1e-12)
+        f = (p * uv).sum() / max(np.square(p).sum(), 1e-12) if focale is None else focale
         return (f * p - uv).ravel(), f
 
     d, amorti = 0.0, 1e-3
@@ -242,39 +242,45 @@ def charger(appareil: str | None = None, dossier: str = DOSSIER) -> MoGe:
     return m.eval().to(appareil)
 
 
+def _monter(brut: np.ndarray, masque: np.ndarray, echelle: float, focale_px: float | None) -> dict:
+    """Des points bruts du réseau (à un recul près) aux points en mètres, pour le zoom trouvé ou imposé."""
+    h, w = masque.shape
+    diag = math.hypot(h, w)
+    uv = _uv(w, h, w / h, dtype=torch.float32).numpy()
+    iy, ix = np.linspace(0, h - 1, 64).round().astype(int), np.linspace(0, w - 1, 64).round().astype(int)
+    pb, ub, mb = brut[iy][:, ix], uv[iy][:, ix], masque[iy][:, ix]
+    if int(mb.sum()) < 2:
+        raise ValueError("MoGe-2 : aucun point fiable dans la photo")
+    f, d = focale_et_decalage(ub[mb], pb[mb], None if focale_px is None else focale_px * 2 / diag)
+    focale_px = f / 2 * diag  # f est relative à la demi-diagonale
+    z = brut[..., 2] + d
+    prof = z * echelle
+    v, u = np.meshgrid(np.arange(h, dtype=np.float32) + 0.5 - h / 2, np.arange(w, dtype=np.float32) + 0.5 - w / 2, indexing="ij")
+    points = np.stack([u / focale_px * prof, v / focale_px * prof, prof], -1).astype(np.float32)
+    return {"points": points, "profondeur": prof.astype(np.float32), "masque": masque & (z > 0), "focale_px": float(focale_px)}
+
+
+def relire(r: dict, focale_px: float) -> dict:
+    """La même lecture, pour un AUTRE zoom (MoGe-2 hésite entre « zoom fort, pièce profonde » et « grand angle, pièce
+    courte » : largeurs et hauteurs restent justes, la profondeur suit le zoom)."""
+    return {**r, **_monter(r["brut"], r["masque_brut"], r["echelle"], focale_px)}
+
+
 @torch.no_grad()
-def lire(modele: MoGe, rgb: np.ndarray, finesse: int = 9) -> dict:
+def lire(modele: MoGe, rgb: np.ndarray, finesse: int = 9, focale_px: float | None = None) -> dict:
     """rgb : (H, W, 3) uint8. Rend `points` (H, W, 3) en mètres dans le repère de l'appareil (x droite, y bas, z devant),
-    `profondeur`, `masque` (points fiables), `normales`, `focale_px` (en pixels de la photo)."""
+    `profondeur`, `masque` (points fiables), `normales`, `focale_px` (en pixels de la photo ; trouvée, ou imposée)."""
     appareil = next(modele.parameters()).device
     h, w = rgb.shape[:2]
-    rapport = w / h
     x = torch.from_numpy(rgb.astype(np.float32) / 255.0).permute(2, 0, 1)[None].to(appareil)
     mini, maxi = modele.carres
     carres = int(mini + finesse / 9 * (maxi - mini))
     with torch.autocast(device_type=appareil.type, dtype=torch.float16, enabled=appareil.type == "cuda"):
         s = modele(x, carres)
-    p = s["points"][0].float()
-    masque = (s["mask"][0] > 0.5) if "mask" in s else torch.ones((h, w), dtype=torch.bool, device=appareil)
-    uv = _uv(w, h, rapport, dtype=torch.float32, device=appareil)
-    iy = torch.linspace(0, h - 1, 64).round().long().to(appareil)
-    ix = torch.linspace(0, w - 1, 64).round().long().to(appareil)
-    pb, ub, mb = p[iy][:, ix], uv[iy][:, ix], masque[iy][:, ix]
-    if int(mb.sum()) < 2:
-        raise ValueError("MoGe-2 : aucun point fiable dans la photo")
-    f, d = focale_et_decalage(ub[mb].cpu().numpy(), pb[mb].cpu().numpy())
-    diag = math.hypot(h, w)
-    focale_px = f / 2 * diag  # f est relative à la demi-diagonale
-    z = p[..., 2] + d
-    masque = masque & (z > 0)
+    brut = s["points"][0].float().cpu().numpy()
+    masque = (s["mask"][0] > 0.5).cpu().numpy() if "mask" in s else np.ones((h, w), bool)
     echelle = float(s["metric_scale"][0]) if "metric_scale" in s else 1.0
-    u = torch.arange(w, device=appareil, dtype=torch.float32) + 0.5 - w / 2
-    v = torch.arange(h, device=appareil, dtype=torch.float32) + 0.5 - h / 2
-    v, u = torch.meshgrid(v, u, indexing="ij")
-    prof = z * echelle
-    points = torch.stack([u / focale_px * prof, v / focale_px * prof, prof], -1)
-    r = {"points": points.cpu().numpy(), "profondeur": prof.cpu().numpy(), "masque": masque.cpu().numpy(),
-         "focale_px": float(focale_px), "echelle": echelle}
+    r = {"brut": brut, "masque_brut": masque, "echelle": echelle, **_monter(brut, masque, echelle, focale_px)}
     if "normal" in s:
         r["normales"] = s["normal"][0].float().cpu().numpy()
     return r
