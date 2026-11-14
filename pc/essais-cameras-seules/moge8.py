@@ -18,7 +18,11 @@ if __name__ == "__main__":
     res = {}
     for nom in d["cameras"]:
         t0 = time.time()
-        z = np.load(src / f"{app}-{nom}.npz")
+        z = np.load(src / f"{app}-{nom}.npz"); z = {k_: z[k_] for k_ in z.files}
+        if os.environ.get("ZOOM") == "main":  # essai « si le zoom était connu » : celui relevé à la main
+            from moteur import moge
+            f = d["cameras"][nom]["camera"]["f"] * z["masque"].shape[1] / d["cameras"][nom]["largeur"]
+            z.update(moge.relire({"brut": z["brut"], "masque_brut": z["masque_brut"], "echelle": float(z["echelle"]), "masque": z["masque"]}, f))
         asp = np.load(src.parent / "aspect" / f"{app}-{nom}.npy") if m5.MODE in ("aspect", "fen") else None
         pr = m5.profil(z, mod["hsp"], asp)
         if pr is None:
@@ -47,4 +51,4 @@ if __name__ == "__main__":
                 liste.append({"piece": mod["ids"][pp], "cam": [float(x) for x in cam], "note": float(v)})
         res[nom] = liste
         print(app, nom, len(liste), "places,", f"{time.time() - t0:.0f} s", flush=True)
-    (sortie / f"par-piece-{app}.json").write_text(json.dumps(res), encoding="utf-8")
+    (sortie / f"par-piece-{app}{os.environ.get('SUFF', '')}.json").write_text(json.dumps(res), encoding="utf-8")

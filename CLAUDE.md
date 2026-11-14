@@ -139,6 +139,9 @@ détaillé correspondant avant d'agir.
   administrateur ni changement de Windows) ; MCP `@runreal/unreal-mcp` 0.1.4 (MIT, fichier LICENSE lu ; 97 modules npm, tous
   MIT / MIT-0 / ISC / BSD, 21 Mo, `D:\Atelya-Unreal\outils\mcp-unreal`), déclaré dans `.mcp.json` du dépôt (non suivi par Git) ;
   il pilote l'éditeur Unreal OUVERT via la « Remote Execution » Python (127.0.0.1 seulement, réglée dans le projet).
+- **GeoCalib (ETH Zurich, zoom et verticale d'une photo), lu le 15/11/2026** : OK commercial. `LICENSE` = Apache 2.0 et `LICENSE-WEIGHTS` = CC BY 4.0,
+  comparés mot à mot aux textes officiels (seul ajout : « Copyright 2024 ETH Zurich ») ; README : code Apache 2.0, poids `geocalib-pinhole` et
+  `geocalib-distorted` CC BY 4.0 (créditer). Poids 116 Mo chacun. PAS téléchargé (gain mesuré faible, voir § 5). Téléchargement = accord écrit NT.
 - Toute nouvelle bibliothèque ou donnée : **lire sa licence** (le fichier, pas un résumé) avant de la
   proposer à NT. Détail : `docs/projet/memoire/audit-technologique-2026-10-31.md`.
 
@@ -401,6 +404,7 @@ verrou = pièces qui se ressemblent. SUITE (accord NT, nouvelle conversation) : 
 les photos d'un logement ensemble, 3 zoom par GeoCalib (téléchargement = accord NT) si besoin. Brique ~35/100. Détail : fin de `produit-livre-client.md`.
 **Point 1 FAIT (14/11 soir), sans gain sur la pose** : fenêtres reconnues sur les photos par le relief (baies, fenêtres nues, portes ouvertes) et par l'aspect (œil DINOv2 + couche apprise, appris sur un logement / noté sur l'autre ; voit aussi derrière les rideaux) ; portes mal reconnues. Pose des 22 photos : toujours 2-3 bien placées (ambiguïté, pièces jumelles à même fenêtre, profondeur de MoGe-2 trop longue de 10-30 %). Prototypes `pc/essais-cameras-seules/moge4…7.py`, sorties `..\atelya\b2\cameras-seules\`. SUITE : point 2 (photos ensemble), puis zoom fiable.
 **Point 2 FAIT (14/11 nuit) : photos placées ENSEMBLE** (type de pièce d'après les meubles OWLv2, photos très ressemblantes = même pièce, chaque pièce principale montrée, pas deux photos au même endroit, fenêtres comptées globalement) : bonne pièce 10 → 16 sur 22, à peu près placées (< 1 m, < 15°) 6 → 9, bien placées 3. Restent : la place dans la pièce (zoom → point 3, GeoCalib, accord NT), chambres jumelles échangées sur app-001, cuisines / entrées / salles d'eau. Prototypes `moge8.py`, `moge9.py`. Brique ~42/100.
+**Point 3 préparé (15/11) : licence de GeoCalib LUE EN ENTIER = OK commercial** (code Apache 2.0, poids CC BY 4.0, textes identiques aux officiels ; créditer ETH Zurich ; poids 116 Mo ; rien téléchargé). Essai gratuit « zoom connu » (zoom de la main) : seulement +2 photos à peu près placées (9 → 11 sur 22) : le zoom n'est PAS le verrou principal ; téléchargement non demandé, décision NT attendue.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 

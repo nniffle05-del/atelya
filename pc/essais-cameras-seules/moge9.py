@@ -103,7 +103,7 @@ if __name__ == "__main__":
     for app in ("app-002", "app-001"):
         d = json.loads(Path(f"verites/{app}/cameras-photos.json").read_text(encoding="utf-8"))
         mod = eb.modele(json.loads(Path(f"verites/{app}/logement.json").read_text(encoding="utf-8")))
-        cands = {n: c for n, c in json.loads((S / "pose" / f"par-piece-{app}.json").read_text(encoding="utf-8")).items() if c}
+        cands = {n: c for n, c in json.loads((S / "pose" / f"par-piece-{app}{os.environ.get('SUFF', '')}.json").read_text(encoding="utf-8")).items() if c}
         types = {n: indices(objets[f"{app}/{n}"]) for n in cands}
         mp = json.loads((S / "meme-piece.json").read_text(encoding="utf-8"))[app]
         sim = {a: {b: mp["sim"][i][j] for j, b in enumerate(mp["noms"])} for i, a in enumerate(mp["noms"])}
@@ -132,7 +132,7 @@ if __name__ == "__main__":
                 cv2.circle(vis, px(p0), 7, coul, -1); cv2.line(vis, px(p0), px(p0 + 0.7 * np.array([np.cos(t), np.sin(t)])), coul, 2)
                 cv2.putText(vis, n[-2:], (px(p0)[0] + 8, px(p0)[1] - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.5, coul, 2)
             cv2.line(vis, px((k["x"], k["y"])), px(cands[n][ens[n]]["cam"][:2]), (190, 190, 190), 1)
-        ecrire_image(S / f"plan-ensemble-{app}.png", vis)
+        ecrire_image(S / f"plan-ensemble-{app}{os.environ.get('SUFF', '')}.png", vis)
     for quoi, t in bilan.items():
         t = np.array(t, float)
         print(f"{quoi:9s} | bien placées (< 0,5 m, < 8°) : {int(((t[:, 0] < 0.5) & (t[:, 1] < 8)).sum())} / {len(t)} | à peu près (< 1 m, < 15°) : "
