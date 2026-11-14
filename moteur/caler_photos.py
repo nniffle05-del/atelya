@@ -650,6 +650,8 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
             cam = np.array(p["cam"])
             if p["note"] <= 0:
                 non[n] = "aucune place ne colle au plan"; continue
+            # (essayé le 14/11/2026 puis retiré : laisser la photo chercher seule sa meilleure place dans un rayon plus large
+            #  autour du bloc DÉGRADE : app-001 5 → 3 photos à peu près placées ; le bloc est le meilleur guide)
             c2, _ = regler(plan, prof[n], cam.copy())  # réglage fin, gardé s'il reste près de la place du bloc
             if math.hypot(*(c2[:2] - cam[:2])) < 0.6 and abs((c2[2] - cam[2] + 180) % 360 - 180) < 10:
                 cam = c2
