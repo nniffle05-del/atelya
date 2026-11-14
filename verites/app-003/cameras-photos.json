@@ -1,0 +1,2478 @@
+{
+ "note": "Corrigé de la place des photos d'app-003 (15/11/2026), relevé à la main par Claude avec soin : repères lus sur des agrandissements quadrillés ; ancres = éléments sûrs du plan ; repères « libre » = arêtes vues sur plusieurs photos, place calculée avec les caméras (calcul d'ensemble par pièce) ; « incertitude_m » = de combien la caméra bouge quand on bouge les lectures de ± 3 px et les ancres de ± 12 cm, l'orientation de ± 0,5° et le zoom de ± 12 px ; zoom (388 px, commun) et orientation mesurés par les lignes de fuite, sans le plan. Produit par verites/app-003/cameras_photos.py.",
+ "photos": "../atelya/photos-clients/app-003/photos",
+ "fichier": "{nom}.jpg",
+ "cameras": {
+  "photo-01": {
+   "camera": {
+    "x": 13.283,
+    "y": 8.744,
+    "z": 1.357,
+    "cap": 1.3,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 337.0
+   },
+   "largeur": 1206,
+   "hauteur": 674,
+   "piece": "sejour_2",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 1.7,
+   "ecart_pire_px": 6.6,
+   "incertitude_m": 0.28,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      14.753,
+      10.98,
+      0.0
+     ],
+     "b": [
+      14.753,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      40,
+      100
+     ],
+     "p2": [
+      40,
+      600
+     ],
+     "quoi": "ouverture cuisine, montant ouest",
+     "ecart_px": 1.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "b": [
+      17.388,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      403,
+      230
+     ],
+     "p2": [
+      403,
+      460
+     ],
+     "quoi": "ouverture cuisine, montant est",
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.79,
+      10.98,
+      0.0
+     ],
+     "b": [
+      18.79,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      459,
+      220
+     ],
+     "p2": [
+      459,
+      430
+     ],
+     "quoi": "bout du mur nord",
+     "ecart_px": 3.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.414,
+      10.259,
+      0.0
+     ],
+     "b": [
+      18.414,
+      10.259,
+      2.9
+     ],
+     "p1": [
+      498,
+      220
+     ],
+     "p2": [
+      498,
+      430
+     ],
+     "quoi": "bout du ressaut nord",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.803,
+      10.043,
+      0.0
+     ],
+     "b": [
+      18.803,
+      10.043,
+      2.9
+     ],
+     "p1": [
+      521,
+      240
+     ],
+     "p2": [
+      521,
+      390
+     ],
+     "quoi": "fenêtre, montant nord",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      19.341,
+      7.467,
+      0.0
+     ],
+     "b": [
+      19.341,
+      7.467,
+      2.9
+     ],
+     "p1": [
+      695,
+      240
+     ],
+     "p2": [
+      695,
+      390
+     ],
+     "quoi": "fenêtre, montant sud",
+     "libre": true,
+     "ecart_px": 0.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      19.283,
+      7.122,
+      0.0
+     ],
+     "b": [
+      19.283,
+      7.122,
+      2.9
+     ],
+     "p1": [
+      724,
+      230
+     ],
+     "p2": [
+      724,
+      430
+     ],
+     "quoi": "embrasure sud, fond",
+     "libre": true,
+     "ecart_px": 6.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.051,
+      7.124,
+      0.0
+     ],
+     "b": [
+      17.051,
+      7.124,
+      2.9
+     ],
+     "p1": [
+      778,
+      220
+     ],
+     "p2": [
+      778,
+      450
+     ],
+     "quoi": "placard est, arête ouest",
+     "libre": true,
+     "ecart_px": 2.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      16.526,
+      6.792,
+      0.0
+     ],
+     "b": [
+      16.526,
+      6.792,
+      2.9
+     ],
+     "p1": [
+      847,
+      160
+     ],
+     "p2": [
+      847,
+      350
+     ],
+     "quoi": "miroir, bord est",
+     "libre": true,
+     "ecart_px": 1.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      15.031,
+      6.89,
+      0.0
+     ],
+     "b": [
+      15.031,
+      6.89,
+      2.9
+     ],
+     "p1": [
+      1033,
+      20
+     ],
+     "p2": [
+      1033,
+      350
+     ],
+     "quoi": "miroir, bord ouest",
+     "libre": true,
+     "ecart_px": 0.7
+    },
+    {
+     "type": "point",
+     "p": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "uv": [
+      403,
+      462
+     ],
+     "quoi": "pied : ouverture cuisine, montant est",
+     "ecart_px": 1.7
+    },
+    {
+     "type": "point",
+     "p": [
+      18.79,
+      10.98,
+      0.0
+     ],
+     "uv": [
+      459,
+      434
+     ],
+     "quoi": "pied : bout du mur nord",
+     "ecart_px": 3.3
+    }
+   ]
+  },
+  "photo-06": {
+   "camera": {
+    "x": 13.84,
+    "y": 7.656,
+    "z": 1.381,
+    "cap": 32.3,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 336.0
+   },
+   "largeur": 1206,
+   "hauteur": 672,
+   "piece": "sejour_2",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 2.3,
+   "ecart_pire_px": 6.1,
+   "incertitude_m": 0.27,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      14.753,
+      10.98,
+      0.0
+     ],
+     "b": [
+      14.753,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      250,
+      160
+     ],
+     "p2": [
+      250,
+      540
+     ],
+     "quoi": "ouverture cuisine, montant ouest",
+     "ecart_px": 0.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "b": [
+      17.388,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      525,
+      250
+     ],
+     "p2": [
+      525,
+      440
+     ],
+     "quoi": "ouverture cuisine, montant est",
+     "ecart_px": 3.7
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.414,
+      10.259,
+      0.0
+     ],
+     "b": [
+      18.414,
+      10.259,
+      2.9
+     ],
+     "p1": [
+      621,
+      240
+     ],
+     "p2": [
+      621,
+      400
+     ],
+     "quoi": "bout du ressaut nord",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.803,
+      10.043,
+      0.0
+     ],
+     "b": [
+      18.803,
+      10.043,
+      2.9
+     ],
+     "p1": [
+      648,
+      240
+     ],
+     "p2": [
+      648,
+      400
+     ],
+     "quoi": "fenêtre, montant nord",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      19.341,
+      7.467,
+      0.0
+     ],
+     "b": [
+      19.341,
+      7.467,
+      2.9
+     ],
+     "p1": [
+      872,
+      220
+     ],
+     "p2": [
+      872,
+      420
+     ],
+     "quoi": "fenêtre, montant sud",
+     "libre": true,
+     "ecart_px": 4.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      19.283,
+      7.122,
+      0.0
+     ],
+     "b": [
+      19.283,
+      7.122,
+      2.9
+     ],
+     "p1": [
+      899,
+      180
+     ],
+     "p2": [
+      899,
+      450
+     ],
+     "quoi": "embrasure sud, fond",
+     "libre": true,
+     "ecart_px": 6.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.051,
+      7.124,
+      0.0
+     ],
+     "b": [
+      17.051,
+      7.124,
+      2.9
+     ],
+     "p1": [
+      950,
+      200
+     ],
+     "p2": [
+      950,
+      540
+     ],
+     "quoi": "placard est, arête ouest",
+     "libre": true,
+     "ecart_px": 1.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      16.526,
+      6.792,
+      0.0
+     ],
+     "b": [
+      16.526,
+      6.792,
+      2.9
+     ],
+     "p1": [
+      1068,
+      30
+     ],
+     "p2": [
+      1068,
+      350
+     ],
+     "quoi": "miroir, bord est",
+     "libre": true,
+     "ecart_px": 0.4
+    },
+    {
+     "type": "point",
+     "p": [
+      14.753,
+      10.98,
+      0.0
+     ],
+     "uv": [
+      251,
+      549
+     ],
+     "quoi": "pied : ouverture cuisine, montant ouest",
+     "ecart_px": 2.8
+    },
+    {
+     "type": "point",
+     "p": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "uv": [
+      527,
+      443
+     ],
+     "quoi": "pied : ouverture cuisine, montant est",
+     "ecart_px": 5.2
+    }
+   ]
+  },
+  "photo-07": {
+   "camera": {
+    "x": 18.793,
+    "y": 7.979,
+    "z": 1.336,
+    "cap": 145.0,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 334.5
+   },
+   "largeur": 1206,
+   "hauteur": 669,
+   "piece": "sejour_2",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 7.4,
+   "ecart_pire_px": 14.5,
+   "incertitude_m": 0.25,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      13.32,
+      8.448,
+      0.0
+     ],
+     "b": [
+      13.32,
+      8.448,
+      2.9
+     ],
+     "p1": [
+      365,
+      260
+     ],
+     "p2": [
+      365,
+      430
+     ],
+     "quoi": "porte, montant sud",
+     "ecart_px": 13.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.32,
+      9.753,
+      0.0
+     ],
+     "b": [
+      13.32,
+      9.753,
+      2.9
+     ],
+     "p1": [
+      479,
+      260
+     ],
+     "p2": [
+      479,
+      430
+     ],
+     "quoi": "porte, montant nord",
+     "ecart_px": 5.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.32,
+      10.98,
+      0.0
+     ],
+     "b": [
+      13.32,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      570,
+      230
+     ],
+     "p2": [
+      570,
+      430
+     ],
+     "quoi": "angle nord-ouest",
+     "ecart_px": 9.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.753,
+      10.98,
+      0.0
+     ],
+     "b": [
+      14.753,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      625,
+      260
+     ],
+     "p2": [
+      625,
+      450
+     ],
+     "quoi": "ouverture cuisine, montant ouest",
+     "ecart_px": 11.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "b": [
+      17.388,
+      10.98,
+      2.9
+     ],
+     "p1": [
+      820,
+      200
+     ],
+     "p2": [
+      820,
+      510
+     ],
+     "quoi": "ouverture cuisine, montant est",
+     "ecart_px": 6.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      15.031,
+      6.89,
+      0.0
+     ],
+     "b": [
+      15.031,
+      6.89,
+      2.9
+     ],
+     "p1": [
+      121,
+      80
+     ],
+     "p2": [
+      121,
+      360
+     ],
+     "quoi": "miroir, bord ouest",
+     "libre": true,
+     "ecart_px": 0.4
+    },
+    {
+     "type": "point",
+     "p": [
+      14.753,
+      10.98,
+      0.0
+     ],
+     "uv": [
+      627,
+      452
+     ],
+     "quoi": "pied : ouverture cuisine, montant ouest",
+     "ecart_px": 14.5
+    },
+    {
+     "type": "point",
+     "p": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "uv": [
+      822,
+      515
+     ],
+     "quoi": "pied : ouverture cuisine, montant est",
+     "ecart_px": 4.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.388,
+      10.98,
+      0.0
+     ],
+     "b": [
+      18.79,
+      10.98,
+      0.0
+     ],
+     "p1": [
+      836,
+      522
+     ],
+     "p2": [
+      1083,
+      600
+     ],
+     "quoi": "pied du mur nord",
+     "ecart_px": 8.1
+    }
+   ]
+  },
+  "photo-08": {
+   "camera": {
+    "x": 17.768,
+    "y": 10.608,
+    "z": 1.268,
+    "cap": -116.4,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 333.5
+   },
+   "largeur": 1206,
+   "hauteur": 667,
+   "piece": "sejour_2",
+   "qualite": "approchée",
+   "ecart_moyen_px": 3.2,
+   "ecart_pire_px": 13.2,
+   "incertitude_m": 0.46,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      19.341,
+      7.467,
+      0.0
+     ],
+     "b": [
+      19.341,
+      7.467,
+      2.9
+     ],
+     "p1": [
+      91,
+      100
+     ],
+     "p2": [
+      91,
+      480
+     ],
+     "quoi": "fenêtre, montant sud",
+     "libre": true,
+     "ecart_px": 2.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      19.283,
+      7.122,
+      0.0
+     ],
+     "b": [
+      19.283,
+      7.122,
+      2.9
+     ],
+     "p1": [
+      140,
+      100
+     ],
+     "p2": [
+      140,
+      540
+     ],
+     "quoi": "embrasure sud, fond",
+     "libre": true,
+     "ecart_px": 2.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.476,
+      7.364,
+      0.0
+     ],
+     "b": [
+      18.476,
+      7.364,
+      2.9
+     ],
+     "p1": [
+      292,
+      110
+     ],
+     "p2": [
+      292,
+      530
+     ],
+     "quoi": "embrasure sud, bout",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.051,
+      7.124,
+      0.0
+     ],
+     "b": [
+      17.051,
+      7.124,
+      2.9
+     ],
+     "p1": [
+      501,
+      160
+     ],
+     "p2": [
+      501,
+      480
+     ],
+     "quoi": "placard est, arête ouest",
+     "libre": true,
+     "ecart_px": 0.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      16.526,
+      6.792,
+      0.0
+     ],
+     "b": [
+      16.526,
+      6.792,
+      2.9
+     ],
+     "p1": [
+      544,
+      180
+     ],
+     "p2": [
+      544,
+      340
+     ],
+     "quoi": "miroir, bord est",
+     "libre": true,
+     "ecart_px": 1.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      15.031,
+      6.89,
+      0.0
+     ],
+     "b": [
+      15.031,
+      6.89,
+      2.9
+     ],
+     "p1": [
+      668,
+      190
+     ],
+     "p2": [
+      668,
+      340
+     ],
+     "quoi": "miroir, bord ouest",
+     "libre": true,
+     "ecart_px": 3.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.32,
+      8.448,
+      0.0
+     ],
+     "b": [
+      13.32,
+      8.448,
+      2.9
+     ],
+     "p1": [
+      905,
+      230
+     ],
+     "p2": [
+      905,
+      440
+     ],
+     "quoi": "porte, montant sud",
+     "ecart_px": 2.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.32,
+      9.753,
+      0.0
+     ],
+     "b": [
+      13.32,
+      9.753,
+      2.9
+     ],
+     "p1": [
+      1112,
+      200
+     ],
+     "p2": [
+      1112,
+      440
+     ],
+     "quoi": "porte, montant nord",
+     "ecart_px": 0.6
+    },
+    {
+     "type": "point",
+     "p": [
+      13.32,
+      8.448,
+      0.0
+     ],
+     "uv": [
+      905,
+      446
+     ],
+     "quoi": "pied : porte, montant sud",
+     "ecart_px": 13.2
+    },
+    {
+     "type": "point",
+     "p": [
+      13.32,
+      9.753,
+      0.0
+     ],
+     "uv": [
+      1112,
+      522
+     ],
+     "quoi": "pied : porte, montant nord",
+     "ecart_px": 9.3
+    }
+   ]
+  },
+  "photo-12": {
+   "camera": {
+    "x": 15.86,
+    "y": 10.503,
+    "z": 1.277,
+    "cap": -89.0,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 333.5
+   },
+   "largeur": 1206,
+   "hauteur": 667,
+   "piece": "sejour_2",
+   "qualite": "approchée",
+   "ecart_moyen_px": 2.2,
+   "ecart_pire_px": 6.6,
+   "incertitude_m": 0.39,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      19.341,
+      7.467,
+      0.0
+     ],
+     "b": [
+      19.341,
+      7.467,
+      2.9
+     ],
+     "p1": [
+      167,
+      100
+     ],
+     "p2": [
+      167,
+      480
+     ],
+     "quoi": "fenêtre, montant sud",
+     "libre": true,
+     "ecart_px": 6.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      19.283,
+      7.122,
+      0.0
+     ],
+     "b": [
+      19.283,
+      7.122,
+      2.9
+     ],
+     "p1": [
+      228,
+      150
+     ],
+     "p2": [
+      228,
+      480
+     ],
+     "quoi": "embrasure sud, fond",
+     "libre": true,
+     "ecart_px": 4.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      18.476,
+      7.364,
+      0.0
+     ],
+     "b": [
+      18.476,
+      7.364,
+      2.9
+     ],
+     "p1": [
+      291,
+      150
+     ],
+     "p2": [
+      291,
+      490
+     ],
+     "quoi": "embrasure sud, bout",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      17.051,
+      7.124,
+      0.0
+     ],
+     "b": [
+      17.051,
+      7.124,
+      2.9
+     ],
+     "p1": [
+      474,
+      200
+     ],
+     "p2": [
+      474,
+      480
+     ],
+     "quoi": "placard est, arête ouest",
+     "libre": true,
+     "ecart_px": 0.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      16.526,
+      6.792,
+      0.0
+     ],
+     "b": [
+      16.526,
+      6.792,
+      2.9
+     ],
+     "p1": [
+      543,
+      180
+     ],
+     "p2": [
+      543,
+      340
+     ],
+     "quoi": "miroir, bord est",
+     "libre": true,
+     "ecart_px": 2.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      15.031,
+      6.89,
+      0.0
+     ],
+     "b": [
+      15.031,
+      6.89,
+      2.9
+     ],
+     "p1": [
+      703,
+      160
+     ],
+     "p2": [
+      703,
+      340
+     ],
+     "quoi": "miroir, bord ouest",
+     "libre": true,
+     "ecart_px": 3.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.32,
+      8.448,
+      0.0
+     ],
+     "b": [
+      13.32,
+      8.448,
+      2.9
+     ],
+     "p1": [
+      1100,
+      130
+     ],
+     "p2": [
+      1100,
+      570
+     ],
+     "quoi": "porte, montant sud",
+     "ecart_px": 0.0
+    },
+    {
+     "type": "point",
+     "p": [
+      13.32,
+      8.448,
+      0.0
+     ],
+     "uv": [
+      1098,
+      580
+     ],
+     "quoi": "pied : porte, montant sud",
+     "ecart_px": 2.0
+    }
+   ]
+  },
+  "photo-02": {
+   "camera": {
+    "x": 4.992,
+    "y": 9.618,
+    "z": 1.417,
+    "cap": 51.6,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 333.5
+   },
+   "largeur": 1206,
+   "hauteur": 667,
+   "piece": "sejour_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 7.5,
+   "ecart_pire_px": 20.1,
+   "incertitude_m": 0.28,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      6.1,
+      13.795,
+      0.0
+     ],
+     "b": [
+      6.1,
+      13.795,
+      2.9
+     ],
+     "p1": [
+      434,
+      210
+     ],
+     "p2": [
+      434,
+      350
+     ],
+     "quoi": "miroir de la cheminée, bord ouest",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      7.282,
+      14.053,
+      0.0
+     ],
+     "b": [
+      7.282,
+      14.053,
+      2.9
+     ],
+     "p1": [
+      546,
+      220
+     ],
+     "p2": [
+      546,
+      350
+     ],
+     "quoi": "miroir de la cheminée, bord est",
+     "libre": true,
+     "ecart_px": 19.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      14.09,
+      0.0
+     ],
+     "b": [
+      9.75,
+      14.09,
+      2.9
+     ],
+     "p1": [
+      640,
+      240
+     ],
+     "p2": [
+      640,
+      380
+     ],
+     "quoi": "angle nord-est",
+     "ecart_px": 20.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.327,
+      13.071,
+      0.0
+     ],
+     "b": [
+      9.327,
+      13.071,
+      2.9
+     ],
+     "p1": [
+      693,
+      305
+     ],
+     "p2": [
+      693,
+      355
+     ],
+     "quoi": "téléviseur, bord gauche",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.332,
+      11.932,
+      0.0
+     ],
+     "b": [
+      9.332,
+      11.932,
+      2.9
+     ],
+     "p1": [
+      772,
+      305
+     ],
+     "p2": [
+      772,
+      358
+     ],
+     "quoi": "téléviseur, bord droit",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      10.64,
+      0.0
+     ],
+     "b": [
+      9.75,
+      10.64,
+      2.9
+     ],
+     "p1": [
+      910,
+      230
+     ],
+     "p2": [
+      910,
+      440
+     ],
+     "quoi": "porte, montant nord",
+     "ecart_px": 12.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      13.13,
+      9.753,
+      0.0
+     ],
+     "b": [
+      13.13,
+      9.753,
+      2.9
+     ],
+     "p1": [
+      1071,
+      250
+     ],
+     "p2": [
+      1071,
+      430
+     ],
+     "quoi": "porte de la salle à manger vue à travers l'entrée",
+     "ecart_px": 5.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      9.384,
+      0.0
+     ],
+     "b": [
+      9.75,
+      9.384,
+      2.9
+     ],
+     "p1": [
+      1158,
+      190
+     ],
+     "p2": [
+      1158,
+      500
+     ],
+     "quoi": "porte, montant sud",
+     "ecart_px": 12.8
+    },
+    {
+     "type": "point",
+     "p": [
+      13.13,
+      9.753,
+      0.0
+     ],
+     "uv": [
+      1071,
+      440
+     ],
+     "quoi": "pied : porte de la salle à manger vue à travers l'entrée",
+     "ecart_px": 5.2
+    }
+   ]
+  },
+  "photo-03": {
+   "camera": {
+    "x": 8.628,
+    "y": 13.402,
+    "z": 1.208,
+    "cap": -136.7,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 335.0
+   },
+   "largeur": 1206,
+   "hauteur": 670,
+   "piece": "sejour_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 5.9,
+   "ecart_pire_px": 17.1,
+   "incertitude_m": 0.2,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      9.072,
+      9.385,
+      0.0
+     ],
+     "b": [
+      9.072,
+      9.385,
+      2.9
+     ],
+     "p1": [
+      88,
+      200
+     ],
+     "p2": [
+      88,
+      480
+     ],
+     "quoi": "porte du couloir, montant est",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      8.328,
+      9.276,
+      0.0
+     ],
+     "b": [
+      8.328,
+      9.276,
+      2.9
+     ],
+     "p1": [
+      247,
+      200
+     ],
+     "p2": [
+      247,
+      480
+     ],
+     "quoi": "porte du couloir, montant ouest",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.617,
+      9.123,
+      0.0
+     ],
+     "b": [
+      5.617,
+      9.123,
+      2.9
+     ],
+     "p1": [
+      534,
+      230
+     ],
+     "p2": [
+      534,
+      470
+     ],
+     "quoi": "porte du placard, bord est",
+     "libre": true,
+     "ecart_px": 10.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.856,
+      9.13,
+      0.0
+     ],
+     "b": [
+      4.856,
+      9.13,
+      2.9
+     ],
+     "p1": [
+      577,
+      230
+     ],
+     "p2": [
+      577,
+      420
+     ],
+     "quoi": "porte du placard, bord ouest",
+     "libre": true,
+     "ecart_px": 9.7
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      9.04,
+      0.0
+     ],
+     "b": [
+      4.31,
+      9.04,
+      2.9
+     ],
+     "p1": [
+      585,
+      220
+     ],
+     "p2": [
+      585,
+      410
+     ],
+     "quoi": "angle sud-ouest",
+     "ecart_px": 4.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      9.531,
+      0.0
+     ],
+     "b": [
+      4.31,
+      9.531,
+      2.9
+     ],
+     "p1": [
+      608,
+      240
+     ],
+     "p2": [
+      608,
+      420
+     ],
+     "quoi": "porte-fenêtre sud, montant sud",
+     "ecart_px": 4.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      10.96,
+      0.0
+     ],
+     "b": [
+      4.31,
+      10.96,
+      2.9
+     ],
+     "p1": [
+      691,
+      240
+     ],
+     "p2": [
+      691,
+      420
+     ],
+     "quoi": "porte-fenêtre sud, montant nord",
+     "ecart_px": 7.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      12.315,
+      0.0
+     ],
+     "b": [
+      4.31,
+      12.315,
+      2.9
+     ],
+     "p1": [
+      806,
+      200
+     ],
+     "p2": [
+      806,
+      440
+     ],
+     "quoi": "porte-fenêtre nord, montant sud",
+     "ecart_px": 13.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      13.596,
+      0.0
+     ],
+     "b": [
+      4.31,
+      13.596,
+      2.9
+     ],
+     "p1": [
+      1020,
+      150
+     ],
+     "p2": [
+      1020,
+      450
+     ],
+     "quoi": "porte-fenêtre nord, montant nord",
+     "ecart_px": 17.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      14.09,
+      0.0
+     ],
+     "b": [
+      4.31,
+      14.09,
+      2.9
+     ],
+     "p1": [
+      1100,
+      80
+     ],
+     "p2": [
+      1100,
+      390
+     ],
+     "quoi": "angle nord-ouest",
+     "ecart_px": 5.9
+    },
+    {
+     "type": "point",
+     "p": [
+      8.328,
+      9.276,
+      0.0
+     ],
+     "uv": [
+      247,
+      487
+     ],
+     "quoi": "pied : porte du couloir, montant ouest",
+     "libre": true,
+     "ecart_px": 1.8
+    },
+    {
+     "type": "point",
+     "p": [
+      4.31,
+      9.04,
+      0.0
+     ],
+     "uv": [
+      585,
+      415
+     ],
+     "quoi": "pied : angle sud-ouest",
+     "ecart_px": 4.5
+    }
+   ]
+  },
+  "photo-04": {
+   "camera": {
+    "x": 5.073,
+    "y": 13.54,
+    "z": 1.161,
+    "cap": -37.6,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 338.5
+   },
+   "largeur": 1206,
+   "hauteur": 677,
+   "piece": "sejour_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 6.0,
+   "ecart_pire_px": 21.6,
+   "incertitude_m": 0.27,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      7.282,
+      14.053,
+      0.0
+     ],
+     "b": [
+      7.282,
+      14.053,
+      2.9
+     ],
+     "p1": [
+      127,
+      20
+     ],
+     "p2": [
+      127,
+      370
+     ],
+     "quoi": "miroir de la cheminée, bord est",
+     "libre": true,
+     "ecart_px": 2.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.327,
+      13.071,
+      0.0
+     ],
+     "b": [
+      9.327,
+      13.071,
+      2.9
+     ],
+     "p1": [
+      367,
+      300
+     ],
+     "p2": [
+      367,
+      355
+     ],
+     "quoi": "téléviseur, bord gauche",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.332,
+      11.932,
+      0.0
+     ],
+     "b": [
+      9.332,
+      11.932,
+      2.9
+     ],
+     "p1": [
+      485,
+      305
+     ],
+     "p2": [
+      485,
+      355
+     ],
+     "quoi": "téléviseur, bord droit",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      10.64,
+      0.0
+     ],
+     "b": [
+      9.75,
+      10.64,
+      2.9
+     ],
+     "p1": [
+      575,
+      270
+     ],
+     "p2": [
+      575,
+      400
+     ],
+     "quoi": "porte, montant nord",
+     "ecart_px": 11.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      9.384,
+      0.0
+     ],
+     "b": [
+      9.75,
+      9.384,
+      2.9
+     ],
+     "p1": [
+      636,
+      270
+     ],
+     "p2": [
+      636,
+      395
+     ],
+     "quoi": "porte, montant sud",
+     "ecart_px": 5.7
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      9.04,
+      0.0
+     ],
+     "b": [
+      9.75,
+      9.04,
+      2.9
+     ],
+     "p1": [
+      650,
+      230
+     ],
+     "p2": [
+      650,
+      390
+     ],
+     "quoi": "angle sud-est",
+     "ecart_px": 4.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.072,
+      9.385,
+      0.0
+     ],
+     "b": [
+      9.072,
+      9.385,
+      2.9
+     ],
+     "p1": [
+      661,
+      260
+     ],
+     "p2": [
+      661,
+      395
+     ],
+     "quoi": "porte du couloir, montant est",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      8.328,
+      9.276,
+      0.0
+     ],
+     "b": [
+      8.328,
+      9.276,
+      2.9
+     ],
+     "p1": [
+      706,
+      260
+     ],
+     "p2": [
+      706,
+      395
+     ],
+     "quoi": "porte du couloir, montant ouest",
+     "libre": true,
+     "ecart_px": 1.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.617,
+      9.123,
+      0.0
+     ],
+     "b": [
+      5.617,
+      9.123,
+      2.9
+     ],
+     "p1": [
+      993,
+      200
+     ],
+     "p2": [
+      993,
+      490
+     ],
+     "quoi": "porte du placard, bord est",
+     "libre": true,
+     "ecart_px": 3.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.856,
+      9.13,
+      0.0
+     ],
+     "b": [
+      4.856,
+      9.13,
+      2.9
+     ],
+     "p1": [
+      1160,
+      180
+     ],
+     "p2": [
+      1160,
+      520
+     ],
+     "quoi": "porte du placard, bord ouest",
+     "libre": true,
+     "ecart_px": 1.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      9.04,
+      0.0
+     ],
+     "b": [
+      9.75,
+      9.04,
+      0.0
+     ],
+     "p1": [
+      1011,
+      492
+     ],
+     "p2": [
+      1158,
+      522
+     ],
+     "quoi": "pied du mur sud (sous la porte du placard)",
+     "ecart_px": 8.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      9.04,
+      0.0
+     ],
+     "b": [
+      9.75,
+      9.04,
+      0.0
+     ],
+     "p1": [
+      665,
+      397
+     ],
+     "p2": [
+      703,
+      398
+     ],
+     "quoi": "pied du mur sud (sous la porte du couloir)",
+     "ecart_px": 21.6
+    }
+   ]
+  },
+  "photo-05": {
+   "camera": {
+    "x": 8.562,
+    "y": 9.674,
+    "z": 1.171,
+    "cap": 137.5,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 332.0
+   },
+   "largeur": 1206,
+   "hauteur": 664,
+   "piece": "sejour_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 3.6,
+   "ecart_pire_px": 11.7,
+   "incertitude_m": 0.25,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      5.617,
+      9.123,
+      0.0
+     ],
+     "b": [
+      5.617,
+      9.123,
+      2.9
+     ],
+     "p1": [
+      85,
+      190
+     ],
+     "p2": [
+      85,
+      500
+     ],
+     "quoi": "porte du placard, bord est",
+     "libre": true,
+     "ecart_px": 1.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.856,
+      9.13,
+      0.0
+     ],
+     "b": [
+      4.856,
+      9.13,
+      2.9
+     ],
+     "p1": [
+      125,
+      190
+     ],
+     "p2": [
+      125,
+      500
+     ],
+     "quoi": "porte du placard, bord ouest",
+     "libre": true,
+     "ecart_px": 1.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      9.531,
+      0.0
+     ],
+     "b": [
+      4.31,
+      9.531,
+      2.9
+     ],
+     "p1": [
+      225,
+      170
+     ],
+     "p2": [
+      225,
+      470
+     ],
+     "quoi": "porte-fenêtre sud, montant sud",
+     "ecart_px": 2.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      10.96,
+      0.0
+     ],
+     "b": [
+      4.31,
+      10.96,
+      2.9
+     ],
+     "p1": [
+      415,
+      200
+     ],
+     "p2": [
+      415,
+      450
+     ],
+     "quoi": "porte-fenêtre sud, montant nord",
+     "ecart_px": 1.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      12.315,
+      0.0
+     ],
+     "b": [
+      4.31,
+      12.315,
+      2.9
+     ],
+     "p1": [
+      530,
+      230
+     ],
+     "p2": [
+      530,
+      420
+     ],
+     "quoi": "porte-fenêtre nord, montant sud",
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      13.596,
+      0.0
+     ],
+     "b": [
+      4.31,
+      13.596,
+      2.9
+     ],
+     "p1": [
+      615,
+      230
+     ],
+     "p2": [
+      615,
+      410
+     ],
+     "quoi": "porte-fenêtre nord, montant nord",
+     "ecart_px": 10.7
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      14.09,
+      0.0
+     ],
+     "b": [
+      4.31,
+      14.09,
+      2.9
+     ],
+     "p1": [
+      639,
+      230
+     ],
+     "p2": [
+      639,
+      410
+     ],
+     "quoi": "angle nord-ouest",
+     "ecart_px": 11.7
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.1,
+      13.795,
+      0.0
+     ],
+     "b": [
+      6.1,
+      13.795,
+      2.9
+     ],
+     "p1": [
+      719,
+      210
+     ],
+     "p2": [
+      719,
+      350
+     ],
+     "quoi": "miroir de la cheminée, bord ouest",
+     "libre": true,
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      7.282,
+      14.053,
+      0.0
+     ],
+     "b": [
+      7.282,
+      14.053,
+      2.9
+     ],
+     "p1": [
+      828,
+      200
+     ],
+     "p2": [
+      828,
+      350
+     ],
+     "quoi": "miroir de la cheminée, bord est",
+     "libre": true,
+     "ecart_px": 10.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.31,
+      9.04,
+      0.0
+     ],
+     "b": [
+      4.31,
+      14.09,
+      0.0
+     ],
+     "p1": [
+      230,
+      480
+     ],
+     "p2": [
+      410,
+      447
+     ],
+     "quoi": "pied du mur ouest (sous la porte-fenêtre sud)",
+     "ecart_px": 0.3
+    }
+   ]
+  },
+  "photo-14": {
+   "camera": {
+    "x": 0.599,
+    "y": 0.746,
+    "z": 1.489,
+    "cap": 46.9,
+    "tangage": 0.0,
+    "f": 388.0,
+    "u0": 603.0,
+    "v0": 333.0
+   },
+   "largeur": 1206,
+   "hauteur": 666,
+   "piece": "chambre_3",
+   "qualite": "approchée",
+   "ecart_moyen_px": 4.8,
+   "ecart_pire_px": 14.2,
+   "incertitude_m": 0.3,
+   "incertitude_cap_deg": 0.5,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      1.355,
+      4.83,
+      0.0
+     ],
+     "b": [
+      1.355,
+      4.83,
+      2.9
+     ],
+     "p1": [
+      360,
+      200
+     ],
+     "p2": [
+      360,
+      440
+     ],
+     "quoi": "porte-fenêtre, montant ouest",
+     "ecart_px": 5.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      2.833,
+      4.83,
+      0.0
+     ],
+     "b": [
+      2.833,
+      4.83,
+      2.9
+     ],
+     "p1": [
+      489,
+      200
+     ],
+     "p2": [
+      489,
+      440
+     ],
+     "quoi": "porte-fenêtre, montant est",
+     "ecart_px": 14.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.06,
+      4.138,
+      0.0
+     ],
+     "b": [
+      4.06,
+      4.138,
+      2.9
+     ],
+     "p1": [
+      625,
+      240
+     ],
+     "p2": [
+      625,
+      420
+     ],
+     "quoi": "porte, montant nord",
+     "ecart_px": 5.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.06,
+      3.399,
+      0.0
+     ],
+     "b": [
+      4.06,
+      3.399,
+      2.9
+     ],
+     "p1": [
+      670,
+      220
+     ],
+     "p2": [
+      670,
+      420
+     ],
+     "quoi": "porte, montant sud",
+     "ecart_px": 2.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.06,
+      0.3,
+      0.0
+     ],
+     "b": [
+      4.06,
+      4.83,
+      0.0
+     ],
+     "p1": [
+      966,
+      560
+     ],
+     "p2": [
+      1151,
+      620
+     ],
+     "quoi": "pied du mur est (à droite du lit)",
+     "ecart_px": 1.0
+    }
+   ]
+  }
+ },
+ "reperes_libres": {
+  "sejour_2:FS": {
+   "quoi": "fenêtre, montant sud",
+   "x": 19.34,
+   "y": 7.47
+  },
+  "sejour_2:BS": {
+   "quoi": "embrasure sud, fond",
+   "x": 19.28,
+   "y": 7.12
+  },
+  "sejour_2:FL": {
+   "quoi": "embrasure sud, bout",
+   "x": 18.48,
+   "y": 7.36
+  },
+  "sejour_2:FN": {
+   "quoi": "fenêtre, montant nord",
+   "x": 18.8,
+   "y": 10.04
+  },
+  "sejour_2:NE2": {
+   "quoi": "bout du ressaut nord",
+   "x": 18.41,
+   "y": 10.26
+  },
+  "sejour_2:C1W": {
+   "quoi": "placard est, arête ouest",
+   "x": 17.05,
+   "y": 7.12
+  },
+  "sejour_2:ME": {
+   "quoi": "miroir, bord est",
+   "x": 16.53,
+   "y": 6.79
+  },
+  "sejour_2:MW": {
+   "quoi": "miroir, bord ouest",
+   "x": 15.03,
+   "y": 6.89
+  },
+  "sejour_1:CE": {
+   "quoi": "porte du couloir, montant est",
+   "x": 9.07,
+   "y": 9.38
+  },
+  "sejour_1:CW": {
+   "quoi": "porte du couloir, montant ouest",
+   "x": 8.33,
+   "y": 9.28
+  },
+  "sejour_1:PLE": {
+   "quoi": "porte du placard, bord est",
+   "x": 5.62,
+   "y": 9.12
+  },
+  "sejour_1:PLW": {
+   "quoi": "porte du placard, bord ouest",
+   "x": 4.86,
+   "y": 9.13
+  },
+  "sejour_1:M1": {
+   "quoi": "miroir de la cheminée, bord ouest",
+   "x": 6.1,
+   "y": 13.79
+  },
+  "sejour_1:M2": {
+   "quoi": "miroir de la cheminée, bord est",
+   "x": 7.28,
+   "y": 14.05
+  },
+  "sejour_1:TVL": {
+   "quoi": "téléviseur, bord gauche",
+   "x": 9.33,
+   "y": 13.07
+  },
+  "sejour_1:TVR": {
+   "quoi": "téléviseur, bord droit",
+   "x": 9.33,
+   "y": 11.93
+  }
+ }
+}
