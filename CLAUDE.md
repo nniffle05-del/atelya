@@ -119,7 +119,7 @@ détaillé correspondant avant d'agir.
   Téléchargement = accord écrit NT.
 - **MoGe-2 (Microsoft, profondeur en mètres d'une seule photo), lu le 14/11/2026** : OK commercial. Fichier LICENSE du dépôt lu en entier = MIT
   (+ Apache 2.0 pour la partie DINOv2) ; poids `Ruicheng/moge-2-vitb-normal` MIT, 419 Mo, téléchargés avec l'accord écrit de NT dans
-  `..telya\modeles-externes\moge-2-vitb-normal`. Réécrit dans `moteur/moge.py`, aucune installation. Sert aux essais « caméras des photos
+  `..\atelya\modeles-externes\moge-2-vitb-normal`. Réécrit dans `moteur/moge.py`, aucune installation. Sert aux essais « caméras des photos
   calées seules » (pas encore en service).
 - **UNREAL ENGINE 5 — CLUF lu EN ENTIER le 10/11/2026** (PDF de la page officielle fourni par NT, 44 p., rangé dans
   `..\atelya\licences\unreal-engine-eula-2026-11-10.pdf` ; sites d'Epic bloqués aux robots). Utilisable commercialement :
@@ -399,7 +399,7 @@ qui doit apprendre »), outils libres permis. MoGe-2 (Microsoft, MIT) réécrit 
 (prototype `pc/essais-cameras-seules/moge2.py`) : 3-4 photos sur 22 bien posées du premier coup, bonne place dans les 8 premières 9/22 ;
 verrou = pièces qui se ressemblent. SUITE (accord NT, nouvelle conversation) : 1 reconnaître portes et fenêtres sur la photo, 2 placer toutes
 les photos d'un logement ensemble, 3 zoom par GeoCalib (téléchargement = accord NT) si besoin. Brique ~35/100. Détail : fin de `produit-livre-client.md`.
-**Point 1 FAIT (14/11 soir), sans gain sur la pose** : fenêtres reconnues sur les photos par le relief (baies, fenêtres nues, portes ouvertes) et par l'aspect (œil DINOv2 + couche apprise, appris sur un logement / noté sur l'autre ; voit aussi derrière les rideaux) ; portes mal reconnues. Pose des 22 photos : toujours 2-3 bien placées (ambiguïté, pièces jumelles à même fenêtre, profondeur de MoGe-2 trop longue de 10-30 %). Prototypes `pc/essais-cameras-seules/moge4…7.py`, sorties `..telya2\cameras-seules\`. SUITE : point 2 (photos ensemble), puis zoom fiable.
+**Point 1 FAIT (14/11 soir), sans gain sur la pose** : fenêtres reconnues sur les photos par le relief (baies, fenêtres nues, portes ouvertes) et par l'aspect (œil DINOv2 + couche apprise, appris sur un logement / noté sur l'autre ; voit aussi derrière les rideaux) ; portes mal reconnues. Pose des 22 photos : toujours 2-3 bien placées (ambiguïté, pièces jumelles à même fenêtre, profondeur de MoGe-2 trop longue de 10-30 %). Prototypes `pc/essais-cameras-seules/moge4…7.py`, sorties `..\atelya\b2\cameras-seules\`. SUITE : point 2 (photos ensemble), puis zoom fiable.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
