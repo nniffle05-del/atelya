@@ -560,3 +560,13 @@ c'est exactement ce qu'il a fait à la main pour `cameras-photos.json`), NOTRE c
 la contrôle (écart en pixels, caméra dans le logement, hauteur et focale plausibles), sinon la photo n'est pas utilisée pour la
 vue. Autonomie complète plus tard, sans doute avec un modèle appris (licence à lire, accord NT). Prototype gardé dans
 `pc/essais-cameras-seules/` pour mémoire, rien de branché.
+
+**DÉCISION NT (14/11/2026) : le calage des photos ne passe PAS par Claude ; « c'est Atelya qui doit apprendre ».** Proposition « repères donnés par Claude via l'API » REFUSÉE : ne pas la reproposer. NT demande de regarder les outils libres qui aideraient.
+Recherche du 14/11 (licences : fichiers LICENSE lus par un outil de lecture de pages, à RELIRE EN ENTIER avant tout téléchargement ; aucun téléchargement fait) :
+- **MoGe-2 (Microsoft)** : d'une seule photo, donne la position 3D en MÈTRES de chaque point, la focale et les normales. Code MIT (+ DINOv2 Apache 2.0), poids `Ruicheng/moge-2-vit{s,b,l}-normal` annoncés MIT sur Hugging Face (35 à 331 millions de paramètres, soit ~0,15 à ~1,3 Go). CANDIDAT N° 1 : la photo devient un morceau de pièce mesuré (sol, plafond, murs), qu'on pose sur le plan (3 inconnues : x, y, cap ; la hauteur vient du sol, l'inclinaison de la verticale). Les meubles ne gênent plus : ils sont devant les murs, en 3D.
+- **GeoCalib (ETH Zurich)** : focale + verticale d'une photo. Code Apache 2.0 (LICENSE lu), poids CC BY 4.0 (README), entraîné sur des panoramas (OpenPano). Petit complément si la focale de MoGe ne suffit pas.
+- **MapAnything (Meta), variante `facebook/map-anything-apache`** : Apache 2.0 (la variante par défaut est CC BY-NC : interdite). Plusieurs photos ensemble → positions relatives. ~4 Go (estimation), lourd pour 8 Go de carte : plus tard, pour départager les pièces jumelles par les photos qui se recoupent.
+- **Depth Anything V2 Small** (Apache 2.0, profondeur en mètres en intérieur) : secours plus léger de MoGe.
+- ÉCARTÉS pour leurs POIDS : F3Loc (code MIT, poids appris sur Gibson), SPVLoc (poids appris sur ZInD / Structured3D, interdits chez nous), VGGT (poids d'origine non commerciaux ; la version « Commercial » a une licence particulière à formulaire), GALoc et UnLoc (articles 2026, pas de code publié trouvé). Leurs IDÉES restent utilisables (comparer la forme vue par la photo au plan).
+- « Atelya apprend » à terme : Atelya sait fabriquer des photos d'intérieurs dont la caméra est connue exactement (Blender / Unreal sur nos logements) → jeu d'entraînement sans limite pour un modèle maison ; à proposer après l'essai MoGe.
+Limite connue quelle que soit la voie : deux pièces jumelles ne se distinguent pas par la forme (meubles, sol, vue ou recoupement entre photos).
