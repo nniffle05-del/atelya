@@ -399,6 +399,7 @@ qui doit apprendre »), outils libres permis. MoGe-2 (Microsoft, MIT) réécrit 
 (prototype `pc/essais-cameras-seules/moge2.py`) : 3-4 photos sur 22 bien posées du premier coup, bonne place dans les 8 premières 9/22 ;
 verrou = pièces qui se ressemblent. SUITE (accord NT, nouvelle conversation) : 1 reconnaître portes et fenêtres sur la photo, 2 placer toutes
 les photos d'un logement ensemble, 3 zoom par GeoCalib (téléchargement = accord NT) si besoin. Brique ~35/100. Détail : fin de `produit-livre-client.md`.
+**Point 1 FAIT (14/11 soir), sans gain sur la pose** : fenêtres reconnues sur les photos par le relief (baies, fenêtres nues, portes ouvertes) et par l'aspect (œil DINOv2 + couche apprise, appris sur un logement / noté sur l'autre ; voit aussi derrière les rideaux) ; portes mal reconnues. Pose des 22 photos : toujours 2-3 bien placées (ambiguïté, pièces jumelles à même fenêtre, profondeur de MoGe-2 trop longue de 10-30 %). Prototypes `pc/essais-cameras-seules/moge4…7.py`, sorties `..telya2\cameras-seules\`. SUITE : point 2 (photos ensemble), puis zoom fiable.
 
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
