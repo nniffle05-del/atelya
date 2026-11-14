@@ -4,7 +4,9 @@ logement (comme moge9 : chaque pièce importante montrée, pas deux photos au m�
 Comparer à moge9 (photos choisies une à une) : 3 bien placées, 9 à peu près, 16 bonne pièce, 7 collent aux repères.
 RÉSULTATS (14/11/2026, 22 photos) : groupes `main` (plafond) 7 / 11 / 16 / 9 ; `pieces` (SEUL, groupes = pièces du premier
 placement photo par photo) 5 / 12 / 17 / 8 ; `atelya` (ressemblance seule : groupes trop petits) 4 / 9 / 15 / 7 ;
-`fusion` (réunir les groupes qui « tiennent » sur le plan) 6 / 10 / 15 / 8 mais réunit des pièces différentes : ÉCARTÉ."""
+`fusion` (réunir les groupes qui « tiennent » sur le plan) 6 / 10 / 15 / 8 mais réunit des pièces différentes : ÉCARTÉ.
+Avec la sortie des intrus (SEUIL_INTRUS = 0,4, défaut) : `pieces` 7 / 12 / 16 / 8, et les 15 photos « sûres »
+(marge > 0,4) sont toutes dans la bonne pièce (sans : 17 sûres dont 16)."""
 import json, os, sys, time
 os.environ.setdefault("MODE", "fen"); os.environ.setdefault("ECH", "0.72,0.8,0.88,0.96,1.04"); os.environ.setdefault("LIM", "0.68,1.08")
 from pathlib import Path
@@ -73,6 +75,7 @@ def choisir(unites, mod, graine=0):
 
 
 SEUIL_FUSION = float(os.environ.get("SEUIL_FUSION", 0.85))  # deux groupes fusionnent si le bloc réuni garde cette part des notes
+SEUIL_INTRUS = float(os.environ.get("SEUIL_INTRUS", 0.4))    # part d'accord en dessous de laquelle deux photos ne montrent pas le même lieu
 SIM_MIN = float(os.environ.get("SIM_MIN", 0.35))            # et si au moins deux de leurs photos se ressemblent un peu
 
 
@@ -143,6 +146,14 @@ if __name__ == "__main__":
             ens, _ = m9.choisir(cands, {n: m9.indices(objets[f"{app}/{n}"]) for n in cands}, sim)
             ou = {n: cands[n][ens[n]]["piece"] if n in cands else n for n in noms}
             groupes = [[n for n in noms if ou[n] == q] for q in dict.fromkeys(ou.values())]
+        if SEUIL_INTRUS > 0:  # une photo qu'AUCUNE autre du groupe ne « revoit » (contrôle croisé de moge18) sort du groupe
+            ml = json.loads((S / "meme-lieu-da3.json").read_text(encoding="utf-8"))[app]
+            acc = lambda x, y: (ml.get(f"{x}|{y}") or ml.get(f"{y}|{x}") or [0, 0, 1])[1]
+            nouveaux = []
+            for g in groupes:
+                reste = [n for n in g if len(g) == 1 or max(acc(n, m) for m in g if m != n) >= SEUIL_INTRUS]
+                nouveaux += ([reste] if reste else []) + [[n] for n in g if n not in reste]
+            groupes = nouveaux
         print(app, "groupes :", " | ".join("+".join(n[-2:] for n in g) for g in groupes), flush=True)
 
         def candidat(ou):

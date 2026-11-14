@@ -14,6 +14,9 @@ from moteur import da3
 import etape_b as eb
 
 
+RAYONS = __import__("os").environ.get("RAYONS", "0") == "1"  # mêmes places que le décodeur (mesuré) : inutile par défaut
+
+
 def verticale(n, ok):
     n = n[::4, ::4].reshape(-1, 3)[ok[::4, ::4].ravel()]
     haut = np.array([0.0, -1.0, 0.0])
@@ -29,6 +32,8 @@ def verticale(n, ok):
 def poser(modele, noms, ims, mesures, reference=None):
     """→ {nom: (centre 2D en m, cap en rad)} dans un repère commun à plat, échelle, accord des « hauts » (°), focales."""
     r = da3.lire(modele, [ims[n] for n in noms], reference=reference)
+    if RAYONS:  # appareils calculés par les rayons (plus précis d'après l'éditeur) au lieu du petit décodeur
+        r = dict(r, appareils=r["appareils_rayons"], focale_px=r["focale_rayons_px"])
     h, w = r["taille"]
     ech, hauts = [], []
     for i, n in enumerate(noms):

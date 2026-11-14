@@ -11,7 +11,9 @@ INTERDITES. Aucun code venu d'internet n'est lancé : le réseau est réécrit i
 (model/dinov2/*, model/dualdpt.py, model/dpt.py, model/cam_dec.py, model/utils/transform.py) ; seuls les POIDS sont lus,
 à la main (`owlv2.lire_safetensors`), dans ..\\atelya\\modeles-externes\\da3-base.
 
-Non réécrit (inutile ici) : la branche « rayons », l'entrée « appareils déjà connus » (cam_enc), les gaussiennes.
+La place des appareils sort de deux façons : par un petit décodeur (rapide, `appareils`) et par les RAYONS (pour chaque
+point de la photo, d'où part et où va son rayon de vue ; plus précis d'après l'éditeur, `appareils_rayons`).
+Non réécrit (inutile ici) : l'entrée « appareils déjà connus » (cam_enc), les gaussiennes.
 """
 from __future__ import annotations
 
@@ -206,6 +208,15 @@ def _ajouter_places(x, W, H, part=0.1):
     return x + e.permute(2, 0, 1)[None].to(x.dtype)
 
 
+class _Permute(nn.Module):
+    def __init__(self, *axes):
+        super().__init__()
+        self.axes = axes
+
+    def forward(self, x):
+        return x.permute(*self.axes)
+
+
 class _Residu(nn.Module):
     def __init__(self, f):
         super().__init__()
@@ -244,10 +255,18 @@ class _Tete(nn.Module):
         s.refinenet1, s.refinenet2, s.refinenet3, s.refinenet4 = _Fusion(f), _Fusion(f), _Fusion(f), _Fusion(f, lateral=False)
         s.output_conv1 = nn.Conv2d(f, f // 2, 3, 1, 1)
         s.output_conv2 = nn.Sequential(nn.Conv2d(f // 2, 32, 3, 1, 1), nn.ReLU(), nn.Conv2d(32, 2, 1))
+        # la branche des rayons (« aux ») : ses propres fusions, 4 niveaux dont seul le dernier sert
+        s.refinenet1_aux, s.refinenet2_aux, s.refinenet3_aux, s.refinenet4_aux = _Fusion(f), _Fusion(f), _Fusion(f), _Fusion(f, lateral=False)
+        s.output_conv1_aux = nn.ModuleList(nn.Sequential(nn.Conv2d(f, f // 2, 3, 1, 1), nn.Conv2d(f // 2, f, 3, 1, 1), nn.Conv2d(f, f // 2, 3, 1, 1),
+                                                         nn.Conv2d(f // 2, f, 3, 1, 1), nn.Conv2d(f, f // 2, 3, 1, 1)) for _ in range(4))
+        norme = nn.LayerNorm(32)  # UNE seule norme, partagée par les 4 niveaux (comme dans le fichier de poids)
+        s.output_conv2_aux = nn.ModuleList(nn.Sequential(nn.Conv2d(f // 2, 32, 3, 1, 1), _Permute(0, 2, 3, 1), norme, _Permute(0, 3, 1, 2),
+                                                         nn.ReLU(), nn.Conv2d(32, 7, 1)) for _ in range(4))
         self.scratch = s
 
     def forward(self, carres, H, W):
-        """carres : 4 tenseurs (S, h*w, dim) → profondeur (S, H, W), confiance (S, H, W)."""
+        """carres : 4 tenseurs (S, h*w, dim) → profondeur (S, H, W), confiance (S, H, W), rayons (S, 8h, 8w, 6) =
+        direction puis origine de chaque rayon dans le repère commun, confiance des rayons (S, 8h, 8w)."""
         S, _, C = carres[0].shape
         ph, pw = H // CARRE, W // CARRE
         n = []
@@ -257,12 +276,16 @@ class _Tete(nn.Module):
         s = self.scratch
         l1, l2, l3, l4 = s.layer1_rn(n[0]), s.layer2_rn(n[1]), s.layer3_rn(n[2]), s.layer4_rn(n[3])
         o = s.refinenet4(l4, taille=l3.shape[2:])
+        a = s.refinenet4_aux(l4, taille=l3.shape[2:])
         o = s.refinenet3(o, l3, taille=l2.shape[2:])
+        a = s.refinenet3_aux(a, l3, taille=l2.shape[2:])
         o = s.refinenet2(o, l2, taille=l1.shape[2:])
+        a = s.refinenet2_aux(a, l2, taille=l1.shape[2:])
         o = s.output_conv1(s.refinenet1(o, l1))
+        a = s.output_conv2_aux[3](_ajouter_places(s.output_conv1_aux[3](s.refinenet1_aux(a, l1)), W, H)).permute(0, 2, 3, 1)
         o = F.interpolate(o, size=(ph * CARRE, pw * CARRE), mode="bilinear", align_corners=True)
         o = s.output_conv2(_ajouter_places(o, W, H))
-        return torch.exp(o[:, 0]), torch.exp(o[:, 1]) + 1
+        return torch.exp(o[:, 0]), torch.exp(o[:, 1]) + 1, a[..., :6], torch.exp(a[..., 6]) + 1
 
 
 class _Appareils(nn.Module):
@@ -301,6 +324,38 @@ def quaternion_vers_matrice(q: torch.Tensor) -> torch.Tensor:
     return o.reshape(q.shape[:-1] + (3, 3))
 
 
+def appareil_depuis_rayons(rayons: np.ndarray, confiance: np.ndarray, pas: int = 4) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """D'une carte de rayons (h, w, 6) : la rotation de l'appareil (3 × 3), sa place (3), son zoom (large, haut) en parts
+    de la demi-photo. Chaque rayon vaut R · (a·x, b·y, 1) pour le point (x, y) de la photo (de -1 à 1) : on cherche la
+    matrice H = R · diag(a, b, 1) qui aligne tous les rayons (sans division, donc sans souci pour un appareil tourné de
+    côté), en écartant deux fois les rayons qui s'en éloignent ; puis H se sépare en rotation × zoom."""
+    h, w = confiance.shape
+    ys, xs = np.meshgrid(np.linspace(-1 + 1 / h, 1 - 1 / h, h)[::pas], np.linspace(-1 + 1 / w, 1 - 1 / w, w)[::pas], indexing="ij")
+    p = np.stack([xs.ravel(), ys.ravel(), np.ones(xs.size)], 1)
+    d = rayons[::pas, ::pas, :3].reshape(-1, 3).astype(np.float64)
+    d = d / np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-9)
+    c = confiance[::pas, ::pas].ravel().astype(np.float64)
+    place = (rayons[..., 3:].reshape(-1, 3) * confiance.reshape(-1, 1)).sum(0) / confiance.sum()
+    poids = c - 1.0 + 1e-3
+    for _ in range(3):
+        # d × (H p) = 0 : trois équations par rayon, linéaires en les 9 nombres de H
+        z = np.zeros_like(p)
+        A = np.concatenate([np.concatenate([z, -d[:, 2:3] * p, d[:, 1:2] * p], 1), np.concatenate([d[:, 2:3] * p, z, -d[:, 0:1] * p], 1),
+                            np.concatenate([-d[:, 1:2] * p, d[:, 0:1] * p, z], 1)], 0) * np.tile(np.sqrt(poids), 3)[:, None]
+        H = np.linalg.svd(A, full_matrices=False)[2][-1].reshape(3, 3)
+        q = p @ H.T
+        if np.sum(poids * (q * d).sum(1)) < 0:
+            H, q = -H, -q
+        q = q / np.maximum(np.linalg.norm(q, axis=1, keepdims=True), 1e-9)
+        ecart = np.degrees(np.arccos(np.clip((q * d).sum(1), -1, 1)))
+        poids = (c - 1.0 + 1e-3) * (ecart < max(2.0, 2.5 * np.median(ecart)))
+    Q, U = np.linalg.qr(H)
+    s = np.sign(np.diag(U)); Q, U = Q * s, U * s[:, None]
+    if np.linalg.det(Q) < 0:
+        Q = -Q; U = -U
+    return Q, place, np.array([U[2, 2] / U[0, 0], U[2, 2] / U[1, 1]])
+
+
 # ---------------------------------------------------------------- usage
 def charger(dossier: Path | None = None, appareil: str | None = None) -> DA3:
     dossier = Path(dossier or dossier_poids() / "da3-base")
@@ -308,8 +363,10 @@ def charger(dossier: Path | None = None, appareil: str | None = None) -> DA3:
         raise FileNotFoundError(f"poids de Depth Anything 3 introuvables : {dossier / 'model.safetensors'}")
     m = DA3()
     poids = {k[6:]: v for k, v in lire_safetensors(dossier / "model.safetensors").items() if k.startswith("model.")}
-    inutiles = ("cam_enc.", "_aux.")
-    poids = {k: v for k, v in poids.items() if not any(s in k for s in inutiles)}
+    poids = {k: v for k, v in poids.items() if not k.startswith("cam_enc.")}
+    for n in (1, 2, 3):  # la norme partagée n'est écrite qu'une fois dans le fichier (niveau 0)
+        for q in ("weight", "bias"):
+            poids[f"head.scratch.output_conv2_aux.{n}.2.{q}"] = poids[f"head.scratch.output_conv2_aux.0.2.{q}"]
     manquants, en_trop = m.load_state_dict(poids, strict=False)
     if manquants or en_trop:
         raise RuntimeError(f"poids de Depth Anything 3 incompatibles : manquants {manquants[:5]}, en trop {en_trop[:5]}")
@@ -336,7 +393,8 @@ def lire(modele: DA3, photos: list[np.ndarray], cote: int = COTE, reference: int
       `profondeur` (S, h, w), `confiance` (S, h, w), sur les photos réduites ;
       `appareils` (S, 3, 4) : pour chaque photo, [rotation | place] de l'appareil dans le repère commun
                   (axes de l'appareil : x à droite, y en bas, z devant) ;
-      `focale_px` (S, 2) : zoom en pixels de la photo RÉDUITE (large, haut) ; `taille` (h, w) ; `rognage` (S, 2)."""
+      `focale_px` (S, 2) : zoom en pixels de la photo RÉDUITE (large, haut) ; `taille` (h, w) ; `rognage` (S, 2) ;
+      `appareils_rayons`, `focale_rayons_px` : les mêmes, calculés par les rayons (plus précis d'après l'éditeur)."""
     ims = [preparer(p, cote) for p in photos]
     h, w = min(i.shape[0] for i in ims), min(i.shape[1] for i in ims)
     rog = [((i.shape[0] - h) // 2, (i.shape[1] - w) // 2) for i in ims]
@@ -347,14 +405,18 @@ def lire(modele: DA3, photos: list[np.ndarray], cote: int = COTE, reference: int
     with torch.autocast(device_type=app.type, dtype=torch.float16, enabled=app.type == "cuda"):
         sorties = modele.backbone.pretrained(x, reference)
     carres = [c.float() for c, _ in sorties]
-    prof, conf = [], []
+    prof, conf, ray, rconf = [], [], [], []
     for s in range(0, len(ims), 4):  # la tête, 4 photos à la fois (mémoire)
-        p, c = modele.head([c[s:s + 4] for c in carres], h, w)
-        prof.append(p); conf.append(c)
+        p, c, ry, rc = modele.head([c[s:s + 4] for c in carres], h, w)
+        prof.append(p); conf.append(c); ray.append(ry); rconf.append(rc)
+    ray, rconf = torch.cat(ray).cpu().numpy(), torch.cat(rconf).cpu().numpy()
+    par_rayons = [appareil_depuis_rayons(a, b) for a, b in zip(ray, rconf)]
     t, q, angles = modele.cam_dec(sorties[-1][1].float())
     R = quaternion_vers_matrice(q)
     fy = (h / 2.0) / torch.clamp(torch.tan(angles[:, 0] / 2.0), min=1e-6)
     fx = (w / 2.0) / torch.clamp(torch.tan(angles[:, 1] / 2.0), min=1e-6)
     return {"profondeur": torch.cat(prof).cpu().numpy(), "confiance": torch.cat(conf).cpu().numpy(),
             "appareils": torch.cat((R, t[..., None]), -1).cpu().numpy(), "focale_px": torch.stack((fx, fy), -1).cpu().numpy(),
+            "appareils_rayons": np.stack([np.concatenate([Rr, tr[:, None]], 1) for Rr, tr, _ in par_rayons]).astype(np.float32),
+            "focale_rayons_px": np.stack([z * np.array([w / 2, h / 2]) for _, _, z in par_rayons]).astype(np.float32),
             "taille": (h, w), "rognage": np.array(rog)}

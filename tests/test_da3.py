@@ -60,3 +60,19 @@ def test_reseau_entier_si_les_poids_sont_la():
     assert (r["focale_px"] > 20).all()
     # la 1re photo sert de repère : son appareil est (presque) à l'origine, sans rotation
     assert np.allclose(r["appareils"][0][:, :3], np.eye(3), atol=0.15)
+
+
+def test_appareil_retrouve_depuis_ses_rayons():
+    """Des rayons fabriqués pour un appareil connu (tourné de côté, zoom différent en large et en haut) : on le retrouve."""
+    rng = np.random.default_rng(3)
+    cy, sy, cp, sp = np.cos(1.9), np.sin(1.9), np.cos(0.2), np.sin(0.2)  # tourné de 109° : beaucoup de rayons « de côté »
+    R = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]]) @ np.array([[1, 0, 0], [0, cp, -sp], [0, sp, cp]])
+    a, b, place = 0.8, 1.25, np.array([1.5, -0.3, 2.0])
+    h, w = 24, 36
+    ys, xs = np.meshgrid(np.linspace(-1 + 1 / h, 1 - 1 / h, h), np.linspace(-1 + 1 / w, 1 - 1 / w, w), indexing="ij")
+    d = np.stack([a * xs, b * ys, np.ones_like(xs)], -1) @ R.T
+    d = d * rng.uniform(0.5, 2.0, (h, w, 1)) + rng.normal(0, 0.002, (h, w, 3))
+    rayons = np.concatenate([d, np.broadcast_to(place, (h, w, 3)) + rng.normal(0, 0.01, (h, w, 3))], -1)
+    Q, t, zoom = da3.appareil_depuis_rayons(rayons, np.full((h, w), 2.0), pas=1)
+    assert np.allclose(Q, R, atol=0.01) and np.allclose(t, place, atol=0.01)
+    assert abs(zoom[0] - 1 / a) < 0.02 and abs(zoom[1] - 1 / b) < 0.02
