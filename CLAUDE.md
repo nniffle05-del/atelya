@@ -391,6 +391,15 @@ branché par défaut dans `vue_dehors_photos` (côté non mesuré = 35 m). app-0
 (piège du demi-étage chambre 14, immeubles anciens trop petits) ; app-001 non mesuré (voilages) ; « accord des photos » écarté (les
 photos voient des immeubles différents). SUITE (NT « creuse ») : second avis d'une AUTRE photo qui voit le même endroit de la rue → sud mesuré : immeuble proche 24 m, lointains 44 m ; décor qui SUIT LA RUE (une toile par distance, pan en biais entre les deux ; la marche franche faisait une bande blanche). VIDE SOUS LA VUE (les photos ne voient pas le pied des immeubles) : mesuré image par image (`moteur/cinema/vide_dehors.py`) ; le REGARD du film évite par défaut les directions qui le cadrent, sauf quand il montre une pièce (app-002 : 21,5 → 20,4 s, au pire 6,3 → 5,3 %, gain modeste) ; refusés par NT : étages recopiés, caméra loin des fenêtres, relance du client. Détail : fin de `produit-livre-client.md`.
 
+**CAMÉRAS DES PHOTOS CALÉES SEULES (13-14/11/2026, branche `etape-cameras-seules`, NON fusionnée, rien de branché)** : but = retrouver seul d'où
+chaque photo du client est prise (aujourd'hui relevé à la main, `verites/<logement>/cameras-photos.json`). `main` = f0a49c8 (poussé).
+Voie « traits de la photo contre murs de la 3D » ÉCARTÉE (3/11, instable). DÉCISION NT 14/11 : pas de Claude pour cette tâche (« c'est Atelya
+qui doit apprendre »), outils libres permis. MoGe-2 (Microsoft, MIT) réécrit dans `moteur/moge.py` : d'une photo, chaque point en mètres
+(0,2 s) ; hauteurs et largeurs justes, profondeurs ~20 % trop longues (zoom cru trop serré ; `relire` impose un zoom). Pose sur le plan
+(prototype `pc/essais-cameras-seules/moge2.py`) : 3-4 photos sur 22 bien posées du premier coup, bonne place dans les 8 premières 9/22 ;
+verrou = pièces qui se ressemblent. SUITE (accord NT, nouvelle conversation) : 1 reconnaître portes et fenêtres sur la photo, 2 placer toutes
+les photos d'un logement ensemble, 3 zoom par GeoCalib (téléchargement = accord NT) si besoin. Brique ~35/100. Détail : fin de `produit-livre-client.md`.
+
 **Chantier mis en pause (06-08/11/2026, branche `etape-vrais-plans-105`) : les 105 vrais plans** (`docs/projet/etapes/reprise-105-plans.md`).
 
 **Restes d'A2** (non prioritaires) :
