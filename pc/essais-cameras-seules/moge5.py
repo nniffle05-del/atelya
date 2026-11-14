@@ -10,6 +10,8 @@ import moge4 as m4
 MODE = os.environ.get("MODE", "creux")
 P_MUR = float(os.environ.get("P_MUR", 0.6))    # creux vu là où le plan a un mur plein
 P_FEN = float(os.environ.get("P_FEN", 0.3))    # fenêtre du plan là où la photo ne voit aucun creux (rideaux : possible)
+A_FEN = float(os.environ.get("A_FEN", 0.6))    # MODE=fen : part de la note perdue si la fenêtre VUE ne tombe sur aucune fenêtre du plan
+B_FEN = float(os.environ.get("B_FEN", 0.2))    # MODE=fen : part perdue si les fenêtres du plan en vue ne sont pas vues (rideaux fermés, reflets)
 P_SOL = float(os.environ.get("P_SOL", 0.3))    # creux jusqu'au sol contre fenêtre à appui, ou l'inverse
 ECH = tuple(float(v) for v in os.environ.get("ECH", "0.94,1.0,1.06").split(","))
 LIM = tuple(float(v) for v in os.environ.get("LIM", "0.9,1.1").split(","))
@@ -30,11 +32,15 @@ def profil(z, hsp, aspect=None):
         H, W = R["M"].shape
         fen = cv2.resize(aspect[..., 2].astype(np.float32), (W, H), interpolation=cv2.INTER_LINEAR) > 0.5
         mi = (~np.isnan(rel)) & (R["h"] > 1.0) & (R["h"] < 1.9) & (rel > -0.35)
-        k = np.round(R["phi"]).astype(int)
+        k = np.round(R["phi"]).astype(int); vu = np.zeros(len(ph), bool)
         for i, d in enumerate(ph):
             col = (k == int(d)) & mi
             if col.sum() >= 20 and (col & fen).sum() / col.sum() > 0.5:
-                creux[i] = True
+                vu[i] = True
+        if MODE == "fen":  # 1 = creux (relief), 2 = fenêtre (aspect), 3 = les deux
+            creux = creux.astype(np.int8) + 2 * vu
+        else:
+            creux = creux | vu
     return ph, rr, creux, sol, {"z": R["z"], "ech": R["ech"]}
 
 
@@ -51,6 +57,14 @@ def tirs(mod, P, angles):
 def note(rm, rp, creux, sol, sorte, appui):
     rp = np.minimum(rp, 40.0)
     v = np.exp(-0.5 * ((rm - rp) / (0.10 + 0.04 * rp)) ** 2)
+    if MODE == "fen":
+        cr, fen, pf = (creux & 1) > 0, (creux & 2) > 0, sorte == 2
+        v = v * np.where(cr & ~fen & (sorte == 0), 0.7, 1.0)
+        v = v * np.where(cr & (sorte > 0) & (((sol == 1) & appui) | ((sol == -1) & ~appui)), 1 - P_SOL, 1.0)
+        base, nf, npf, les2 = v.mean(-1), fen.sum(-1), pf.sum(-1), (fen & pf).sum(-1)
+        if np.max(nf) >= 5:
+            base = base * (1 - A_FEN + A_FEN * les2 / np.maximum(nf, 1))
+        return base * np.where(npf >= 5, 1 - B_FEN + B_FEN * les2 / np.maximum(npf, 1), 1.0)
     if MODE != "murs":
         v = v * np.where(creux & (sorte == 0), 1 - P_MUR, 1.0) * np.where(~creux & (sorte == 2), 1 - P_FEN, 1.0)
         if MODE in ("creux", "aspect"):
@@ -109,7 +123,7 @@ if __name__ == "__main__":
         for nom, c in d["cameras"].items():
             k = c["camera"]; t0 = time.time()
             z = np.load(src / f"{app}-{nom}.npz")
-            asp = np.load(src.parent / "aspect" / f"{app}-{nom}.npy") if MODE == "aspect" else None
+            asp = np.load(src.parent / "aspect" / f"{app}-{nom}.npy") if MODE in ("aspect", "fen") else None
             pr = profil(z, mod["hsp"], asp)
             if pr is None:
                 print(f"{app} {nom} : pas assez de murs vus"); bilan.append((np.nan, np.nan, 0, 0)); continue
