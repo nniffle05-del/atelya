@@ -1,7 +1,7 @@
 r"""Image « corrigé contre Atelya » pour app-003 : sur le plan, la vraie place de chaque photo (vert, cercle = incertitude du
 corrigé) et la place trouvée seule par Atelya (rouge), reliées par un trait.
 
-    ..\atelya\.venv\Scripts\python.exe pc\essais-cameras-seules\image_corrige.py
+    ..\atelya\.venv\Scripts\python.exe pc\essais-cameras-seules\image_corrige.py [fiche d'Atelya] [image] [légende]
 """
 import json
 import math
@@ -36,7 +36,7 @@ def fleche(d, x, y, cap, couleur, long=38):
 
 def main():
     vrai = json.loads((RACINE / "verites/app-003/cameras-photos.json").read_text(encoding="utf-8"))["cameras"]
-    seul = json.loads((RACINE / "../atelya/b2/app-003/cameras-photos-seul.json").read_text(encoding="utf-8"))
+    seul = json.loads(Path(sys.argv[1] if len(sys.argv) > 1 else RACINE / "../atelya/b2/app-003/cameras-photos-seul.json").read_text(encoding="utf-8"))
     plan = Image.open(RACINE / "../atelya/photos-clients/app-003/plan.jpg").convert("RGB")
     plan = Image.blend(plan, Image.new("RGB", plan.size, "white"), 0.45).resize((plan.width * K, plan.height * K), Image.LANCZOS)
     d = ImageDraw.Draw(plan, "RGBA")
@@ -61,8 +61,8 @@ def main():
     d.ellipse([36, 72, 50, 86], fill=VERT)
     d.text((60, 66), "vraie place (corrigé fait à la main ; cercle = sa marge d'erreur)", fill=(0, 0, 0), font=police(21))
     d.ellipse([36, 108, 50, 122], fill=ROUGE)
-    d.text((60, 102), "place trouvée seule par Atelya ; le nombre = l'écart en mètres", fill=(0, 0, 0), font=police(21))
-    sortie = RACINE / "../atelya/b2/app-003/corrige/corrige-contre-atelya.png"
+    d.text((60, 102), (sys.argv[3] if len(sys.argv) > 3 else "place trouvée seule par Atelya") + " ; le nombre = l'écart en mètres", fill=(0, 0, 0), font=police(21))
+    sortie = Path(sys.argv[2]) if len(sys.argv) > 2 else RACINE / "../atelya/b2/app-003/corrige/corrige-contre-atelya.png"
     plan.save(sortie)
     print("Image :", sortie)
 
