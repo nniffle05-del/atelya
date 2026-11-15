@@ -10,8 +10,9 @@ la même place (deux chaises plantées dans la table). Ici, des règles de bon s
 2. un meuble doit tenir dans SA pièce : s'il dépasse dans un mur, il est ramené vers l'intérieur (au plus GLISSE_MAX), sinon retiré ;
 3. deux meubles de la MÊME sorte qui se recouvrent : c'est le même meuble vu deux fois, le moins sûr est retiré (deux chaises
    ou deux fauteuils qui ne se recouvrent qu'un peu sont deux vrais voisins : le moins sûr est seulement écarté) ;
-4. deux meubles de sortes différentes qui se recouvrent beaucoup (plus de MEME_OBJET du plus petit) : un seul objet pris pour
-   deux sortes, le moins sûr est retiré ; s'ils se recouvrent un peu, le moins sûr est écarté jusqu'à ne plus toucher (au plus
+4. deux meubles de sortes différentes : si ces sortes se confondent (SE_CONFONDENT) et qu'ils se recouvrent beaucoup (plus de
+   MEME_OBJET du plus petit), c'est un seul objet pris pour deux sortes, le moins sûr est retiré ; sinon le moins sûr est écarté
+   jusqu'à ne plus toucher (au plus
    GLISSE_MAX) ; sans place libre, une table ou un rangement est rétréci (table d'appoint, chevet) ; sinon retiré ;
 5. une chaise peut être glissée sous une table (jusqu'à SOUS_LA_TABLE de sa surface) ; au-delà elle est reculée et tournée vers
    la table.
@@ -30,6 +31,9 @@ A_PLAT = ("tapis",)
 PLUSIEURS_COTE_A_COTE = ("chaise", "fauteuil")  # sortes dont deux voisins qui se touchent un peu sont deux vrais meubles
 RETRECIT = ("table", "rangement")  # sortes qui existent en petit (table d'appoint, chevet) : rétrécies plutôt que retirées
 PROFONDEUR_MIN = 0.4  # m
+# sortes qu'un même objet peut recevoir à la fois (un meuble télé est vu « rangement » et « table », une méridienne « canapé » et
+# « lit ») ; entre deux autres sortes, un fort recouvrement vient d'une place mal lue : le meuble est écarté, pas retiré
+SE_CONFONDENT = {frozenset(p) for p in (("table", "rangement"), ("canape", "fauteuil"), ("canape", "lit"), ("chaise", "fauteuil"))}
 TOUCHE = 0.04  # part de la surface du plus petit en dessous de laquelle deux meubles ne « se recouvrent » pas (place à 30 cm près)
 MEME_OBJET = 0.5  # au-delà de cette part du plus petit : un seul objet pris pour deux
 SOUS_LA_TABLE = 0.35  # part d'une chaise qui peut être sous une table
@@ -155,7 +159,7 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
                 note(m, "retiré", f"le même meuble que {autre['id']}, vu deux fois")
                 continue
             chaise_et_table = {m["categorie"], autre["categorie"]} == {"chaise", "table"}
-            if g[1] > MEME_OBJET and not chaise_et_table:  # règle 4 : un seul objet pris pour deux sortes
+            if g[1] > MEME_OBJET and frozenset((m["categorie"], autre["categorie"])) in SE_CONFONDENT:  # règle 4
                 note(m, "retiré", f"au même endroit que {autre['categorie']} {autre['id']}")
                 continue
             ecart = np.asarray(m["position"], float) - np.asarray(autre["position"], float)
