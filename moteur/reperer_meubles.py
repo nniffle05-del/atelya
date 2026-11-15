@@ -328,19 +328,71 @@ def coller_au_mur(meuble: dict, piece: dict) -> dict:
     return {**meuble, "position": [round(float(nouveau[0]), 3), round(float(nouveau[1]), 3)]}
 
 
+UNIQUES = ("table", "canape", "lit", "fauteuil")  # sortes plafonnées par pièce au nombre vu ensemble sur une même photo
+EN_GRAPPE = ("chaise",)  # sorte plafonnée par grappe de voisines (plusieurs tablées possibles dans une pièce)
+LIEN_GRAPPE_M = 1.0  # deux chaises à moins de 1 m l'une de l'autre sont de la même grappe
+PRES_GRAPPE_M = 0.8  # une chaise vue sur une photo compte pour la grappe si elle est à moins de 0,8 m d'une de ses chaises
+
+
+def plafonner(trouves: list[dict], par_photo: list[list[dict]], logement: dict) -> list[dict]:
+    """Moins de meubles EN TROP (NT, 15/11/2026, app-004 : 5 chaises posées pour 2 vraies, le meuble télé posé en « table ») :
+    le même meuble vu de plusieurs endroits est posé plusieurs fois quand les photos sont placées à 40-50 cm près. Une photo,
+    elle, ne se trompe pas sur le NOMBRE de meubles qu'elle montre ensemble. Donc :
+    - tables, canapés, lits, fauteuils : dans une pièce, pas plus que le plus grand nombre vu sur UNE photo de cette pièce ;
+    - chaises : par grappe de chaises voisines (une tablée), pas plus que le plus grand nombre vu sur une photo dans cette
+      grappe (une grande pièce peut avoir deux tablées : le plafond par pièce en faisait perdre 4 vraies sur app-001) ;
+    - rangements et le reste : pas de plafond (essayé : autant de vrais perdus que de faux retirés).
+    Les plus sûrs sont gardés (photos qui l'ont vu × confiance). Mesuré avec le rangement (moteur.ranger_meubles), caméras
+    relevées à la main : app-001 en trop 18 → 11 (retrouvés 25 → 23 sur 34), app-002 en trop 9 → 3 (retrouvés 22 → 21 sur 30)."""
+    from moteur.sol_a_plat import piece_de
+    piece_id = lambda m: (piece_de(m["position"], logement["pieces"]) or {}).get("id")
+    plafond: dict[tuple, int] = {}
+    for liste in par_photo:
+        compte: dict[tuple, int] = {}
+        for m in liste:
+            k = (piece_id(m), m["groupe"])
+            compte[k] = compte.get(k, 0) + 1
+        for k, c in compte.items():
+            plafond[k] = max(plafond.get(k, 0), c)
+    tri = sorted(trouves, key=lambda m: -m["vues"] * m["confiance"])
+    gardes, pris = [], {}
+    for m in tri:
+        if m["groupe"] in UNIQUES:
+            k = (piece_id(m), m["groupe"])
+            if pris.get(k, 0) < max(plafond.get(k, 0), 1):
+                pris[k] = pris.get(k, 0) + 1
+                gardes.append(m)
+        elif m["groupe"] not in EN_GRAPPE:
+            gardes.append(m)
+    for g in EN_GRAPPE:
+        grappes: list[list[dict]] = []
+        for m in (x for x in tri if x["groupe"] == g):
+            liees = [gr for gr in grappes if any(math.dist(m["position"], x["position"]) < LIEN_GRAPPE_M for x in gr)]
+            grappes = [gr for gr in grappes if not any(gr is l for l in liees)] + [[m] + [x for gr in liees for x in gr]]
+        for gr in grappes:
+            maxi = max((sum(1 for v in liste if v["groupe"] == g
+                            and any(math.dist(v["position"], x["position"]) < PRES_GRAPPE_M for x in gr)) for liste in par_photo), default=0)
+            gardes += sorted(gr, key=lambda m: -m["vues"] * m["confiance"])[:max(maxi, 1)]
+    return [m for m in trouves if any(m is x for x in gardes)]  # l'ordre d'origine est gardé
+
+
 def reperer_owl(photos: list, logement: dict, objets_par_photo: list[list[dict]], groupe_de: dict,
-                seuils: dict | None = None, coller: bool = True) -> list[dict]:
+                seuils: dict | None = None, coller: bool = True, plafond: bool = True) -> list[dict]:
     """photos : [(largeur, hauteur, caméra 8 nombres)] ; objets_par_photo : rectangles d'OWLv2 de chaque photo → meubles
     trouvés (fusionnés entre photos ET entre phrases : « a bed » et « a bed with a duvet » sur le même lit ne font qu'un)."""
     from moteur.sol_a_plat import piece_de_l_appareil
-    vus = []
+    vus, par_photo = [], []
     for (largeur, hauteur, cam), objets in zip(photos, objets_par_photo):
         piece, _ = piece_de_l_appareil(cam, logement["pieces"])
-        vus += meubles_owl_d_une_photo(objets, groupe_de, cam, largeur, hauteur, piece, seuils)
+        de_la_photo = meubles_owl_d_une_photo(objets, groupe_de, cam, largeur, hauteur, piece, seuils)
+        vus += de_la_photo
+        par_photo.append(fusionner(de_la_photo))  # les meubles distincts que CETTE photo montre ensemble
     trouves = fusionner(vus)
     if coller:
         from moteur.sol_a_plat import piece_de
         trouves = [coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
+    if plafond:
+        trouves = plafonner(trouves, par_photo, logement)
     return trouves
 
 

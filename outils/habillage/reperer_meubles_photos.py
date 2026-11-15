@@ -46,6 +46,12 @@ def main() -> int:
     releve = fiche_ou_photos(args.releve, logement, args.sortie.with_suffix(".cameras-seul.json"))
     trouves = reperer_depuis_releve(releve, logement, RACINE, journal=print)
     nouveaux = vers_meubles_du_logement(trouves, logement)
+    # rangés par défaut (15/11/2026) : jamais deux meubles au même endroit, jamais un meuble dans un mur ; ceux déjà dans le
+    # logement (relevés, placés à l'écran) ne bougent pas, les nouveaux s'y adaptent
+    from moteur.ranger_meubles import ranger
+    deja = list(logement.get("meubles", []))
+    ranges, _ = ranger(deja + nouveaux, logement, journal=print)
+    nouveaux = [m for m in ranges if not any(m["id"] == d["id"] for d in deja)]
     pris = {m["id"] for m in logement.get("meubles", [])} | {p["id"] for p in logement["pieces"]}
     for m in nouveaux:
         while m["id"] in pris:
