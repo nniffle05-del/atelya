@@ -18,7 +18,9 @@ pieces-des-photos.json complété par les endroits pointés.
 
 --port : 8765 par défaut (le suivant si pris). --sans-navigateur : ne pas ouvrir la page (essais). --rester : ne pas
 s'arrêter à la fin (essais). --raccourci : écrit seulement « Verifier le plan et les photos.bat » dans le dossier de lecture
-(un double-clic relance cette commande), sans rien lancer.
+(un double-clic relance cette commande), sans rien lancer. --suite : une fois le plan et les photos terminés, Atelya enchaîne
+SEUL jusqu'au film (outils/atelya/de_l_ecran_au_film.py : sols, meubles, maquette, Unreal, film en « Jour voilé ») ; avec
+--raccourci, le raccourci écrit enchaîne lui aussi.
 Tout se passe sur ce PC (adresse 127.0.0.1) : rien ne sort sur le réseau.
 """
 from __future__ import annotations
@@ -48,7 +50,7 @@ if not sys.stdout.isatty() and hasattr(sys.stdout, "reconfigure"):  # sortie red
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-def ecrire_raccourci(lecture: Path, photos: Path) -> Path:
+def ecrire_raccourci(lecture: Path, photos: Path, suite: bool = False) -> Path:
     """Un fichier à double-cliquer, dans le dossier de lecture. Que des chemins RELATIFS à lui-même et sans accent : un .bat
     est lu dans l'ancien codage de Windows, un accent écrit dedans serait mal lu (« %~dp0 », lui, est toujours juste)."""
     ici = lecture.resolve()
@@ -59,7 +61,7 @@ def ecrire_raccourci(lecture: Path, photos: Path) -> Path:
             raise ValueError(f"chemin avec accent dans le raccourci : {c}")
     bat = ici / RACCOURCI
     bat.write_text('@echo off\r\ntitle Atelya - verification du plan puis des photos\r\n'
-                   f'"%~dp0{python}" "%~dp0{outil}" "%~dp0." "%~dp0{dossier}" %*\r\n'
+                   f'"%~dp0{python}" "%~dp0{outil}" "%~dp0." "%~dp0{dossier}"{" --suite" if suite else ""} %*\r\n'
                    'if errorlevel 1 pause\r\n', encoding="ascii", newline="")
     return bat
 
@@ -72,13 +74,14 @@ def main() -> int:
     ap.add_argument("--sans-navigateur", action="store_true")
     ap.add_argument("--rester", action="store_true")
     ap.add_argument("--raccourci", action="store_true")
+    ap.add_argument("--suite", action="store_true", help="après la vérification, enchaîner seul jusqu'au film")
     args = ap.parse_args()
     for f in (args.lecture / "verification.json", args.lecture / "plan.png", args.photos):
         if not f.exists():
             dire(f"PLANTÉ : introuvable : {f}")
             return 2
     if args.raccourci:
-        dire(f"Raccourci écrit : {ecrire_raccourci(args.lecture, args.photos)}")
+        dire(f"Raccourci écrit : {ecrire_raccourci(args.lecture, args.photos, args.suite)}")
         return 0
 
     # Les réseaux se chargent pendant que la personne vérifie le plan : l'attente après « Terminer » en est raccourcie.
@@ -133,6 +136,11 @@ def main() -> int:
             encoding="utf-8")
         dire(f"Fini. Logement vérifié : {args.lecture / 'logement-verifie.json'}")
         dire(f"      Photos rangées  : {args.lecture / 'questions-photos' / 'cameras-photos-seul.json'}")
+        if args.suite:  # jointure « écran → film » : la suite part seule, dans la même fenêtre
+            import subprocess
+            dire("Atelya enchaîne : sols, meubles, maquette, Unreal, film. Laissez cette fenêtre ouverte (Unreal fermé).")
+            return subprocess.call([sys.executable, str(RACINE / "outils" / "atelya" / "de_l_ecran_au_film.py"),
+                                    str(args.lecture), str(args.photos)])
     return 0
 
 
