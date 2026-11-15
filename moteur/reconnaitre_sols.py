@@ -141,6 +141,9 @@ class CarteDesSols:
     classes: tuple[str, ...]
     # les avis des seules vignettes PROPRES (pas vues derrière un meuble possible) ; None = tout est propre (10/11/2026)
     votes_propres: np.ndarray | None = None
+    # par case : combien de photos l'ont vue, et combien l'ont vue PROPREMENT (pas derrière un lit, un canapé, un tapis…)
+    vues: np.ndarray | None = None
+    vues_propres: np.ndarray | None = None
 
     @property
     def indices_sol(self) -> list[int]:
@@ -215,6 +218,10 @@ def familles_verite(logement: dict, X: np.ndarray, Y: np.ndarray, classes=FAMILL
 # ---------------------------------------------------------------- temps 3 : le sol de chaque pièce et ses zones
 ZONE_MIN_M2 = 1.0  # en dessous, une tache d'une autre famille est du bruit (un meuble, un reflet), pas une zone de sol
 SURFACE_VUE_MIN_M2 = 1.0  # une pièce dont on voit moins que ça n'est pas jugée
+# Une ZONE (un autre sol dans la pièce) n'est pas gardée là où la plupart des photos voient un MEUBLE (16/11/2026, app-004 : le
+# lit, écarté sur quatre photos, laissait quand même une « zone de carrelage » de 3 m² à sa place, à cause de quelques avis
+# venus d'une photo mal placée). ZONE_PROPRE_MIN : part des vues de la zone qui doivent être propres.
+ZONE_PROPRE_MIN = 0.5
 ZONE_MEUBLE_MAX = 1.0  # DÉSACTIVÉ (09/11/2026) : à 0,35-0,5, +5 points sur le contrôle fabriqué MAIS app-001 81,5 → 52 % (sur vraies photos l'œil dit « meuble » bien plus souvent : la vraie zone de cubes et le point de Hongrie étaient retirés)
 
 
@@ -256,6 +263,9 @@ def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZO
                 continue
             if float(meuble[morceau].mean()) > ZONE_MEUBLE_MAX:
                 continue  # l'œil y voit surtout des meubles (un lit, un tapis) : pas une zone de sol
+            if carte.vues is not None and carte.vues[morceau].sum() > 0 \
+                    and carte.vues_propres[morceau].sum() / carte.vues[morceau].sum() < ZONE_PROPRE_MIN:
+                continue  # la plupart des photos y voient un lit, un canapé, un tapis : pas un autre sol
             f = int(np.bincount(fam[morceau], minlength=len(carte.classes)).argmax())
             lignes, colonnes = np.nonzero(morceau)
             coins = np.concatenate([np.stack([colonnes + dc, lignes + dl], 1) for dc in (0, 1) for dl in (0, 1)]).astype(np.float32)
@@ -311,6 +321,7 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
     h, w = v0.image.shape[:2]
     votes = np.zeros((int(np.ceil(h * v0.resolution / CASE_M)), int(np.ceil(w * v0.resolution / CASE_M)), len(clf.classes)))
     propres = np.zeros_like(votes) if any(v.douteux is not None for _, _, v in vues) else None
+    nb_vues, nb_propres = np.zeros(votes.shape[:2], np.int32), np.zeros(votes.shape[:2], np.int32)
     tuiles_xy, tuiles_e = [], []  # centre (x, y) et empreinte de chaque vignette : pour choisir la matière d'une région
     for nom, _, vue in vues:
         if vue.douteux is not None:
@@ -321,16 +332,21 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
             e = empreintes(oeil, v)
             pr = clf.probabilites(e)
             voter(votes, centres, pr, finesses, vue.resolution, facteurs=facteurs)
+            ok = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
             if propres is not None:
-                ok = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
                 voter(propres, centres[ok], pr[ok], finesses[ok], vue.resolution,
                       facteurs=None if facteurs is None else facteurs[ok])
+            for compte, lesquelles in ((nb_vues, np.ones(len(v), bool)), (nb_propres, ok)):  # les cases que CETTE photo voit
+                de_la_photo = np.zeros_like(votes)
+                voter(de_la_photo, centres[lesquelles], pr[lesquelles], finesses[lesquelles], vue.resolution)
+                compte += de_la_photo.sum(-1) > 1e-9
             garde = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
             # le choix de la matière ne regarde que les vignettes propres (pas le lit vu à la place du parquet)
             tuiles_xy.append(np.stack(vue.vers_sol(centres[garde, 0], centres[garde, 1]), 1))
             tuiles_e.append(e[garde])
         journal(f"  {nom} : {len(v)} vignettes")
-    carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes), votes_propres=propres)
+    carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes), votes_propres=propres, vues=nb_vues,
+                         vues_propres=nb_propres)
     pieces = sols_des_pieces(carte, logement)
     image, finesse, choisie = assembler([v for _, _, v in vues])
     douteux = np.zeros(finesse.shape, bool)  # le point retenu est vu derrière un meuble possible
@@ -460,6 +476,7 @@ def sols_vers_logement(resultat: dict, logement: dict, bibliotheque, prototypes:
             d["teinte"] = list(teinte_pour(albedo_de_la_matiere(Path(bibliotheque), matiere), s["couleur_photo"]))
         return d
 
+    couleur_sure_du_bois(resultat["pieces"])
     sortie = _json.loads(_json.dumps(logement))
     for p in sortie["pieces"]:
         s = resultat["pieces"].get(p["id"])
@@ -467,7 +484,71 @@ def sols_vers_logement(resultat: dict, logement: dict, bibliotheque, prototypes:
             continue
         p["sol"] = sol(s, s.get("part", 1.0))
         p["zones_sol"] = [{"contour": z["contour"], "sol": sol(z, s.get("part", 1.0))} for z in s["zones"]]
-    return sortie
+    return sols_des_espaces_ouverts(sortie)
+
+
+PHOTOS_COULEUR_SURES = 2  # une couleur mesurée sur au moins 2 photos est gardée telle quelle
+BOIS = ("lames", "point_de_hongrie", "batons_rompus")
+
+
+def couleur_sure_du_bois(pieces: dict) -> None:
+    """La couleur d'un parquet mesurée sur UNE SEULE photo est peu sûre (16/11/2026, app-004 : la chambre sortait deux fois plus
+    claire que le séjour, [0,70 ; 0,47 ; 0,26] contre [0,26 ; 0,13 ; 0,05], alors que c'est le même bois : sur cette photo, la
+    mise à plat avait pris du linge et du mur avec le parquet). Si un autre parquet du logement a sa couleur mesurée sur au
+    moins PHOTOS_COULEUR_SURES photos, la pièce vue une seule fois prend cette couleur-là (celle du parquet le plus vu) : dans
+    un logement, les parquets sont presque toujours du même bois. Sans autre parquet sûr, rien ne change."""
+    surs = [s for s in pieces.values() if s.get("famille") in BOIS and s.get("couleur_photo")
+            and s.get("photos_couleur", 0) >= PHOTOS_COULEUR_SURES]
+    if not surs:
+        return
+    reference = max(surs, key=lambda s: s.get("photos_couleur", 0))
+    for s in pieces.values():
+        if s.get("famille") in BOIS and s.get("couleur_photo") and s.get("photos_couleur", 0) < PHOTOS_COULEUR_SURES:
+            s["couleur_photo_seule"] = s["couleur_photo"]  # gardée pour mémoire
+            s["couleur_photo"] = list(reference["couleur_photo"])
+
+
+PIECES_SECHES = ("entree", "degagement", "sejour", "chambre", "bureau", "placard")  # pas les pièces d'eau : leur sol change
+
+
+def sols_des_espaces_ouverts(logement: dict) -> dict:
+    """Une pièce SANS sol reconnu (aucune photo ne montre son sol) qui s'ouvre SANS CLOISON sur une pièce au sol reconnu prend
+    le même sol (16/11/2026, app-004 : l'entrée, ouverte sur le séjour, recevait un carrelage par défaut alors que le parquet du
+    séjour s'y prolonge). Seulement pour les pièces sèches (une cuisine ou une salle d'eau ouverte a souvent un autre sol).
+    Le sol repris est marqué « ajoute » (supposé), avec la pièce d'où il vient ; de proche en proche (entrée, puis dégagement)."""
+    from moteur.preparer_verification import limites_sans_mur
+    from moteur.sol_a_plat import dans_polygone
+
+    pieces = logement.get("pieces", [])
+    voisins: dict[str, set] = {p["id"]: set() for p in pieces}
+    for lim in limites_sans_mur(logement):
+        (x0, y0), (x1, y1) = lim["debut"], lim["fin"]
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        L = float(np.hypot(x1 - x0, y1 - y0)) or 1.0
+        nx, ny = -(y1 - y0) / L * 0.15, (x1 - x0) / L * 0.15  # 15 cm de chaque côté du milieu de la limite
+        cotes = []
+        for sx, sy in ((mx + nx, my + ny), (mx - nx, my - ny)):
+            cotes.append(next((p["id"] for p in pieces if dans_polygone(np.array([sx]), np.array([sy]), p["contour"])[0]), None))
+        if cotes[0] and cotes[1] and cotes[0] != cotes[1]:
+            voisins[cotes[0]].add(cotes[1])
+            voisins[cotes[1]].add(cotes[0])
+    par_id = {p["id"]: p for p in pieces}
+    reconnu = lambda p: str((p.get("sol") or {}).get("source", "")).startswith(("brique photos", "même sol que"))
+    change = True
+    while change:
+        change = False
+        for p in pieces:
+            if reconnu(p) or not p["id"].rsplit("_", 1)[0] in PIECES_SECHES:
+                continue
+            sources = [par_id[v] for v in sorted(voisins[p["id"]]) if reconnu(par_id[v])]
+            if not sources:
+                continue
+            origine = max(sources, key=lambda q: float(q["sol"].get("confiance", 0.0)))
+            p["sol"] = {**{k: v for k, v in origine["sol"].items() if k in ("matiere", "teinte", "couleur_photo", "echelle")},
+                        "statut": "ajoute", "confiance": round(0.8 * float(origine["sol"].get("confiance", 0.5)), 2),
+                        "source": f"même sol que {origine['id']} (espace ouvert, sans cloison)"}
+            change = True
+    return logement
 
 
 def famille_decidee(pieces: dict, logement: dict, X: np.ndarray, Y: np.ndarray, classes=FAMILLES) -> np.ndarray:
