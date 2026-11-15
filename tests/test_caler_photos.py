@@ -153,6 +153,24 @@ def test_endroit_pointe_a_la_verification():
     assert cp.zone_pointee(plan, G, pg, (5.4, 0.9), [1])[::2] == ([1], False)              # chambre donnée, pointé sur son seuil côté séjour
 
 
+def test_endroit_pointe_entre_deux_portes_voisines():
+    """Deux salles d'eau sur le même couloir, pointé dans le couloir entre leurs portes : le sens du regard choisit, sinon
+    la porte la plus proche."""
+    logement = {"hauteur_sous_plafond": 2.5,
+                "pieces": [{"id": "degagement_1", "contour": [[0, 0], [6, 0], [6, 1.2], [0, 1.2]]},
+                           {"id": "salle_d_eau_1", "contour": [[0, 1.4], [2.9, 1.4], [2.9, 4], [0, 4]]},
+                           {"id": "salle_d_eau_2", "contour": [[3.1, 1.4], [6, 1.4], [6, 4], [3.1, 4]]}],
+                "murs": [{"id": "m1", "debut": [0, 1.3], "fin": [6, 1.3], "epaisseur": 0.2}],
+                "ouvertures": [{"mur": "m1", "type": "porte", "position": 1.9, "largeur": 0.8, "hauteur": 2.1},     # porte de la salle d'eau 1 : x de 1,9 à 2,7
+                               {"mur": "m1", "type": "porte", "position": 3.3, "largeur": 0.8, "hauteur": 2.1}]}    # porte de la salle d'eau 2 : x de 3,3 à 4,1
+    plan = cp.plan_du_logement(logement)
+    G = cp.grille(plan); pg = cp.piece_de(plan, G)
+    assert cp.zone_pointee(plan, G, pg, (3.0, 0.6, 140.0), [1, 2])[::2] == ([1], False)   # dans le couloir, on regarde vers la gauche : salle d'eau 1
+    assert cp.zone_pointee(plan, G, pg, (3.0, 0.6, 40.0), [1, 2])[::2] == ([2], False)    # … vers la droite : salle d'eau 2
+    assert cp.zone_pointee(plan, G, pg, (3.2, 0.6), [1, 2])[::2] == ([2], False)          # sans le sens : la porte la plus proche
+    assert cp.zone_pointee(plan, G, pg, (5.0, 3.0), [1, 2])[::2] == ([2], False)          # pointé DANS la salle d'eau 2 : elle
+
+
 def test_second_avis_sur_la_piece_donnee():
     """Le client a donné la pièce : Atelya ne lève un doute que s'il a une raison nette de la voir ailleurs."""
     assert cp.doute_sur_la_piece_donnee(None, 1.0, 0.95) is None

@@ -2144,6 +2144,28 @@
     };
   }
 
+  // ---------- Photos du client : « d'où est prise cette photo ? » ----------
+
+  /** L'endroit pointé pour une photo : on clique là où se tenait le photographe (`depart`, en m) et on tire vers ce qu'il
+   *  regardait (`point`, en m). Rend [x, y, cap] : cap en degrés, 0 = vers les x croissants, sens inverse des aiguilles
+   *  (le haut du plan = 90). Geste plus court que `seuil` mètres : pas de sens, [x, y] seulement. */
+  function endroitPointe(depart, point, seuil = 0.15) {
+    const dx = point[0] - depart[0], dy = point[1] - depart[1];
+    const ici = [arrondi(depart[0], 3), arrondi(depart[1], 3)];
+    if (Math.hypot(dx, dy) < seuil) return ici;
+    return [...ici, arrondi(Math.atan2(dy, dx) * 180 / Math.PI, 1)];
+  }
+
+  /** Ce que l'écran rend pour les photos : les endroits pointés, les photos passées (« je ne sais pas ») et celles qui
+   *  restent sans réponse. Seules les photos des questions comptent ; une photo pointée n'est plus « passée ». */
+  function reponsesPhotos(questions, endroits = {}, passees = []) {
+    const noms = (questions || []).map((q) => q.nom);
+    const gardes = {};
+    for (const n of noms) if (Array.isArray(endroits[n]) && endroits[n].length >= 2) gardes[n] = endroits[n];
+    const laissees = noms.filter((n) => passees.includes(n) && !(n in gardes));
+    return { endroits: gardes, passees: laissees, sans_reponse: noms.filter((n) => !(n in gardes) && !laissees.includes(n)) };
+  }
+
   // ---------- Lecture du fichier ----------
 
   /** Vérifie la forme d'un fichier de vérification et renvoie la liste des problèmes (vide si tout va bien). */
@@ -2171,6 +2193,8 @@
     centrePolygone,
     trouverDoutes,
     verifierFichier,
+    endroitPointe,
+    reponsesPhotos,
     VERSION_RESULTAT,
     resultat,
     NOMS_PIECES,
