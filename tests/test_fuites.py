@@ -45,3 +45,14 @@ def test_zoom_du_lot_seulement_si_accord():
     assert math.isclose(fuites.zoom_du_lot(lot([380, 390, 400, 385])), 0.3875)
     assert fuites.zoom_du_lot(lot([280, 460, 630, 720])) is None
     assert fuites.zoom_du_lot(lot([380, 390])) is None
+
+
+def test_orientation_refaite_au_zoom_impose():
+    """Une seule famille de fuyantes bien visible (photo presque de face) : le zoom propre n'est pas net, mais une fois le
+    vrai zoom donné l'orientation est retrouvée."""
+    image = _piece(cap=8.0, f=390.0)
+    m = fuites.mesurer(image)
+    o = fuites.orienter_au_zoom(m, 390.0, image.shape[1], image.shape[0])
+    assert o["oriente"]
+    assert abs((o["alpha"] - 8.0 + 45) % 90 - 45) < 0.8
+    assert abs(o["v0"] - image.shape[0] / 2) < 12

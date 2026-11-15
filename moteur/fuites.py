@@ -85,7 +85,41 @@ def mesurer(rgb: np.ndarray) -> dict:
             "segments": s, "famille": np.where(e.min(0) < TOLERANCE, e.argmin(0), -1)}
 
 
-ACCORD = 0.06            # les zooms nets d'un lot « s'accordent » si leur écart médian à la médiane est sous 6 %
+def orienter_au_zoom(mesure: dict, f: float, largeur: int, hauteur: int) -> dict:
+    """L'orientation de la photo REFAITE avec un zoom imposé (celui du lot, `zoom_du_lot`) : `mesurer` cherche zoom et
+    orientation ensemble, et quand son propre zoom est faux son orientation l'est aussi (app-002, corrigé soigné du
+    15/11/2026 : chambre 10 fausse de 11°, zoom propre 716 px pour un vrai zoom de 545 ; refaite à 545 px : 0,1°). Ici seule
+    l'orientation (et l'horizon) est cherchée ; une seule famille de fuyantes suffit alors (9 photos d'app-002 : à 2° du
+    corrigé soigné sur 7, 3,4° et 4,2° sur les deux où le corrigé lui-même est incertain).
+    → {"alpha", "v0", "oriente", "note", "petite_famille"}."""
+    s = mesure["segments"]
+    w, h, u0 = largeur, hauteur, largeur / 2
+    if len(s) < 8:
+        return {"alpha": 0.0, "v0": h / 2, "oriente": False, "note": 0.0, "petite_famille": 0.0}
+    dx, dy = s[:, 2] - s[:, 0], s[:, 3] - s[:, 1]
+    mx, my = (s[:, 0] + s[:, 2]) / 2, (s[:, 1] + s[:, 3]) / 2
+    direction = np.arctan2(dy, dx)
+    poids = np.minimum(np.hypot(dx, dy), 150.0 * w / 1206)
+
+    def note(alpha, v0):
+        t = np.tan(np.radians(alpha))
+        n = []
+        for pu in (u0 + f * t, u0 - f / t if abs(t) > 1e-6 else 1e9):
+            vers = np.arctan2(v0 - my, pu - mx)
+            n.append(float((poids * (np.degrees(np.abs((direction - vers + np.pi / 2) % np.pi - np.pi / 2)) < TOLERANCE)).sum()))
+        return n[0] + n[1], min(n)
+
+    meilleur = max((note(a, v)[0], -abs(v - h / 2), a, v) for a in np.arange(-45.0, 45.01, 0.5) for v in np.arange(h / 2 - h / 18, h / 2 + h / 18 + 0.1, h / 110))
+    a0, v0 = meilleur[2], meilleur[3]
+    fins = [(note(a, v0)[0], a) for a in np.arange(a0 - 1.0, a0 + 1.01, 0.1)]
+    haut = max(n for n, _ in fins)
+    alpha = float(np.mean([a for n, a in fins if n >= haut - 1e-6]))  # milieu du palier quand plusieurs angles se valent
+    n, petite = note(alpha, v0)
+    return {"alpha": alpha, "v0": float(v0), "note": float(n), "petite_famille": float(petite),
+            "oriente": bool(n >= 1500.0 * w / 1206)}
+
+
+ACCORD = 0.06           # les zooms nets d'un lot « s'accordent » si leur écart médian à la médiane est sous 6 %
 
 
 def zoom_du_lot(mesures: dict[str, dict]) -> float | None:

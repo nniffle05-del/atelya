@@ -597,8 +597,11 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     zoom_par_fuites : EN RÉSERVE (14/11/2026 nuit), pas en service. Zoom et cap donnés par les lignes de fuite
     (moteur/fuites.py) quand les photos du lot s'accordent. True = dès la mesure des photos : app-003 écart médian 0,53 → 0,46 m,
     pire 1,45 → 0,98 m, mais app-002 chambres jumelles échangées et dites « sûres », meubles 19 → 16 sur 30. "fin" = pièces
-    choisies comme avant, zoom juste seulement pour affiner la place : app-003 médiane 0,46 m (séjour 0,10 à 0,39 m), app-002
-    meubles inchangés (19/30, écart moyen 0,35 → 0,30 m) mais sols 87,9 → 82,6 % : recul, donc non mis en service (règle 8)."""
+    choisies comme avant, zoom juste seulement pour affiner la place. Rejugée le 15/11/2026 contre le corrigé soigné d'app-002
+    (verites/app-002/cameras-photos-soigne.json), après correction de l'orientation (`fuites.orienter_au_zoom`) : app-002
+    médiane 0,36 → 0,39 m, pire 0,90 → 0,75 m, orientation 2,2° → 0,9°, sols 87,9 → 90,2 %, meubles 19 → 20 sur 30 ; app-003
+    médiane 0,53 → 0,51 m, pire 1,45 → 1,21 m mais une photo passe au-delà de 1 m (0,82 → 1,21). Pas de gain net en mètres :
+    reste en réserve."""
     o = outils or Outils()
     plan = plan_du_logement(logement)
     G = grille(plan); pg = piece_de(plan, G)
@@ -611,6 +614,9 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     fu = {nom: {**fuites.mesurer(rgb), "largeur": rgb.shape[1]} for nom, rgb in photos.items()} if zoom_par_fuites else {}
     zoom_fin = fuites.zoom_du_lot(fu) if fu else None
     zoom = None if zoom_par_fuites == "fin" else zoom_fin  # « fin » : pièces choisies comme avant, zoom juste pour la place seulement
+    if zoom_fin:  # l'orientation de chaque photo refaite au zoom du lot (celle de `mesurer` est liée à son propre zoom, parfois faux)
+        for nom, rgb in photos.items():
+            fu[nom].update(fuites.orienter_au_zoom(fu[nom], zoom_fin * rgb.shape[1], rgb.shape[1], rgb.shape[0]))
     fens = {}
     journal(f"  zoom par les lignes de fuite : {'%.3f × la largeur' % zoom if zoom else 'pas net, on garde celui de MoGe-2'}")
     sens = sens_des_murs(plan)
