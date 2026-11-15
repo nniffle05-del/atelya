@@ -82,6 +82,8 @@ class Enchainement:
         self.places: list[dict] = []  # où Atelya a rangé chaque photo : dessiné sur le plan à la fin
         self.passees: set[str] = set()  # « je ne sais pas » : photos qu'on ne redemande pas
         self.erreur = None
+        self.temps: dict[str, float] = {}  # le chronomètre de la personne : secondes passées sur le plan, puis sur les photos
+        self._t_ouverture = self._t_questions = None
         self.fin_vue = threading.Event()  # l'écran a reçu « fini » : le service peut s'arrêter
         self.fil = None
 
@@ -90,6 +92,8 @@ class Enchainement:
         """Le fichier de vérification donné à l'écran : la lecture d'Atelya tant que le plan n'est pas terminé, le logement
         vérifié ensuite (page rouverte en cours de route). « a_suivre » annonce les photos à l'écran."""
         with self.verrou:
+            if self._t_ouverture is None:  # le chronomètre du plan part quand l'écran le reçoit pour la première fois
+                self._t_ouverture = time.time()
             v = dict(self.depart)
             if self.logement is not None:
                 v.update(logement=self.logement, doutes=[])
@@ -123,6 +127,8 @@ class Enchainement:
             if self.etape != "plan" and not (self.etape == "erreur" and self.retour == "plan"):
                 raise Refus("le plan a déjà été terminé")
             self.logement = lg
+            if self._t_ouverture is not None and "plan_s" not in self.temps:
+                self._chronometrer("plan_s", time.time() - self._t_ouverture)
             (self.lecture / "resultat-verification.json").write_text(json.dumps(resultat, ensure_ascii=False, indent=1), encoding="utf-8")
             (self.lecture / "logement-verifie.json").write_text(json.dumps(lg, ensure_ascii=False, indent=1), encoding="utf-8")
             self.journal(f"Plan vérifié reçu ({len(lg['murs'])} murs, {len(lg['pieces'])} pièces) : Atelya range les {len(self.noms)} photos.")
@@ -146,9 +152,18 @@ class Enchainement:
             except ValueError as e:
                 raise Refus(str(e)) from e
             chemin.write_text(json.dumps(apres, ensure_ascii=False, indent=1), encoding="utf-8")
+            if self._t_questions is not None:
+                self._chronometrer("photos_s", self.temps.get("photos_s", 0.0) + time.time() - self._t_questions)
+                self._t_questions = None
             self.passees |= posees - set(endroits)  # « je ne sais pas » et photos laissées sans réponse : on n'y revient pas
             self.journal(f"Réponses reçues : {len(endroits)} endroits pointés, {len(posees - set(endroits))} photos laissées de côté.")
             self._lancer("questions")
+
+    def _chronometrer(self, quoi: str, secondes: float) -> None:
+        """Le temps passé par la personne (objectif NT : ~2 min de vérification) : gardé dans temps-verification.json."""
+        self.temps[quoi] = round(secondes, 1)
+        (self.lecture / "temps-verification.json").write_text(json.dumps(self.temps, ensure_ascii=False, indent=1), encoding="utf-8")
+        self.journal(f"Temps de la personne, {'le plan' if quoi == 'plan_s' else 'les photos'} : {int(secondes // 60)} min {int(secondes % 60):02d} s")
 
     # ---- le calcul
     def _lancer(self, retour: str) -> None:
@@ -179,6 +194,7 @@ class Enchainement:
                                for n, d in sorted(cameras.items())]
                 self.bloc = bloc
                 self.etape = "questions" if bloc["questions"] else "fini"
+                self._t_questions = time.time() if bloc["questions"] else None  # le chronomètre des photos part quand les questions arrivent
                 duree = time.time() - self.debut
             if bloc["questions"]:
                 self.journal(f"{self.rangees} photos rangées sur {len(self.noms)} en {duree:.0f} s ; {len(bloc['questions'])} questions posées à l'écran.")

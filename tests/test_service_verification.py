@@ -85,6 +85,8 @@ def test_le_plan_puis_les_questions_puis_la_fin(tmp_path):
     assert rangement["endroits"] == {"photo-02": [1.5, 2.25, 45.0]} and appels[1]["endroits"] == rangement["endroits"]
     s = e.etat()
     assert s["etape"] == "fini" and s["rangees"] == 2 and s["laissees"] == 1 and s["tour"] == 2  # la photo passée n'est pas redemandée
+    temps = json.loads((lecture / "temps-verification.json").read_text(encoding="utf-8"))   # le chronomètre de la personne
+    assert set(temps) == {"plan_s", "photos_s"} and all(0 <= v < 30 for v in temps.values())
     assert s["places"] == [{"nom": n, "x": 1.0, "y": 2.0, "cap": 90.0, "piece": "chambre_1"} for n in ("photo-01", "photo-02")]  # dessinées sur le plan
     assert e.fin_vue.is_set()
 
