@@ -138,6 +138,22 @@
     #confirmation { background: #fff; border-radius: 10px; padding: 18px 20px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
     #confirmation h3 { margin: 0 0 8px; font-size: 16px; }
     #confirmation .ligne { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+    /* Photos du client : « d'où est prise cette photo ? » */
+    body.avec-photos { grid-template-columns: 1fr 470px; }
+    #photos { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+    #photos h2 { margin: 2px 0 8px; font-size: 17px; }
+    #photo-numero { color: var(--doux); font-size: 12px; }
+    #photo-image { width: 100%; border-radius: 6px; cursor: zoom-in; display: block; }
+    #photo-question { margin: 8px 0 4px; font-size: 14px; }
+    #photo-consigne { margin: 0 0 6px; font-size: 13px; color: var(--doux); }
+    #photo-etat { margin: 0 0 8px; font-size: 13px; min-height: 1em; }
+    #photo-etat.fait { color: #15803d; font-weight: 600; }
+    #photo-actions, #photo-nav { display: flex; flex-wrap: wrap; gap: 6px; }
+    #photo-actions .bouton, #photo-nav .bouton { flex: 1 1 auto; }
+    #photo-nav { margin-top: 8px; }
+    #photo-grande { position: fixed; inset: 0; background: rgba(0,0,0,.84); z-index: 30; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+    #photo-grande[hidden] { display: none; }
+    #photo-grande img { max-width: 94vw; max-height: 94vh; border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -181,6 +197,24 @@
         <p id="reprise-texte"></p>
         <button class="bouton principal" id="reprise-oui">Reprendre là où j'en étais</button>
         <button class="bouton" id="reprise-non">Repartir de la lecture d'Atelya</button>
+      </section>
+      <section id="photos" hidden>
+        <div id="photo-numero"></div>
+        <h2>D'où est prise cette photo ?</h2>
+        <img id="photo-image" alt="Photo du client" title="Cliquer pour agrandir">
+        <p id="photo-question"></p>
+        <p id="photo-consigne">Sur le plan : cliquez là où se tenait le photographe, puis tirez vers ce qu'il regardait.</p>
+        <p id="photo-etat"></p>
+        <div id="photo-actions">
+          <button class="bouton principal" id="photo-pointer" hidden>Pointer sur le plan</button>
+          <button class="bouton" id="photo-accepter" hidden>C'est bien la place proposée</button>
+          <button class="bouton" id="photo-effacer" hidden>Effacer ma réponse</button>
+          <button class="bouton" id="photo-passer">Je ne sais pas</button>
+        </div>
+        <div id="photo-nav">
+          <button class="bouton" id="photo-precedente">‹ Photo précédente</button>
+          <button class="bouton" id="photo-suivante">Photo suivante ›</button>
+        </div>
       </section>
       <section id="point" aria-live="polite">
         <div id="point-numero"></div>
@@ -258,6 +292,8 @@
       </div>
     </div>
   </aside>
+
+  <div id="photo-grande" hidden><img id="photo-grande-image" alt="Photo du client, en grand"></div>
 
   <div id="fond-confirmation" hidden>
     <div id="confirmation" role="dialog" aria-modal="true">

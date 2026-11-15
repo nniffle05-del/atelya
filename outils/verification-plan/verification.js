@@ -38,6 +38,7 @@
     relier: "Cliquez sur le bout d'un mur, puis sur le bout de l'autre.",
     meuble: "Cliquez dans une pièce pour y poser un meuble, puis choisissez ce que c'est dans sa fiche.",
     limite: "Une limite SANS mur entre deux pièces d'un même espace : cliquez ses deux bouts (ils se collent aux murs). Cliquez sur une limite existante pour l'enlever.",
+    photo: "Cliquez là où se tenait le photographe, puis tirez vers ce qu'il regardait. (Maj + glisser : déplacer le plan.)",
   };
   const VISEE = 8; // pixels d'écran : à quelle distance un clic « touche » un élément
 
@@ -49,6 +50,7 @@
     doutes: [],
     points: [], // les points à vérifier, dans l'ordre
     rangPoint: 0, // le point affiché
+    photos: null, // les photos du client à pointer : {questions, seules, rang, endroits: {nom: [x, y, cap]}, passees: [nom]}
     resultat: null, // le dernier résultat validé
     choisi: null, // id de l'élément choisi
     outil: "choisir",
@@ -109,6 +111,12 @@
       message("Fichier de vérification refusé : " + erreurs.join(" ; "), true);
       return;
     }
+    // Les photos du client à pointer restent À PART du plan corrigé : elles sont lourdes (ni historique ni sauvegarde du plan).
+    const { photos, ...sansPhotos } = verification;
+    verification = sansPhotos;
+    etat.photos = photos && Array.isArray(photos.questions) && photos.questions.length
+      ? { questions: photos.questions, seules: !!photos.seules, rang: 0, endroits: {}, passees: [] } : null;
+    document.body.classList.toggle("avec-photos", !!etat.photos); // avant de cadrer le plan : le panneau des photos est plus large
     // Dès l'ouverture, les zones coloriées collent aux murs (règle NT n° 21) : murs alignés fusionnés, pièces recalculées.
     let depart = verification;
     try { depart = C.apresMurs(verification).v; } catch (e) { depart = verification; }
@@ -125,6 +133,7 @@
     etat.deplacementPropose = null;
     etat.references.set(depart, empreinteMurs(depart));
     etat.depart_lecture = depart;
+    if (etat.photos) { reprendrePhotos(); etat.outil = "photo"; } else if (etat.outil === "photo") etat.outil = "choisir";
     $("accueil").style.display = "none";
     message("");
     recalculer();
@@ -211,6 +220,124 @@
     rafraichir();
   }
 
+  // ---------- Photos du client : « d'où est prise cette photo ? » ----------
+  //
+  // Le client a nommé la pièce de chaque photo ; pour celles qu'Atelya ne sait pas ranger, on montre la photo et on demande
+  // de pointer sur le plan l'endroit d'où elle est prise (clic) et ce qu'elle regarde (on tire). Les réponses sortent à
+  // part du logement : resultat.photos = {endroits: {nom: [x, y, cap]}, passees: [nom]} (voir BRANCHEMENT.md).
+
+  const clePhotos = () => `atelya-verification-photos|${etat.depart_lecture.logement.projet_id}`;
+  const questionPhoto = () => (etat.photos ? etat.photos.questions[etat.photos.rang] : null);
+  const bilanPhotos = () => C.reponsesPhotos(etat.photos.questions, etat.photos.endroits, etat.photos.passees);
+
+  /** À l'ouverture : les réponses déjà données dans ce navigateur, et la première photo sans réponse. */
+  function reprendrePhotos() {
+    if (!integre) {
+      try {
+        const t = JSON.parse(localStorage.getItem(clePhotos()));
+        if (t && t.endroits) { etat.photos.endroits = t.endroits; etat.photos.passees = t.passees || []; }
+      } catch (e) { /* rien d'enregistré */ }
+    }
+    const r = bilanPhotos();
+    etat.photos.endroits = r.endroits;
+    etat.photos.passees = r.passees;
+    etat.photos.rang = Math.max(0, etat.photos.questions.findIndex((q) => r.sans_reponse.includes(q.nom)));
+  }
+
+  function garderPhotos() {
+    if (integre || !etat.photos) return;
+    try { localStorage.setItem(clePhotos(), JSON.stringify({ endroits: etat.photos.endroits, passees: etat.photos.passees })); } catch (e) { /* tant pis */ }
+  }
+
+  function afficherPhoto() {
+    const q = questionPhoto();
+    $("photos").hidden = !q;
+    document.body.classList.toggle("avec-photos", !!q);
+    $("point").hidden = !!(q && etat.photos.seules);
+    if (!q) return;
+    const ph = etat.photos;
+    const fait = ph.questions.length - bilanPhotos().sans_reponse.length;
+    $("photo-numero").textContent = `Photo ${ph.rang + 1} sur ${ph.questions.length} · ${fait} réponse${fait > 1 ? "s" : ""}`;
+    if ($("photo-image").getAttribute("src") !== q.image) { $("photo-image").src = q.image; $("photo-grande-image").src = q.image; }
+    $("photo-question").textContent = q.question;
+    const e = ph.endroits[q.nom];
+    const passee = ph.passees.includes(q.nom);
+    $("photo-etat").textContent = e ? (e.length > 2 ? "✓ Endroit et sens notés. Refaites le geste pour corriger." : "Endroit noté, sans le sens : tirez vers ce que regardait le photographe.")
+      : passee ? "Photo laissée de côté (« je ne sais pas »)." : (q.proposition ? "En orange sur le plan : la place qu'Atelya propose, sans en être sûr." : "");
+    $("photo-etat").className = e && e.length > 2 ? "fait" : "";
+    $("photo-accepter").hidden = !q.proposition || !!e;
+    $("photo-effacer").hidden = !e && !passee;
+    $("photo-pointer").hidden = etat.outil === "photo";
+    $("photo-precedente").disabled = ph.rang === 0;
+    $("photo-suivante").disabled = ph.rang === ph.questions.length - 1;
+  }
+
+  function allerALaPhoto(sens) {
+    const ph = etat.photos;
+    if (!ph) return;
+    ph.rang = Math.min(ph.questions.length - 1, Math.max(0, ph.rang + sens));
+    message("");
+    if (etat.outil !== "photo") changerOutil("photo"); else rafraichir();
+  }
+
+  /** La réponse pour la photo en cours : un endroit [x, y, cap], « je ne sais pas » (passer), ou rien (effacer). */
+  function repondrePhoto(endroit, passer = false) {
+    const q = questionPhoto();
+    if (!q) return;
+    const ph = etat.photos;
+    delete ph.endroits[q.nom];
+    ph.passees = ph.passees.filter((n) => n !== q.nom);
+    if (endroit) ph.endroits[q.nom] = endroit;
+    else if (passer) ph.passees.push(q.nom);
+    garderPhotos();
+    rafraichir();
+  }
+
+  /** Sur le plan : les photos déjà pointées (vert), la place proposée par Atelya pour la photo en cours (orange, en
+   *  pointillés) et le geste en cours. Un rond = où se tenait le photographe ; la flèche = ce qu'il regardait. */
+  function dessinerPhotos(trait) {
+    const ph = etat.photos;
+    if (!ph) return;
+    const marque = (e, couleur, gros, tirets) => {
+      const a = px([e[0], e[1]]);
+      ctx.strokeStyle = couleur;
+      ctx.fillStyle = couleur;
+      ctx.lineWidth = (gros ? 3.5 : 2.5) * trait;
+      if (e.length > 2 && e[2] !== null && e[2] !== undefined) {
+        const cap = e[2] * Math.PI / 180, l = metresPour(gros ? 52 : 32, e);
+        const b = px([e[0] + l * Math.cos(cap), e[1] + l * Math.sin(cap)]);
+        const d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const u = [(b[0] - a[0]) / d, (b[1] - a[1]) / d];
+        ctx.setLineDash(tirets ? [6 * trait, 4 * trait] : []);
+        ctx.beginPath();
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const t = (gros ? 11 : 8) * trait;
+        ctx.beginPath();
+        ctx.moveTo(b[0] + u[0] * t * 0.6, b[1] + u[1] * t * 0.6);
+        ctx.lineTo(b[0] - u[0] * t - u[1] * t * 0.7, b[1] - u[1] * t + u[0] * t * 0.7);
+        ctx.lineTo(b[0] - u[0] * t + u[1] * t * 0.7, b[1] - u[1] * t - u[0] * t * 0.7);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(a[0], a[1], (gros ? 8 : 5.5) * trait, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.lineWidth = 2 * trait;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+    };
+    const q = questionPhoto();
+    for (const x of ph.questions) if (x !== q && ph.endroits[x.nom]) marque(ph.endroits[x.nom], "#15803d", false, false);
+    if (!q) return;
+    const g = etat.glisse && etat.glisse.genre === "photo" ? etat.glisse : null;
+    const e = g ? C.endroitPointe(g.depart, g.point, metresPour(12, g.depart)) : ph.endroits[q.nom];
+    if (!e && q.proposition) marque([q.proposition.x, q.proposition.y, q.proposition.cap], "#ea580c", true, true);
+    if (e) marque(e, "#15803d", true, false);
+  }
+
   const empreinteMurs = (v) => JSON.stringify(v.logement.murs.map((m) => [m.debut, m.fin, m.epaisseur]));
 
   function recalculer() {
@@ -218,6 +345,7 @@
     etat.inverse = C.inverse(etat.matrice);
     etat.doutes = C.trouverDoutes(etat.v);
     etat.points = C.pointsAVerifier(etat.v, { detail: etat.detail, fermeture: etat.fermeture });
+    if (etat.photos && etat.photos.seules) etat.points = []; // page des photos seules : le plan a déjà été vérifié
     etat.rangPoint = Math.min(etat.rangPoint, Math.max(0, etat.points.length - 1));
     if (etat.choisi && !trouverElement(etat.choisi)) etat.choisi = null;
   }
@@ -684,6 +812,7 @@
       }
     }
     dessinerTrace(v, trait);
+    dessinerPhotos(trait);
 
     dessinerEtiquettes(f, enCours, dpr);
     dessinerPastilles(f, dpr);
@@ -868,6 +997,7 @@
     afficherPoint();
     afficherPrecision();
     afficherFiche();
+    afficherPhoto();
     $("alerte-pieces").hidden = empreinteMurs(v) === etat.references.get(v);
 
     const tb = $("pieces");
@@ -1306,6 +1436,13 @@
     const tol = metresPour(VISEE, p);
     const lg = etat.v.logement;
 
+    if (etat.outil === "photo") { // photo du client : on clique où se tenait le photographe, on tire vers ce qu'il regardait
+      if (etat.photos && !ev.shiftKey && etat.affichage !== "plan") etat.glisse = { genre: "photo", depart: p, point: p };
+      else etat.glisse = { genre: "vue", dernier: [ev.clientX, ev.clientY] }; // Maj + glisser : déplacer le plan
+      dessiner();
+      return;
+    }
+
     // Une poignée du mur choisi passe avant une pastille posée au même endroit.
     const murPoignee = etat.choisi && lg.murs.find((m) => m.id === etat.choisi);
     const surPoignee = murPoignee && ["debut", "fin"].some((b) => C.longueur(p, murPoignee[b]) <= metresPour(VISEE * 1.5, p));
@@ -1445,6 +1582,8 @@
       etat.vue.dx += ev.clientX - g.dernier[0];
       etat.vue.dy += ev.clientY - g.dernier[1];
       g.dernier = [ev.clientX, ev.clientY];
+    } else if (g && g.genre === "photo") {
+      g.point = p;
     } else if (g && g.genre === "bout") {
       const a = C.accrocherBout(etat.v.logement, g.id, g.bout, p, metresPour(VISEE * 1.5, p));
       etat.accroche = a.accroche ? a.point : null;
@@ -1506,6 +1645,13 @@
     etat.glisse = null;
     etat.apercu = null;
     etat.accroche = null;
+    if (g && g.genre === "photo") {
+      const e = C.endroitPointe(g.depart, g.point, metresPour(12, g.depart));
+      repondrePhoto(e);
+      message(e.length > 2 ? "Endroit et sens notés. Passez à la photo suivante, ou refaites le geste pour corriger."
+        : "Endroit noté. Tirez vers ce que regardait le photographe pour donner aussi le sens.");
+      return;
+    }
     if (g && g.genre === "bout") {
       if (g.erreur) message(g.erreur, true);
       if (g.point) corrigerMurs((x) => C.deplacerBout(x, g.id, g.bout, g.point), "Bout du mur déplacé.");
@@ -1563,14 +1709,22 @@
         "Vous pouvez revenir les vérifier, ou terminer quand même : ce qui reste en doute sera noté dans le rapport.");
       if (!ok) return;
     }
+    if (etat.photos && bilanPhotos().sans_reponse.length) {
+      const reste = bilanPhotos().sans_reponse.length;
+      const ok = await demander(`Il reste ${reste} photo${reste > 1 ? "s" : ""} sans réponse`,
+        "Vous pouvez revenir les pointer, ou terminer quand même : Atelya laissera ces photos de côté.");
+      if (!ok) return;
+    }
     const r = C.resultat(etat.v, { corrections: etat.historique.length });
+    if (etat.photos) { const b = bilanPhotos(); r.photos = { endroits: b.endroits, passees: b.passees }; }
     etat.resultat = r;
     if (integre && origineSite) {
       versSite({ type: PREFIXE + "valide", resultat: r });
       message("Vérification envoyée au site.");
     } else {
-      telecharger(`${r.projet_id}-logement.json`, r.logement);
-      message("Logement corrigé enregistré (dossier Téléchargements).");
+      if (!r.photos || etat.historique.length) telecharger(`${r.projet_id}-logement.json`, r.logement);
+      if (r.photos) telecharger(`${r.projet_id}-photos.json`, { schema: "reponses-photos/0.1", projet_id: r.projet_id, photos: r.photos });
+      message(r.photos ? "Réponses sur les photos enregistrées (dossier Téléchargements)." : "Logement corrigé enregistré (dossier Téléchargements).");
     }
   }
 
@@ -1645,6 +1799,18 @@
   $("recalculer-pieces-2").addEventListener("click", refairePieces);
   $("point-precedent").addEventListener("click", () => allerAuPoint(-1));
   $("point-suivant").addEventListener("click", () => allerAuPoint(1));
+  $("photo-precedente").addEventListener("click", () => allerALaPhoto(-1));
+  $("photo-suivante").addEventListener("click", () => allerALaPhoto(1));
+  $("photo-pointer").addEventListener("click", () => changerOutil("photo"));
+  $("photo-accepter").addEventListener("click", () => {
+    const p = questionPhoto().proposition;
+    repondrePhoto([p.x, p.y, p.cap]);
+    message("Place proposée par Atelya gardée.");
+  });
+  $("photo-effacer").addEventListener("click", () => { repondrePhoto(null); message("Réponse effacée."); });
+  $("photo-passer").addEventListener("click", () => { repondrePhoto(null, true); message("Photo laissée de côté."); });
+  $("photo-image").addEventListener("click", () => { $("photo-grande").hidden = false; });
+  $("photo-grande").addEventListener("click", () => { $("photo-grande").hidden = true; });
   $("fermer-choix").addEventListener("click", () => choisir(null));
   $("arreter-outil").addEventListener("click", () => changerOutil("choisir"));
   const volet = (bouton, cible) => $(bouton).addEventListener("click", () => {

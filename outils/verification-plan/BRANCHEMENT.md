@@ -141,3 +141,38 @@ python -m moteur.plan_propre resultat.json --sortie plan.pdf \
 Le moteur ne produit pas encore `verification.json` à partir d'une vraie lecture d'Atelya
 (il faut y ajouter le calage image ↔ mètres). C'est la prochaine étape côté moteur ; d'ici là,
 le format ci-dessus est figé et l'exemple `exemples/exemple-cas-test-00.verification.json` permet d'essayer.
+
+## Photos du client : « d'où est prise cette photo ? » (ajout du 15/11/2026, facultatif)
+
+Le fichier de vérification peut porter, EN PLUS, un champ `photos` ; sans lui l'écran se comporte exactement comme avant
+(le format `verification/0.1` ne change pas pour le reste).
+
+```json
+"photos": {
+  "seules": true,
+  "questions": [
+    {"nom": "photo-14", "image": "data:image/jpeg;base64,…", "largeur": 1000, "hauteur": 667,
+     "question": "Atelya hésite entre « Chambre 2 » et « Chambre 3 ». Pointez d'où la photo est prise.",
+     "piece": "chambre_2", "hesite_avec": ["chambre_1"], "proposition": {"x": 13.2, "y": 4.4, "cap": -62.0}}
+  ]
+}
+```
+
+- `questions` : une question par photo qu'Atelya ne sait pas ranger. `image` est la photo elle-même (data URL) ; `proposition`
+  (ou `null`) est la place qu'Atelya propose sans en être sûr, dessinée en orange.
+- `seules` : `true` quand le plan a déjà été vérifié ; l'écran ne repose alors aucune question sur le plan.
+- À l'écran : la photo, la question, et sur le plan on CLIQUE là où se tenait le photographe puis on TIRE vers ce qu'il
+  regardait. Boutons « C'est bien la place proposée », « Je ne sais pas », « Effacer ma réponse ».
+
+Le résultat porte alors, EN PLUS, à sa racine (jamais dans `logement`) :
+
+```json
+"photos": {"endroits": {"photo-14": [13.13, 4.14, -58.1]}, "passees": ["photo-13"]}
+```
+
+- `endroits` : pour chaque photo pointée, `[x, y, cap]` en mètres du plan ; `cap` en degrés (0 = vers la droite du plan, 90 =
+  vers le haut) ; `[x, y]` seulement si la personne a cliqué sans tirer.
+- `passees` : les photos pour lesquelles la personne a répondu « Je ne sais pas ».
+- Écran ouvert seul : le bouton « Terminer » télécharge `<projet>-photos.json` (`{"schema": "reponses-photos/0.1",
+  "projet_id", "photos"}`), à donner à `outils\habillage\questions_photos.py ranger`. Dans le site : le champ `photos` est
+  dans le `resultat` du message `atelya-verification:valide`.

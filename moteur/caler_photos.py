@@ -472,12 +472,30 @@ def zone_pointee(plan: dict, G: np.ndarray, pg: np.ndarray, point, donnee: list[
     """L'endroit pointé à l'écran de vérification (« d'où est prise cette photo ? ») → (pièces permises, places de la grille à
     moins de RAYON_POINTE du point, True si le point contredit la pièce donnée par le client). La pièce est celle du point :
     c'est elle qui départage deux chambres jumelles. Si le point tombe hors de la pièce donnée mais sur son seuil (une cuisine
-    photographiée du couloir), la pièce donnée reste ; s'il tombe franchement ailleurs, c'est le point qui compte."""
+    photographiée du couloir), la pièce donnée reste ; entre DEUX pièces données dont les portes sont voisines (deux salles
+    d'eau sur le même couloir), c'est celle vers laquelle on regarde si le sens est indiqué, sinon celle dont la porte est la
+    plus proche ; si le point tombe franchement ailleurs, c'est le point qui compte."""
     ecart = np.hypot(G[:, 0] - point[0], G[:, 1] - point[1])
     pres, pointee = ecart < RAYON_POINTE, int(pg[ecart.argmin()])
     ailleurs = donnee is not None and pointee not in donnee
-    if ailleurs and (pieces_montrees(plan, G, pg, donnee)[1] & pres[:, None]).any():
-        return list(donnee), pres, False
+    if ailleurs:
+        seuils = []  # (écart au sens du regard, distance de la porte, pièce) pour chaque pièce donnée dont une porte est à portée
+        cap = float(point[2]) if len(point) > 2 and point[2] is not None else None
+        for q in donnee:
+            portes = (plan["face_piece"] == q) & (plan["sorte"] == 1)
+            if not portes.any():
+                continue
+            A, B = plan["A"][portes], plan["B"][portes]
+            e = B - A
+            t = np.clip(((np.asarray(point[:2], float)[None] - A) * e).sum(1) / (e * e).sum(1), 0, 1)
+            vers = A + t[:, None] * e - np.asarray(point[:2], float)[None]
+            d = np.linalg.norm(vers, axis=1)
+            j = int(d.argmin())
+            if d[j] < PORTE_M:
+                biais = 0.0 if cap is None else abs((np.degrees(np.arctan2(vers[j, 1], vers[j, 0])) - cap + 180) % 360 - 180)
+                seuils.append((round(float(biais) / 20), float(d[j]), q))  # le sens d'abord (par tranches de 20°), puis la porte la plus proche
+        if seuils:
+            return [min(seuils)[2]], pres, False
     return [pointee], pres, bool(ailleurs)
 
 

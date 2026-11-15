@@ -869,3 +869,20 @@ test("sens par défaut : la porte s'ouvre vers la pièce, pas vers l'entrée ; u
   v.logement.ouvertures[2].largeur = 2.0;
   assert.equal(C.arcPorte(v.logement, v.logement.ouvertures[2]), null);
 });
+
+test("photo du client : on clique où se tenait le photographe, on tire vers ce qu'il regardait", () => {
+  assert.deepEqual(C.endroitPointe([2, 3], [4, 3]), [2, 3, 0]);            // vers les x croissants
+  assert.deepEqual(C.endroitPointe([2, 3], [2, 5]), [2, 3, 90]);           // vers le haut du plan
+  assert.deepEqual(C.endroitPointe([2, 3], [1, 2]), [2, 3, -135]);
+  assert.deepEqual(C.endroitPointe([2.12345, 3], [2.13, 3.01]), [2.123, 3]); // geste trop court : l'endroit, sans le sens
+  assert.deepEqual(C.endroitPointe([0, 0], [0.3, 0], 0.5), [0, 0]);          // le seuil suit le zoom de l'écran
+});
+
+test("photos du client : ce que l'écran rend (endroits, « je ne sais pas », sans réponse)", () => {
+  const questions = [{ nom: "photo-02" }, { nom: "photo-07" }, { nom: "photo-09" }];
+  const r = C.reponsesPhotos(questions, { "photo-02": [7, 2, 90], "photo-99": [1, 1, 0], "photo-07": [3] }, ["photo-07", "photo-02", "photo-50"]);
+  assert.deepEqual(r.endroits, { "photo-02": [7, 2, 90] });   // une photo qui n'est pas dans les questions ne sort pas
+  assert.deepEqual(r.passees, ["photo-07"]);                   // une photo pointée n'est plus « passée »
+  assert.deepEqual(r.sans_reponse, ["photo-09"]);
+  assert.deepEqual(C.reponsesPhotos(null), { endroits: {}, passees: [], sans_reponse: [] });
+});
