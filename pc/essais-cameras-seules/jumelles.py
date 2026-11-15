@@ -94,7 +94,9 @@ def memoire(o: cp.Outils):
     cp.poser_bloc = avec_memoire(cp.poser_bloc, lambda T, rel, noms, combien=40: ("pose", tuple(noms), tuple(empreinte(T, n) for n in noms),
                                                                                   tuple((round(float(rel[n][0][0]), 4), round(float(rel[n][1]), 4)) for n in noms)))
     brut = o.pds.brut
-    o.pds.brut = lambda cle, rgb: brut(f"jumelles/{id(rgb)}", rgb)
+    # seulement pour les appels du calage (photos gardées en mémoire, reconnues à leur adresse) : les sols et les meubles relisent
+    # les photos dans des tableaux provisoires dont l'adresse resservirait à une AUTRE photo (objets d'une photo donnés à une autre)
+    o.pds.brut = lambda cle, rgb: brut(f"jumelles/{id(rgb)}" if cle.startswith("caler/") else cle, rgb)
     return garde
 
 

@@ -6,6 +6,12 @@ r"""Les photos du client CALÉES SEULES (moteur/caler_photos.py) : la fiche « d
 La fiche écrite a le MÊME format que celle faite à la main (verites\<logement>\cameras-photos.json) : elle se donne telle
 quelle aux sols (sols_photos.py) et aux meubles (reperer_meubles_photos.py). « cameras » ne contient que les photos dont
 Atelya est SÛR ; les autres sont rangées dans « incertaines » (placées, mais à ne pas utiliser) et « non_calees ».
+LA PIÈCE DONNÉE PAR LE CLIENT (15/11/2026) : --pieces <fichier.json>, ou un fichier « pieces-des-photos.json » rangé dans le
+dossier des photos (alors pris tout seul, aussi par sols_photos.py et reperer_meubles_photos.py) :
+    {"photo-01": "sejour_1", "photo-07": "chambre_2", "photo-09": "cuisine"}        (identifiant du plan, ou sorte de pièce)
+ou  {"pieces": {…}, "confirmees": ["photo-07"]}   (confirmees : pièces confirmées à l'écran de vérification).
+Une photo dont la pièce est donnée est utilisée, sauf si Atelya la voit ailleurs : elle est alors rangée dans « a_verifier »
+avec la raison (à confirmer à l'écran de vérification), et laissée de côté en attendant.
 --corrige : compare à un relevé à la main (essais). --fenetres <dossier> : cartes des fenêtres toutes faites (essais sur les
 deux logements qui ont servi à apprendre la couche des fenêtres : cartes apprises sans le logement noté).
 """
@@ -49,13 +55,31 @@ def fiche(resultat: dict, dossier: Path, modele: str) -> dict:
         rel = Path(os.path.relpath(dossier.resolve(), RACINE)).as_posix()
     except ValueError:  # autre disque
         rel = dossier.resolve().as_posix()
-    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec") if k in d and (k != "hesite_avec" or d[k])}
+    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier")
+                       if k in d and (k != "hesite_avec" or d[k])}
     return {"note": f"Caméras des photos retrouvées SEULES par Atelya (moteur/caler_photos.py {cp.VERSION}). « cameras » : photos "
                     "dont Atelya est sûr (seules à utiliser) ; « incertaines » : placées, mais pas sûres (« hesite_avec » : l'autre pièce possible).",
             "photos": rel, "fichier": modele,
             "cameras": {n: garde(d) for n, d in resultat["cameras"].items() if d["sure"]},
-            "incertaines": {n: garde(d) for n, d in resultat["cameras"].items() if not d["sure"]},
+            "incertaines": {n: garde(d) for n, d in resultat["cameras"].items() if not d["sure"] and not d.get("a_verifier")},
+            "a_verifier": {n: garde(d) for n, d in resultat["cameras"].items() if d.get("a_verifier")},
             "non_calees": resultat["non_calees"]}
+
+
+PIECES_DES_PHOTOS = "pieces-des-photos.json"  # dans le dossier des photos : la pièce de chaque photo, dite par le client
+
+
+def lire_pieces(chemin: Path | None, photos: dict) -> tuple[dict, set]:
+    """Le fichier des pièces données par le client → ({photo: pièce}, photos confirmées). Les noms peuvent porter l'extension."""
+    if chemin is None or not chemin.is_file():
+        return {}, set()
+    d = json.loads(chemin.read_text(encoding="utf-8"))
+    pieces, confirmees = (d["pieces"], d.get("confirmees", [])) if isinstance(d.get("pieces"), dict) else (d, [])
+    nom = lambda n: n if n in photos else Path(n).stem
+    inconnues = [n for n in pieces if nom(n) not in photos]
+    if inconnues:
+        print(f"  attention : {chemin.name} parle de photos absentes du dossier : {inconnues}", flush=True)
+    return {nom(n): p for n, p in pieces.items() if nom(n) in photos and p}, {nom(n) for n in confirmees}
 
 
 def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print) -> dict:
@@ -67,11 +91,13 @@ def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print) -
 
     import torch
     photos, modele = lire_photos(chemin)
-    journal(f"Photos calées seules ({len(photos)} photos) :")
-    f = fiche(cp.caler(logement, photos, journal=journal), chemin, modele)
+    pieces, confirmees = lire_pieces(chemin / PIECES_DES_PHOTOS, photos)
+    journal(f"Photos calées seules ({len(photos)} photos, pièce donnée par le client pour {len(pieces)}) :")
+    f = fiche(cp.caler(logement, photos, journal=journal, pieces_donnees=pieces, confirmees=confirmees), chemin, modele)
     a_cote.parent.mkdir(parents=True, exist_ok=True)
     a_cote.write_text(json.dumps(f, ensure_ascii=False, indent=1), encoding="utf-8")
-    journal(f"  {len(f['cameras'])} photos sûres (utilisées), {len(f['incertaines'])} incertaines et {len(f['non_calees'])} non calées (laissées de côté) : {a_cote}")
+    journal(f"  {len(f['cameras'])} photos sûres (utilisées), {len(f['a_verifier'])} à vérifier, {len(f['incertaines'])} incertaines et {len(f['non_calees'])} non calées "
+            f"(laissées de côté) : {a_cote}")
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -108,6 +134,7 @@ def main() -> int:
     ap.add_argument("logement", type=Path)
     ap.add_argument("photos", type=Path, help="dossier des photos du client")
     ap.add_argument("sortie", type=Path, help="fiche écrite (format cameras-photos.json)")
+    ap.add_argument("--pieces", type=Path, help=f"la pièce de chaque photo, dite par le client (défaut : {PIECES_DES_PHOTOS} dans le dossier des photos)")
     ap.add_argument("--corrige", type=Path, help="relevé à la main, pour comparer (essais)")
     ap.add_argument("--fenetres", type=Path, help="dossier de cartes des fenêtres toutes faites, <prefixe><nom>.npy (essais)")
     ap.add_argument("--prefixe", default="", help="début du nom des cartes (--fenetres)")
@@ -126,11 +153,15 @@ def main() -> int:
         fen = {n: np.load(args.fenetres / f"{args.prefixe}{n}.npy")[..., 2].astype(np.float32) for n in photos if (args.fenetres / f"{args.prefixe}{n}.npy").is_file()}
     t0 = time.time()
     print(f"{len(photos)} photos, {len(logement['pieces'])} pièces", flush=True)
-    resultat = cp.caler(logement, photos, journal=lambda *a: print(*a, flush=True), fenetres_de=fen)
+    pieces, confirmees = lire_pieces(args.pieces or args.photos / PIECES_DES_PHOTOS, photos)
+    if pieces:
+        print(f"pièce donnée par le client pour {len(pieces)} photos", flush=True)
+    resultat = cp.caler(logement, photos, journal=lambda *a: print(*a, flush=True), fenetres_de=fen, pieces_donnees=pieces, confirmees=confirmees)
     f = fiche(resultat, args.photos, modele)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     args.sortie.write_text(json.dumps(f, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"{len(f['cameras'])} photos sûres, {len(f['incertaines'])} incertaines, {len(f['non_calees'])} non calées, en {time.time() - t0:.0f} s → {args.sortie}", flush=True)
+    print(f"{len(f['cameras'])} photos sûres, {len(f['a_verifier'])} à vérifier, {len(f['incertaines'])} incertaines, {len(f['non_calees'])} non calées, "
+          f"en {time.time() - t0:.0f} s → {args.sortie}", flush=True)
     if corrige:
         comparer(resultat, corrige, logement)
     return 0
