@@ -116,6 +116,7 @@ def doutes_de_construction(logement: dict) -> list[dict]:
 
 
 LIMITE_MIN, LIMITE_ECART = 0.3, 0.08  # une limite sans mur : au moins 30 cm ; deux bords de pièces « se touchent » à 8 cm près
+LIMITE_DANS_MUR = 1.0  # m : jusqu'où une limite sans mur se prolonge DANS le mur qu'elle rejoint (elle le traverse)
 
 
 def limites_sans_mur(logement: dict) -> list[dict]:
@@ -163,7 +164,15 @@ def limites_sans_mur(logement: dict) -> list[dict]:
                         while j + 1 < len(pas) and libre[j + 1]:
                             j += 1
                         if pas[j] - pas[k] >= LIMITE_MIN:
-                            u, v = a0 + d * (pas[k] - 0.04) + decal, a0 + d * (pas[j] + 0.04) + decal  # 4 cm de plus : la limite rejoint les murs
+                            # La limite TRAVERSE le mur qu'elle rejoint à chaque bout (15/11/2026, app-004 : NT a raccourci un
+                            # poteau à l'écran, la limite, qui s'arrêtait 4 cm dans le poteau, ne le touchait plus, et cuisine,
+                            # entrée et séjour ont fondu en une seule pièce). Au moins 4 cm, au plus LIMITE_DANS_MUR.
+                            s0, s1 = pas[k] - 0.04, pas[j] + 0.04
+                            while pas[k] - s0 < LIMITE_DANS_MUR and sur_un_mur(a0 + d * (s0 - 0.02) + decal):
+                                s0 -= 0.02
+                            while s1 - pas[j] < LIMITE_DANS_MUR and sur_un_mur(a0 + d * (s1 + 0.02) + decal):
+                                s1 += 0.02
+                            u, v = a0 + d * s0 + decal, a0 + d * s1 + decal
                             limites.append({"debut": [round(float(u[0]), 3), round(float(u[1]), 3)], "fin": [round(float(v[0]), 3), round(float(v[1]), 3)]})
                         k = j + 1
     return limites

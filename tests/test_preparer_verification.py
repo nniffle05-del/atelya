@@ -148,5 +148,7 @@ def test_limites_sans_mur_entre_deux_pieces_nommees():
     limites = limites_sans_mur(logement)
     assert len(limites) == 1                                             # cuisine / entrée seulement ; le mur m3 sépare déjà la chambre
     (x0, y0), (x1, y1) = limites[0]["debut"], limites[0]["fin"]
-    assert abs(x0 - 3) < 0.01 and abs(x1 - 3) < 0.01 and min(y0, y1) < 0.0 and 2.0 < max(y0, y1) < 2.2   # s'arrête au bout de mur m2
+    # depuis le 15/11/2026 la limite TRAVERSE le mur qu'elle rejoint (ici le bout de mur m2, puis le mur du haut) : si la personne
+    # raccourcit ce mur à l'écran, la limite tient toujours et les deux pièces ne fondent pas en une seule
+    assert abs(x0 - 3) < 0.01 and abs(x1 - 3) < 0.01 and min(y0, y1) < 0.0 and 2.9 < max(y0, y1) <= 3.25
     assert limites_sans_mur({"murs": [], "pieces": [logement["pieces"][0]]}) == []
