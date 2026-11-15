@@ -70,7 +70,8 @@ MARGE_D_ENSEMBLE = True                     # « sûre » jugé en laissant les 
 SEUIL_PAR_RACINE = True                     # seuil du « sûr » × racine du nombre de photos du bloc (False = avant le 15/11/2026)
 MARGE_SURE = 0.4                            # « sûre » : changer de pièce ferait perdre au moins autant (× racine du nombre de photos du bloc)
 SENS_POINTE_DEG = 45.0                      # … et, si le sens du regard est indiqué aussi, le cap à 45° près
-RAYON_POINTE = 1.5                          # endroit pointé à la vérification : l'appareil est cherché à moins de 1,5 m du point
+RAYON_POINTE = 1.0                          # endroit pointé à la vérification : l'appareil est cherché à moins de 1 m du point (1,5 m jusqu'au 16/11/2026 :
+                                            # 33 photos pointées à 0,5 m près, à plus de 1 m de la vraie place 8 → 4, écart moyen 0,67 → 0,53 m ; pc/essais-cameras-seules/rayon_pointe.py)
 VERS_PORTE_DEG = 50.0                       # … et regarde alors vers cette porte, à 50° près
 PORTE_M = 1.2                               # pièce donnée par le client : l'appareil peut être sur le seuil, à moins de 1,2 m d'une de ses portes
 MEUBLES_MIN = 0.3                           # pièce donnée : meubles vus qui ne vont pas avec cette sorte de pièce (un lit dans une « cuisine ») → à vérifier
@@ -78,6 +79,8 @@ COLLE_MIN = 0.6                             # pièce donnée : en dessous de cet
 LOIN_M, TOURNE_DEG = 1.0, 60.0              # « endroit douteux » : une autre place à plus de 1 m, ou le même endroit tourné de plus de 60°
 AUTRE_POSE_MIN = 0.95                       # … douteux si une autre pose du bloc, ailleurs dans la pièce, vaut au moins 95 % de la pose choisie
 ACCORD_MIN = 0.6                            # … ou si une photo du bloc est à moins de 60 % de sa propre meilleure place
+ECART_POINTE = 0.75                         # photo pointée par NT que son bloc met à plus de 75 cm du point : elle se place seule, près du point
+PETITES_PIECES = ("cuisine", "salle_d_eau", "entree", "wc", "degagement")  # … et toujours dans ces petites pièces (demande de NT)
 CAP_FUITES = 12.0                          # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
@@ -518,7 +521,7 @@ def doute_sur_la_piece_donnee(sure_ailleurs: str | None, facteur_meubles: float,
     return None
 
 
-def endroit_douteux(endroit: dict | None) -> str | None:
+def endroit_douteux(endroit: dict | None, piece: str | None = None) -> str | None:
     """Le signal « ENDROIT DOUTEUX » (15/11/2026, demande de NT) : la pièce est la bonne, mais la PLACE dans la pièce est-elle
     fiable ? La raison d'aller le demander à la vérification, ou None. Jugé pour le BLOC de la photo (ses photos bougent
     ensemble), avec ce que le calage calcule déjà (champ « endroit » de chaque caméra) :
@@ -526,9 +529,15 @@ def endroit_douteux(endroit: dict | None) -> str | None:
         de TOURNE_DEG), va presque aussi bien (petite pièce sans repère : salle d'eau placée à l'envers) ;
       - accord < ACCORD_MIN : une photo du bloc est loin de sa propre meilleure place : les photos de la pièce ne s'accordent
         pas (cuisine d'app-002 : une photo juste, l'autre à 2 m).
+      - et, d'abord, la PETITE PIÈCE (cuisine, salle d'eau, entrée, WC, dégagement : PETITES_PIECES) : toujours douteuse. Mesuré le
+        16/11/2026 dans les conditions du service : sur les 4 photos de petites pièces dont on connaît la vraie place, 3 à 4
+        sont mal placées, et les deux indices ci-dessus ne voient pas la cuisine d'app-002 (autre_pose 0,76 à 0,93 selon de
+        petits changements du plan, accord 1,0).
     Regarder la photo SEULE ne suffit pas (mesuré : dans un grand séjour, une photo juste a souvent une autre place aussi
     bonne ; c'est le bloc qui tranche). On ne sait PAS dire laquelle des photos d'un bloc douteux est mal placée.
     Mesures et limites : pc/essais-cameras-seules/endroit_douteux.py et le journal."""
+    if piece and sorte_de_piece(piece) in PETITES_PIECES:
+        return "c'est une petite pièce, où Atelya se repère mal"
     if not endroit:
         return None
     if endroit.get("autre_pose", 0.0) >= AUTRE_POSE_MIN:
@@ -543,7 +552,7 @@ def _signaler_les_endroits(cameras: dict, journal) -> None:
     sols et les meubles s'en servent comme avant ; c'est la vérification qui pose la question. Une photo pointée par NT est
     déjà une réponse."""
     for n, d in cameras.items():
-        raison = None if (not d["sure"] or d.get("pointee")) else endroit_douteux(d.get("endroit"))
+        raison = None if (not d["sure"] or d.get("pointee")) else endroit_douteux(d.get("endroit"), d.get("piece"))
         if raison:
             d["endroit_douteux"] = raison
             journal(f"  {n} : ENDROIT DOUTEUX dans {d['piece']}, {raison}")
@@ -1012,6 +1021,12 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                     if c not in garde:
                         garde.append(c)
             unites.append(garde)
+        for g, u in zip(groupes, unites):  # aucune place possible (endroit pointé dans un mur, hors des pièces…) : photo laissée de côté,
+            if not u:                      # au lieu de faire planter tout le calage (16/11/2026)
+                non.update({n: "aucune place ne colle au plan" for n in g})
+        groupes, unites = [g for g, u in zip(groupes, unites) if u], [u for u in unites if u]
+        if not unites:
+            return {}, non, dict(unites=[], choix=[], marges=[], groupes=[], seules={}, accords={})
         ch, marges_seul = choisir_les_blocs(unites)
         marges, rivales = marges_d_ensemble(unites, ch) if MARGE_D_ENSEMBLE else (marges_seul, [[] for _ in unites])
         det = dict(unites=unites, choix=ch, marges=marges, groupes=groupes, seules={n: [c["photos"][n] for c in cs] for n, cs in seules.items()},
@@ -1021,8 +1036,16 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
         for u, k, g, marge, rivale in zip(unites, ch, groupes, marges, rivales):
             sure = marge > seuil_sure(len(u[k]["photos"]))
             for n, p in u[k]["photos"].items():
-                cam = np.array(p["cam"])
-                if p["note"] <= 0:
+                cam, note, montree = np.array(p["cam"]), p["note"], p["piece"]
+                if n in PM and n in pres_du_point and (note <= 0 or math.hypot(cam[0] - endroits_donnes[n][0], cam[1] - endroits_donnes[n][1]) > ECART_POINTE):
+                    # la photo a été POINTÉE par NT et son bloc la met ailleurs (bloc mal recoupé : cuisine d'app-002, une photo
+                    # confirmée, l'autre pointée à 2 m) : la réponse de NT passe avant le bloc, la photo prend sa propre
+                    # meilleure place près du point (ses notes sont déjà limitées à la zone pointée)
+                    iy, ix, kk = np.unravel_index(R[n].argmax(), R[n].shape)
+                    if R[n][iy, ix, kk] > 0:
+                        cam = np.array([orig[0] + ix * PAS, orig[1] + iy * PAS, float(kk), float(echelles[int(Er[n][iy, ix, kk])])])
+                        note, montree = float(R[n][iy, ix, kk]), plan["ids"][PM[n][iy, ix]]
+                if note <= 0:
                     non[n] = "aucune place ne colle au plan"; continue
                 # (essayé le 14/11/2026 puis retiré : laisser la photo chercher seule sa meilleure place dans un rayon plus large
                 #  autour du bloc DÉGRADE : app-001 5 → 3 photos à peu près placées ; le bloc est le meilleur guide)
@@ -1036,7 +1059,7 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                 ip = piece_de(plan, cam[None, :2])[0]
                 if ip < 0:
                     non[n] = "placée hors des pièces"; continue
-                piece = p["piece"] if n in PM else plan["ids"][ip]  # pièce donnée : celle que la photo MONTRE (l'appareil peut être sur le seuil)
+                piece = montree if n in PM else plan["ids"][ip]  # pièce donnée : celle que la photo MONTRE (l'appareil peut être sur le seuil)
                 H, W = photos[n].shape[:2]; f = zoom_fin * W if (zoom_par_fuites == "fin" and zoom_fin) else mes[n]["focale_px"]; haut = mes[n]["haut"]
                 cameras[n] = {
                     "camera": {"x": round(float(cam[0]), 3), "y": round(float(cam[1]), 3), "z": round(float(np.clip(prof[n]["z"], 0.3, plan["hsp"] - 0.2)), 3),

@@ -55,16 +55,18 @@ def mesurer(noms: list[str]) -> list[dict]:
         cartes = {}
         for n, rgb in photos.items():
             c = PC / "b2/cameras-seules/aspect" / f"{nom}-{n}.npy"
-            cartes[n] = np.load(c)[..., 2].astype(np.float32) if c.is_file() else o.fenetres.proba(cp.Fenetres.carres(o.oeil, rgb))
+            # --service : les fenêtres vues par la couche EN SERVICE (comme chez un client), pas par les cartes d'essai
+            cartes[n] = np.load(c)[..., 2].astype(np.float32) if (c.is_file() and "--service" not in sys.argv) else o.fenetres.proba(cp.Fenetres.carres(o.oeil, rgb))
         client = {n: CLIENT.get(nom, {}).get(n, v[0]) for n, v in f["vrai"].items()}
         client = {n: p for n, p in client.items() if p}
         sorte = {n: cp.sorte_de_piece(p) for n, p in client.items()}
         releves = [json.loads(r.read_text(encoding="utf-8")) for r in RELEVES[nom]]
         surfaces = {p["id"]: surface(p["contour"]) for p in logement["pieces"]}
         tirages = [("client", list(photos), client, (1.0, 1.0)), ("sorte", list(photos), sorte, (1.0, 1.0))]
-        tirages += [(f"plan{k:+d}", list(photos), client, (1 + k / 100, 1 + k / 100)) for k in (3, -3, 5, -5, 8, -8)]
-        tirages += [("plan-ns+5", list(photos), client, (1.0, 1.05)), ("plan-eo+5", list(photos), client, (1.05, 1.0))]
-        tirages += [(f"sans-{n[-2:]}", [m for m in photos if m != n], client, (1.0, 1.0)) for n in photos]
+        if "--court" not in sys.argv:
+            tirages += [(f"plan{k:+d}", list(photos), client, (1 + k / 100, 1 + k / 100)) for k in (3, -3, 5, -5, 8, -8)]
+            tirages += [("plan-ns+5", list(photos), client, (1.0, 1.05)), ("plan-eo+5", list(photos), client, (1.05, 1.0))]
+            tirages += [(f"sans-{n[-2:]}", [m for m in photos if m != n], client, (1.0, 1.0)) for n in photos]
         for titre, lot, pieces, (sx, sy) in tirages:
             r = cp.caler(etirer(logement, sx, sy) if (sx, sy) != (1.0, 1.0) else logement, {n: photos[n] for n in lot}, outils=o, journal=lambda *a: None,
                          fenetres_de=cartes, pieces_donnees={n: p for n, p in pieces.items() if n in lot})
@@ -82,6 +84,7 @@ def mesurer(noms: list[str]) -> list[dict]:
     return lignes
 
 
+# (dans mesurer : args sans les options)
 def mal_placee(x: dict) -> bool | None:
     return None if x["ecart_m"] is None else (x["ecart_m"] > MAL_M or x["ecart_deg"] > MAL_DEG)
 
@@ -135,12 +138,13 @@ def juger(lignes: list[dict], seuil_autre: float, seuil_accord: float) -> None:
 if __name__ == "__main__":
     try:
         SORTIE.mkdir(parents=True, exist_ok=True)
-        args = sys.argv[2:]
+        args = [a for a in sys.argv[2:] if not a.startswith("--")]
+        fichier = SORTIE / ("mesures-service.json" if "--service" in sys.argv else "mesures.json")
         if sys.argv[1] == "mesurer":
             L = mesurer(args or list(LOGEMENTS))
-            (SORTIE / "mesures.json").write_text(json.dumps(L, ensure_ascii=False, indent=1), encoding="utf-8")
+            fichier.write_text(json.dumps(L, ensure_ascii=False, indent=1), encoding="utf-8")
         else:
-            L = json.loads((SORTIE / "mesures.json").read_text(encoding="utf-8"))
+            L = json.loads(fichier.read_text(encoding="utf-8"))
         tableau(L)
         juger(L, float(args[0]) if sys.argv[1] == "juger" and args else 0.95, float(args[1]) if sys.argv[1] == "juger" and len(args) > 1 else 0.6)
     except Exception as e:

@@ -61,8 +61,7 @@ def questions(resultat: dict) -> dict:
     for n, d in resultat["cameras"].items():
         if d["sure"]:
             if d.get("endroit_douteux"):  # la pièce est sûre, pas la place dans la pièce : la photo reste utilisée, mais on demande
-                q[n] = (f"Atelya a rangé cette photo dans {d['piece']}, mais il n'est pas sûr de l'endroit : {d['endroit_douteux']}. "
-                        "Si la place proposée est la bonne, confirmez-la ; sinon pointez d'où la photo est prise.")
+                q[n] = f"Atelya a rangé cette photo dans {d['piece']}, mais il n'est pas sûr de l'endroit : {d['endroit_douteux']}."
             continue
         if d.get("a_verifier"):
             q[n] = f"Pièce donnée : {d['piece']}, mais {d['a_verifier']}. Confirmez la pièce, ou pointez d'où la photo est prise."

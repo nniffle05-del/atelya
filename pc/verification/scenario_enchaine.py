@@ -5,7 +5,7 @@ sur les photos, clique « Terminer les photos », attend la fin. Une capture d'�
 
     ..\atelya\.venv\Scripts\python.exe pc\verification\scenario_enchaine.py <dossier de lecture> <dossier des photos> <gestes.json> <sortie>
 
-gestes.json : comme pour scenario_photos.py : {"photo-10": [x, y, x2, y2], "photo-13": "passer", …} en MÈTRES du plan (on
+gestes.json : comme pour scenario_photos.py : {"photo-10": [x, y, x2, y2], "photo-13": "passer", "photo-09": "accepter", …} en MÈTRES du plan (on
 clique en (x, y), on tire jusqu'à (x2, y2)) ; une photo absente reste sans réponse. --recharger : au milieu des questions, la
 page est rechargée (touche F5 par mégarde) : les réponses déjà données doivent revenir.
 ATTENTION : le dossier des photos est modifié (pieces-des-photos.json reçoit les endroits pointés) : travailler sur une copie.
@@ -105,6 +105,8 @@ def jouer(lecture: Path, photos: Path, gestes: dict, sortie: Path, recharger: bo
                         c.tirer(*a, *b)
                     elif g == "passer":
                         c.cliquer("#photo-passer")
+                    elif g == "accepter":  # « C'est bien la place proposée »
+                        c.cliquer("#photo-accepter")
                     time.sleep(0.3)
                     q = {**q, **c.lire(PHOTO), "geste": g}
                     bilan["photos"].append(q)
