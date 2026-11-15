@@ -1,13 +1,14 @@
 r"""LA SUITE DE LA CHAÎNE, EN UNE COMMANDE : de l'écran de vérification terminé jusqu'au film (examen app-004, 15/11/2026).
 
     ..\atelya\.venv\Scripts\python.exe outils\atelya\de_l_ecran_au_film.py <dossier de lecture> <dossier des photos>
-        [--sortie ..\atelya\b2\<logement>\chaine] [--eclairage jour_voile] [--depuis sols|meubles|maquette|paquet|import|film]
+        [--sortie ..\atelya\b2\<logement>\chaine] [--eclairage jour_voile] [--depuis enveloppe|sols|meubles|maquette|paquet|import|film]
         [--jusqu-a …] [--sans-vue]
 
 Pourquoi : jusqu'ici chaque brique se lançait à la main, avec des copies de fichiers entre elles (carte du 16/11/2026 dans
 docs/projet/memoire/produit-livre-client.md, « LA SUITE DE LA CHAÎNE »). Ici chaque JOINTURE est écrite une fois pour toutes :
 
     écran terminé (logement-verifie.json + questions-photos\cameras-photos-seul.json, voir fin-verification.json)
+      0. enveloppe moteuraccorder_murs.fermer_les_fentes      → logement-depart.json (fentes entre bouts de murs refermées)
       1. sols      outils\habillage\sols_photos.py logement         → logement-sols.json
       2. meubles   outils\habillage\reperer_meubles_photos.py       → logement-meuble.json
       3. maquette  python -m moteur.construire … --sans-images      → 3d\maquette.blend           (Blender)
@@ -38,7 +39,7 @@ RACINE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "outils" / "unreal"))
 
-ETAPES = ("sols", "meubles", "maquette", "paquet", "import", "film")
+ETAPES = ("enveloppe", "sols", "meubles", "maquette", "paquet", "import", "film")
 MODELE_SOLS = RACINE / "moteur" / "modeles" / "sols-vits14-v2.pt"
 FICHE_PHOTOS = Path("questions-photos") / "cameras-photos-seul.json"
 
@@ -102,6 +103,7 @@ def main() -> int:
     sortie = a.sortie or RACINE.parent / "atelya" / "b2" / projet / "chaine"
     sortie.mkdir(parents=True, exist_ok=True)
     journaux = sortie / "journaux"
+    depart = sortie / "logement-depart.json"
     sols, meuble, d3, export = sortie / "logement-sols.json", sortie / "logement-meuble.json", sortie / "3d", sortie / "unreal" / "export"
     py = sys.executable
     faire = ETAPES[ETAPES.index(a.depuis):ETAPES.index(a.jusqu_a) + 1]
@@ -124,8 +126,17 @@ def main() -> int:
         dire("PLANTÉ : l'éditeur Unreal est ouvert ; le fermer avant un rendu (éditeur + rendu = plantage de la carte graphique)")
         return 3
 
+    if "enveloppe" in faire or not depart.is_file():
+        # jointure : les fentes entre deux bouts de murs (mur raccourci à l'écran…) sont refermées avant de construire
+        from moteur.raccorder_murs import fermer_les_fentes
+        debut = time.time()
+        dire("\n=== enveloppe : les murs sont-ils raccordés ?")
+        logement, bilan_env = fermer_les_fentes(json.loads(verifie.read_text(encoding="utf-8")), journal=lambda s: dire("   " + s))
+        depart.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
+        bilan["enveloppe"] = bilan_env
+        note("enveloppe", time.time() - debut)
     if "sols" in faire:
-        note("sols", lancer("sols", [py, "outils/habillage/sols_photos.py", "logement", fiche, verifie, MODELE_SOLS, sols], journaux))
+        note("sols", lancer("sols", [py, "outils/habillage/sols_photos.py", "logement", fiche, depart, MODELE_SOLS, sols], journaux))
     if "meubles" in faire:
         note("meubles", lancer("meubles", [py, "outils/habillage/reperer_meubles_photos.py", fiche, sols, meuble], journaux))
     if "maquette" in faire:

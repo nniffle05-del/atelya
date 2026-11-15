@@ -378,7 +378,19 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
     murs = [[m.axe[0] / f, m.axe[1] / f, m.axe[2] / f, m.axe[3] / f, m.epaisseur_px / f] for m in fiche.murs]
     if recaler:
         avant = [list(m) for m in murs]
-        murs = [affiner_mur(gris, m) for m in murs]
+        # Les portes et fenêtres de chaque mur ne sont pas mesurées (15/11/2026, app-004 : une cloison à moitié occupée par sa
+        # porte était recalée sur le dessin de la porte et devenait épaisse de 4 cm).
+        ouvertures_du_mur: dict[int, list] = {}
+        for o in fiche.ouvertures:
+            bords = [v / f for v in o.bords]
+            k = _mur_porteur(bords, avant, {m.id: i for i, m in enumerate(fiche.murs)}.get(o.mur) if o.mur else None)
+            if k is not None:
+                x0, y0, x1, y1, _ = avant[k]
+                l2 = (x1 - x0) ** 2 + (y1 - y0) ** 2 or 1e-9
+                ouvertures_du_mur.setdefault(k, []).append(tuple(((bords[i] - x0) * (x1 - x0) + (bords[i + 1] - y0) * (y1 - y0)) / l2
+                                                                 for i in (0, 2)))
+        papier = float(255 - np.percentile(gris[::4, ::4], 90))
+        murs = [affiner_mur(gris, m, exclure=ouvertures_du_mur.get(k), papier=papier) for k, m in enumerate(murs)]
         decalages = [abs(_sur_le_mur((a[0] + a[2]) / 2, (a[1] + a[3]) / 2, b)[0]) for a, b in zip(avant, murs)]
         infos["recalage_px_moyen"] = round(float(np.mean(decalages)), 2) if decalages else 0.0
     indice_mur = {m.id: k for k, m in enumerate(fiche.murs)}

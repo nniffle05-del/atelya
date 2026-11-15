@@ -10,6 +10,8 @@ la grille (le dehors). Un jour plus fin que la grille peut échapper au contrôl
 """
 from __future__ import annotations
 
+import math
+
 import cv2
 import numpy as np
 
@@ -167,3 +169,35 @@ def vides_remplis(briques: list[Brique]) -> list[dict]:
                 xs, ys = [p[0] for p in b.contour], [p[1] for p in b.contour]
                 sortie.append({"aire_m2": round(aire, 2), "zone_m": [min(xs), min(ys), max(xs), max(ys)]})
     return sortie
+
+
+FENTE_DEHORS_MIN = 0.03  # m : une fente vers le dehors plus courte n'est qu'un arrondi de dessin
+
+
+def fentes_vers_dehors(briques: list[Brique]) -> list[dict]:
+    """Les endroits où le SOL d'une pièce touche le DEHORS sans mur ni seuil entre les deux : une fente dans l'enveloppe du
+    logement (examen app-004, 15/11/2026 : deux fentes de 17 cm entre les pans d'un mur en biais, que `controler` ne voit pas,
+    car un vide qui communique avec le dehors n'est pas un « trou »). Rend, du plus long au plus court, la longueur (m) de
+    chaque fente et sa boîte en mètres."""
+    if not briques:
+        return []
+    x0, y0, W, H = _grille(briques)
+    sols = [b for b in briques if b.categorie == "sol"]
+    murs = [b for b in briques if b.categorie == "mur" and b.z_bas <= 1e-6]
+    if not sols:
+        return []
+    couvert = _dessiner(sols, x0, y0, (H, W)) | _dessiner(murs, x0, y0, (H, W))
+    # le seuil d'une porte d'entrée ou d'une porte-fenêtre touche le dehors, c'est normal : on ne regarde que les sols des pièces
+    sol = _dessiner([b for b in sols if not b.id.startswith("seuil__")], x0, y0, (H, W))
+    n, etiq = cv2.connectedComponents((couvert == 0).astype(np.uint8), connectivity=4)
+    dehors = np.isin(etiq, np.unique(np.concatenate([etiq[0], etiq[-1], etiq[:, 0], etiq[:, -1]]))) & (couvert == 0)
+    bord = cv2.dilate(sol, np.ones((3, 3), np.uint8)) & dehors.astype(np.uint8)  # cases du dehors collées à un sol
+    n, etiq, stats, _ = cv2.connectedComponentsWithStats(bord, connectivity=8)
+    sortie = []
+    for i in range(1, n):
+        x, y, w, h, a = (int(v) for v in stats[i])
+        longueur = math.hypot(w, h) * PAS
+        if longueur >= FENTE_DEHORS_MIN:
+            sortie.append({"longueur_m": round(longueur, 3),
+                           "zone_m": [round(x0 + x * PAS, 3), round(y0 + y * PAS, 3), round(x0 + (x + w) * PAS, 3), round(y0 + (y + h) * PAS, 3)]})
+    return sorted(sortie, key=lambda f: -f["longueur_m"])
