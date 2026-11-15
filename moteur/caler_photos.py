@@ -14,7 +14,20 @@ MÉTHODE (mise au point dans pc/essais-cameras-seules, moge1 à moge18) :
  4. les photos tombées dans la même pièce sont RECOUPÉES entre elles par Depth Anything 3 (moteur/da3.py) : on sait alors
     où sont les appareils les uns par rapport aux autres, et on pose le BLOC entier sur le plan (un grand morceau de pièce
     se confond bien moins qu'une photo seule) ; une photo qu'aucune autre du groupe ne « revoit » sort du groupe ;
- 5. second choix d'ensemble, par blocs ; réglage fin ; « sûre » = la photo perdrait beaucoup à changer de pièce.
+ 5. second choix d'ensemble, par blocs ; réglage fin ; « sûre » = l'ensemble perdrait beaucoup si le bloc changeait de pièce.
+
+« SÛRE », règle du 15/11/2026 (version 0.2.0, étape « chambres jumelles ») : trois défauts faisaient dire « sûr » à tort
+quand deux pièces se ressemblent (deux chambres jumelles, un séjour et une salle à manger de taille voisine) :
+ a. l'échange de deux pièces qui ont chacune leurs photos n'était jamais essayé (un seul bloc déplacé à la fois : la pièce
+    d'arrivée étant « prise », l'échange paraissait coûteux) → `marges_d_ensemble` : les autres blocs peuvent bouger aussi ;
+ b. les photos de deux pièces tombées dans le même groupe formaient UN bloc, posé d'un coup et « sûr » pour toutes
+    → `sous_groupes` : le groupe est coupé en sous-groupes de photos qui se revoient ;
+ c. le seuil était le même pour une photo et pour un bloc de cinq → `seuil_sure` : × la racine du nombre de photos.
+Mesuré par pc/essais-cameras-seules/jumelles.py (99 rejouements des trois logements : une ou deux photos en moins, plan faux
+de 3 à 8 %, zoom des lignes de fuite ; 36 d'entre eux jamais regardés pour régler) : photos sûres et FAUSSES 41 → 3, dont
+entre pièces de même sorte 30 → 0, sans perdre de photo sûre en service hors des chambres jumelles d'app-002 (qui n'étaient
+justes que par chance : marge d'échange 0,04). Restent : une photo seule de chambre ou de cuisine accrochée au bloc du séjour
+par un faux accord « même lieu ». Une photo pas sûre dit avec quelle pièce elle hésite (`hesite_avec`).
 
 Mesuré sur les 22 photos calées à la main d'app-001 et app-002 (examens déjà vus, réglages regardés dessus) : bonne pièce
 16/22, à peu près placées (< 1 m, < 15°) 12, bien placées 7 ; photos « sûres » : 15, toutes dans la bonne pièce.
@@ -31,7 +44,7 @@ import torch
 from . import da3, fuites, moge
 from .oeil_dinov2 import ECART, MOYENNE, charger as charger_oeil, empreintes
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 PAS = 0.2                                   # une place possible tous les 20 cm
 HAUT_DES_MURS = 2.1                         # au-dessus : ni portes ni meubles, on y mesure la distance du mur
 ECHELLES = (0.72, 0.8, 0.88, 0.96, 1.04)    # MoGe-2 voit souvent trop profond : on essaie plusieurs tailles
@@ -44,7 +57,10 @@ JEU_M, JEU_DEG = 2, 4                       # jeu laissé à chaque photo dans s
 L_TYPE, L_COUV, L_DOUBLE, L_MEME, SEUIL_MEME = 1.0, 0.15, 0.5, 0.4, 0.6
 PRINCIPALES = ("sejour", "chambre", "cuisine")
 SEUIL_INTRUS = 0.4                          # part d'accord en dessous de laquelle deux photos ne montrent pas le même lieu
-MARGE_SURE = 0.4                            # « sûre » : changer de pièce ferait perdre au moins autant
+SOUS_GROUPES = True                         # groupes coupés en sous-groupes de photos qui se revoient (False = avant le 15/11/2026)
+MARGE_D_ENSEMBLE = True                     # « sûre » jugé en laissant les autres blocs bouger (False = avant le 15/11/2026)
+SEUIL_PAR_RACINE = True                     # seuil du « sûr » × racine du nombre de photos du bloc (False = avant le 15/11/2026)
+MARGE_SURE = 0.4                            # « sûre » : changer de pièce ferait perdre au moins autant (× racine du nombre de photos du bloc)
 CAP_FUITES = 12.0                           # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
@@ -445,9 +461,8 @@ def choisir_les_pieces(cands: dict, types: dict, sim: dict) -> dict:
     return {n: cands[n][k]["piece"] for n, k in zip(noms, ch)}
 
 
-def choisir_les_blocs(unites: list[list[dict]]) -> tuple[list[int], list[float]]:
-    """Second choix, par blocs. unites : [[candidat]], candidat = {photos: {nom: {cam, note, piece}}}.
-    → indices choisis, et pour chaque bloc ce que l'ensemble perdrait s'il changeait de pièce (la « marge »)."""
+def note_d_ensemble(unites: list[list[dict]]):
+    """La note d'un choix d'ensemble (un candidat par bloc) : → (fonction total(choix), notes de chaque candidat seul)."""
     seul = [[sum(math.log(max(p["note"], 1e-3)) for p in c["photos"].values()) for c in u] for u in unites]
 
     def total(ch):
@@ -461,6 +476,13 @@ def choisir_les_blocs(unites: list[list[dict]]) -> tuple[list[int], list[float]]
                         if _meme_endroit(a["cam"], b["cam"]):
                             s -= L_DOUBLE
         return s
+    return total, seul
+
+
+def choisir_les_blocs(unites: list[list[dict]]) -> tuple[list[int], list[float]]:
+    """Second choix, par blocs. unites : [[candidat]], candidat = {photos: {nom: {cam, note, piece}}}.
+    → indices choisis, et pour chaque bloc ce que l'ensemble perdrait s'il changeait de pièce (la « marge »)."""
+    total, seul = note_d_ensemble(unites)
     ch, v = _monter(total, len(unites), [len(u) for u in unites], np.random.default_rng(0), depart=[int(np.argmax(s)) for s in seul])
     marges = []
     for i, u in enumerate(unites):
@@ -468,6 +490,50 @@ def choisir_les_blocs(unites: list[list[dict]]) -> tuple[list[int], list[float]]
         autres = [total([*ch[:i], k, *ch[i + 1:]]) for k in range(len(u)) if {p["piece"] for p in u[k]["photos"].values()} != ici]
         marges.append(float(v - max(autres)) if autres else 9.0)
     return ch, marges
+
+
+def marges_d_ensemble(unites: list[list[dict]], choix: list[int]) -> tuple[list[float], list[list[str]]]:
+    """Pour chaque bloc : ce que l'ensemble perd si ce bloc change de pièce, LES AUTRES BLOCS POUVANT BOUGER AUSSI, et les
+    pièces où il irait alors (ses « rivales »).
+    POURQUOI : deux chambres jumelles qui ont chacune leurs photos ne s'échangent qu'à deux. La marge de `choisir_les_blocs`
+    ne déplace qu'un bloc à la fois : mettre les photos de la chambre A dans la chambre B, déjà occupée, « perd » une pièce
+    montrée, et l'échange paraît coûteux alors qu'il ne coûte presque rien (app-002 : 0,42 et 0,65 au lieu de ~0,1)."""
+    total, _ = note_d_ensemble(unites)
+    v = total(choix)
+    pieces = lambda i, k: {p["piece"] for p in unites[i][k]["photos"].values()}
+    marges, rivales = [], []
+    for i, u in enumerate(unites):
+        ici, meilleur = pieces(i, choix[i]), (None, -1e18)
+        for k in range(len(u)):
+            la = pieces(i, k)
+            if la == ici:
+                continue
+            ch = list(choix); ch[i] = k; w = total(ch)
+            deloges = [j for j in range(len(unites)) if j != i and pieces(j, ch[j]) & la]  # ceux dont on prend la place
+            vus = set()
+            while deloges:
+                j = deloges.pop(0)
+                if j in vus:
+                    continue
+                vus.add(j)
+                for kj in range(len(unites[j])):
+                    c2 = list(ch); c2[j] = kj; w2 = total(c2)
+                    if w2 > w + 1e-9:
+                        ch, w = c2, w2
+                deloges += [m for m in range(len(unites)) if m != i and m not in vus and pieces(m, ch[m]) & pieces(j, ch[j])]
+            if w > meilleur[1]:
+                meilleur = (k, w)
+        marges.append(float(v - meilleur[1]) if meilleur[0] is not None else 9.0)
+        rivales.append(sorted(pieces(i, meilleur[0])) if meilleur[0] is not None else [])
+    return marges, rivales
+
+
+def seuil_sure(photos_du_bloc: int) -> float:
+    """La marge qu'un bloc doit dépasser pour être « sûr » : MARGE_SURE pour une photo seule, × la racine du nombre de photos
+    pour un bloc. POURQUOI : la marge d'un bloc est une SOMME sur ses photos ; avec un seuil fixe, un bloc de cinq photos
+    passait pour sûr avec un avantage de 8 % par photo, qu'un plan faux de 5 % suffit à retourner (app-003, plan rétréci :
+    séjour et salle à manger échangés, marge 0,46)."""
+    return MARGE_SURE * (math.sqrt(max(1, photos_du_bloc)) if SEUIL_PAR_RACINE else 1.0)
 
 
 # ================================================================ les blocs (Depth Anything 3)
@@ -515,6 +581,30 @@ def meme_lieu(modele_da3, a: np.ndarray, b: np.ndarray) -> float:
         dj = r["profondeur"][j][y[dedans], x[dedans]]
         parts.append(float((np.abs(z[dedans] - dj) / dj < 0.10).mean()))
     return float(np.mean(parts))
+
+
+def _sans_les_isoles(g: list[str], acc: dict) -> list[list[str]]:
+    """Ancienne règle (avant le 15/11/2026) : seules les photos qu'aucune autre ne revoit sortent du groupe."""
+    reste = [n for n in g if max(acc.get((n, m), acc.get((m, n), 0.0)) for m in g if m != n) >= SEUIL_INTRUS]
+    return ([reste] if reste else []) + [[n] for n in g if n not in reste]
+
+
+def sous_groupes(g: list[str], acc: dict) -> list[list[str]]:
+    """Un groupe de photos coupé en sous-groupes de photos qui se REVOIENT, de proche en proche (accord « même lieu » d'au
+    moins SEUIL_INTRUS). POURQUOI : deux pièces qui se ressemblent (deux chambres, séjour et salle à manger) tombent souvent
+    dans le même groupe au premier choix ; sans cette coupe, leurs photos formaient UN bloc, posé d'un coup dans une seule
+    pièce et dit « sûr » pour toutes (app-003 : la chambre d'enfants mise dans la chambre d'angle)."""
+    lie = lambda a, b: acc.get((a, b), acc.get((b, a), 0.0)) >= SEUIL_INTRUS
+    reste, sortie = list(g), []
+    while reste:
+        sg, i = [reste.pop(0)], 0
+        while i < len(sg):
+            for m in list(reste):
+                if lie(sg[i], m):
+                    sg.append(m); reste.remove(m)
+            i += 1
+        sortie.append(sorted(sg, key=g.index))
+    return sortie
 
 
 def _glisse(A, dy, dx):
@@ -588,10 +678,12 @@ class Outils:
 
 
 def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None,
-          zoom_par_fuites: bool | str = False) -> dict:
+          zoom_par_fuites: bool | str = False, detail: dict | None = None) -> dict:
     """logement : le logement lu (pièces, murs, ouvertures) ; photos : {nom: photo RGB}.
-    → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc"}},
-       "non_calees": {nom: raison}}. Seules les photos « sure » : True doivent servir aux sols et aux meubles.
+    → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc",
+                         "hesite_avec"}},
+       "non_calees": {nom: raison}}. Seules les photos « sure » : True doivent servir aux sols et aux meubles ; une photo pas
+    sûre porte « hesite_avec » : les pièces où elle irait sinon (deux chambres jumelles : l'autre chambre).
     fenetres_de : {nom: carte « fenêtre ou non »} toute faite, pour les ESSAIS seulement (noter la chaîne sur les photos qui
     ont servi à apprendre la couche des fenêtres, avec une carte apprise sans elles).
     zoom_par_fuites : EN RÉSERVE (14/11/2026 nuit), pas en service. Zoom et cap donnés par les lignes de fuite
@@ -681,13 +773,13 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     seules = {n: par_piece(n, 3) for n in noms}
     piece1 = choisir_les_pieces({n: [{**c["photos"][n]} for c in cs] for n, cs in seules.items()}, {n: {} for n in noms}, sim)  # le type de pièce est déjà dans les notes
     groupes = [[n for n in noms if piece1.get(n, n) == q] for q in dict.fromkeys(piece1.get(n, n) for n in noms)]
-    nouveaux = []
-    for g in groupes:  # une photo qu'aucune autre du groupe ne revoit sort du groupe
+    nouveaux, accords = [], {}
+    for g in groupes:  # le groupe est coupé en sous-groupes de photos qui se revoient ; une photo que personne ne revoit reste seule
         if len(g) == 1:
             nouveaux.append(g); continue
         acc = {(a, b): meme_lieu(o.da3, photos[a], photos[b]) for i, a in enumerate(g) for b in g[i + 1:]}
-        reste = [n for n in g if max(acc.get((n, m), acc.get((m, n), 0.0)) for m in g if m != n) >= SEUIL_INTRUS]
-        nouveaux += ([reste] if reste else []) + [[n] for n in g if n not in reste]
+        accords.update(acc)
+        nouveaux += sous_groupes(g, acc) if SOUS_GROUPES else _sans_les_isoles(g, acc)
     groupes = nouveaux
     journal("  groupes : " + " | ".join("+".join(g) for g in groupes))
 
@@ -705,10 +797,15 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                 if c not in garde:
                     garde.append(c)
         unites.append(garde)
-    ch, marges = choisir_les_blocs(unites)
+    ch, marges_seul = choisir_les_blocs(unites)
+    marges, rivales = marges_d_ensemble(unites, ch) if MARGE_D_ENSEMBLE else (marges_seul, [[] for _ in unites])
+    if detail is not None:  # pour les essais : de quoi rejuger le choix d'ensemble sans tout recalculer
+        detail.update(unites=unites, choix=ch, marges=marges, groupes=groupes, seules={n: [c["photos"][n] for c in cs] for n, cs in seules.items()},
+                      accords={f"{a}|{b}": round(v, 3) for (a, b), v in accords.items()})
 
     sortie = {"cameras": {}, "non_calees": non}
-    for u, k, g, marge in zip(unites, ch, groupes, marges):
+    for u, k, g, marge, rivale in zip(unites, ch, groupes, marges, rivales):
+        sure = marge > seuil_sure(len(u[k]["photos"]))
         for n, p in u[k]["photos"].items():
             cam = np.array(p["cam"])
             if p["note"] <= 0:
@@ -730,7 +827,8 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                 "camera": {"x": round(float(cam[0]), 3), "y": round(float(cam[1]), 3), "z": round(float(np.clip(prof[n]["z"], 0.3, plan["hsp"] - 0.2)), 3),
                            "cap": round(float((cam[2] + 180) % 360 - 180), 2), "tangage": 0.0, "f": round(f, 2), "u0": W / 2,
                            "v0": round(H / 2 + f * float(haut[2] / max(-haut[1], 0.2)), 2)},
-                "largeur": W, "hauteur": H, "piece": plan["ids"][ip], "sure": bool(marge > MARGE_SURE), "marge": round(float(marge), 2), "bloc": list(g)}
-            journal(f"  {n} : {plan['ids'][ip]}{'' if marge > MARGE_SURE else ' (pas sûr)'}")
+                "largeur": W, "hauteur": H, "piece": plan["ids"][ip], "sure": bool(sure), "marge": round(float(marge), 2), "bloc": list(g),
+                "hesite_avec": [] if sure else [q for q in rivale if q != plan["ids"][ip]]}
+            journal(f"  {n} : {plan['ids'][ip]}" + ("" if sure else " (pas sûr" + (", hésite avec " + " / ".join(rivale) if rivale else "") + ")"))
     return sortie
 

@@ -93,6 +93,39 @@ def test_choix_d_ensemble_une_photo_par_chambre():
     assert cp.choisir_les_blocs([[c("chambre_1", 1.0, 0.80), c("chambre_2", 5.0, 0.30)]])[1][0] > cp.MARGE_SURE
 
 
+def test_chambres_jumelles_jamais_sures():
+    """Deux chambres jumelles, chacune avec sa photo : les échanger ne coûte presque rien, AUCUNE des deux n'est « sûre ».
+    L'ancienne marge (un seul bloc déplacé à la fois) comptait une pièce « perdue » et les disait sûres."""
+    def c(piece, x, note, nom):
+        return {"photos": {nom: {"cam": [x, 1.0, 0.0, 1.0], "note": note, "piece": piece}}}
+    sejour = [c("sejour_1", 20.0, 0.80, "s"), c("chambre_1", 1.5, 0.10, "s")]
+    unites = [[c("chambre_1", 1.0, 0.80, "a"), c("chambre_2", 5.0, 0.62, "a")], [c("chambre_2", 5.0, 0.80, "b"), c("chambre_1", 1.0, 0.62, "b")], sejour]
+    ch, anciennes = cp.choisir_les_blocs(unites)
+    assert ch == [0, 0, 0] and anciennes[0] > cp.MARGE_SURE and anciennes[1] > cp.MARGE_SURE  # le défaut : « sûres » à tort
+    marges, rivales = cp.marges_d_ensemble(unites, ch)
+    assert marges[0] > cp.MARGE_SURE and marges[1] > cp.MARGE_SURE  # ici l'échange coûte cher (0,80 contre 0,62 deux fois) : sûres
+    presque = [[c("chambre_1", 1.0, 0.80, "a"), c("chambre_2", 5.0, 0.76, "a")], [c("chambre_2", 5.0, 0.80, "b"), c("chambre_1", 1.0, 0.76, "b")], sejour]
+    ch, anciennes = cp.choisir_les_blocs(presque)
+    marges, rivales = cp.marges_d_ensemble(presque, ch)
+    assert ch == [0, 0, 0] and min(anciennes[:2]) > cp.MARGE_SURE            # avant : sûres (l'autre chambre est « prise »)
+    assert max(marges[:2]) < cp.MARGE_SURE and marges[2] > cp.MARGE_SURE     # maintenant : pas sûres ; le séjour reste sûr
+    assert rivales[0] == ["chambre_2"] and rivales[1] == ["chambre_1"]
+    assert all(m <= a + 1e-9 for m, a in zip(marges, anciennes))             # jamais plus confiant qu'avant
+
+
+def test_seuil_du_sur_plus_haut_pour_un_bloc():
+    """Une photo seule : le seuil d'avant ; un bloc de quatre photos doit faire deux fois mieux (sa marge est une somme)."""
+    assert cp.seuil_sure(1) == cp.MARGE_SURE and abs(cp.seuil_sure(4) - 2 * cp.MARGE_SURE) < 1e-9
+    assert cp.seuil_sure(5) > 0.46  # app-003, plan rétréci de 5 % : séjour et salle à manger échangés avec une marge de 0,46
+
+
+def test_sous_groupes_de_photos_qui_se_revoient():
+    """Cinq photos tombées dans la même pièce au premier choix, mais de deux pièces : deux sous-groupes, plus une photo seule."""
+    acc = {("a", "b"): 0.7, ("b", "c"): 0.5, ("a", "c"): 0.1, ("d", "e"): 0.6, ("a", "d"): 0.2, ("c", "e"): 0.39}
+    assert cp.sous_groupes(["a", "d", "b", "e", "c", "f"], acc) == [["a", "b", "c"], ["d", "e"], ["f"]]
+    assert cp._sans_les_isoles(["a", "d", "b", "e", "c", "f"], acc) == [["a", "d", "b", "e", "c"], ["f"]]  # l'ancienne règle
+
+
 def test_verticale_depuis_sol_et_plafond():
     rng = np.random.default_rng(1)
     n = np.zeros((80, 120, 3), np.float32)
