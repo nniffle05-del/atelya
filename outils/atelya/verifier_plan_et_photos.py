@@ -37,6 +37,7 @@ sys.path.insert(0, str(RACINE / "outils" / "habillage"))
 from moteur import service_verification as sv  # noqa: E402
 
 RACCOURCI = "Verifier le plan et les photos.bat"
+FIN = "fin-verification.json"  # écrit dans le dossier de lecture quand le plan ET les photos sont terminés
 
 
 def dire(*a) -> None:
@@ -123,6 +124,13 @@ def main() -> int:
         dire("Arrêt demandé.")
     serveur.shutdown()
     if enchainement.etape == "fini":
+        # Jointure « écran → suite de la chaîne » (examen app-004, 15/11/2026) : ce fichier dit que la vérification est finie
+        # (plan + photos) ; la suite (sols, meubles, maquette, film : outils/atelya/de_l_ecran_au_film.py) l'attend.
+        import json
+        (args.lecture / FIN).write_text(json.dumps(
+            {"fini": time.strftime("%Y-%m-%d %H:%M:%S"), "photos": str(args.photos), "temps": enchainement.temps,
+             "photos_rangees": enchainement.rangees, "photos_laissees": enchainement.laissees}, ensure_ascii=False, indent=1),
+            encoding="utf-8")
         dire(f"Fini. Logement vérifié : {args.lecture / 'logement-verifie.json'}")
         dire(f"      Photos rangées  : {args.lecture / 'questions-photos' / 'cameras-photos-seul.json'}")
     return 0

@@ -48,7 +48,7 @@ from moteur.lecture_cotes import ECART_MAX, TexteLu
 from moteur.logement import Logement
 from moteur.recalage_murs import affiner_mur
 
-VERSION_TRADUCTEUR_CLAUDE = "0.3.0"  # 10/11/2026 : dimensions de pièces mesurées entre les murs (2e clé)
+VERSION_TRADUCTEUR_CLAUDE = "0.3.1"  # 15/11/2026 : hauteur sous plafond estimée d'après les photos si le plan n'en écrit pas
 MODELE = "claude"
 ACCORD_DEUX_CLES = 0.03  # 3 % : écart maximal entre l'échelle retrouvée par Atelya et celle proposée par Claude
 PORTEE_OUVERTURE_PX = 12.0  # une ouverture appartient à un mur dont l'axe passe à moins de ça (ou de son épaisseur)
@@ -355,12 +355,14 @@ def _refus(source: PlanSource, raison: str, echelle: dict | None = None, coloria
 
 
 def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0, *, projet_id: str | None = None,
-             recaler: bool = True, ocr: bool = True) -> PlanLu:
+             recaler: bool = True, ocr: bool = True, hauteur_estimee: float | None = None) -> PlanLu:
     """La lecture complète d'un plan à partir de la fiche de Claude.
 
     `source` : le plan tel que l'écran l'affichera (image pleine taille, textes exacts du PDF s'il y en a) ;
     `controlee` : la fiche passée par moteur.lecture_claude.controler_fiche ;
-    `facteur` : pixels de l'image ENVOYÉE à Claude / pixels de l'image du plan (moteur.lecture_claude.image_pour_claude)."""
+    `facteur` : pixels de l'image ENVOYÉE à Claude / pixels de l'image du plan (moteur.lecture_claude.image_pour_claude) ;
+    `hauteur_estimee` : la hauteur sous plafond estimée ailleurs (d'après les photos du client, moteur.hauteur_photos), prise
+    seulement si le plan n'en écrit pas ; sans elle ni hauteur écrite : HAUTEUR_SOUS_PLAFOND."""
     if controlee.refusee:
         raisons = "; ".join(p.raison for p in controlee.problemes if p.gravite == "refus") or "fiche refusée"
         return _refus(source, f"fiche de Claude refusée : {raisons}")
@@ -526,7 +528,9 @@ def traduire(source: PlanSource, controlee: FicheControlee, facteur: float = 1.0
         ids_murs[fiche.murs[k].id] = ident
         sortie_murs.append({"id": ident, "debut": m_(x0, y0), "fin": m_(x1, y1), "epaisseur": round(ep / s, 3),
                             "statut": "estime", "source": "lecture_claude"})
-    hsp = float(e.hauteur_sous_plafond or HAUTEUR_SOUS_PLAFOND)
+    hsp = float(e.hauteur_sous_plafond or hauteur_estimee or HAUTEUR_SOUS_PLAFOND)
+    infos["hauteur_sous_plafond"] = {"valeur": hsp, "source": "plan" if e.hauteur_sous_plafond else
+                                     "photos" if hauteur_estimee else "defaut"}
     ids_ouv: dict[str, str] = {}
     sortie_ouv = []
     for o, k in zip(fiche.ouvertures, porteurs):
