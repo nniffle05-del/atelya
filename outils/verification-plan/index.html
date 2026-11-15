@@ -154,6 +154,24 @@
     #photo-grande { position: fixed; inset: 0; background: rgba(0,0,0,.84); z-index: 30; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
     #photo-grande[hidden] { display: none; }
     #photo-grande img { max-width: 94vw; max-height: 94vh; border-radius: 6px; }
+    /* Le plan, puis les photos : l'étape en cours, et l'attente pendant qu'Atelya range les photos */
+    #etapes { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--doux); white-space: nowrap; }
+    #etapes span { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--bord); }
+    #etapes span.ici { background: var(--accent-doux); border-color: #bfd3fb; color: var(--accent); font-weight: 600; }
+    #etapes span.fait { background: #ecfdf3; border-color: #a7e3bd; color: var(--ok); }
+    #fond-attente { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 20; }
+    #attente { background: #fff; border-radius: 12px; padding: 22px 26px; width: 460px; max-width: 92vw; box-shadow: 0 10px 30px rgba(0,0,0,.25); text-align: center; }
+    #attente h3 { margin: 10px 0 6px; font-size: 18px; }
+    #attente p { margin: 0 0 10px; }
+    #attente-rond { width: 38px; height: 38px; margin: 0 auto; border-radius: 50%; border: 4px solid var(--accent-doux); border-top-color: var(--accent); animation: tourne 1s linear infinite; }
+    #attente.fini #attente-rond { animation: none; border-color: var(--ok); background: var(--ok); position: relative; }
+    #attente.fini #attente-rond::after { content: "✓"; color: #fff; font-weight: 700; font-size: 22px; line-height: 30px; }
+    #attente.erreur #attente-rond { animation: none; border-color: var(--erreur); background: var(--erreur); }
+    #attente.erreur #attente-rond::after { content: "!"; color: #fff; font-weight: 700; font-size: 22px; line-height: 30px; }
+    #attente-barre { height: 8px; border-radius: 4px; background: var(--accent-doux); overflow: hidden; margin: 4px 0 8px; }
+    #attente-part { height: 100%; width: 0; background: var(--accent); transition: width .6s; }
+    #attente-detail { color: var(--doux); font-size: 13px; min-height: 1.4em; }
+    @keyframes tourne { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -164,6 +182,7 @@
       <button data-vue="lecture" title="Seulement ce qu'Atelya a compris, sans le plan">Lecture d'Atelya</button>
       <button data-vue="deux" title="La lecture d'Atelya posée sur le plan">Les deux</button>
     </div>
+    <div id="etapes" hidden><span id="etape-plan">1 · Le plan</span>›<span id="etape-photos">2 · Les photos</span></div>
     <span id="sauvegarde"></span>
     <button class="bouton" id="annuler" title="Défaire la dernière correction (Ctrl+Z)" disabled>↶ Annuler</button>
     <button class="bouton" id="refaire" title="Remettre la correction annulée (Ctrl+Y)" hidden>↷ Rétablir</button>
@@ -294,6 +313,17 @@
   </aside>
 
   <div id="photo-grande" hidden><img id="photo-grande-image" alt="Photo du client, en grand"></div>
+
+  <div id="fond-attente" hidden>
+    <div id="attente" role="status" aria-live="polite">
+      <div id="attente-rond"></div>
+      <h3 id="attente-titre"></h3>
+      <p id="attente-texte"></p>
+      <div id="attente-barre"><div id="attente-part"></div></div>
+      <p id="attente-detail"></p>
+      <button class="bouton" id="attente-fermer" hidden>Revoir le plan</button>
+    </div>
+  </div>
 
   <div id="fond-confirmation" hidden>
     <div id="confirmation" role="dialog" aria-modal="true">

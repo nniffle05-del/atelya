@@ -886,3 +886,37 @@ test("photos du client : ce que l'écran rend (endroits, « je ne sais pas », s
   assert.deepEqual(r.sans_reponse, ["photo-09"]);
   assert.deepEqual(C.reponsesPhotos(null), { endroits: {}, passees: [], sans_reponse: [] });
 });
+
+test("le plan, puis les photos : ce que l'écran dit pendant qu'Atelya range les photos", () => {
+  assert.equal(C.suitePhotos({ etape: "plan", total: 15 }).phase, "plan");
+  assert.equal(C.suitePhotos(null).phase, "plan");
+  const calcul = C.suitePhotos({ etape: "calcul", total: 15, faites: 6, tour: 1 });
+  assert.equal(calcul.phase, "calcul");
+  assert.equal(calcul.part, 0.4);
+  assert.match(calcul.texte, /chacune des 15 photos, sur le plan que vous venez de vérifier/);
+  assert.match(C.suitePhotos({ etape: "calcul", total: 15, faites: 99, tour: 2 }).texte, /avec vos réponses/);
+  assert.equal(C.suitePhotos({ etape: "calcul", total: 15, faites: 99 }).part, 1);
+  assert.equal(C.suitePhotos({ etape: "calcul" }).part, null);
+
+  const questions = [{ nom: "photo-10" }, { nom: "photo-14" }];
+  const q = C.suitePhotos({ etape: "questions", total: 15, rangees: 13, photos: { questions } });
+  assert.equal(q.phase, "questions");
+  assert.deepEqual(q.questions, questions);
+  assert.match(q.texte, /rangé seul 13 photos sur 15\. Il lui reste 2 questions/);
+  assert.match(C.suitePhotos({ etape: "questions", total: 2, rangees: 1, photos: { questions: [{ nom: "a" }] } }).texte, /rangé seul 1 photo sur 2\. Il lui reste 1 question :/);
+});
+
+test("le plan, puis les photos : la fin, avec ou sans question", () => {
+  const sans = C.suitePhotos({ etape: "fini", total: 15, rangees: 15, tour: 1 });
+  assert.equal(sans.phase, "fini");
+  assert.equal(sans.texte, "Aucune question à vous poser. Les 15 photos sont rangées.");
+  assert.equal(C.suitePhotos({ etape: "questions", total: 1, rangees: 1, photos: { questions: [] } }).texte, "Aucune question à vous poser. La photo est rangée.");
+  assert.equal(C.suitePhotos({ etape: "fini", total: 15, rangees: 15, tour: 2 }).texte, "Merci pour vos réponses. Les 15 photos sont rangées.");
+  assert.equal(C.suitePhotos({ etape: "fini", total: 15, rangees: 14, laissees: 1, tour: 2 }).texte,
+    "Merci pour vos réponses. 14 photos sur 15 sont rangées ; 1 est laissée de côté (« je ne sais pas »).");
+  assert.equal(C.suitePhotos({ etape: "fini", total: 15, rangees: 12, laissees: 3, tour: 2 }).texte,
+    "Merci pour vos réponses. 12 photos sur 15 sont rangées ; 3 sont laissées de côté (« je ne sais pas »).");
+  const e = C.suitePhotos({ etape: "erreur", erreur: "carte graphique occupée", retour: "questions" });
+  assert.deepEqual([e.phase, e.texte, e.retour], ["erreur", "carte graphique occupée", "questions"]);
+  assert.equal(C.suitePhotos({ etape: "erreur" }).retour, "plan");
+});

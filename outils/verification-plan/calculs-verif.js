@@ -2166,6 +2166,51 @@
     return { endroits: gardes, passees: laissees, sans_reponse: noms.filter((n) => !(n in gardes) && !laissees.includes(n)) };
   }
 
+  // ---------- Le plan, puis les photos : l'enchaînement ----------
+
+  const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+
+  /** Ce que l'écran montre pendant qu'Atelya range les photos sur le plan qui vient d'être vérifié, d'après ce qu'Atelya
+   *  dit de son travail : s = {etape: "plan" | "calcul" | "questions" | "fini" | "erreur", total (photos du client),
+   *  faites (photos déjà regardées), rangees, laissees (« je ne sais pas »), tour (1 = après le plan, 2 = après des
+   *  réponses), detail, secondes, erreur, retour (où revenir après une erreur), photos: {questions}}.
+   *  Rend {phase, titre, texte, part (0 à 1, ou null), questions}. */
+  function suitePhotos(s) {
+    s = s || {};
+    const total = s.total || 0, rangees = s.rangees || 0, laissees = s.laissees || 0, tour = s.tour || 1;
+    const questions = (s.photos && Array.isArray(s.photos.questions)) ? s.photos.questions : [];
+    if (s.etape === "calcul") {
+      return {
+        phase: "calcul", questions: [],
+        titre: "Atelya range vos photos",
+        texte: tour > 1 ? "Il replace les photos avec vos réponses. Comptez environ une minute."
+          : `Il cherche d'où ${total > 1 ? `est prise chacune des ${total} photos` : "est prise la photo"}, sur le plan que vous venez de vérifier. Comptez environ une minute.`,
+        part: total ? Math.max(0, Math.min(1, (s.faites || 0) / total)) : null,
+      };
+    }
+    if (s.etape === "questions" && questions.length) {
+      return {
+        phase: "questions", questions, part: null,
+        titre: pluriel(questions.length, "question") + " sur les photos",
+        texte: `Atelya a rangé seul ${pluriel(rangees, "photo")} sur ${total}. Il lui reste ${pluriel(questions.length, "question")} : pour chaque photo, montrez sur le plan d'où elle est prise.`,
+      };
+    }
+    if (s.etape === "fini" || s.etape === "questions") {
+      const tout = rangees >= total;
+      return {
+        phase: "fini", questions: [], part: 1,
+        titre: "C'est terminé",
+        texte: (tour > 1 ? "Merci pour vos réponses. " : "Aucune question à vous poser. ")
+          + (tout ? (total > 1 ? `Les ${total} photos sont rangées.` : "La photo est rangée.") : `${pluriel(rangees, "photo")} sur ${total} ${rangees > 1 ? "sont rangées" : "est rangée"}`
+            + (laissees ? ` ; ${laissees > 1 ? `${laissees} sont laissées` : "1 est laissée"} de côté (« je ne sais pas »).` : ".")),
+      };
+    }
+    if (s.etape === "erreur") {
+      return { phase: "erreur", questions: [], part: null, titre: "Atelya n'a pas pu ranger les photos", texte: s.erreur || "Erreur inconnue.", retour: s.retour === "questions" ? "questions" : "plan" };
+    }
+    return { phase: "plan", questions: [], part: null, titre: "", texte: "" };
+  }
+
   // ---------- Lecture du fichier ----------
 
   /** Vérifie la forme d'un fichier de vérification et renvoie la liste des problèmes (vide si tout va bien). */
@@ -2195,6 +2240,7 @@
     verifierFichier,
     endroitPointe,
     reponsesPhotos,
+    suitePhotos,
     VERSION_RESULTAT,
     resultat,
     NOMS_PIECES,

@@ -51,6 +51,7 @@
     points: [], // les points à vérifier, dans l'ordre
     rangPoint: 0, // le point affiché
     photos: null, // les photos du client à pointer : {questions, seules, rang, endroits: {nom: [x, y, cap]}, passees: [nom]}
+    suite: null, // « le plan, puis les photos » : {nombre de photos, phase: "plan" | "calcul" | "questions" | "fini", tour}
     resultat: null, // le dernier résultat validé
     choisi: null, // id de l'élément choisi
     outil: "choisir",
@@ -84,10 +85,12 @@
   //   écran → site : {type: "atelya-verification:pret"}
   //   site → écran : {type: "atelya-verification:ouvrir", verification, plan}
   //   écran → site : {type: "atelya-verification:valide", resultat}  ou  {type: "atelya-verification:abandon"}
+  //   site → écran : {type: "atelya-verification:photos", etat}  (le plan, puis les photos : où en est Atelya, ses questions)
   // Par sécurité, l'écran n'écoute et ne répond qu'à l'adresse du site donnée dans ?origine=…
   const PREFIXE = "atelya-verification:";
   const parametres = new URLSearchParams(window.location.search);
   const integre = window.parent !== window;
+  const service = parametres.get("service"); // Atelya à l'écoute à côté de l'écran, sur le même site (outils/atelya/verifier_plan_et_photos.py)
   const origineSite = (() => {
     if (parametres.get("origine")) return parametres.get("origine");
     try { return document.referrer ? new URL(document.referrer).origin : null; } catch (e) { return null; }
@@ -116,6 +119,10 @@
     verification = sansPhotos;
     etat.photos = photos && Array.isArray(photos.questions) && photos.questions.length
       ? { questions: photos.questions, seules: !!photos.seules, rang: 0, endroits: {}, passees: [] } : null;
+    // « a_suivre » : le client a déposé des photos ; après « Terminer » sur le plan, Atelya les range et pose ses questions ici même.
+    clearTimeout(veille);
+    etat.suite = photos && photos.a_suivre && (service || integre) ? { nombre: photos.nombre || 0, phase: "plan", tour: 1 } : null;
+    montrerAttente(null);
     document.body.classList.toggle("avec-photos", !!etat.photos); // avant de cadrer le plan : le panneau des photos est plus large
     // Dès l'ouverture, les zones coloriées collent aux murs (règle NT n° 21) : murs alignés fusionnés, pièces recalculées.
     let depart = verification;
@@ -140,6 +147,7 @@
     ajuster();
     rafraichir();
     proposerReprise();
+    if (etat.suite && service) surveiller(); // page rouverte en cours de route : Atelya dit où il en est
   }
 
   // ---------- Garder le travail ----------
@@ -253,7 +261,7 @@
     const q = questionPhoto();
     $("photos").hidden = !q;
     document.body.classList.toggle("avec-photos", !!q);
-    $("point").hidden = !!(q && etat.photos.seules);
+    $("point").hidden = planFini();
     if (!q) return;
     const ph = etat.photos;
     const fait = ph.questions.length - bilanPhotos().sans_reponse.length;
@@ -297,7 +305,8 @@
    *  pointillés) et le geste en cours. Un rond = où se tenait le photographe ; la flèche = ce qu'il regardait. */
   function dessinerPhotos(trait) {
     const ph = etat.photos;
-    if (!ph) return;
+    const places = etat.suite && etat.suite.phase === "fini" ? etat.suite.places || [] : [];
+    if (!ph && !places.length) return;
     const marque = (e, couleur, gros, tirets) => {
       const a = px([e[0], e[1]]);
       ctx.strokeStyle = couleur;
@@ -329,6 +338,19 @@
       ctx.strokeStyle = "#fff";
       ctx.stroke();
     };
+    for (const p of places) { // à la fin de l'enchaînement : où Atelya a rangé chaque photo, avec son numéro
+      marque([p.x, p.y, p.cap], "#15803d", false, false);
+      const a = px([p.x, p.y]);
+      const numero = (String(p.nom).match(/(\d+)\D*$/) || [null, String(p.nom)])[1].replace(/^0+(?=\d)/, "");
+      ctx.font = `700 ${12 * trait}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.lineWidth = 3.5 * trait;
+      ctx.strokeStyle = "#fff";
+      ctx.strokeText(numero, a[0], a[1] - 9 * trait);
+      ctx.fillStyle = "#14532d";
+      ctx.fillText(numero, a[0], a[1] - 9 * trait);
+    }
+    if (!ph) return;
     const q = questionPhoto();
     for (const x of ph.questions) if (x !== q && ph.endroits[x.nom]) marque(ph.endroits[x.nom], "#15803d", false, false);
     if (!q) return;
@@ -338,6 +360,108 @@
     if (e) marque(e, "#15803d", true, false);
   }
 
+  // ---------- Le plan, puis les photos : l'enchaînement ----------
+  //
+  // Quand le client a déposé des photos (verification.photos.a_suivre), « Terminer » sur le plan ne ferme rien : l'écran
+  // remet le plan vérifié à Atelya, attend pendant qu'il range les photos dessus (environ une minute), puis affiche ses
+  // questions (« d'où est prise cette photo ? ») ou dit qu'il n'y en a pas. Atelya parle soit par le service à côté de
+  // l'écran (?service=…, interrogé chaque seconde), soit par le site (message « photos »). Textes : C.suitePhotos.
+
+  let veille = null; // la prochaine question « où en es-tu ? » posée à Atelya
+  let rates = 0;     // demandes restées sans réponse, à la suite
+  const planFini = () => !!(etat.photos && etat.photos.seules) || !!(etat.suite && etat.suite.phase !== "plan");
+
+  async function parler(chemin, corps) {
+    const r = await fetch(service + chemin, corps === undefined ? { cache: "no-store" }
+      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.erreur || `Atelya a répondu ${r.status}`);
+    return d;
+  }
+
+  function surveiller() {
+    clearTimeout(veille);
+    if (!service || !etat.suite) return;
+    parler("/etat").then((s) => { rates = 0; suiteRecue(s); }, () => {
+      if (++rates < 6) veille = setTimeout(surveiller, 1000);
+      else suiteRecue({ etape: "erreur", retour: etat.suite.phase === "plan" ? "plan" : "questions", sans_reponse: true,
+                        erreur: "Atelya ne répond plus. Sa fenêtre a peut-être été fermée : relancez-le, puis rouvrez cette page." });
+    });
+  }
+
+  /** Le panneau d'attente : `a` vient de C.suitePhotos (null = le fermer). */
+  function montrerAttente(a, s = {}) {
+    $("fond-attente").hidden = !a;
+    if (!a) return;
+    $("attente").className = a.phase === "fini" ? "fini" : a.phase === "erreur" ? "erreur" : "";
+    $("attente-titre").textContent = a.titre;
+    $("attente-texte").textContent = a.texte;
+    $("attente-barre").hidden = a.phase !== "calcul" || a.part === null;
+    $("attente-part").style.width = Math.round(100 * (a.part || 0)) + "%";
+    const depuis = s.secondes ? ` · ${Math.round(s.secondes)} s` : "";
+    $("attente-detail").textContent = a.phase === "calcul" ? (s.detail || "Atelya se prépare…") + depuis : "";
+    $("attente-fermer").hidden = a.phase === "calcul";
+    $("attente-fermer").textContent = a.phase === "erreur" ? "Fermer" : (etat.suite && (etat.suite.places || []).length) ? "Voir les photos sur le plan" : "Revoir le plan";
+  }
+
+  /** Atelya dit où il en est (s : voir C.suitePhotos) : on attend, on pose ses questions, ou c'est fini. */
+  function suiteRecue(s) {
+    if (!etat.suite || !etat.v) return;
+    const a = C.suitePhotos(s);
+    if (a.phase === "plan") return;
+    clearTimeout(veille);
+    const st = etat.suite;
+    if (s.total) st.nombre = s.total;
+    if (s.tour) st.tour = s.tour;
+    if (a.phase === "erreur") {
+      if (!s.sans_reponse || st.phase === "calcul") st.phase = a.retour;
+      montrerAttente(a);
+      recalculer();
+      rafraichir();
+      return;
+    }
+    st.phase = a.phase;
+    etat.choisi = null;
+    etat.fait = null;
+    if (a.phase === "questions") {
+      etat.photos = { questions: a.questions, seules: true, rang: 0, endroits: {}, passees: [] };
+      reprendrePhotos();
+      etat.outil = "photo";
+      if (etat.affichage === "plan") etat.affichage = "deux";
+      montrerAttente(null);
+      message(a.texte);
+    } else {
+      if (a.phase === "fini") {
+        etat.photos = null;
+        if (etat.outil === "photo") etat.outil = "choisir";
+        st.places = Array.isArray(s.places) ? s.places : []; // où Atelya a rangé chaque photo : dessiné sur le plan
+      }
+      message(a.phase === "fini" ? a.texte + (st.places.length ? " Sur le plan, chaque rond vert est une photo, avec son numéro ; la flèche montre ce qu'elle regarde." : "") : "");
+      montrerAttente(a, s);
+      if (a.phase === "calcul" && service) veille = setTimeout(surveiller, 1000);
+    }
+    document.body.classList.toggle("avec-photos", !!etat.photos);
+    recalculer();
+    rafraichir();
+    if (a.phase !== "calcul") ajuster(); // le panneau des photos change la place laissée au plan
+  }
+
+  /** « Terminer » pendant l'enchaînement : le plan vérifié (puis les réponses sur les photos) est remis à Atelya, et on attend. */
+  async function remettreAAtelya(r) {
+    const st = etat.suite, phase = st.phase;
+    $("valider").disabled = true;
+    try {
+      if (service) await parler(phase === "plan" ? "/plan" : "/photos", r);
+      else versSite({ type: PREFIXE + "valide", resultat: r });
+    } catch (e) {
+      $("valider").disabled = false;
+      message("Envoi à Atelya impossible : " + e.message, true);
+      return;
+    }
+    if (phase === "questions") { try { localStorage.removeItem(clePhotos()); } catch (e) { /* rien à effacer */ } }
+    suiteRecue({ etape: "calcul", total: st.nombre, faites: 0, tour: phase === "plan" ? 1 : st.tour + 1 });
+  }
+
   const empreinteMurs = (v) => JSON.stringify(v.logement.murs.map((m) => [m.debut, m.fin, m.epaisseur]));
 
   function recalculer() {
@@ -345,7 +469,7 @@
     etat.inverse = C.inverse(etat.matrice);
     etat.doutes = C.trouverDoutes(etat.v);
     etat.points = C.pointsAVerifier(etat.v, { detail: etat.detail, fermeture: etat.fermeture });
-    if (etat.photos && etat.photos.seules) etat.points = []; // page des photos seules : le plan a déjà été vérifié
+    if (planFini()) etat.points = []; // le plan a déjà été vérifié (page des photos seules, ou plan terminé dans l'enchaînement)
     etat.rangPoint = Math.min(etat.rangPoint, Math.max(0, etat.points.length - 1));
     if (etat.choisi && !trouverElement(etat.choisi)) etat.choisi = null;
   }
@@ -982,7 +1106,14 @@
   function rafraichir() {
     const v = etat.v;
     $("annuler").disabled = !etat.historique.length;
-    $("valider").disabled = !etat.v;
+    const phase = etat.suite ? etat.suite.phase : null;
+    $("valider").disabled = !etat.v || phase === "calcul" || phase === "fini";
+    $("valider").textContent = !phase ? "✓ Terminer" : phase === "plan" ? "✓ Terminer le plan" : "✓ Terminer les photos";
+    $("valider").title = !phase ? "Enregistrer le logement corrigé" : phase === "plan" ? "Le plan est bon : Atelya range ensuite les photos, puis pose ses questions ici"
+      : "Envoyer vos réponses sur les photos";
+    $("etapes").hidden = !phase;
+    $("etape-plan").className = phase === "plan" ? "ici" : "fait";
+    $("etape-photos").className = phase === "plan" ? "" : phase === "fini" ? "fait" : "ici";
     $("refaire").hidden = !etat.refaire.length;
     document.querySelectorAll("[data-vue]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vue === etat.affichage)));
     const outilActif = etat.outil !== "choisir";
@@ -1718,6 +1849,7 @@
     const r = C.resultat(etat.v, { corrections: etat.historique.length });
     if (etat.photos) { const b = bilanPhotos(); r.photos = { endroits: b.endroits, passees: b.passees }; }
     etat.resultat = r;
+    if (etat.suite && (etat.suite.phase === "plan" || etat.suite.phase === "questions")) return remettreAAtelya(r);
     if (integre && origineSite) {
       versSite({ type: PREFIXE + "valide", resultat: r });
       message("Vérification envoyée au site.");
@@ -1752,6 +1884,7 @@
     if (!integre || ev.source !== window.parent || ev.origin !== origineSite) return; // messages d'ailleurs : ignorés
     const m = ev.data || {};
     if (m.type === PREFIXE + "ouvrir") ouvrirDepuisSite(m.verification, m.plan);
+    if (m.type === PREFIXE + "photos") suiteRecue(m.etat);
   });
 
   // ---------- Événements ----------
@@ -1811,6 +1944,7 @@
   $("photo-passer").addEventListener("click", () => { repondrePhoto(null, true); message("Photo laissée de côté."); });
   $("photo-image").addEventListener("click", () => { $("photo-grande").hidden = false; });
   $("photo-grande").addEventListener("click", () => { $("photo-grande").hidden = true; });
+  $("attente-fermer").addEventListener("click", () => montrerAttente(null));
   $("fermer-choix").addEventListener("click", () => choisir(null));
   $("arreter-outil").addEventListener("click", () => changerOutil("choisir"));
   const volet = (bouton, cible) => $(bouton).addEventListener("click", () => {

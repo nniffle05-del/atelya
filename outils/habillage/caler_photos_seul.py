@@ -107,9 +107,10 @@ def lire_pieces(chemin: Path | None, photos: dict) -> tuple[dict, set, dict]:
             {nom(n): tuple(float(x) for x in v[:3]) for n, v in endroits.items() if nom(n) in photos})
 
 
-def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print) -> dict:
+def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print, outils=None) -> dict:
     """Ce que les outils des sols et des meubles reçoivent : une fiche déjà faite (fichier .json, calée à la main ou par
-    Atelya), ou directement le DOSSIER des photos du client : Atelya les cale alors seul et range la fiche `a_cote`."""
+    Atelya), ou directement le DOSSIER des photos du client : Atelya les cale alors seul et range la fiche `a_cote`.
+    outils : les réseaux déjà chargés (caler_photos.Outils), pour ne pas les recharger à chaque appel (écran enchaîné)."""
     if not chemin.is_dir():
         return json.loads(chemin.read_text(encoding="utf-8"))
     import gc
@@ -118,7 +119,7 @@ def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print) -
     photos, modele = lire_photos(chemin)
     pieces, confirmees, endroits = lire_pieces(chemin / PIECES_DES_PHOTOS, photos)
     journal(f"Photos calées seules ({len(photos)} photos, pièce donnée par le client pour {len(pieces)}, endroit pointé pour {len(endroits)}) :")
-    f = fiche(cp.caler(logement, photos, journal=journal, pieces_donnees=pieces, confirmees=confirmees, endroits_donnes=endroits), chemin, modele)
+    f = fiche(cp.caler(logement, photos, outils=outils, journal=journal, pieces_donnees=pieces, confirmees=confirmees, endroits_donnes=endroits), chemin, modele)
     a_cote.parent.mkdir(parents=True, exist_ok=True)
     a_cote.write_text(json.dumps(f, ensure_ascii=False, indent=1), encoding="utf-8")
     journal(f"  {len(f['cameras'])} photos sûres (utilisées), {len(f['a_pointer'])} à montrer à la vérification (« d'où est prise cette photo ? ») : {a_cote}")
