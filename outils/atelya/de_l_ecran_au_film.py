@@ -1,14 +1,16 @@
 r"""LA SUITE DE LA CHAÎNE, EN UNE COMMANDE : de l'écran de vérification terminé jusqu'au film (examen app-004, 15/11/2026).
 
     ..\atelya\.venv\Scripts\python.exe outils\atelya\de_l_ecran_au_film.py <dossier de lecture> <dossier des photos>
-        [--sortie ..\atelya\b2\<logement>\chaine] [--eclairage jour_voile] [--depuis enveloppe|sols|meubles|maquette|paquet|import|film]
-        [--jusqu-a …] [--sans-vue]
+        [--sortie ..\atelya\b2\<logement>\chaine] [--eclairage jour_voile] [--depuis enveloppe|baies|sols|meubles|maquette|paquet|import|film]
+        [--jusqu-a …] [--sans-vue] [--sans-verification]
 
 Pourquoi : jusqu'ici chaque brique se lançait à la main, avec des copies de fichiers entre elles (carte du 16/11/2026 dans
 docs/projet/memoire/produit-livre-client.md, « LA SUITE DE LA CHAÎNE »). Ici chaque JOINTURE est écrite une fois pour toutes :
 
     écran terminé (logement-verifie.json + questions-photos\cameras-photos-seul.json, voir fin-verification.json)
-      0. enveloppe moteuraccorder_murs.fermer_les_fentes      → logement-depart.json (fentes entre bouts de murs refermées)
+      0. enveloppe moteur
+accorder_murs.fermer_les_fentes      → logement-depart.json (fentes entre bouts de murs refermées)
+         baies     moteur/ouvertures_photos                             → les baies qui descendent jusqu'au sol, lues sur les photos
       1. sols      outils\habillage\sols_photos.py logement         → logement-sols.json
       2. meubles   outils\habillage\reperer_meubles_photos.py       → logement-meuble.json
       3. maquette  python -m moteur.construire … --sans-images      → 3d\maquette.blend           (Blender)
@@ -16,6 +18,10 @@ docs/projet/memoire/produit-livre-client.md, « LA SUITE DE LA CHAÎNE »). Ici 
                    + copie dans D:\Atelya-Unreal\Paquets\<nom sans accent>   (Unreal ne veut pas d'accents)
       5. import    moteur\unreal\importer_maquette.py               → /Game/Logements/<nom>       (Unreal, éditeur FERMÉ)
       6. film      outils\unreal\balade_unreal.py                   → film.mp4, recopié dans <sortie>\film
+
+--sans-verification : un PREMIER FILM sans passer par l'écran (logement tel qu'il a été lu, photos rangées par Atelya seul avec
+ce que le client a dit de chaque photo) : pour voir tout de suite ce que donne la lecture, ou refaire un film après une correction
+d'Atelya sans redemander la vérification.
 
 Sans orientation connue (pas de nord), le film est tourné en « Jour voilé » (règle proposée à NT le 11/11/2026). La vraie vue
 par les fenêtres est tirée des photos rangées à l'écran (--sans-vue pour s'en passer). L'ordinateur est tenu éveillé pendant
@@ -39,7 +45,7 @@ RACINE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(RACINE / "outils" / "unreal"))
 
-ETAPES = ("enveloppe", "sols", "meubles", "maquette", "paquet", "import", "film")
+ETAPES = ("enveloppe", "baies", "sols", "meubles", "maquette", "paquet", "import", "film")
 MODELE_SOLS = RACINE / "moteur" / "modeles" / "sols-vits14-v2.pt"
 FICHE_PHOTOS = Path("questions-photos") / "cameras-photos-seul.json"
 
@@ -91,14 +97,22 @@ def main() -> int:
     ap.add_argument("--depuis", choices=ETAPES, default=ETAPES[0])
     ap.add_argument("--jusqu-a", choices=ETAPES, default=ETAPES[-1])
     ap.add_argument("--sans-vue", action="store_true", help="ne pas tirer la vue par les fenêtres des photos")
+    ap.add_argument("--sans-verification", action="store_true",
+                    help="pas d'écran : le logement tel qu'il a été lu (verification.json) et les photos rangées par Atelya seul")
     a = ap.parse_args()
 
     verifie, fiche = a.lecture / "logement-verifie.json", a.lecture / FICHE_PHOTOS
-    for f in (verifie, fiche, a.photos, MODELE_SOLS):
+    lu = a.lecture / "verification.json"
+    attendus = (lu, a.photos, MODELE_SOLS) if a.sans_verification else (verifie, fiche, a.photos, MODELE_SOLS)
+    for f in attendus:
         if not f.exists():
             dire(f"PLANTÉ : introuvable : {f}")
             return 2
-    projet = json.loads(verifie.read_text(encoding="utf-8")).get("projet_id") or a.lecture.name
+    if a.sans_verification:
+        logement_de_depart = json.loads(lu.read_text(encoding="utf-8"))["logement"]
+    else:
+        logement_de_depart = json.loads(verifie.read_text(encoding="utf-8"))
+    projet = logement_de_depart.get("projet_id") or a.lecture.name
     nom = nom_sans_accent(projet)
     sortie = a.sortie or RACINE.parent / "atelya" / "b2" / projet / "chaine"
     sortie.mkdir(parents=True, exist_ok=True)
@@ -131,10 +145,32 @@ def main() -> int:
         from moteur.raccorder_murs import fermer_les_fentes
         debut = time.time()
         dire("\n=== enveloppe : les murs sont-ils raccordés ?")
-        logement, bilan_env = fermer_les_fentes(json.loads(verifie.read_text(encoding="utf-8")), journal=lambda s: dire("   " + s))
+        logement, bilan_env = fermer_les_fentes(logement_de_depart, journal=lambda s: dire("   " + s))
         depart.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
         bilan["enveloppe"] = bilan_env
         note("enveloppe", time.time() - debut)
+    if a.sans_verification:
+        fiche = sortie / "cameras-photos-seul.json"
+        if "enveloppe" in faire or not fiche.is_file():  # pas d'écran : Atelya range les photos seul, sur le logement lu
+            note("photos", lancer("photos", [py, "outils/habillage/caler_photos_seul.py", depart, a.photos, fiche], journaux))
+    if "baies" in faire:
+        # jointure : ce que le plan ne dit pas et que les photos montrent (une baie qui descend jusqu'au sol)
+        from moteur import ouvertures_photos
+        debut = time.time()
+        dire("\n=== baies : que montrent les photos ?")
+        logement = json.loads(depart.read_text(encoding="utf-8"))
+        votes = ouvertures_photos.lire(logement, json.loads(fiche.read_text(encoding="utf-8")), RACINE, journal=lambda s: dire("   " + s))
+        logement, changes = ouvertures_photos.corriger(logement, votes, journal=lambda s: dire("   " + s))
+        depart.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
+        bilan["baies"] = {"votes": votes, "changements": changes}
+        dire(f"   {len(changes)} baie(s) corrigée(s) d'après les photos, sur {len(votes)} vue(s)")
+        note("baies", time.time() - debut)
+        import gc
+
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     if "sols" in faire:
         note("sols", lancer("sols", [py, "outils/habillage/sols_photos.py", "logement", fiche, depart, MODELE_SOLS, sols], journaux))
     if "meubles" in faire:
