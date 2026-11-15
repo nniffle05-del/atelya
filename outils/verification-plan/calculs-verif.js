@@ -2163,7 +2163,10 @@
     const gardes = {};
     for (const n of noms) if (Array.isArray(endroits[n]) && endroits[n].length >= 2) gardes[n] = endroits[n];
     const laissees = noms.filter((n) => passees.includes(n) && !(n in gardes));
-    return { endroits: gardes, passees: laissees, sans_reponse: noms.filter((n) => !(n in gardes) && !laissees.includes(n)) };
+    const sans = noms.filter((n) => !(n in gardes) && !laissees.includes(n));
+    // « endroit douteux » : la photo est déjà rangée ; sans réponse, elle garde la place proposée (elle n'est pas laissée de côté)
+    const dEndroit = new Set((questions || []).filter((q) => q.sorte === "endroit").map((q) => q.nom));
+    return { endroits: gardes, passees: laissees, sans_reponse: sans, sans_reponse_endroit: sans.filter((n) => dEndroit.has(n)) };
   }
 
   // ---------- Le plan, puis les photos : l'enchaînement ----------
@@ -2189,10 +2192,13 @@
       };
     }
     if (s.etape === "questions" && questions.length) {
+      const endroits = questions.filter((q) => q.sorte === "endroit").length; // pièce sûre, place dans la pièce incertaine
       return {
         phase: "questions", questions, part: null,
         titre: pluriel(questions.length, "question") + " sur les photos",
-        texte: `Atelya a rangé seul ${pluriel(rangees, "photo")} sur ${total}. Il lui reste ${pluriel(questions.length, "question")} : pour chaque photo, montrez sur le plan d'où elle est prise.`,
+        texte: `Atelya a rangé seul ${pluriel(rangees, "photo")} sur ${total}. Il lui reste ${pluriel(questions.length, "question")} : pour chaque photo, montrez sur le plan d'où elle est prise.`
+          + (!endroits ? "" : (endroits === questions.length ? " Il" : ` Pour ${endroits} d'entre elles, il`)
+            + " connaît la pièce et doute seulement de l'endroit : un clic suffit si sa proposition est bonne."),
       };
     }
     if (s.etape === "fini" || s.etape === "questions") {

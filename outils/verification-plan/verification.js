@@ -270,8 +270,15 @@
     $("photo-question").textContent = q.question;
     const e = ph.endroits[q.nom];
     const passee = ph.passees.includes(q.nom);
+    const dEndroit = q.sorte === "endroit"; // la pièce est sûre, Atelya doute seulement de la place : un clic suffit pour confirmer
+    $("photo-titre").textContent = dEndroit ? "Est-ce le bon endroit ?" : "D'où est prise cette photo ?";
+    $("photo-consigne").textContent = dEndroit
+      ? "En orange sur le plan : la place qu'Atelya propose. Si elle est bonne, confirmez-la ; sinon cliquez là où se tenait le photographe, puis tirez vers ce qu'il regardait."
+      : "Sur le plan : cliquez là où se tenait le photographe, puis tirez vers ce qu'il regardait.";
+    $("photo-accepter").className = dEndroit ? "bouton principal" : "bouton";
     $("photo-etat").textContent = e ? (e.length > 2 ? "✓ Endroit et sens notés. Refaites le geste pour corriger." : "Endroit noté, sans le sens : tirez vers ce que regardait le photographe.")
-      : passee ? "Photo laissée de côté (« je ne sais pas »)." : (q.proposition ? "En orange sur le plan : la place qu'Atelya propose, sans en être sûr." : "");
+      : passee ? (dEndroit ? "« Je ne sais pas » : Atelya garde la place qu'il propose." : "Photo laissée de côté (« je ne sais pas »).")
+        : (q.proposition && !dEndroit ? "En orange sur le plan : la place qu'Atelya propose, sans en être sûr." : "");
     $("photo-etat").className = e && e.length > 2 ? "fait" : "";
     $("photo-accepter").hidden = !q.proposition || !!e;
     $("photo-effacer").hidden = !e && !passee;
@@ -1841,9 +1848,11 @@
       if (!ok) return;
     }
     if (etat.photos && bilanPhotos().sans_reponse.length) {
-      const reste = bilanPhotos().sans_reponse.length;
+      const b = bilanPhotos(), reste = b.sans_reponse.length, gardees = b.sans_reponse_endroit.length;
       const ok = await demander(`Il reste ${reste} photo${reste > 1 ? "s" : ""} sans réponse`,
-        "Vous pouvez revenir les pointer, ou terminer quand même : Atelya laissera ces photos de côté.");
+        "Vous pouvez revenir les pointer, ou terminer quand même : " + (gardees === reste ? "Atelya gardera la place qu'il propose pour ces photos."
+          : gardees ? "Atelya laissera de côté les photos qu'il n'a pas su ranger, et gardera sa place pour celles dont il doutait seulement de l'endroit."
+            : "Atelya laissera ces photos de côté."));
       if (!ok) return;
     }
     const r = C.resultat(etat.v, { corrections: etat.historique.length });

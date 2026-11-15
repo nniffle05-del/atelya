@@ -50,20 +50,25 @@ def avec_les_noms(texte: str, logement: dict | None) -> str:
     return texte
 
 
-def questions_pour_l_ecran(fiche: dict, dossier: Path, largeur: int = LARGEUR_PHOTO, logement: dict | None = None) -> dict:
+def questions_pour_l_ecran(fiche: dict, dossier: Path, largeur: int = LARGEUR_PHOTO, logement: dict | None = None, endroits: bool = True) -> dict:
     """La fiche du calage → le bloc « photos » de l'écran de vérification. Une question par photo de `fiche["a_pointer"]`,
-    dans l'ordre : d'abord celles où Atelya hésite entre des pièces qui se ressemblent, puis les doutes, puis les autres.
+    dans l'ordre : d'abord celles où Atelya hésite entre des pièces qui se ressemblent, puis les doutes, puis les autres, et
+    à la fin les « endroits douteux » (15/11/2026 : la pièce est sûre, pas la place dans la pièce ; `sorte` = "endroit" : la
+    photo est déjà rangée, sans réponse elle garde la place proposée). endroits=False : sans ces dernières.
     logement : pour écrire les questions avec les NOMS des pièces affichés à l'écran plutôt qu'avec leurs identifiants."""
     modele = fiche.get("fichier", "{nom}.jpg")
-    connues = {**fiche.get("incertaines", {}), **fiche.get("a_verifier", {})}
-    rang = lambda n: 0 if connues.get(n, {}).get("hesite_avec") else 1 if connues.get(n, {}).get("a_verifier") else 2
+    douteuses = {n: d for n, d in fiche.get("cameras", {}).items() if d.get("endroit_douteux")}
+    connues = {**douteuses, **fiche.get("incertaines", {}), **fiche.get("a_verifier", {})}
+    rang = lambda n: 3 if n in douteuses else 0 if connues.get(n, {}).get("hesite_avec") else 1 if connues.get(n, {}).get("a_verifier") else 2
     questions = []
-    for nom in sorted(fiche.get("a_pointer", {}), key=lambda n: (rang(n), n)):
+    for nom in sorted(fiche.get("a_pointer", {}), key=lambda n: (rang(n), (douteuses[n].get("piece") or "") if n in douteuses else "", n)):
+        if nom in douteuses and not endroits:
+            continue
         d = connues.get(nom, {})
         image, w, h = _photo_reduite(Path(dossier) / modele.format(nom=nom), largeur)
         cam = d.get("camera")
         questions.append({"nom": nom, "image": image, "largeur": w, "hauteur": h, "question": avec_les_noms(fiche["a_pointer"][nom], logement),
-                          "piece": d.get("piece"), "hesite_avec": d.get("hesite_avec", []),
+                          "piece": d.get("piece"), "hesite_avec": d.get("hesite_avec", []), "sorte": "endroit" if nom in douteuses else "piece",
                           "proposition": {"x": cam["x"], "y": cam["y"], "cap": cam["cap"]} if cam else None})
     return {"questions": questions}
 

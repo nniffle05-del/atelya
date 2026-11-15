@@ -165,3 +165,31 @@ def test_le_service_par_le_navigateur(tmp_path):
     finally:
         serveur.shutdown()
         serveur.server_close()
+
+
+def test_endroit_douteux_demande_une_fois_et_garde_sa_place(tmp_path):
+    """La pièce est sûre mais pas la place : la photo est rangée ET demandée (« est-ce le bon endroit ? »). Sans réponse elle
+    garde sa place ; la question n'est posée qu'au premier passage."""
+    lecture, photos = _dossiers(tmp_path)
+    cam = {"x": 1.0, "y": 2.0, "cap": 90.0}
+
+    def ranger(logement, journal):
+        fichier = photos / sv.PIECES_DES_PHOTOS
+        endroits = json.loads(fichier.read_text(encoding="utf-8")).get("endroits", {}) if fichier.is_file() else {}
+        douteuse = lambda n: n in ("photo-01", "photo-02") and n not in endroits  # une photo pointée n'est plus douteuse
+        return {"fichier": "{nom}.jpg", "incertaines": {}, "a_verifier": {}, "non_calees": {},
+                "cameras": {n: {"camera": cam, "piece": "sejour_1", **({"endroit_douteux": "une autre place irait presque aussi bien"} if douteuse(n) else {})}
+                            for n in ("photo-01", "photo-02", "photo-03")},
+                "a_pointer": {n: "Atelya a rangé cette photo dans sejour_1, mais il n'est pas sûr de l'endroit." for n in ("photo-01", "photo-02") if douteuse(n)}}
+    e = sv.Enchainement(lecture, photos, ranger, journal=lambda *a: None)
+    e.plan_valide({"logement": LOGEMENT})
+    e.attendre(10)
+    s = e.etat()
+    assert s["etape"] == "questions" and s["rangees"] == 1                        # « rangées » = sans question en attente
+    assert [(q["nom"], q["sorte"], q["proposition"]) for q in s["photos"]["questions"]] == [("photo-01", "endroit", cam), ("photo-02", "endroit", cam)]
+    assert "« Séjour »" in s["photos"]["questions"][0]["question"]
+    e.photos_repondues({"photos": {"endroits": {"photo-02": [1.0, 2.0, 90.0]}, "passees": []}})  # photo-02 confirmée, photo-01 sans réponse
+    e.attendre(10)
+    s = e.etat()
+    assert s["etape"] == "fini" and s["rangees"] == 3 and s["laissees"] == 0      # photo-01 garde sa place, elle n'est pas redemandée
+    assert len(s["places"]) == 3

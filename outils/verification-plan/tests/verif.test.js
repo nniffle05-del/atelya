@@ -884,7 +884,20 @@ test("photos du client : ce que l'écran rend (endroits, « je ne sais pas », s
   assert.deepEqual(r.endroits, { "photo-02": [7, 2, 90] });   // une photo qui n'est pas dans les questions ne sort pas
   assert.deepEqual(r.passees, ["photo-07"]);                   // une photo pointée n'est plus « passée »
   assert.deepEqual(r.sans_reponse, ["photo-09"]);
-  assert.deepEqual(C.reponsesPhotos(null), { endroits: {}, passees: [], sans_reponse: [] });
+  assert.deepEqual(C.reponsesPhotos(null), { endroits: {}, passees: [], sans_reponse: [], sans_reponse_endroit: [] });
+});
+
+test("photos du client : « endroit douteux », la photo sans réponse garde la place proposée", () => {
+  const questions = [{ nom: "photo-10", sorte: "piece" }, { nom: "photo-08", sorte: "endroit" }, { nom: "photo-09", sorte: "endroit" }, { nom: "photo-12" }];
+  const r = C.reponsesPhotos(questions, { "photo-09": [2, 6, 180] }, []);
+  assert.deepEqual(r.sans_reponse, ["photo-10", "photo-08", "photo-12"]);
+  assert.deepEqual(r.sans_reponse_endroit, ["photo-08"]);        // celle-ci n'est pas laissée de côté : Atelya garde sa place
+  const s = C.suitePhotos({ etape: "questions", total: 15, rangees: 11, photos: { questions } });
+  assert.match(s.texte, /rangé seul 11 photos sur 15\. Il lui reste 4 questions/);
+  assert.match(s.texte, /Pour 2 d'entre elles, il connaît la pièce et doute seulement de l'endroit : un clic suffit/);
+  const tout = C.suitePhotos({ etape: "questions", total: 3, rangees: 2, photos: { questions: [{ nom: "a", sorte: "endroit" }] } });
+  assert.match(tout.texte, /d'où elle est prise\. Il connaît la pièce et doute seulement de l'endroit/);
+  assert.ok(!/doute seulement/.test(C.suitePhotos({ etape: "questions", total: 3, rangees: 2, photos: { questions: [{ nom: "a" }] } }).texte));
 });
 
 test("le plan, puis les photos : ce que l'écran dit pendant qu'Atelya range les photos", () => {

@@ -60,6 +60,9 @@ def questions(resultat: dict) -> dict:
     q = {}
     for n, d in resultat["cameras"].items():
         if d["sure"]:
+            if d.get("endroit_douteux"):  # la pièce est sûre, pas la place dans la pièce : la photo reste utilisée, mais on demande
+                q[n] = (f"Atelya a rangé cette photo dans {d['piece']}, mais il n'est pas sûr de l'endroit : {d['endroit_douteux']}. "
+                        "Si la place proposée est la bonne, confirmez-la ; sinon pointez d'où la photo est prise.")
             continue
         if d.get("a_verifier"):
             q[n] = f"Pièce donnée : {d['piece']}, mais {d['a_verifier']}. Confirmez la pièce, ou pointez d'où la photo est prise."
@@ -77,7 +80,7 @@ def fiche(resultat: dict, dossier: Path, modele: str) -> dict:
         rel = Path(os.path.relpath(dossier.resolve(), RACINE)).as_posix()
     except ValueError:  # autre disque
         rel = dossier.resolve().as_posix()
-    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier", "pointee")
+    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier", "pointee", "endroit", "endroit_douteux")
                        if k in d and (k != "hesite_avec" or d[k])}
     return {"note": f"Caméras des photos retrouvées SEULES par Atelya (moteur/caler_photos.py {cp.VERSION}). « cameras » : photos "
                     "dont Atelya est sûr (seules à utiliser) ; « incertaines » : placées, mais pas sûres (« hesite_avec » : l'autre pièce possible).",

@@ -75,7 +75,10 @@ VERS_PORTE_DEG = 50.0                       # … et regarde alors vers cette po
 PORTE_M = 1.2                               # pièce donnée par le client : l'appareil peut être sur le seuil, à moins de 1,2 m d'une de ses portes
 MEUBLES_MIN = 0.3                           # pièce donnée : meubles vus qui ne vont pas avec cette sorte de pièce (un lit dans une « cuisine ») → à vérifier
 COLLE_MIN = 0.6                             # pièce donnée : en dessous de cette part de sa meilleure note ailleurs, la photo « colle mal » → à vérifier
-CAP_FUITES = 12.0                           # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
+LOIN_M, TOURNE_DEG = 1.0, 60.0              # « endroit douteux » : une autre place à plus de 1 m, ou le même endroit tourné de plus de 60°
+AUTRE_POSE_MIN = 0.95                       # … douteux si une autre pose du bloc, ailleurs dans la pièce, vaut au moins 95 % de la pose choisie
+ACCORD_MIN = 0.6                            # … ou si une photo du bloc est à moins de 60 % de sa propre meilleure place
+CAP_FUITES = 12.0                          # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
 
@@ -515,6 +518,37 @@ def doute_sur_la_piece_donnee(sure_ailleurs: str | None, facteur_meubles: float,
     return None
 
 
+def endroit_douteux(endroit: dict | None) -> str | None:
+    """Le signal « ENDROIT DOUTEUX » (15/11/2026, demande de NT) : la pièce est la bonne, mais la PLACE dans la pièce est-elle
+    fiable ? La raison d'aller le demander à la vérification, ou None. Jugé pour le BLOC de la photo (ses photos bougent
+    ensemble), avec ce que le calage calcule déjà (champ « endroit » de chaque caméra) :
+      - autre_pose ≥ AUTRE_POSE_MIN : une autre pose du bloc, ailleurs dans la même pièce (à plus de LOIN_M, ou tournée de plus
+        de TOURNE_DEG), va presque aussi bien (petite pièce sans repère : salle d'eau placée à l'envers) ;
+      - accord < ACCORD_MIN : une photo du bloc est loin de sa propre meilleure place : les photos de la pièce ne s'accordent
+        pas (cuisine d'app-002 : une photo juste, l'autre à 2 m).
+    Regarder la photo SEULE ne suffit pas (mesuré : dans un grand séjour, une photo juste a souvent une autre place aussi
+    bonne ; c'est le bloc qui tranche). On ne sait PAS dire laquelle des photos d'un bloc douteux est mal placée.
+    Mesures et limites : pc/essais-cameras-seules/endroit_douteux.py et le journal."""
+    if not endroit:
+        return None
+    if endroit.get("autre_pose", 0.0) >= AUTRE_POSE_MIN:
+        return "une autre place dans la pièce irait presque aussi bien"
+    if endroit.get("accord", 1.0) < ACCORD_MIN:
+        return "les photos de cette pièce ne s'accordent pas entre elles"
+    return None
+
+
+def _signaler_les_endroits(cameras: dict, journal) -> None:
+    """Pose « endroit_douteux » sur les photos SÛRES de leur pièce dont la place ne l'est pas. Ne change pas « sure » : les
+    sols et les meubles s'en servent comme avant ; c'est la vérification qui pose la question. Une photo pointée par NT est
+    déjà une réponse."""
+    for n, d in cameras.items():
+        raison = None if (not d["sure"] or d.get("pointee")) else endroit_douteux(d.get("endroit"))
+        if raison:
+            d["endroit_douteux"] = raison
+            journal(f"  {n} : ENDROIT DOUTEUX dans {d['piece']}, {raison}")
+
+
 # ================================================================ les choix d'ensemble
 def _monter(total, nb, nombres, rng, essais=30, depart=None):
     """Meilleur choix (un indice par élément) par petites améliorations, depuis plusieurs départs."""
@@ -935,6 +969,19 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                     Rp[max(0, iy - 4):iy + 5, max(0, ix - 4):ix + 5] = 0
             return cs
 
+        def detache(n, cam, piece):
+            """À quel point la place trouvée se détache, pour cette photo SEULE, des autres places possibles dans la MÊME
+            pièce : sa note ici, la meilleure note AILLEURS (à plus de LOIN_M), la meilleure au même endroit mais TOURNÉE (cap
+            à plus de TOURNE_DEG), et la meilleure de toute la pièce. Sert au signal « endroit douteux »."""
+            M = R[n] * (PM.get(n, P) == plan["ids"].index(piece))[:, :, None]
+            h, w, _ = M.shape
+            yy, xx = np.mgrid[:h, :w]
+            d = np.hypot(xx - (cam[0] - orig[0]) / PAS, yy - (cam[1] - orig[1]) / PAS) * PAS
+            dk = np.abs((np.arange(360) - cam[2] + 180) % 360 - 180)
+            haut = lambda t: round(float(t.max(initial=0.0)), 4)
+            return {"ici": haut(M[d <= 0.5][:, dk <= 12]), "ailleurs": haut(M[d > LOIN_M]), "tournee": haut(M[d <= LOIN_M][:, dk > TOURNE_DEG]),
+                    "meilleure": haut(M)}
+
         # 1er choix photo par photo → groupes de photos de la même pièce
         seules = {n: par_piece(n, 3) for n in noms}
         piece1 = choisir_les_pieces({n: [{**c["photos"][n]} for c in cs] for n, cs in seules.items()}, {n: {} for n in noms}, sim)  # le type de pièce est déjà dans les notes
@@ -996,8 +1043,25 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                                "cap": round(float((cam[2] + 180) % 360 - 180), 2), "tangage": 0.0, "f": round(f, 2), "u0": W / 2,
                                "v0": round(H / 2 + f * float(haut[2] / max(-haut[1], 0.2)), 2)},
                     "largeur": W, "hauteur": H, "piece": piece, "sure": bool(sure), "marge": round(float(marge), 2), "bloc": list(g),
-                    "hesite_avec": [] if sure else [q for q in rivale if q != piece]}
+                    "hesite_avec": [] if sure else [q for q in rivale if q != piece], "endroit": detache(n, cam, piece)}
                 journal(f"  {n} : {piece}" + ("" if sure else " (pas sûr" + (", hésite avec " + " / ".join(rivale) if rivale else "") + ")"))
+        # « endroit douteux » : jugé pour le BLOC entier (ses photos bougent ensemble). autre_pose : la meilleure autre pose du
+        # bloc dans les mêmes pièces mais ailleurs (une photo à plus de LOIN_M, ou tournée de plus de TOURNE_DEG), en part de la
+        # note de la pose choisie ; accord : la photo du bloc la plus loin de sa propre meilleure place (1 = toutes d'accord).
+        for u, k in zip(unites, ch):
+            la = u[k]["photos"]
+            total = sum(p["note"] for p in la.values())
+            autre = 0.0
+            for j, c in enumerate(u):
+                if j == k or any(c["photos"][n]["piece"] != p["piece"] for n, p in la.items()):
+                    continue
+                if any(math.hypot(c["photos"][n]["cam"][0] - p["cam"][0], c["photos"][n]["cam"][1] - p["cam"][1]) > LOIN_M
+                       or abs((c["photos"][n]["cam"][2] - p["cam"][2] + 180) % 360 - 180) > TOURNE_DEG for n, p in la.items()):
+                    autre = max(autre, sum(p["note"] for p in c["photos"].values()) / max(total, 1e-6))
+            dans = [n for n in la if n in cameras]
+            accord = min((cameras[n]["endroit"]["ici"] / max(cameras[n]["endroit"]["meilleure"], 1e-6) for n in dans), default=1.0)
+            for n in dans:
+                cameras[n]["endroit"].update(autre_pose=round(autre, 3), accord=round(accord, 3))
         return cameras, non, det
 
     muet = lambda *a: None
@@ -1005,6 +1069,7 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     if not PM:
         if detail is not None:  # pour les essais : de quoi rejuger le choix d'ensemble sans tout recalculer
             detail.update(det)
+        _signaler_les_endroits(seul, journal)
         return {"cameras": seul, "non_calees": {**non, **non_seul}}
     cameras, non_avec, det = choisir({**R, **Rd}, {**T, **Td}, PM, journal)  # avec les pièces données par le client
     if detail is not None:
@@ -1026,4 +1091,5 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
         if raison and n not in confirmees:
             d.update(sure=False, a_verifier=raison)
             journal(f"  {n} : À VÉRIFIER, {raison}")
+    _signaler_les_endroits(cameras, journal)
     return {"cameras": cameras, "non_calees": {**non, **non_avec}}

@@ -167,11 +167,13 @@ class Enchainement:
     def _calculer(self) -> None:
         try:
             fiche = self.ranger(self.logement, self._note)
-            bloc = pv.questions_pour_l_ecran(fiche, self.photos, logement=self.logement)
+            # les « endroits douteux » (pièce sûre, place incertaine) ne sont demandés qu'au premier passage : ensuite Atelya
+            # replace les photos avec les réponses et ne redemande que ce qu'il ne sait vraiment pas ranger
+            bloc = pv.questions_pour_l_ecran(fiche, self.photos, logement=self.logement, endroits=self.tour == 1)
             bloc["questions"] = [q for q in bloc["questions"] if q["nom"] not in self.passees]
             with self.verrou:
                 cameras = fiche.get("cameras", {})
-                self.rangees = len(cameras)
+                self.rangees = len(set(cameras) - {q["nom"] for q in bloc["questions"]})  # rangées SANS question en attente
                 self.laissees = len(self.passees - set(cameras))  # une photo passée peut être rangée quand même, par sa voisine pointée
                 self.places = [{"nom": n, "x": d["camera"]["x"], "y": d["camera"]["y"], "cap": d["camera"]["cap"], "piece": d.get("piece")}
                                for n, d in sorted(cameras.items())]
