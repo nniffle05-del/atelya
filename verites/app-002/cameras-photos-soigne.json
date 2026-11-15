@@ -1,0 +1,2995 @@
+{
+ "note": "Corrigé SOIGNÉ de la place des photos d'app-002 (15/11/2026), relevé à la main par Claude : repères lus sur des agrandissements quadrillés ; ancres = éléments sûrs du plan ; repères « libre » = objets fixés au mur vus sur plusieurs photos, place calculée avec les caméras (calcul d'ensemble par pièce) ; zoom commun 545 px (lignes de fuite nettes de 5 photos) ; orientation calculée d'après les ancres et des fuyantes relevées à la main ; « incertitude_m » = de combien la caméra bouge quand on bouge les lectures de ± 3 px, les ancres de ± 12 cm et le zoom de ± 12 px. L'ancien relevé (cameras-photos.json) reste la référence des vérités sols / meubles. Produit par verites/app-002/cameras_photos.py.",
+ "photos": "../atelya/photos-clients/app-002/photos",
+ "fichier": "{nom}.jpg",
+ "cameras": {
+  "photo-01": {
+   "camera": {
+    "x": 2.1,
+    "y": 2.685,
+    "z": 1.396,
+    "cap": 52.19,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 320.7
+   },
+   "largeur": 1206,
+   "hauteur": 751,
+   "piece": "sejour_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 4.1,
+   "ecart_pire_px": 13.3,
+   "incertitude_m": 0.29,
+   "incertitude_cap_deg": 2.2,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0.0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      580,
+      262
+     ],
+     "p2": [
+      580,
+      400
+     ],
+     "quoi": "porte de l'entrée, bord ouest",
+     "ecart_px": 0.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.28,
+      6.95,
+      0.0
+     ],
+     "b": [
+      6.28,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      663,
+      262
+     ],
+     "p2": [
+      663,
+      400
+     ],
+     "quoi": "porte de l'entrée, bord est",
+     "ecart_px": 3.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.95,
+      0.0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      681,
+      215
+     ],
+     "p2": [
+      681,
+      495
+     ],
+     "quoi": "angle nord-est",
+     "ecart_px": 7.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      0.0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      886,
+      190
+     ],
+     "p2": [
+      886,
+      495
+     ],
+     "quoi": "bout du mur du tableau",
+     "ecart_px": 3.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      4.69,
+      0.0
+     ],
+     "b": [
+      9.75,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      1014,
+      215
+     ],
+     "p2": [
+      1014,
+      235
+     ],
+     "quoi": "coin salon, angle nord-est",
+     "ecart_px": 7.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      2.693,
+      6.85,
+      0.0
+     ],
+     "b": [
+      2.693,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      282,
+      215
+     ],
+     "p2": [
+      282,
+      255
+     ],
+     "quoi": "applique ouest",
+     "libre": true,
+     "ecart_px": 10.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.311,
+      6.85,
+      0.0
+     ],
+     "b": [
+      4.311,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      503,
+      240
+     ],
+     "p2": [
+      503,
+      275
+     ],
+     "quoi": "applique est",
+     "libre": true,
+     "ecart_px": 5.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.973,
+      6.95,
+      0.0
+     ],
+     "b": [
+      4.973,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      566,
+      335
+     ],
+     "p2": [
+      566,
+      350
+     ],
+     "quoi": "interrupteur près de la porte",
+     "libre": true,
+     "ecart_px": 0.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.089,
+      0.0
+     ],
+     "b": [
+      6.4,
+      6.089,
+      2.5
+     ],
+     "p1": [
+      740,
+      240
+     ],
+     "p2": [
+      740,
+      315
+     ],
+     "quoi": "tableau, bord nord",
+     "libre": true,
+     "ecart_px": 2.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      5.518,
+      0.0
+     ],
+     "b": [
+      6.4,
+      5.518,
+      2.5
+     ],
+     "p1": [
+      792,
+      240
+     ],
+     "p2": [
+      792,
+      315
+     ],
+     "quoi": "tableau, bord sud",
+     "libre": true,
+     "ecart_px": 3.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.442,
+      6.85,
+      0.0
+     ],
+     "b": [
+      1.442,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      28,
+      395
+     ],
+     "p2": [
+      28,
+      545
+     ],
+     "quoi": "radiateur, bord ouest",
+     "libre": true,
+     "ecart_px": 5.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.898,
+      6.85,
+      0.0
+     ],
+     "b": [
+      1.898,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      137,
+      395
+     ],
+     "p2": [
+      137,
+      545
+     ],
+     "quoi": "radiateur, bord est",
+     "libre": true,
+     "ecart_px": 0.8
+    },
+    {
+     "type": "point",
+     "p": [
+      6.4,
+      4.69,
+      0.0
+     ],
+     "uv": [
+      886,
+      501
+     ],
+     "quoi": "pied : bout du mur du tableau",
+     "ecart_px": 3.0
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "x",
+     "p1": [
+      50,
+      117
+     ],
+     "p2": [
+      625,
+      200
+     ],
+     "quoi": "corniche du mur du buffet",
+     "source": "main",
+     "ecart_px": 6.6
+    },
+    {
+     "axe": "x",
+     "p1": [
+      20,
+      552
+     ],
+     "p2": [
+      225,
+      540
+     ],
+     "quoi": "pied du mur du buffet",
+     "source": "main",
+     "ecart_px": 13.3
+    },
+    {
+     "axe": "y",
+     "p1": [
+      887.0,
+      163.8
+     ],
+     "p2": [
+      680.6,
+      203.2
+     ],
+     "quoi": "corniche du mur du tableau",
+     "source": "ordinateur",
+     "ecart_px": 3.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      938.3,
+      196.4
+     ],
+     "p2": [
+      1009.6,
+      223.7
+     ],
+     "quoi": "corniche du fond du coin salon",
+     "source": "ordinateur",
+     "ecart_px": 1.6
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1204.4,
+      192.5
+     ],
+     "p2": [
+      1019.4,
+      215.6
+     ],
+     "quoi": "corniche du mur est",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    }
+   ]
+  },
+  "photo-03": {
+   "camera": {
+    "x": 1.839,
+    "y": 6.122,
+    "z": 1.144,
+    "cap": -37.14,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 380.5
+   },
+   "largeur": 1206,
+   "hauteur": 779,
+   "piece": "sejour_1",
+   "qualite": "approchée",
+   "ecart_moyen_px": 2.0,
+   "ecart_pire_px": 18.2,
+   "incertitude_m": 0.51,
+   "incertitude_cap_deg": 4.6,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      0.0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      404,
+      215
+     ],
+     "p2": [
+      404,
+      515
+     ],
+     "quoi": "bout du mur du tableau",
+     "ecart_px": 3.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.45,
+      2.67,
+      0.0
+     ],
+     "b": [
+      6.45,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      606,
+      240
+     ],
+     "p2": [
+      606,
+      435
+     ],
+     "quoi": "angle saillant baie sud / coin salon",
+     "ecart_px": 6.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.81,
+      2.67,
+      0.0
+     ],
+     "b": [
+      5.81,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      658,
+      265
+     ],
+     "p2": [
+      658,
+      440
+     ],
+     "quoi": "baie sud, bord est",
+     "ecart_px": 18.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      2.25,
+      2.67,
+      0.0
+     ],
+     "b": [
+      2.25,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      1165,
+      180
+     ],
+     "p2": [
+      1165,
+      553
+     ],
+     "quoi": "baie sud, bord ouest",
+     "ecart_px": 3.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.089,
+      0.0
+     ],
+     "b": [
+      6.4,
+      6.089,
+      2.5
+     ],
+     "p1": [
+      194,
+      225
+     ],
+     "p2": [
+      194,
+      335
+     ],
+     "quoi": "tableau, bord nord",
+     "libre": true,
+     "ecart_px": 2.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      5.518,
+      0.0
+     ],
+     "b": [
+      6.4,
+      5.518,
+      2.5
+     ],
+     "p1": [
+      291,
+      225
+     ],
+     "p2": [
+      291,
+      335
+     ],
+     "quoi": "tableau, bord sud",
+     "libre": true,
+     "ecart_px": 2.5
+    },
+    {
+     "type": "point",
+     "p": [
+      6.4,
+      4.69,
+      0.0
+     ],
+     "uv": [
+      404,
+      519
+     ],
+     "quoi": "pied : bout du mur du tableau",
+     "ecart_px": 3.8
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "y",
+     "p1": [
+      419.4,
+      204.2
+     ],
+     "p2": [
+      26.9,
+      114.4
+     ],
+     "quoi": "corniche du mur du tableau",
+     "source": "ordinateur",
+     "ecart_px": 5.3
+    },
+    {
+     "axe": "y",
+     "p1": [
+      82.1,
+      566.8
+     ],
+     "p2": [
+      144.6,
+      557.2
+     ],
+     "quoi": "pied du mur du tableau",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "y",
+     "p1": [
+      254.2,
+      540.7
+     ],
+     "p2": [
+      304.2,
+      533.3
+     ],
+     "quoi": "pied du mur du tableau",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      605.7,
+      265.8
+     ],
+     "p2": [
+      971.7,
+      171.2
+     ],
+     "quoi": "corniche du mur de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 2.2
+    },
+    {
+     "axe": "x",
+     "p1": [
+      988.2,
+      174.8
+     ],
+     "p2": [
+      877.9,
+      202.4
+     ],
+     "quoi": "corniche du mur de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.4
+    },
+    {
+     "axe": "x",
+     "p1": [
+      877.0,
+      202.4
+     ],
+     "p2": [
+      608.0,
+      270.0
+     ],
+     "quoi": "corniche du mur de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 1.3
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1037.0,
+      162.3
+     ],
+     "p2": [
+      990.6,
+      174.4
+     ],
+     "quoi": "corniche du mur de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1190.3,
+      124.5
+     ],
+     "p2": [
+      1037.9,
+      162.2
+     ],
+     "quoi": "corniche du mur de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1147.0,
+      126.1
+     ],
+     "p2": [
+      1204.5,
+      111.0
+     ],
+     "quoi": "corniche du mur de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1057.8,
+      209.2
+     ],
+     "p2": [
+      962.6,
+      228.2
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      906.9,
+      240.5
+     ],
+     "p2": [
+      793.3,
+      262.5
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      758.5,
+      268.6
+     ],
+     "p2": [
+      670.6,
+      285.4
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.3
+    },
+    {
+     "axe": "x",
+     "p1": [
+      929.8,
+      226.2
+     ],
+     "p2": [
+      1152.2,
+      179.8
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      771.9,
+      263.5
+     ],
+     "p2": [
+      913.2,
+      236.1
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.4
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1107.1,
+      185.3
+     ],
+     "p2": [
+      948.1,
+      219.1
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1150.8,
+      186.5
+     ],
+     "p2": [
+      1075.5,
+      201.4
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.2
+    },
+    {
+     "axe": "x",
+     "p1": [
+      919.3,
+      228.0
+     ],
+     "p2": [
+      785.6,
+      255.5
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.2
+    },
+    {
+     "axe": "x",
+     "p1": [
+      751.8,
+      262.6
+     ],
+     "p2": [
+      704.5,
+      272.3
+     ],
+     "quoi": "haut de la baie sud",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    }
+   ]
+  },
+  "photo-04": {
+   "camera": {
+    "x": 3.443,
+    "y": 2.345,
+    "z": 1.204,
+    "cap": 92.42,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 384.3
+   },
+   "largeur": 1206,
+   "hauteur": 792,
+   "piece": "sejour_1",
+   "qualite": "approchée",
+   "ecart_moyen_px": 2.6,
+   "ecart_pire_px": 11.9,
+   "incertitude_m": 0.31,
+   "incertitude_cap_deg": 3.0,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.58,
+      0.0
+     ],
+     "b": [
+      1.23,
+      6.58,
+      2.5
+     ],
+     "p1": [
+      350,
+      240
+     ],
+     "p2": [
+      350,
+      520
+     ],
+     "quoi": "baie ouest, bord nord",
+     "ecart_px": 3.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0.0
+     ],
+     "b": [
+      1.23,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      372,
+      240
+     ],
+     "p2": [
+      372,
+      520
+     ],
+     "quoi": "angle nord-ouest",
+     "ecart_px": 3.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0.0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      826,
+      290
+     ],
+     "p2": [
+      826,
+      480
+     ],
+     "quoi": "porte de l'entrée, bord ouest",
+     "ecart_px": 4.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.28,
+      6.95,
+      0.0
+     ],
+     "b": [
+      6.28,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      968,
+      290
+     ],
+     "p2": [
+      968,
+      480
+     ],
+     "quoi": "porte de l'entrée, bord est",
+     "ecart_px": 3.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.95,
+      0.0
+     ],
+     "b": [
+      6.4,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      987,
+      230
+     ],
+     "p2": [
+      987,
+      525
+     ],
+     "quoi": "angle nord-est",
+     "ecart_px": 0.7
+    },
+    {
+     "type": "ligne",
+     "a": [
+      2.693,
+      6.85,
+      0.0
+     ],
+     "b": [
+      2.693,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      542,
+      290
+     ],
+     "p2": [
+      542,
+      320
+     ],
+     "quoi": "applique ouest",
+     "libre": true,
+     "ecart_px": 6.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.311,
+      6.85,
+      0.0
+     ],
+     "b": [
+      4.311,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      731,
+      290
+     ],
+     "p2": [
+      731,
+      320
+     ],
+     "quoi": "applique est",
+     "libre": true,
+     "ecart_px": 1.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.973,
+      6.95,
+      0.0
+     ],
+     "b": [
+      4.973,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      812.5,
+      380
+     ],
+     "p2": [
+      812.5,
+      390
+     ],
+     "quoi": "interrupteur près de la porte",
+     "libre": true,
+     "ecart_px": 2.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      6.089,
+      0.0
+     ],
+     "b": [
+      6.4,
+      6.089,
+      2.5
+     ],
+     "p1": [
+      1073.5,
+      240
+     ],
+     "p2": [
+      1073.5,
+      350
+     ],
+     "quoi": "tableau, bord nord",
+     "libre": true,
+     "ecart_px": 1.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      5.518,
+      0.0
+     ],
+     "b": [
+      6.4,
+      5.518,
+      2.5
+     ],
+     "p1": [
+      1156,
+      230
+     ],
+     "p2": [
+      1156,
+      345
+     ],
+     "quoi": "tableau, bord sud",
+     "libre": true,
+     "ecart_px": 0.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.442,
+      6.85,
+      0.0
+     ],
+     "b": [
+      1.442,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      376,
+      420
+     ],
+     "p2": [
+      376,
+      515
+     ],
+     "quoi": "radiateur, bord ouest",
+     "libre": true,
+     "ecart_px": 11.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.898,
+      6.85,
+      0.0
+     ],
+     "b": [
+      1.898,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      440,
+      420
+     ],
+     "p2": [
+      440,
+      515
+     ],
+     "quoi": "radiateur, bord est",
+     "libre": true,
+     "ecart_px": 1.5
+    },
+    {
+     "type": "point",
+     "p": [
+      6.4,
+      6.95,
+      0.0
+     ],
+     "uv": [
+      987,
+      531
+     ],
+     "quoi": "pied : angle nord-est",
+     "ecart_px": 0.7
+    },
+    {
+     "type": "point",
+     "p": [
+      1.23,
+      6.95,
+      0.0
+     ],
+     "uv": [
+      372,
+      524
+     ],
+     "quoi": "pied : angle nord-ouest",
+     "ecart_px": 3.2
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "x",
+     "p1": [
+      380,
+      232
+     ],
+     "p2": [
+      980,
+      232
+     ],
+     "quoi": "corniche du mur du buffet",
+     "source": "main",
+     "ecart_px": 3.5
+    },
+    {
+     "axe": "y",
+     "p1": [
+      50,
+      50
+     ],
+     "p2": [
+      360,
+      225
+     ],
+     "quoi": "corniche du mur de la baie ouest",
+     "source": "main",
+     "ecart_px": 2.9
+    },
+    {
+     "axe": "y",
+     "p1": [
+      2.5,
+      704.4
+     ],
+     "p2": [
+      345.4,
+      531.3
+     ],
+     "quoi": "pied de la baie ouest",
+     "source": "ordinateur",
+     "ecart_px": 1.8
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1204.5,
+      122.2
+     ],
+     "p2": [
+      985.3,
+      222.5
+     ],
+     "quoi": "corniche du mur du tableau",
+     "source": "ordinateur",
+     "ecart_px": 0.6
+    }
+   ]
+  },
+  "photo-05": {
+   "camera": {
+    "x": 6.766,
+    "y": 2.773,
+    "z": 0.922,
+    "cap": 149.06,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 390.1
+   },
+   "largeur": 1206,
+   "hauteur": 777,
+   "piece": "sejour_1",
+   "qualite": "approchée",
+   "ecart_moyen_px": 4.4,
+   "ecart_pire_px": 13.6,
+   "incertitude_m": 0.6,
+   "incertitude_cap_deg": 4.7,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      2.67,
+      0.0
+     ],
+     "b": [
+      1.23,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      259,
+      220
+     ],
+     "p2": [
+      259,
+      495
+     ],
+     "quoi": "angle sud-ouest",
+     "ecart_px": 3.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      4.2,
+      0.0
+     ],
+     "b": [
+      1.23,
+      4.2,
+      2.5
+     ],
+     "p1": [
+      443,
+      275
+     ],
+     "p2": [
+      443,
+      470
+     ],
+     "quoi": "baie ouest, bord sud",
+     "ecart_px": 1.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.58,
+      0.0
+     ],
+     "b": [
+      1.23,
+      6.58,
+      2.5
+     ],
+     "p1": [
+      630,
+      280
+     ],
+     "p2": [
+      630,
+      450
+     ],
+     "quoi": "baie ouest, bord nord",
+     "ecart_px": 7.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      1.23,
+      6.95,
+      0.0
+     ],
+     "b": [
+      1.23,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      671.5,
+      270
+     ],
+     "p2": [
+      671.5,
+      480
+     ],
+     "quoi": "angle nord-ouest",
+     "ecart_px": 10.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0.0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      1016,
+      230
+     ],
+     "p2": [
+      1016,
+      520
+     ],
+     "quoi": "porte de l'entrée, bord ouest",
+     "ecart_px": 9.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      2.693,
+      6.85,
+      0.0
+     ],
+     "b": [
+      2.693,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      753.5,
+      285
+     ],
+     "p2": [
+      753.5,
+      310
+     ],
+     "quoi": "applique ouest",
+     "libre": true,
+     "ecart_px": 13.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.311,
+      6.85,
+      0.0
+     ],
+     "b": [
+      4.311,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      898.5,
+      255
+     ],
+     "p2": [
+      898.5,
+      285
+     ],
+     "quoi": "applique est",
+     "libre": true,
+     "ecart_px": 5.5
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.973,
+      6.95,
+      0.0
+     ],
+     "b": [
+      4.973,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      996,
+      345
+     ],
+     "p2": [
+      996,
+      360
+     ],
+     "quoi": "interrupteur près de la porte",
+     "libre": true,
+     "ecart_px": 0.6
+    },
+    {
+     "type": "point",
+     "p": [
+      1.23,
+      2.67,
+      0.0
+     ],
+     "uv": [
+      259,
+      497
+     ],
+     "quoi": "pied : angle sud-ouest",
+     "ecart_px": 3.5
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "x",
+     "p1": [
+      731,
+      250
+     ],
+     "p2": [
+      1206,
+      102
+     ],
+     "quoi": "corniche du mur du buffet",
+     "source": "main",
+     "ecart_px": 0.5
+    },
+    {
+     "axe": "x",
+     "p1": [
+      951,
+      505
+     ],
+     "p2": [
+      1031,
+      522
+     ],
+     "quoi": "pied du mur du buffet",
+     "source": "main",
+     "ecart_px": 1.6
+    },
+    {
+     "axe": "y",
+     "p1": [
+      299.2,
+      492.7
+     ],
+     "p2": [
+      369.3,
+      486.2
+     ],
+     "quoi": "pied du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 0.3
+    }
+   ]
+  },
+  "photo-07": {
+   "camera": {
+    "x": 8.192,
+    "y": 0.574,
+    "z": 0.958,
+    "cap": 93.62,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 376.4
+   },
+   "largeur": 1206,
+   "hauteur": 782,
+   "piece": "sejour_1",
+   "qualite": "approchée",
+   "ecart_moyen_px": 3.8,
+   "ecart_pire_px": 9.4,
+   "incertitude_m": 0.33,
+   "incertitude_cap_deg": 2.2,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      6.45,
+      2.67,
+      0.0
+     ],
+     "b": [
+      6.45,
+      2.67,
+      2.5
+     ],
+     "p1": [
+      200,
+      20
+     ],
+     "p2": [
+      200,
+      290
+     ],
+     "quoi": "angle saillant baie sud / coin salon",
+     "ecart_px": 5.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      5.14,
+      6.95,
+      0.0
+     ],
+     "b": [
+      5.14,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      380,
+      285
+     ],
+     "p2": [
+      380,
+      400
+     ],
+     "quoi": "porte de l'entrée, bord ouest",
+     "ecart_px": 3.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      6.4,
+      4.69,
+      0.0
+     ],
+     "b": [
+      6.4,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      415,
+      180
+     ],
+     "p2": [
+      415,
+      495
+     ],
+     "quoi": "bout du mur du tableau",
+     "ecart_px": 9.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      4.69,
+      0.0
+     ],
+     "b": [
+      9.75,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      845,
+      165
+     ],
+     "p2": [
+      845,
+      180
+     ],
+     "quoi": "coin salon, angle nord-est",
+     "ecart_px": 4.6
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.311,
+      6.85,
+      0.0
+     ],
+     "b": [
+      4.311,
+      6.85,
+      2.5
+     ],
+     "p1": [
+      312,
+      290
+     ],
+     "p2": [
+      312,
+      305
+     ],
+     "quoi": "applique est",
+     "libre": true,
+     "ecart_px": 0.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      4.973,
+      6.95,
+      0.0
+     ],
+     "b": [
+      4.973,
+      6.95,
+      2.5
+     ],
+     "p1": [
+      367.5,
+      340
+     ],
+     "p2": [
+      367.5,
+      350
+     ],
+     "quoi": "interrupteur près de la porte",
+     "libre": true,
+     "ecart_px": 2.3
+    },
+    {
+     "type": "point",
+     "p": [
+      6.4,
+      4.69,
+      0.0
+     ],
+     "uv": [
+      415,
+      500
+     ],
+     "quoi": "pied : bout du mur du tableau",
+     "ecart_px": 9.4
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "x",
+     "p1": [
+      410,
+      172
+     ],
+     "p2": [
+      840,
+      172
+     ],
+     "quoi": "corniche du fond du coin salon",
+     "source": "main",
+     "ecart_px": 5.1
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1000.6,
+      0.6
+     ],
+     "p2": [
+      840.6,
+      164.4
+     ],
+     "quoi": "corniche du mur est",
+     "source": "ordinateur",
+     "ecart_px": 0.8
+    },
+    {
+     "axe": "x",
+     "p1": [
+      202,
+      245
+     ],
+     "p2": [
+      412,
+      245
+     ],
+     "quoi": "corniche du mur du buffet (au loin)",
+     "source": "main",
+     "ecart_px": 1.7
+    }
+   ]
+  },
+  "photo-06": {
+   "camera": {
+    "x": 6.993,
+    "y": 4.612,
+    "z": 1.225,
+    "cap": -43.94,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 376.3
+   },
+   "largeur": 1206,
+   "hauteur": 799,
+   "piece": "sejour_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 1.4,
+   "ecart_pire_px": 6.7,
+   "incertitude_m": 0.28,
+   "incertitude_cap_deg": 1.9,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      4.69,
+      0.0
+     ],
+     "b": [
+      9.75,
+      4.69,
+      2.5
+     ],
+     "p1": [
+      47,
+      60
+     ],
+     "p2": [
+      47,
+      400
+     ],
+     "quoi": "coin salon, angle nord-est",
+     "ecart_px": 0.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.75,
+      0.0,
+      0.0
+     ],
+     "b": [
+      9.75,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      751,
+      250
+     ],
+     "p2": [
+      751,
+      505
+     ],
+     "quoi": "coin salon, angle sud-est",
+     "ecart_px": 0.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.25,
+      0.0,
+      0.0
+     ],
+     "b": [
+      9.25,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      801,
+      285
+     ],
+     "p2": [
+      801,
+      500
+     ],
+     "quoi": "baie du coin salon, bord est",
+     "ecart_px": 0.1
+    },
+    {
+     "type": "point",
+     "p": [
+      9.75,
+      0.0,
+      0.0
+     ],
+     "uv": [
+      751,
+      505
+     ],
+     "quoi": "pied : coin salon, angle sud-est",
+     "ecart_px": 0.1
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "y",
+     "p1": [
+      271.9,
+      91.8
+     ],
+     "p2": [
+      70.6,
+      30.7
+     ],
+     "quoi": "corniche du mur est",
+     "source": "ordinateur",
+     "ecart_px": 1.2
+    },
+    {
+     "axe": "y",
+     "p1": [
+      327.2,
+      108.3
+     ],
+     "p2": [
+      273.0,
+      92.2
+     ],
+     "quoi": "corniche du mur est",
+     "source": "ordinateur",
+     "ecart_px": 0.6
+    },
+    {
+     "axe": "y",
+     "p1": [
+      614.3,
+      197.0
+     ],
+     "p2": [
+      360.5,
+      118.4
+     ],
+     "quoi": "corniche du mur est",
+     "source": "ordinateur",
+     "ecart_px": 1.3
+    },
+    {
+     "axe": "y",
+     "p1": [
+      690.5,
+      221.0
+     ],
+     "p2": [
+      616.9,
+      198.0
+     ],
+     "quoi": "corniche du mur est",
+     "source": "ordinateur",
+     "ecart_px": 0.4
+    },
+    {
+     "axe": "x",
+     "p1": [
+      761,
+      247
+     ],
+     "p2": [
+      1116,
+      197
+     ],
+     "quoi": "corniche du mur de la baie",
+     "source": "main",
+     "ecart_px": 6.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      930.9,
+      541.9
+     ],
+     "p2": [
+      790.4,
+      515.8
+     ],
+     "quoi": "pied du mur de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      755.4,
+      504.3
+     ],
+     "p2": [
+      1014.4,
+      551.5
+     ],
+     "quoi": "pied du mur de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      936.7,
+      267.3
+     ],
+     "p2": [
+      1110.5,
+      237.4
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 3.5
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1102.0,
+      247.9
+     ],
+     "p2": [
+      1053.1,
+      255.5
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.8
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1110.7,
+      241.2
+     ],
+     "p2": [
+      998.2,
+      259.8
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 2.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      925.6,
+      264.0
+     ],
+     "p2": [
+      847.0,
+      277.4
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 1.5
+    },
+    {
+     "axe": "x",
+     "p1": [
+      822.0,
+      279.9
+     ],
+     "p2": [
+      924.4,
+      262.0
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 2.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      918.2,
+      260.9
+     ],
+     "p2": [
+      817.0,
+      278.6
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 2.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      1090.6,
+      234.3
+     ],
+     "p2": [
+      935.7,
+      261.2
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 2.8
+    },
+    {
+     "axe": "x",
+     "p1": [
+      923.0,
+      268.9
+     ],
+     "p2": [
+      878.2,
+      276.0
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    }
+   ]
+  },
+  "photo-10": {
+   "camera": {
+    "x": 11.972,
+    "y": 4.086,
+    "z": 1.063,
+    "cap": -120.86,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 384.2
+   },
+   "largeur": 1206,
+   "hauteur": 772,
+   "piece": "chambre_1",
+   "qualite": "moyenne",
+   "ecart_moyen_px": 1.3,
+   "ecart_pire_px": 8.4,
+   "incertitude_m": 0.28,
+   "incertitude_cap_deg": 1.4,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      12.47,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.47,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      186,
+      150
+     ],
+     "p2": [
+      186,
+      540
+     ],
+     "quoi": "angle sud-est",
+     "ecart_px": 5.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      11.98,
+      0.0,
+      0.0
+     ],
+     "b": [
+      11.98,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      267.5,
+      225
+     ],
+     "p2": [
+      267.5,
+      520
+     ],
+     "quoi": "baie, bord est",
+     "ecart_px": 8.4
+    },
+    {
+     "type": "ligne",
+     "a": [
+      10.03,
+      0.0,
+      0.0
+     ],
+     "b": [
+      10.03,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      550,
+      240
+     ],
+     "p2": [
+      550,
+      420
+     ],
+     "quoi": "baie, bord ouest",
+     "ecart_px": 1.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.89,
+      0.0,
+      0.0
+     ],
+     "b": [
+      9.89,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      570,
+      225
+     ],
+     "p2": [
+      570,
+      420
+     ],
+     "quoi": "angle sud-ouest",
+     "ecart_px": 3.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      9.89,
+      0.0,
+      0.0
+     ],
+     "b": [
+      9.89,
+      4.75,
+      0.0
+     ],
+     "p1": [
+      981,
+      692
+     ],
+     "p2": [
+      1156,
+      770
+     ],
+     "quoi": "pied du mur ouest",
+     "ecart_px": 0.6
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "y",
+     "p1": [
+      601,
+      215
+     ],
+     "p2": [
+      996,
+      10
+     ],
+     "quoi": "corniche du mur ouest",
+     "source": "main",
+     "ecart_px": 0.4
+    },
+    {
+     "axe": "y",
+     "p1": [
+      979.3,
+      663.3
+     ],
+     "p2": [
+      1204.3,
+      750.7
+     ],
+     "quoi": "plinthe du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 0.8
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1026.9,
+      678.1
+     ],
+     "p2": [
+      979.3,
+      659.5
+     ],
+     "quoi": "plinthe du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1143.3,
+      722.7
+     ],
+     "p2": [
+      1094.2,
+      703.7
+     ],
+     "quoi": "plinthe du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1074.3,
+      695.9
+     ],
+     "p2": [
+      1035.5,
+      680.9
+     ],
+     "quoi": "plinthe du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "y",
+     "p1": [
+      186,
+      150
+     ],
+     "p2": [
+      155,
+      50
+     ],
+     "quoi": "corniche du mur est",
+     "source": "main",
+     "ecart_px": 3.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      240,
+      165
+     ],
+     "p2": [
+      565,
+      220
+     ],
+     "quoi": "corniche du mur de la baie",
+     "source": "main",
+     "ecart_px": 0.5
+    },
+    {
+     "axe": "x",
+     "p1": [
+      416.8,
+      260.9
+     ],
+     "p2": [
+      290.7,
+      246.6
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      426.7,
+      253.2
+     ],
+     "p2": [
+      534.3,
+      266.1
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      525.6,
+      268.3
+     ],
+     "p2": [
+      426.8,
+      256.5
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      536.9,
+      263.8
+     ],
+     "p2": [
+      426.9,
+      250.4
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      435.7,
+      248.8
+     ],
+     "p2": [
+      483.1,
+      254.5
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      514.3,
+      254.9
+     ],
+     "p2": [
+      468.2,
+      249.0
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      486.9,
+      255.1
+     ],
+     "p2": [
+      537.0,
+      261.2
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    }
+   ]
+  },
+  "photo-14": {
+   "camera": {
+    "x": 13.126,
+    "y": 4.138,
+    "z": 1.063,
+    "cap": -57.83,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 373.3
+   },
+   "largeur": 1206,
+   "hauteur": 786,
+   "piece": "chambre_2",
+   "qualite": "approchée",
+   "ecart_moyen_px": 2.1,
+   "ecart_pire_px": 6.1,
+   "incertitude_m": 0.32,
+   "incertitude_cap_deg": 1.8,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      15.2,
+      0.0,
+      0.0
+     ],
+     "b": [
+      15.2,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      651,
+      215
+     ],
+     "p2": [
+      651,
+      480
+     ],
+     "quoi": "angle sud-est",
+     "ecart_px": 4.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.72,
+      0.0,
+      0.0
+     ],
+     "b": [
+      14.72,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      716,
+      245
+     ],
+     "p2": [
+      716,
+      490
+     ],
+     "quoi": "baie, bord est",
+     "ecart_px": 6.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.77,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.77,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      1009,
+      215
+     ],
+     "p2": [
+      1009,
+      515
+     ],
+     "quoi": "baie, bord ouest",
+     "ecart_px": 6.0
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.64,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      1047,
+      150
+     ],
+     "p2": [
+      1047,
+      540
+     ],
+     "quoi": "angle sud-ouest",
+     "ecart_px": 4.8
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.64,
+      4.75,
+      0.0
+     ],
+     "p1": [
+      1071,
+      607
+     ],
+     "p2": [
+      1166,
+      780
+     ],
+     "quoi": "pied du mur ouest",
+     "ecart_px": 0.9
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "y",
+     "p1": [
+      350,
+      45
+     ],
+     "p2": [
+      640,
+      200
+     ],
+     "quoi": "corniche du mur est",
+     "source": "main",
+     "ecart_px": 2.8
+    },
+    {
+     "axe": "y",
+     "p1": [
+      0.3,
+      719.9
+     ],
+     "p2": [
+      151.9,
+      665.7
+     ],
+     "quoi": "plinthe du mur est",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      651,
+      217
+     ],
+     "p2": [
+      1041,
+      155
+     ],
+     "quoi": "corniche du mur de la baie",
+     "source": "main",
+     "ecart_px": 1.9
+    },
+    {
+     "axe": "x",
+     "p1": [
+      838.1,
+      243.1
+     ],
+     "p2": [
+      975.7,
+      225.1
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.9
+    },
+    {
+     "axe": "x",
+     "p1": [
+      719.4,
+      252.4
+     ],
+     "p2": [
+      827.0,
+      237.6
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      826.8,
+      240.4
+     ],
+     "p2": [
+      726.9,
+      254.3
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.9
+    },
+    {
+     "axe": "x",
+     "p1": [
+      976.8,
+      228.6
+     ],
+     "p2": [
+      845.6,
+      245.4
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.8
+    },
+    {
+     "axe": "x",
+     "p1": [
+      999.5,
+      210.0
+     ],
+     "p2": [
+      716.8,
+      250.0
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 1.9
+    },
+    {
+     "axe": "x",
+     "p1": [
+      816.8,
+      229.0
+     ],
+     "p2": [
+      768.2,
+      236.1
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.3
+    },
+    {
+     "axe": "x",
+     "p1": [
+      895.6,
+      229.0
+     ],
+     "p2": [
+      834.4,
+      237.1
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.3
+    }
+   ]
+  },
+  "photo-15": {
+   "camera": {
+    "x": 14.751,
+    "y": 3.83,
+    "z": 0.992,
+    "cap": -122.96,
+    "tangage": 0.0,
+    "f": 545.0,
+    "u0": 603.0,
+    "v0": 366.7
+   },
+   "largeur": 1206,
+   "hauteur": 779,
+   "piece": "chambre_2",
+   "qualite": "approchée",
+   "ecart_moyen_px": 2.1,
+   "ecart_pire_px": 7.6,
+   "incertitude_m": 0.32,
+   "incertitude_cap_deg": 1.9,
+   "reperes": [
+    {
+     "type": "ligne",
+     "a": [
+      15.2,
+      0.0,
+      0.0
+     ],
+     "b": [
+      15.2,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      150,
+      100
+     ],
+     "p2": [
+      150,
+      500
+     ],
+     "quoi": "angle sud-est",
+     "ecart_px": 1.3
+    },
+    {
+     "type": "ligne",
+     "a": [
+      14.72,
+      0.0,
+      0.0
+     ],
+     "b": [
+      14.72,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      258,
+      190
+     ],
+     "p2": [
+      258,
+      500
+     ],
+     "quoi": "baie, bord est",
+     "ecart_px": 2.2
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.77,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.77,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      542.5,
+      205
+     ],
+     "p2": [
+      542.5,
+      485
+     ],
+     "quoi": "baie, bord ouest",
+     "ecart_px": 6.9
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.64,
+      0.0,
+      2.5
+     ],
+     "p1": [
+      570,
+      195
+     ],
+     "p2": [
+      570,
+      470
+     ],
+     "quoi": "angle sud-ouest",
+     "ecart_px": 6.1
+    },
+    {
+     "type": "ligne",
+     "a": [
+      12.64,
+      0.0,
+      0.0
+     ],
+     "b": [
+      12.64,
+      4.75,
+      0.0
+     ],
+     "p1": [
+      976,
+      645
+     ],
+     "p2": [
+      1206,
+      750
+     ],
+     "quoi": "pied du mur ouest",
+     "ecart_px": 7.6
+    }
+   ],
+   "fuyantes": [
+    {
+     "axe": "y",
+     "p1": [
+      566,
+      197
+     ],
+     "p2": [
+      916,
+      10
+     ],
+     "quoi": "corniche du mur ouest",
+     "source": "main",
+     "ecart_px": 0.2
+    },
+    {
+     "axe": "y",
+     "p1": [
+      968.6,
+      611.7
+     ],
+     "p2": [
+      1204.6,
+      688.8
+     ],
+     "quoi": "plinthe du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 1.3
+    },
+    {
+     "axe": "y",
+     "p1": [
+      1078.0,
+      643.5
+     ],
+     "p2": [
+      989.0,
+      614.2
+     ],
+     "quoi": "plinthe du mur ouest",
+     "source": "ordinateur",
+     "ecart_px": 0.2
+    },
+    {
+     "axe": "x",
+     "p1": [
+      150,
+      100
+     ],
+     "p2": [
+      570,
+      195
+     ],
+     "quoi": "corniche du mur de la baie",
+     "source": "main",
+     "ecart_px": 4.9
+    },
+    {
+     "axe": "x",
+     "p1": [
+      305.9,
+      214.1
+     ],
+     "p2": [
+      263.0,
+      207.6
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.4
+    },
+    {
+     "axe": "x",
+     "p1": [
+      419.3,
+      219.8
+     ],
+     "p2": [
+      529.2,
+      236.6
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.6
+    },
+    {
+     "axe": "x",
+     "p1": [
+      494.1,
+      237.5
+     ],
+     "p2": [
+      424.6,
+      228.1
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.0
+    },
+    {
+     "axe": "x",
+     "p1": [
+      404.6,
+      213.2
+     ],
+     "p2": [
+      265.5,
+      191.6
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.5
+    },
+    {
+     "axe": "x",
+     "p1": [
+      265.7,
+      197.9
+     ],
+     "p2": [
+      311.8,
+      204.7
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.1
+    },
+    {
+     "axe": "x",
+     "p1": [
+      323.2,
+      208.9
+     ],
+     "p2": [
+      269.4,
+      200.5
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.4
+    },
+    {
+     "axe": "x",
+     "p1": [
+      533.2,
+      227.5
+     ],
+     "p2": [
+      398.0,
+      205.3
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    },
+    {
+     "axe": "x",
+     "p1": [
+      371.8,
+      216.1
+     ],
+     "p2": [
+      326.9,
+      209.4
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.2
+    },
+    {
+     "axe": "x",
+     "p1": [
+      528.1,
+      230.6
+     ],
+     "p2": [
+      414.3,
+      212.2
+     ],
+     "quoi": "haut de la baie",
+     "source": "ordinateur",
+     "ecart_px": 0.7
+    }
+   ]
+  }
+ },
+ "reperes_libres": {
+  "sejour_1:L1": {
+   "quoi": "applique ouest",
+   "x": 2.69,
+   "y": 6.85
+  },
+  "sejour_1:L2": {
+   "quoi": "applique est",
+   "x": 4.31,
+   "y": 6.85
+  },
+  "sejour_1:INT": {
+   "quoi": "interrupteur près de la porte",
+   "x": 4.97,
+   "y": 6.95
+  },
+  "sejour_1:RL": {
+   "quoi": "radiateur, bord ouest",
+   "x": 1.44,
+   "y": 6.85
+  },
+  "sejour_1:RR": {
+   "quoi": "radiateur, bord est",
+   "x": 1.9,
+   "y": 6.85
+  },
+  "sejour_1:TN": {
+   "quoi": "tableau, bord nord",
+   "x": 6.4,
+   "y": 6.09
+  },
+  "sejour_1:TS": {
+   "quoi": "tableau, bord sud",
+   "x": 6.4,
+   "y": 5.52
+  }
+ }
+}

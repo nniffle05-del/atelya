@@ -3,7 +3,6 @@
  "projet_id": "app-003",
  "unites": "m",
  "hauteur_sous_plafond": 2.9,
- "note": "Relevé à la main sur le plan de l'annonce (sans cotes) ; échelle d'après la surface de 145 m² donnée par NT ; hauteur sous plafond estimée d'après les photos ; relevé partiel (un mur par ouverture).",
  "murs": [
   {
    "id": "M1",
@@ -352,8 +351,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "séjour, côté rue (ouest)"
+   "source": "verite_claude"
   },
   {
    "id": "O2",
@@ -364,8 +362,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "séjour, côté rue (ouest)"
+   "source": "verite_claude"
   },
   {
    "id": "O3",
@@ -376,8 +373,7 @@
    "hauteur": 1.5,
    "allege": 0.9,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du haut (bureau)"
+   "source": "verite_claude"
   },
   {
    "id": "O4",
@@ -388,8 +384,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "cuisine"
+   "source": "verite_claude"
   },
   {
    "id": "O5",
@@ -400,8 +395,7 @@
    "hauteur": 2.0,
    "allege": 0.6,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "salle à manger (radiateur dessous)"
+   "source": "verite_claude"
   },
   {
    "id": "O6",
@@ -412,8 +406,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du milieu"
+   "source": "verite_claude"
   },
   {
    "id": "O7",
@@ -424,8 +417,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre de gauche"
+   "source": "verite_claude"
   },
   {
    "id": "O8",
@@ -436,8 +428,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre de gauche"
+   "source": "verite_claude"
   },
   {
    "id": "O9",
@@ -448,8 +439,7 @@
    "hauteur": 2.5,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du bas à droite (type supposé)"
+   "source": "verite_claude"
   },
   {
    "id": "O10",
@@ -460,8 +450,7 @@
    "hauteur": 1.0,
    "allege": 1.2,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "salle de bains"
+   "source": "verite_claude"
   },
   {
    "id": "O11",
@@ -472,8 +461,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "séjour / entrée (double)"
+   "source": "verite_claude"
   },
   {
    "id": "O12",
@@ -484,8 +472,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "entrée / salle à manger (double)"
+   "source": "verite_claude"
   },
   {
    "id": "O13",
@@ -496,8 +483,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "WC / entrée"
+   "source": "verite_claude"
   },
   {
    "id": "O14",
@@ -508,8 +494,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du haut / entrée"
+   "source": "verite_claude"
   },
   {
    "id": "O15",
@@ -520,8 +505,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du haut / SDE"
+   "source": "verite_claude"
   },
   {
    "id": "O16",
@@ -532,8 +516,7 @@
    "hauteur": 2.4,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "cuisine / salle à manger (grande ouverture sans porte)"
+   "source": "verite_claude"
   },
   {
    "id": "O17",
@@ -544,8 +527,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "entrée / couloir"
+   "source": "verite_claude"
   },
   {
    "id": "O18",
@@ -556,8 +538,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "séjour / couloir"
+   "source": "verite_claude"
   },
   {
    "id": "O19",
@@ -568,8 +549,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "porte palière (entrée)"
+   "source": "verite_claude"
   },
   {
    "id": "O20",
@@ -580,8 +560,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du milieu / couloir"
+   "source": "verite_claude"
   },
   {
    "id": "O21",
@@ -592,8 +571,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre de gauche / couloir"
+   "source": "verite_claude"
   },
   {
    "id": "O22",
@@ -604,8 +582,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "salle de bains / couloir"
+   "source": "verite_claude"
   },
   {
    "id": "O23",
@@ -616,8 +593,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "chambre du bas à droite / couloir"
+   "source": "verite_claude"
   },
   {
    "id": "O24",
@@ -628,8 +604,7 @@
    "hauteur": 2.1,
    "allege": 0.0,
    "statut": "estime",
-   "source": "verite_claude",
-   "note": "WC / couloir (mur en biais sur le plan, mis droit)"
+   "source": "verite_claude"
   }
  ],
  "pieces": [
