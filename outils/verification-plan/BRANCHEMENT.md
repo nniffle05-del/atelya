@@ -176,3 +176,46 @@ Le résultat porte alors, EN PLUS, à sa racine (jamais dans `logement`) :
 - Écran ouvert seul : le bouton « Terminer » télécharge `<projet>-photos.json` (`{"schema": "reponses-photos/0.1",
   "projet_id", "photos"}`), à donner à `outils\habillage\questions_photos.py ranger`. Dans le site : le champ `photos` est
   dans le `resultat` du message `atelya-verification:valide`.
+
+## Le plan, PUIS les photos, dans le même écran (ajout du 15/11/2026, facultatif)
+
+Quand le client a déposé des photos, l'écran peut tout enchaîner : la personne vérifie le plan, clique « Terminer le plan »,
+attend pendant qu'Atelya range les photos sur le plan vérifié (environ une minute), puis répond dans la MÊME page aux questions
+« d'où est prise cette photo ? » (ou lit « Aucune question à vous poser »). Sans le champ ci-dessous, rien ne change.
+
+```
+Site                                                Écran de vérification (iframe)
+  ouvrir {verification avec photos.a_suivre} ───►   étape « 1 · Le plan »
+                                   ◄── valide {resultat}          (« Terminer le plan » : le plan vérifié)
+  … le site remet le plan à Atelya …                l'écran affiche « Atelya range vos photos »
+  photos {etat: calcul}  (facultatif, répété) ──►   la barre avance
+  photos {etat: questions} ─────────────────────►   étape « 2 · Les photos » : les questions
+                                   ◄── valide {resultat avec photos}   (« Terminer les photos » : les réponses)
+  photos {etat: fini} ──────────────────────────►   « C'est terminé », les photos montrées sur le plan
+```
+
+1. À l'ouverture, le site ajoute au fichier de vérification : `"photos": {"a_suivre": true, "nombre": 15}` (`nombre` = photos
+   déposées par le client).
+2. Le premier message `atelya-verification:valide` porte le plan vérifié (pas de champ `photos` dans `resultat`). L'écran ne
+   se ferme pas : il attend.
+3. Le site dit à l'écran où en est Atelya par le message `{type: "atelya-verification:photos", etat: {...}}` :
+
+```json
+{"etape": "calcul", "total": 15, "faites": 6, "detail": "Il regarde la photo 7 sur 15…", "secondes": 21, "tour": 1}
+{"etape": "questions", "total": 15, "rangees": 9, "photos": {"questions": [ … comme au paragraphe précédent … ]}}
+{"etape": "fini", "total": 15, "rangees": 15, "laissees": 0, "tour": 2,
+ "places": [{"nom": "photo-01", "x": 3.1, "y": 2.4, "cap": 35.0}]}
+{"etape": "erreur", "erreur": "ce qui s'est passé, en clair", "retour": "plan"}
+```
+
+   - `calcul` est facultatif (il fait avancer la barre) ; `tour` vaut 1 après le plan, 2 après des réponses.
+   - `questions` sans aucune question, ou `fini` : l'écran affiche « C'est terminé » ; `places` (facultatif) = où chaque
+     photo est rangée, dessiné sur le plan.
+   - `erreur` : l'écran l'affiche et revient à l'étape `retour` (`"plan"` ou `"questions"`) : on peut recliquer « Terminer ».
+4. Le second message `atelya-verification:valide` porte les réponses (`resultat.photos`, voir plus haut). Le site les remet à
+   Atelya, qui replace les photos, puis répond `fini` (ou de nouvelles `questions`).
+
+Côté Atelya, sans site (essais, PC seul) : `outils\atelya\verifier_plan_et_photos.py <dossier de lecture> <dossier des photos>`
+fait exactement ce rôle sur le PC (petit service local, adresse 127.0.0.1 ; l'écran lui parle par `?service=/atelya`) ; les mêmes
+états sont produits par `moteur/service_verification.py` (`Enchainement.etat()`), à reprendre tel quel côté serveur du site.
+Essai du parcours « dans un site » sans vrai site : `pc\verification\scenario_site.py`.

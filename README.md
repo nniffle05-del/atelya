@@ -70,6 +70,11 @@ uv run python -m moteur.lecture_pdf plan.pdf
 uv run python -m moteur.generateur.plan_pdf --jeu sorties/jeu-100 --sortie sorties/pdf-100
                      # écrit en PDF les plans d'un jeu du générateur (étape A2-5) : vectoriel, piégé,
                      # scanné, réduit, tourné, dossier de 3 pages ; la vérité dans plan-<sorte>.json
+..\atelya\.venv\Scripts\python.exe outils\atelya\verifier_plan_et_photos.py <dossier de lecture> <dossier des photos>
+                     # (PC) l'écran de vérification ENCHAÎNÉ : on vérifie le plan, « Terminer le plan », Atelya range les
+                     # photos du client sur le plan vérifié (~1 min), ses questions « d'où est prise cette photo ? »
+                     # arrivent dans la même page, puis il s'arrête seul. --raccourci : écrit un .bat à double-cliquer
+                     # dans le dossier de lecture. Tout reste sur le PC (127.0.0.1). Voir moteur/service_verification.py.
 ```
 
 ## Saisir un plan

@@ -60,6 +60,8 @@ def questions(resultat: dict) -> dict:
     q = {}
     for n, d in resultat["cameras"].items():
         if d["sure"]:
+            if d.get("endroit_douteux"):  # la pièce est sûre, pas la place dans la pièce : la photo reste utilisée, mais on demande
+                q[n] = f"Atelya a rangé cette photo dans {d['piece']}, mais il n'est pas sûr de l'endroit : {d['endroit_douteux']}."
             continue
         if d.get("a_verifier"):
             q[n] = f"Pièce donnée : {d['piece']}, mais {d['a_verifier']}. Confirmez la pièce, ou pointez d'où la photo est prise."
@@ -77,7 +79,7 @@ def fiche(resultat: dict, dossier: Path, modele: str) -> dict:
         rel = Path(os.path.relpath(dossier.resolve(), RACINE)).as_posix()
     except ValueError:  # autre disque
         rel = dossier.resolve().as_posix()
-    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier", "pointee")
+    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier", "pointee", "endroit", "endroit_douteux")
                        if k in d and (k != "hesite_avec" or d[k])}
     return {"note": f"Caméras des photos retrouvées SEULES par Atelya (moteur/caler_photos.py {cp.VERSION}). « cameras » : photos "
                     "dont Atelya est sûr (seules à utiliser) ; « incertaines » : placées, mais pas sûres (« hesite_avec » : l'autre pièce possible).",
@@ -107,9 +109,10 @@ def lire_pieces(chemin: Path | None, photos: dict) -> tuple[dict, set, dict]:
             {nom(n): tuple(float(x) for x in v[:3]) for n, v in endroits.items() if nom(n) in photos})
 
 
-def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print) -> dict:
+def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print, outils=None) -> dict:
     """Ce que les outils des sols et des meubles reçoivent : une fiche déjà faite (fichier .json, calée à la main ou par
-    Atelya), ou directement le DOSSIER des photos du client : Atelya les cale alors seul et range la fiche `a_cote`."""
+    Atelya), ou directement le DOSSIER des photos du client : Atelya les cale alors seul et range la fiche `a_cote`.
+    outils : les réseaux déjà chargés (caler_photos.Outils), pour ne pas les recharger à chaque appel (écran enchaîné)."""
     if not chemin.is_dir():
         return json.loads(chemin.read_text(encoding="utf-8"))
     import gc
@@ -118,7 +121,7 @@ def fiche_ou_photos(chemin: Path, logement: dict, a_cote: Path, journal=print) -
     photos, modele = lire_photos(chemin)
     pieces, confirmees, endroits = lire_pieces(chemin / PIECES_DES_PHOTOS, photos)
     journal(f"Photos calées seules ({len(photos)} photos, pièce donnée par le client pour {len(pieces)}, endroit pointé pour {len(endroits)}) :")
-    f = fiche(cp.caler(logement, photos, journal=journal, pieces_donnees=pieces, confirmees=confirmees, endroits_donnes=endroits), chemin, modele)
+    f = fiche(cp.caler(logement, photos, outils=outils, journal=journal, pieces_donnees=pieces, confirmees=confirmees, endroits_donnes=endroits), chemin, modele)
     a_cote.parent.mkdir(parents=True, exist_ok=True)
     a_cote.write_text(json.dumps(f, ensure_ascii=False, indent=1), encoding="utf-8")
     journal(f"  {len(f['cameras'])} photos sûres (utilisées), {len(f['a_pointer'])} à montrer à la vérification (« d'où est prise cette photo ? ») : {a_cote}")

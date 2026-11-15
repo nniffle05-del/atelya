@@ -49,3 +49,16 @@ def test_ranger_les_reponses():
     assert pv.ranger_les_reponses(None, None) == {"pieces": {}}
     with pytest.raises(ValueError):
         pv.ranger_les_reponses(client, {"endroits": {"photo-02": [7.0]}})
+
+
+def test_endroits_douteux_a_la_fin_avec_la_place_proposee(tmp_path):
+    for i in range(1, 6):
+        ecrire_image(tmp_path / f"photo-0{i}.jpg", np.full((40, 60, 3), 40 * i, np.uint8))
+    fiche = _fiche()
+    fiche["cameras"]["photo-01"]["endroit_douteux"] = "une autre place dans la pièce irait presque aussi bien"
+    fiche["a_pointer"]["photo-01"] = "Atelya a rangé cette photo dans sejour_1, mais il n'est pas sûr de l'endroit."
+    q = pv.questions_pour_l_ecran(fiche, tmp_path)["questions"]
+    assert [(x["nom"], x["sorte"]) for x in q] == [("photo-02", "piece"), ("photo-03", "piece"), ("photo-04", "piece"), ("photo-05", "piece"), ("photo-01", "endroit")]
+    assert q[-1]["proposition"] == {"x": 2, "y": 2, "cap": 0} and q[-1]["piece"] == "sejour_1"   # la place d'Atelya, à confirmer d'un clic
+    sans = pv.questions_pour_l_ecran(fiche, tmp_path, endroits=False)["questions"]
+    assert [x["nom"] for x in sans] == ["photo-02", "photo-03", "photo-04", "photo-05"]

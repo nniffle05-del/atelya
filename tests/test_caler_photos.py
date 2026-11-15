@@ -188,3 +188,22 @@ def test_verticale_depuis_sol_et_plafond():
     n += rng.normal(0, 0.01, n.shape).astype(np.float32)
     haut = cp.verticale(n, np.ones((80, 120), bool))
     assert haut[1] < -0.98 and abs(np.linalg.norm(haut) - 1) < 1e-6
+
+
+def test_endroit_douteux():
+    """La pièce est la bonne, la place dans la pièce est-elle fiable ? Jugé pour le bloc, sans changer « sure »."""
+    net = {"ici": 0.8, "ailleurs": 0.5, "tournee": 0.2, "meilleure": 0.8, "autre_pose": 0.7, "accord": 1.0}
+    assert cp.endroit_douteux(net) is None and cp.endroit_douteux(None) is None and cp.endroit_douteux({}) is None
+    assert "autre place" in cp.endroit_douteux({**net, "autre_pose": cp.AUTRE_POSE_MIN})        # salle d'eau sans repère : à l'envers aussi bien
+    assert "ne s'accordent pas" in cp.endroit_douteux({**net, "accord": cp.ACCORD_MIN - 0.01})  # cuisine : une photo juste, l'autre à 2 m
+    assert "petite pièce" in cp.endroit_douteux(net, "cuisine_1") and "petite pièce" in cp.endroit_douteux(None, "salle_d_eau_2")  # toujours demandé
+    assert cp.endroit_douteux(net, "sejour_1") is None and cp.endroit_douteux(net, "chambre_2") is None
+    cameras = {"a": {"sure": True, "piece": "sejour_2", "endroit": {**net, "accord": 0.5}},
+               "b": {"sure": False, "piece": "sejour_2", "endroit": {**net, "accord": 0.5}},                    # déjà une question sur la pièce
+               "c": {"sure": True, "pointee": True, "piece": "cuisine_1", "endroit": {**net, "accord": 0.5}},   # pointée par NT : déjà une réponse
+               "d": {"sure": True, "piece": "sejour_1", "endroit": net},
+               "e": {"sure": True, "piece": "entree_1", "endroit": net}}
+    lignes = []
+    cp._signaler_les_endroits(cameras, lambda *a: lignes.append(a))
+    assert [n for n, d in cameras.items() if d.get("endroit_douteux")] == ["a", "e"] and all(d["sure"] == (n != "b") for n, d in cameras.items())
+    assert len(lignes) == 2 and "ENDROIT DOUTEUX" in lignes[0][0]
