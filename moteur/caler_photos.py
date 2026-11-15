@@ -34,6 +34,8 @@ LA PIÈCE DONNÉE PAR LE CLIENT (15/11/2026, version 0.3.0, décision NT : le cl
 garde son propre avis comme SECOND AVIS (`doute_sur_la_piece_donnee` → « a_verifier »). Mesuré par
 pc/essais-cameras-seules/pieces_donnees.py : photos utilisables 23 → 43 sur 45 sur les trois logements ; la place dans les
 petites pièces (cuisine, salle d'eau, entrée) reste peu fiable.
+EN DEUX TEMPS (NT, 15/11/2026) : le client nomme la pièce ; quand Atelya ne sait pas où ranger la photo, l'écran de
+vérification demande d'où elle est prise et NT pointe l'endroit : `caler(..., endroits_donnes=…)`.
 
 Mesuré sur les 22 photos calées à la main d'app-001 et app-002 (examens déjà vus, réglages regardés dessus) : bonne pièce
 16/22, à peu près placées (< 1 m, < 15°) 12, bien placées 7 ; photos « sûres » : 15, toutes dans la bonne pièce.
@@ -50,7 +52,7 @@ import torch
 from . import da3, fuites, moge
 from .oeil_dinov2 import ECART, MOYENNE, charger as charger_oeil, empreintes
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 PAS = 0.2                                   # une place possible tous les 20 cm
 HAUT_DES_MURS = 2.1                         # au-dessus : ni portes ni meubles, on y mesure la distance du mur
 ECHELLES = (0.72, 0.8, 0.88, 0.96, 1.04)    # MoGe-2 voit souvent trop profond : on essaie plusieurs tailles
@@ -67,6 +69,8 @@ SOUS_GROUPES = True                         # groupes coupés en sous-groupes de
 MARGE_D_ENSEMBLE = True                     # « sûre » jugé en laissant les autres blocs bouger (False = avant le 15/11/2026)
 SEUIL_PAR_RACINE = True                     # seuil du « sûr » × racine du nombre de photos du bloc (False = avant le 15/11/2026)
 MARGE_SURE = 0.4                            # « sûre » : changer de pièce ferait perdre au moins autant (× racine du nombre de photos du bloc)
+SENS_POINTE_DEG = 45.0                      # … et, si le sens du regard est indiqué aussi, le cap à 45° près
+RAYON_POINTE = 1.5                          # endroit pointé à la vérification : l'appareil est cherché à moins de 1,5 m du point
 VERS_PORTE_DEG = 50.0                       # … et regarde alors vers cette porte, à 50° près
 PORTE_M = 1.2                               # pièce donnée par le client : l'appareil peut être sur le seuil, à moins de 1,2 m d'une de ses portes
 MEUBLES_MIN = 0.3                           # pièce donnée : meubles vus qui ne vont pas avec cette sorte de pièce (un lit dans une « cuisine ») → à vérifier
@@ -464,6 +468,19 @@ def pieces_montrees(plan: dict, G: np.ndarray, pg: np.ndarray, permises: list[in
     return r, permis
 
 
+def zone_pointee(plan: dict, G: np.ndarray, pg: np.ndarray, point, donnee: list[int] | None) -> tuple[list[int], np.ndarray, bool]:
+    """L'endroit pointé à l'écran de vérification (« d'où est prise cette photo ? ») → (pièces permises, places de la grille à
+    moins de RAYON_POINTE du point, True si le point contredit la pièce donnée par le client). La pièce est celle du point :
+    c'est elle qui départage deux chambres jumelles. Si le point tombe hors de la pièce donnée mais sur son seuil (une cuisine
+    photographiée du couloir), la pièce donnée reste ; s'il tombe franchement ailleurs, c'est le point qui compte."""
+    ecart = np.hypot(G[:, 0] - point[0], G[:, 1] - point[1])
+    pres, pointee = ecart < RAYON_POINTE, int(pg[ecart.argmin()])
+    ailleurs = donnee is not None and pointee not in donnee
+    if ailleurs and (pieces_montrees(plan, G, pg, donnee)[1] & pres[:, None]).any():
+        return list(donnee), pres, False
+    return [pointee], pres, bool(ailleurs)
+
+
 def doute_sur_la_piece_donnee(sure_ailleurs: str | None, facteur_meubles: float, colle: float) -> str | None:
     """Le SECOND AVIS d'Atelya sur la pièce donnée par le client : la raison d'envoyer la photo à la vérification, ou None.
     sure_ailleurs : la pièce dont Atelya, seul, est sûr quand ce n'est pas la pièce donnée (ni son seuil) ; facteur_meubles :
@@ -744,7 +761,7 @@ class Outils:
 
 def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None,
           zoom_par_fuites: bool | str = False, detail: dict | None = None, pieces_donnees: dict | None = None,
-          confirmees=()) -> dict:
+          confirmees=(), endroits_donnes: dict | None = None) -> dict:
     """logement : le logement lu (pièces, murs, ouvertures) ; photos : {nom: photo RGB}.
     → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc",
                          "hesite_avec"}},
@@ -757,6 +774,11 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     photo colle bien moins à cette pièce qu'ailleurs (« colle » < COLLE_MIN) → « a_verifier » : la raison, et « sure » False (écran de vérification : NT confirme). confirmees : noms des
     photos dont la pièce a été confirmée à la vérification (plus de doute levé). Champs en plus : « donnee », « colle »,
     « avis_seul » ({piece, sure} : ce qu'Atelya aurait dit sans le client).
+    endroits_donnes (15/11/2026, NT : « en deux temps » : le client nomme la pièce, puis, quand Atelya ne sait pas où ranger
+    la photo, l'écran de vérification demande d'où elle est prise et NT POINTE l'endroit sur le plan) : {nom: (x, y)} en mètres
+    du plan, ou (x, y, cap) si le sens du regard est indiqué aussi (cap en degrés, 0 = vers les x croissants, sens inverse des
+    aiguilles ; alors à SENS_POINTE_DEG près). L'appareil est cherché à moins de RAYON_POINTE du point, dans la pièce pointée (ou sur son seuil) ; la photo
+    est « sure » (c'est une réponse de NT : plus de second avis), champ « pointee ».
     fenetres_de : {nom: carte « fenêtre ou non »} toute faite, pour les ESSAIS seulement (noter la chaîne sur les photos qui
     ont servi à apprendre la couche des fenêtres, avec une carte apprise sans elles).
     zoom_par_fuites : EN RÉSERVE (14/11/2026 nuit), pas en service. Zoom et cap donnés par les lignes de fuite
@@ -794,6 +816,16 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
         elif nom in photos:
             journal(f"  {nom} : pièce donnée inconnue du plan ({valeur}), photo calée comme si rien n'était dit")
 
+    pres_du_point, sens_pointes = {}, {}
+    for nom, point in (endroits_donnes or {}).items():
+        if nom not in photos:
+            continue
+        donnees[nom], pres_du_point[nom], contredit = zone_pointee(plan, G, pg, point, donnees.get(nom))
+        if len(point) > 2 and point[2] is not None:  # le sens du regard est indiqué aussi (cliquer puis tirer vers ce qu'on voit)
+            sens_pointes[nom] = np.abs((np.arange(360.0) - float(point[2]) + 180) % 360 - 180) <= SENS_POINTE_DEG
+        if contredit:
+            journal(f"  {nom} : l'endroit pointé n'est pas dans la pièce donnée, c'est l'endroit pointé qui compte")
+
     def avec_jeu(r):
         """La meilleure note dans le jeu laissé à chaque photo dans son bloc (cases voisines, caps voisins)."""
         t = torch.nn.functional.max_pool2d(torch.from_numpy(r).permute(2, 0, 1)[None], 2 * JEU_M + 1, 1, JEU_M)[0].permute(1, 2, 0).numpy()
@@ -824,6 +856,10 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
             detail.setdefault("types", {})[nom] = types[nom]
         if nom in donnees:  # la pièce est donnée : plus besoin des meubles pour deviner sa sorte, seules ses cases comptent
             montree, permis = pieces_montrees(plan, G, pg, donnees[nom])
+            if nom in pres_du_point:
+                permis = permis & pres_du_point[nom][:, None]
+            if nom in sens_pointes:
+                permis = permis & sens_pointes[nom][None, :]
             PM[nom] = np.full(forme, -1); PM[nom][ij[:, 1], ij[:, 0]] = montree
             Rd[nom] = np.zeros((*forme, 360), np.float32); Rd[nom][ij[:, 1], ij[:, 0]] = N * permis
             Td[nom] = avec_jeu(Rd[nom])
@@ -960,6 +996,9 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
             continue
         s = seul.get(n)
         d.update(donnee=True, colle=round(colle[n], 2), avis_seul={"piece": s["piece"], "sure": s["sure"]} if s else None)
+        if n in pres_du_point:  # pointée par NT à la vérification : c'est déjà une réponse, pas de second avis
+            d.update(pointee=True)
+            continue
         ailleurs = None
         if s and s["sure"] and s["piece"] not in [plan["ids"][q] for q in donnees[n]]:
             ix, iy = int(round((s["camera"]["x"] - orig[0]) / PAS)), int(round((s["camera"]["y"] - orig[1]) / PAS))

@@ -91,9 +91,25 @@ def main():
         releves = [json.loads(r.read_text(encoding="utf-8")) for r in RELEVES[nom]]
         b = bilan[nom] = {"photos": len(photos)}
         res, det = {}, {}
-        for passage, pieces in (("seul", None), ("client", client), ("sorte", sorte)):
+        centre = {p["id"]: np.array(p["contour"], float).mean(0) for p in logement["pieces"]}
+        for passage, pieces in (("seul", None), ("client", client), ("sorte", sorte), ("deux-temps", sorte)):
             det[passage] = {}
-            r = res[passage] = cp.caler(logement, photos, outils=o, journal=lambda *a: None, fenetres_de=cartes, pieces_donnees=pieces, detail=det[passage])
+            endroits = {}
+            if passage == "deux-temps":  # 2e temps : NT pointe d'où est prise chaque photo qu'Atelya n'a pas su ranger au 1er temps
+                for n in photos:
+                    if n in b["sorte"]["sures"] or n not in client:
+                        continue
+                    vraie = next((np.array([r_["cameras"][n]["camera"]["x"], r_["cameras"][n]["camera"]["y"]]) for r_ in releves if n in r_["cameras"]), None)
+                    cap = next((r_["cameras"][n]["camera"]["cap"] for r_ in releves if n in r_["cameras"]), None)
+                    c = centre[client[n]]
+                    if vraie is None:  # pas de relevé : on pointe le milieu de la vraie pièce
+                        endroits[n] = (float(c[0]), float(c[1]))
+                    else:               # relevé : on pointe à 0,5 m de la vraie place (NT ne pointe pas au centimètre)
+                        v = c - vraie; v = v / max(np.linalg.norm(v), 1e-6) * 0.5
+                        endroits[n] = (float(vraie[0] + v[0]), float(vraie[1] + v[1])) + ((cap + 20.0,) if "--sens" in sys.argv else ())  # sens indiqué à 20° près
+                b["pointees"] = sorted(endroits)
+            r = res[passage] = cp.caler(logement, photos, outils=o, journal=lambda *a: None, fenetres_de=cartes, pieces_donnees=pieces, detail=det[passage],
+                                        endroits_donnes=endroits)
             utiles = [n for n, d in r["cameras"].items() if d["sure"]]
             justes = [n for n in utiles if r["cameras"][n]["piece"] in f["vrai"][n]]
             alertes = {n: d["a_verifier"] for n, d in r["cameras"].items() if d.get("a_verifier")}
@@ -107,8 +123,8 @@ def main():
                   f"non calées {len(r['non_calees'])}", flush=True)
             print(f"   place, photos utilisables : {resume(e, utiles)}")
             if passage != "seul":
-                nouvelles = [n for n in utiles if n not in b["seul"]["sures"]]
-                print(f"   place, photos NOUVELLES (pas sûres quand Atelya est seul) : {resume(e, nouvelles)}")
+                nouvelles = [n for n in utiles if n not in b["sorte" if passage == "deux-temps" else "seul"]["sures"]]
+                print(f"   place, photos NOUVELLES ({'pointées par NT' if passage == 'deux-temps' else 'pas sûres quand Atelya est seul'}) : {resume(e, nouvelles)}")
                 for n in nouvelles:
                     if n in e:
                         print(f"      {n} {r['cameras'][n]['piece']:14s} {e[n][0]:.2f} m, {e[n][1]:.0f}°  (colle {r['cameras'][n].get('colle')})")

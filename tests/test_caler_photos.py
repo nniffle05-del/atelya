@@ -142,6 +142,17 @@ def test_piece_donnee_par_le_client():
     assert montree[loin] == -1 and not permis[loin].any()                   # au fond du séjour : jamais
 
 
+def test_endroit_pointe_a_la_verification():
+    """« D'où est prise cette photo ? » : le point choisit la pièce (c'est lui qui départage deux chambres jumelles)."""
+    plan = cp.plan_du_logement(_logement_en_l())
+    G = cp.grille(plan); pg = cp.piece_de(plan, G)
+    permises, pres, contredit = cp.zone_pointee(plan, G, pg, (7.5, 2.0), None)             # pointé dans la chambre, rien de donné
+    assert permises == [1] and not contredit and pres.any() and np.hypot(G[pres, 0] - 7.5, G[pres, 1] - 2.0).max() < cp.RAYON_POINTE
+    assert cp.zone_pointee(plan, G, pg, (7.5, 2.0), [1])[::2] == ([1], False)              # … et la chambre était donnée : d'accord
+    assert cp.zone_pointee(plan, G, pg, (8.5, 3.0), [0])[::2] == ([1], True)               # « séjour » donné, pointé au fond de la chambre
+    assert cp.zone_pointee(plan, G, pg, (5.4, 0.9), [1])[::2] == ([1], False)              # chambre donnée, pointé sur son seuil côté séjour
+
+
 def test_second_avis_sur_la_piece_donnee():
     """Le client a donné la pièce : Atelya ne lève un doute que s'il a une raison nette de la voir ailleurs."""
     assert cp.doute_sur_la_piece_donnee(None, 1.0, 0.95) is None
