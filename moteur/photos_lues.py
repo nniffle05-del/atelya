@@ -44,6 +44,9 @@ CACHE_M = 0.05  # un meuble d'une autre pièce est gardé seulement si aucun mur
 POINTS_COEUR_MIN = 20  # points mesurés qu'il faut dans le cœur d'un rectangle pour en tirer une profondeur
 PIED_CACHE = ("chaise", "fauteuil", "table", "lampe", "plante")  # groupes de petits meubles isolés dont le pied peut être caché
 EPAISSEUR_VUE_M = 0.6  # dans le rectangle, les points à moins de 60 cm de la distance du cœur sont le meuble
+MOITIE = 0.6  # un meuble vu moins large que 60 % de la plus petite largeur de sa sorte n'est pas à la distance mesurée
+COEUR_LIBRE_MIN = 0.5  # part du cœur du rectangle qui doit rester visible (ni cachée par un meuble de devant, ni sans mesure)
+DEVANT_PX = 12  # un meuble dont le bas du rectangle est 12 px plus bas dans l'image est posé devant (plus près de l'appareil)
 
 
 def rayon(cam, u: float, v: float) -> tuple[float, float]:
@@ -121,7 +124,7 @@ def premier_mur(plan: dict, origine, angle_deg: float, portes_max: int = 3, piec
     return math.inf, 0
 
 
-def place_d_un_meuble(boite, repere: dict, camera: dict, largeur: int, hauteur: int) -> dict | None:
+def place_d_un_meuble(boite, repere: dict, camera: dict, largeur: int, hauteur: int, devant: list | None = None) -> dict | None:
     """La place d'un meuble PLEIN d'après la profondeur de la photo (MoGe-2, moteur.caler_photos.repere) : le cœur de son
     rectangle (sa moitié centrale) est le meuble lui-même ; sa distance est la MÉDIANE de ce cœur — et non les points les plus
     proches (moteur.objets_accroches.place_dans_la_photo, fait pour un luminaire devant un mur lointain), qui sont ici ce qui
@@ -136,13 +139,18 @@ def place_d_un_meuble(boite, repere: dict, camera: dict, largeur: int, hauteur: 
         u0, v0 = max(0, u0), max(0, v0)
         return slice(v0, min(Hm, max(v1, v0 + 1))), slice(u0, min(Wm, max(u1, u0 + 1)))
 
+    # ce qui passe DEVANT le meuble (`devant` : les rectangles des meubles de la photo posés plus près, leur bas plus bas dans
+    # l'image) n'est pas lui : une chaise derrière une table, dont le cœur du rectangle est le dossier de la chaise de devant
+    libre = np.ones(M.shape, bool)
+    for b in devant or []:
+        libre[max(0, int(b[1] * Hm / hauteur)):int(math.ceil(b[3] * Hm / hauteur)), max(0, int(b[0] * Wm / largeur)):int(math.ceil(b[2] * Wm / largeur))] = False
     coeur = fenetre(0.25)
-    ok = M[coeur] & repere["devant"][coeur]
-    if ok.sum() < POINTS_COEUR_MIN:
-        return None
+    ok = M[coeur] & repere["devant"][coeur] & libre[coeur]
+    if ok.sum() < max(POINTS_COEUR_MIN, COEUR_LIBRE_MIN * ok.size):
+        return None  # cœur caché par un meuble posé devant : rien de sûr à mesurer ici (ce qui dépasse autour est souvent le mur du fond)
     distance, direction = float(np.median(r[coeur][ok])), float(np.median(phi[coeur][ok]))
     tout = fenetre(0.05)
-    du_meuble = M[tout] & repere["devant"][tout] & (np.abs(r[tout] - distance) < EPAISSEUR_VUE_M)
+    du_meuble = M[tout] & repere["devant"][tout] & libre[tout] & (np.abs(r[tout] - distance) < EPAISSEUR_VUE_M)
     if du_meuble.sum() < POINTS_COEUR_MIN:
         return None
     bas, haut = float(np.percentile(h[tout][du_meuble], 5)), float(np.percentile(h[tout][du_meuble], 95))
@@ -179,11 +187,22 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
             vu = rm.vu_au_sol(g, o["sorte"], o["boite"], o["note"], cam, largeur, hauteur, piece)
         else:
             vu = rm.vu_au_sol(g, o["sorte"], o["boite"], o["note"], cam, largeur, hauteur, None)
-            mesure = place_d_un_meuble(o["boite"], repere, camera, largeur, hauteur) if g != "tapis" else None
+            # ce qui est posé devant lui sur la photo : les autres meubles au sol dont le bas du rectangle est nettement plus bas
+            devant = [x["boite"] for x in objets if x is not o and rm.groupe(x["sorte"]) in rm.TYPE_DE_GROUPE
+                      and rm.groupe(x["sorte"]) != "tapis" and float(x["boite"][3]) > y1 + DEVANT_PX] if g in PIED_CACHE else None
+            mesure = place_d_un_meuble(o["boite"], repere, camera, largeur, hauteur, devant) if g != "tapis" else None
             # le pied caché : toujours si le rectangle est coupé par le bas de la photo ou si le pied ne donne rien ; et, pour un
             # petit meuble isolé (chaise derrière une table), si le bas mesuré de son rectangle n'est pas au sol. Un grand meuble
             # adossé (buffet vu derrière des chaises) garde son pied : le cœur de son rectangle est ce qui passe devant lui.
             cache = vu is None or y1 >= hauteur - 3 or (g in PIED_CACHE and mesure is not None and mesure["bas"] > BAS_AU_SOL_M)
+            if cache and vu is not None and mesure is not None and y1 < hauteur - 3:
+                # la TAILLE de la sorte départage : à la distance de la profondeur, le rectangle ferait-il un meuble trop étroit pour
+                # sa sorte (une chaise de 20 cm), alors qu'à la distance du pied il a sa largeur ? Le cœur montrait autre chose,
+                # posé devant (une chaise lointaine vue contre le bord d'un téléviseur) : le pied est gardé.
+                etroit = MOITIE * meubles_photos.TAILLES.get(o["sorte"], meubles_photos.TAILLES["rangement"])[1][0]
+                au_pied = (x1 - x0) / float(cam[5]) * float(np.linalg.norm(np.asarray(vu["position"], float) - origine))
+                if mesure["largeur"] < etroit <= au_pied:
+                    cache = False
             if mesure is not None and cache:
                 point = np.asarray(mesure["position"], float)
                 direction = (point - origine) / max(float(np.linalg.norm(point - origine)), 1e-9)
@@ -220,10 +239,89 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
                     vu["position"] = [float(centre[0]), float(centre[1])]
         if vu is None:
             continue
-        vu.update(categorie=o["sorte"], photo=photo, phrase=o.get("dit") or o["sorte"], forme=o.get("forme"),
+        if logement is not None:
+            vu["piece"] = (piece_de(vu["position"], logement["pieces"]) or {}).get("id")
+        vu.update(categorie=o["sorte"], photo=photo, phrase=o.get("dit") or o["sorte"], forme=o.get("forme"), numero=o.get("numero"),
+                  distance=float(np.linalg.norm(np.asarray(vu["position"], float) - origine)), approche=bool(o.get("approche")),
+                  appareil=[float(origine[0]), float(origine[1])], coupe=bool(y1 >= hauteur - meubles_photos.BORD_PX and g != "tapis"),
                   mesure={**meubles_photos.mesurer(o["boite"], cam, largeur, hauteur, rgb), "appareil": [float(c) for c in cam[:3]]})
         sortie.append(vu)
     return sortie
+
+
+LOIN_M = 4.5  # un meuble vu seulement d'aussi loin n'a pas de place sûre (moteur.meubles_photos.incertitude : plus de 1,1 m)
+PLUS_PRES = 0.6  # une photo prise à moins de 60 % de cette distance, qui regarde l'endroit, fait foi sur ce qui s'y trouve
+MARGE_CADRE = 0.08  # l'endroit doit être dans le cadre de cette photo, à 8 % du bord au moins
+LARGE_LOINTAIN = 1.5  # un meuble lointain rejoint un meuble de son GROUPE vu de près jusqu'à 1,5 fois la limite habituelle
+
+
+HAUTEURS_VOISINES = 1.5  # deux sortes dont les hauteurs courantes diffèrent de moins de 50 % peuvent nommer le même meuble
+
+
+def confirmer_les_lointains(trouves: list[dict], appareils: list[tuple], plan: dict, logement: dict, journal=lambda *_: None,
+                            par_sorte: bool = True, objets_par_photo: dict[int, list[dict]] | None = None) -> list[dict]:
+    """Un meuble vu SEULEMENT de loin (place incertaine de plus d'un mètre) est rarement un meuble de plus. D'abord il rejoint
+    le meuble déjà posé de son groupe qu'il peut être (c'est lui, nommé autrement d'une photo à l'autre : « buffet » et
+    « commode », ou tombé loin de sa place). Sinon, si une photo bien plus proche regarde l'endroit sans rien y montrer de son
+    groupe, il est écarté (cette photo, lue elle aussi, l'aurait montré). Sinon il est gardé : c'est le seul témoin de ce
+    meuble (le fond d'une grande pièce photographiée d'un seul bout).
+    `appareils` : [(caméra 8 nombres, (largeur, hauteur) de la photo)], dans l'ordre des photos.
+    Les meubles viennent de moteur.meubles_photos.associer (ils gardent leurs vues, `_vues`)."""
+    from moteur import meubles_photos as mp
+    from moteur.camera_photo import projeter
+
+    def regarde(k: int, place) -> bool:
+        cam, (largeur, hauteur) = appareils[k]
+        u, v, d = projeter((float(place[0]), float(place[1]), 0.4), cam)
+        if not (d > 0.3 and MARGE_CADRE * largeur <= u <= (1 - MARGE_CADRE) * largeur and 0 <= v <= hauteur):
+            return False
+        origine = np.array([float(cam[0]), float(cam[1])])
+        distance = float(np.linalg.norm(np.asarray(place, float) - origine))
+        angle = math.degrees(math.atan2(place[1] - origine[1], place[0] - origine[0]))
+        return premier_mur(plan, origine, angle, pieces=logement["pieces"])[0] >= distance - CACHE_M
+
+    def montre(k: int, t: dict) -> bool:
+        """La photo k a-t-elle, dans la direction de ce meuble, un rectangle lu de son groupe (même si Atelya n'a pas su le
+        poser : pied caché derrière un canapé) ?"""
+        cam, _ = appareils[k]
+        u, _, d = projeter((float(t["position"][0]), float(t["position"][1]), 0.4), cam)
+        marge = float(cam[5]) * min(1.0, mp.incertitude(t["distance_min"])) / max(d, 0.5)
+        return any(rm.groupe(o["sorte"]) == t["groupe"] and semblables(o["sorte"], t["categorie"])
+                   and float(o["boite"][0]) - marge <= u <= float(o["boite"][2]) + marge for o in (objets_par_photo or {}).get(k, []))
+
+    def semblables(a: str, b: str) -> bool:
+        """Deux sortes d'un même groupe qui peuvent nommer le même meuble d'une photo à l'autre (un buffet et une commode,
+        une armoire et une bibliothèque ; pas une bibliothèque et un meuble télé) : leurs hauteurs courantes sont voisines."""
+        ha, hb = mp.taille_courante(a)[2], mp.taille_courante(b)[2]
+        return max(ha, hb) <= HAUTEURS_VOISINES * min(ha, hb)
+
+    from moteur import reperer_meubles as rm
+
+    gardes = [t for t in trouves if t["distance_min"] < LOIN_M]
+    for t in sorted((t for t in trouves if t["distance_min"] >= LOIN_M), key=lambda t: t["distance_min"]):
+        # 1. c'est un meuble déjà posé, plus sûr que lui : même groupe, même pièce, hauteurs voisines, vu par d'AUTRES photos,
+        #    et à sa portée (la limite d'une vue lointaine, une fois et demie)
+        vue = min(t["_vues"], key=mp.eloignement)
+        memes = [(c, g) for g in gardes if g["groupe"] == t["groupe"] and semblables(g["categorie"], t["categorie"])
+                 and g["_vues"][0].get("piece") == t["_vues"][0].get("piece") and not set(g["photos"]) & set(t["photos"])
+                 and (c := mp.meme_meuble(vue, g["position"], mp.seuil_de(vue, par_sorte), LARGE_LOINTAIN)) is not None]
+        if memes:
+            g = min(memes, key=lambda c: c[0])[1]
+            g["vues"] += t["vues"]
+            g["photos"] = sorted(set(g["photos"]) | set(t["photos"]))
+            g["membres"] = g["membres"] + t["membres"]
+            journal(f"  {t['categorie']} vu de loin ({t['distance_min']:.1f} m) = {g['categorie']} déjà posé en {g['position']}")
+            continue
+        # 2. sinon : une photo bien plus proche regarde-t-elle l'endroit ? Si elle n'y montre rien de son groupe, il est écarté ;
+        #    si personne ne regarde de plus près, il est gardé (le seul témoin du fond d'une grande pièce)
+        proches = [k for k, (cam, _) in enumerate(appareils) if k not in t["photos"]
+                   and math.dist(cam[:2], t["position"]) <= PLUS_PRES * t["distance_min"] and regarde(k, t["position"])]
+        if not proches or any(montre(k, t) for k in proches):
+            gardes.append(t)
+        else:
+            journal(f"  {t['categorie']} vu seulement de loin ({t['distance_min']:.1f} m) en {t['position']}, qu'une photo plus proche "
+                    f"regarde sans le montrer : écarté")
+    return [t for t in trouves if any(t is g for g in gardes)]  # l'ordre d'origine est gardé
 
 
 # ---------------------------------------------------------------- 2. les objets au mur
@@ -272,25 +370,19 @@ def au_mur_d_une_photo(objets: list[dict], cam, camera: dict, plan: dict, repere
         sortie.append({"sorte": o["sorte"], "position": [float(position[0]), float(position[1])], "face": float(face), "bas": float(bas),
                        "haut": float(haut), "largeur": float(etendue) if etendue < LARGEUR_MAX_M else None, "note": float(o["note"]),
                        "photo": photo, "poids": (x1 - x0) * (y1 - y0), "couleur": _couleur(rgb, o["boite"]), "sur_le_mur": sur_le_mur,
-                       "dit": o.get("dit")})
+                       "dit": o.get("dit"), "distance": float(distance), "appareil": [float(origine[0]), float(origine[1])]})
     return sortie
 
 
 def fusionner_au_mur(vus: list[dict], fusion_m: float = FUSION_MUR_M) -> list[dict]:
-    """Le même objet accroché vu sur plusieurs photos ne compte qu'une fois (même sorte, à moins de `fusion_m`) ; la place et la
-    face sont celles de sa vue la plus grande, les hauteurs et la largeur les médianes."""
-    restants = sorted(vus, key=lambda v: -v["poids"])
+    """Le même objet accroché vu sur plusieurs photos ne compte qu'une fois (même sorte, à moins de `fusion_m`, plus loin le
+    long du regard pour une vue lointaine : moteur.meubles_photos.reunir) ; la place et la face sont celles de sa vue la plus
+    PROCHE, les hauteurs et la largeur les médianes."""
+    from moteur.meubles_photos import reunir
+
     sortie = []
-    while restants:
-        tete = restants.pop(0)
-        paquet, photos = [tete], {tete["photo"]}
-        for v in sorted(restants, key=lambda v: math.dist(v["position"], tete["position"])):
-            ecart = math.dist(v["position"], tete["position"])
-            if v["sorte"] != tete["sorte"] or ecart >= fusion_m or (ecart >= MEME_OBJET_M and v["photo"] is not None and v["photo"] in photos):
-                continue
-            paquet.append(v)
-            photos.add(v["photo"])
-        restants = [v for v in restants if not any(v is p for p in paquet)]
+    for paquet in reunir(vus, fusion_m, MEME_OBJET_M, cle="sorte"):  # la vue la plus proche en tête : la plus sûre
+        tete = paquet[0]
         largeurs = [v["largeur"] for v in paquet if v.get("largeur")]
         couleurs = [v["couleur"] for v in paquet if v.get("couleur")]
         sortie.append({**tete, "vues": len(paquet), "bas": float(np.median([v["bas"] for v in paquet])),
@@ -431,7 +523,7 @@ def appliquer_les_sols(pieces: dict, lus: dict[str, dict]) -> dict:
 
 # ---------------------------------------------------------------- l'ensemble
 def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list[dict]], modele_moge=None, par_sorte: bool = True,
-          source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True) -> dict:
+          source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True, associer: bool = True) -> dict:
     """Photos placées (fiche cameras-photos.json) + objets de chaque photo avec leur sorte → ce qu'Atelya en fait :
     {"meubles": meubles à ajouter au logement (au sol rangés, suspendus, au mur), "baies": votes,
      "equipements": ce que moteur.equipements.poser rend (équipements à ajouter, rideaux, passe-plats, non posés)}.
@@ -454,7 +546,7 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
     plan = cp.plan_du_logement(logement)
     hsp = float(logement.get("hauteur_sous_plafond", 2.5))
     dossier, fichier = Path(racine) / releve["photos"], releve.get("fichier", "{nom}.png")
-    vus, par_photo, suspendus, au_mur, vues_equipements, baies = [], [], [], [], [], {}
+    vus, par_photo, suspendus, au_mur, vues_equipements, baies, tailles = [], [], [], [], [], {}, []
     vides = eq.vides_du_plan(logement) if equiper else []
     for k, (nom, d) in enumerate(releve["cameras"].items()):
         objets = objets_par_photo.get(nom) or []
@@ -463,6 +555,7 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
             raise FileNotFoundError(dossier / fichier.format(nom=nom))
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         hauteur, largeur = rgb.shape[:2]
+        tailles.append((largeur, hauteur))
         cam = camera_depuis_dict(d["camera"])
         piece, _ = piece_de_l_appareil(cam, logement["pieces"])
         repere = cp.repere(cp.mesurer(modele_moge, rgb, float(d["camera"]["f"])), hsp) if objets else None
@@ -481,7 +574,15 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
             t[1] += f
         journal(f"  {nom} : {len(de_la_photo)} meuble(s) au sol, {sum(1 for o in objets if o['sorte'] == 'suspension')} suspension(s), "
                 f"{sum(1 for o in objets if o['sorte'] in AU_MUR)} au mur, {sum(1 for o in objets if o['sorte'] in eq.SORTES_LUES)} équipement(s)")
-    trouves = meubles_photos.fusionner(vus, par_sorte=par_sorte)
+    if associer:  # le même meuble d'une photo à l'autre : des vues les plus sûres aux moins sûres (16/11/2026)
+        trouves = meubles_photos.associer(vus, par_sorte=par_sorte)
+        appareils = [(camera_depuis_dict(d["camera"]), t) for d, t in zip(releve["cameras"].values(), tailles)]
+        lus = {k: objets_par_photo.get(nom) or [] for k, nom in enumerate(releve["cameras"])}
+        trouves = confirmer_les_lointains(trouves, appareils, plan, logement, journal, par_sorte=par_sorte, objets_par_photo=lus)
+    else:
+        trouves = meubles_photos.fusionner(vus, par_sorte=par_sorte)
+    for t in trouves:
+        t.pop("_vues", None)
     trouves = [rm.coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
     trouves = rm.plafonner(trouves, par_photo, logement)
     nouveaux = rm.vers_meubles_du_logement(trouves, logement)
@@ -519,4 +620,4 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
                                      for v in vues_equipements]}
     for m in poses:
         m.pop("_appareils", None)
-    return {"meubles": poses, "equipements": equipements, "baies": baies}
+    return {"meubles": poses, "equipements": equipements, "baies": baies, "trace": {"trouves": trouves, "photos": list(releve["cameras"])}}

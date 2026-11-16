@@ -148,7 +148,9 @@ def fusionner(vus: list[dict], par_sorte: bool = False) -> list[dict]:
                     "position": [round(float(pos[0]), 3), round(float(pos[1]), 3)], "vues": len(paquet),
                     "confiance": round(float(np.mean([m["confiance"] for m in paquet])), 3),
                     "largeur_vue": round(float(max(m["largeur_vue"] for m in paquet)), 2),
-                    "mesures": [m["mesure"] for m in paquet if m.get("mesure")]}
+                    "mesures": [m["mesure"] for m in paquet if m.get("mesure")],
+                    "membres": [{"photo": m.get("photo"), "numero": m.get("numero"), "position": m["position"], "distance": m.get("distance"),
+                                 "categorie": m.get("categorie"), "approche": m.get("approche", False)} for m in paquet]}
         formes: dict[str, float] = {}
         for m, w in zip(paquet, poids):
             if m.get("forme"):
@@ -157,6 +159,154 @@ def fusionner(vus: list[dict], par_sorte: bool = False) -> list[dict]:
             fusionne["forme"] = max(formes, key=formes.get)
         sortie.append(fusionne)
     return sortie
+
+
+# ---------------------------------------------------------------- le MÊME meuble d'une photo à l'autre (16/11/2026)
+# La place d'un meuble posé par son pied est sûre EN TRAVERS du regard (la direction du rectangle, à 3-4° près) et de moins en
+# moins sûre LE LONG du regard à mesure qu'il est loin : l'appareil est à ~1,2 m du sol, un degré d'erreur sur son inclinaison
+# déplace le pied de d²/70 m (6 cm à 2 m, 0,35 m à 5 m, 1,4 m à 10 m). Vu sur app-001 et app-002 (pc/verification/
+# trace_pose.py) : les vues à moins de 3 m tombent à moins de 50 cm de leur meuble ; à 5-7 m, à 1 - 2 m. Les « meubles en trop »
+# de la pose d'après la lecture étaient d'abord cela : la table, les chaises et le buffet du coin repas vus du salon et posés une
+# seconde fois, 1,5 m plus près.
+LE_LONG_DU_REGARD = 0.04  # × distance² (m) : ce dont une vue peut se tromper le long du regard
+EN_TRAVERS = 0.06  # × distance (m) : ce dont elle peut se tromper en travers (3,5°)
+INCERTITUDE_PRES_M = 0.3  # la place de l'appareil lui-même
+APPROCHE = 1.5  # un rectangle approché (dessiné par la lecture, pas par le détecteur) compte comme vu 1,5 fois plus loin
+LOIN_COUPE_M = 4.0  # rang d'une vue coupée par le bas de la photo dans l'ordre des vues (comme une vue à 4 m)
+PETIT_M = 0.45  # la limite d'un petit meuble vu de près ; un GRAND meuble garde la sienne (ses vues s'étalent sur sa longueur)
+COUPE_M = 1.0  # un meuble coupé par le bas de la photo : son pied est hors du cadre, sa place peut être fausse d'un mètre de plus
+
+
+def incertitude(distance: float) -> float:
+    """De combien la place d'un meuble vu à cette distance peut être fausse (m), le long du regard."""
+    return INCERTITUDE_PRES_M + LE_LONG_DU_REGARD * distance * distance
+
+
+def eloignement(v: dict) -> float:
+    """La distance de la vue à son appareil, allongée si son rectangle n'est qu'approché ; une vue coupée par le bas de la
+    photo (pied hors du cadre) compte comme une vue lointaine : elle passe après les vues entières."""
+    d = float(v.get("distance") or 0.0) * (APPROCHE if v.get("approche") else 1.0)
+    return max(d, LOIN_COUPE_M) if v.get("coupe") else d
+
+
+def ecart_au_regard(v: dict, place) -> tuple[float, float]:
+    """L'écart entre la place mesurée par la vue `v` et `place`, décomposé le long du regard de la vue et en travers (m)."""
+    o, p = np.asarray(v["appareil"][:2], float), np.asarray(v["position"], float)
+    u = (p - o) / max(float(np.linalg.norm(p - o)), 1e-9)
+    e = np.asarray(place, float) - p
+    return abs(float(e @ u)), abs(float(e[0] * u[1] - e[1] * u[0]))
+
+
+def meme_meuble(v: dict, place, seuil: float, large: float = 1.0) -> float | None:
+    """La vue `v` peut-elle être le meuble posé en `place` ? Rend un coût (0 = au même endroit, 1 = à la limite) ou None.
+    `seuil` : la distance sous laquelle deux vues PROCHES de cette sorte sont le même meuble ; la limite s'allonge le long du
+    regard (d²) et un peu en travers (d) avec l'éloignement de la vue."""
+    d = eloignement(v)
+    le_long, en_travers = ecart_au_regard(v, place)
+    coupe = COUPE_M if v.get("coupe") else 0.0
+    # `large` élargit ce qui vient de l'incertitude de la vue, pas la limite propre à la sorte (deux armoires à 3 m restent deux)
+    a = le_long / max(seuil, large * (PETIT_M + LE_LONG_DU_REGARD * d * d + coupe))
+    b = en_travers / max(seuil, large * (PETIT_M + EN_TRAVERS * d + coupe))
+    cout = float(math.hypot(a, b))  # une ellipse allongée le long du regard ; pour une vue proche : le cercle de rayon `seuil` d'avant
+    return cout if cout < 1.0 else None
+
+
+def seuil_de(v: dict, par_sorte: bool = True) -> float:
+    """La distance sous laquelle deux vues proches de cette sorte (ou de ce groupe) sont le même meuble."""
+    seuil = FUSION_M.get(v["groupe"], FUSION_DEFAUT)
+    return FUSION_SORTE_M.get(v.get("categorie"), seuil) if par_sorte else seuil
+
+
+def _resume(paquet: list[dict]) -> dict:
+    """Le meuble que ses vues décrivent : place = moyenne des vues, chacune pesée par sa sûreté (une vue à 2 m pèse quinze fois
+    une vue à 6 m) ; sorte = celle de ses vues les plus sûres ; le reste comme `fusionner`."""
+    poids = np.array([max(m["poids"], 1e-3) ** 0.5 * m["confiance"] / incertitude(eloignement(m)) ** 2 for m in paquet])
+    pos = (np.array([m["position"] for m in paquet]) * poids[:, None]).sum(0) / poids.sum()
+    voix: dict[str, float] = {}
+    formes: dict[str, float] = {}
+    for m, w in zip(paquet, poids):
+        if m.get("categorie"):
+            voix[m["categorie"]] = voix.get(m["categorie"], 0.0) + float(w)
+        if m.get("forme"):
+            formes[m["forme"]] = formes.get(m["forme"], 0.0) + float(w)
+    r = {"groupe": paquet[0]["groupe"], "categorie": max(voix, key=voix.get) if voix else None,
+         "position": [round(float(pos[0]), 3), round(float(pos[1]), 3)], "vues": len(paquet),
+         "confiance": round(float(np.mean([m["confiance"] for m in paquet])), 3),
+         "largeur_vue": round(float(max(m["largeur_vue"] for m in paquet)), 2),
+         "mesures": [m["mesure"] for m in paquet if m.get("mesure")],
+         "distance_min": round(min(eloignement(m) for m in paquet), 2), "photos": sorted({m.get("photo") for m in paquet}),
+         "membres": [{"photo": m.get("photo"), "numero": m.get("numero"), "position": m["position"], "distance": m.get("distance"),
+                      "categorie": m.get("categorie"), "approche": m.get("approche", False)} for m in paquet], "_vues": paquet}
+    if formes:
+        r["forme"] = max(formes, key=formes.get)
+    return r
+
+
+def associer(vus: list[dict], par_sorte: bool = True) -> list[dict]:
+    """Le même meuble vu sur plusieurs photos ne compte qu'une fois — en partant des vues les plus SÛRES (les plus proches).
+
+    Chaque vue, de la plus proche à la plus lointaine, rejoint le meuble déjà trouvé de sa sorte (`par_sorte`) ou de son groupe
+    qui peut être le sien (`meme_meuble` : la limite suit l'incertitude de la vue, allongée le long de son regard), sinon elle
+    fonde un nouveau meuble. Deux objets distincts d'une MÊME photo restent deux meubles. Remplace `fusionner` (limite fixe,
+    en partant des plus grands rectangles) quand chaque vue connaît son appareil et sa distance (moteur/photos_lues.py)."""
+    cle = "categorie" if par_sorte else "groupe"
+    paquets: list[list[dict]] = []
+    places: list[np.ndarray] = []
+    for v in sorted(vus, key=eloignement):
+        seuil = seuil_de(v, par_sorte)
+        candidats = []
+        for k, paquet in enumerate(paquets):
+            if paquet[0][cle] != v[cle] or (v.get("photo") is not None and any(m.get("photo") == v.get("photo") for m in paquet)):
+                continue
+            if v.get("piece") is not None and paquet[0].get("piece") is not None and v["piece"] != paquet[0]["piece"]:
+                continue  # deux pièces : deux meubles (le meuble télé du séjour et celui de la chambre, de part et d'autre d'un mur)
+            cout = meme_meuble(v, places[k], seuil)
+            if cout is not None:
+                candidats.append((cout, k))
+        if candidats:
+            k = min(candidats)[1]
+            paquets[k].append(v)
+            places[k] = np.asarray(_resume(paquets[k])["position"], float)
+        else:
+            paquets.append([v])
+            places.append(np.asarray(v["position"], float))
+    return [_resume(p) for p in paquets]
+
+
+PROFONDEUR = 0.25  # × distance : ce dont une place tirée de la PROFONDEUR de la photo peut se tromper le long du regard
+
+
+def reunir(vus: list[dict], seuil: float, meme_photo_m: float = 0.0, cle: str | None = None) -> list[list[dict]]:
+    """Les vues d'objets ACCROCHÉS (luminaires, télévisions, tableaux, miroirs : place tirée de la profondeur de la photo)
+    réunies par objet, des plus proches aux plus lointaines : comme `associer`, la limite s'allonge le long du regard avec la
+    distance (un quart de la distance : un luminaire vu à 6 m est placé à 1,5 m près). Chaque vue porte « position »,
+    « distance », « appareil », « photo ». Deux vues d'une même photo ne sont le même objet qu'à moins de `meme_photo_m`.
+    Une vue sans appareil connu garde la limite fixe `seuil` (comme avant). Rend les paquets, vue la plus proche en tête."""
+    paquets: list[list[dict]] = []
+    for v in sorted(vus, key=lambda v: float(v.get("distance") or 0.0)):
+        d = float(v.get("distance") or 0.0)
+        candidats = []
+        for k, paquet in enumerate(paquets):
+            tete = paquet[0]
+            if cle is not None and tete[cle] != v[cle]:
+                continue
+            ecart = math.dist(v["position"], tete["position"])
+            if v.get("photo") is not None and any(m.get("photo") == v.get("photo") for m in paquet):
+                if ecart >= meme_photo_m:
+                    continue
+            elif v.get("appareil") is None:
+                if ecart >= seuil:
+                    continue
+            else:
+                le_long, en_travers = ecart_au_regard(v, tete["position"])
+                if le_long >= max(seuil, PROFONDEUR * d) or en_travers >= max(seuil, PETIT_M + EN_TRAVERS * d):
+                    continue
+            candidats.append((ecart, k))
+        if candidats:
+            paquets[min(candidats)[1]].append(v)
+        else:
+            paquets.append([v])
+    return paquets
 
 
 def selon_la_forme(categorie: str, dims, forme: str | None) -> tuple[float, float, float]:

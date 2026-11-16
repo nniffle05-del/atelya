@@ -354,6 +354,7 @@ def _profondeur(m: dict) -> float:
 
 
 CONTRE_LE_MUR = ("lit", "canape", "rangement")  # meubles presque toujours dos (tête) au mur
+MARGE_COLLER_M = 0.2  # … ou, quand on connaît la distance de la vue la plus proche, son incertitude + 20 cm
 COLLER_MAX_M = 1.0  # le mur le plus proche à au plus une demi-profondeur + 1 m : on y colle le meuble
 
 
@@ -374,7 +375,13 @@ def coller_au_mur(meuble: dict, piece: dict) -> dict:
         d = float(np.linalg.norm(p - q))
         if d < meilleur and d > 1e-6 and 0.0 < t < 1.0:
             meilleur, q_mur, normale = d, q, (p - q) / d
-    if q_mur is None or meilleur > pr / 2 + COLLER_MAX_M:
+    limite = COLLER_MAX_M
+    if meuble.get("distance_min") is not None:
+        # le mur corrige la profondeur dans la limite de ce dont la vue peut se tromper : une commode vue à 2 m (place sûre à
+        # 50 cm) et mesurée à 90 cm d'un mur n'est pas contre ce mur (app-002 : elle est derrière la tête de lit, au milieu)
+        from moteur.meubles_photos import incertitude
+        limite = min(COLLER_MAX_M, incertitude(meuble["distance_min"]) + MARGE_COLLER_M)
+    if q_mur is None or meilleur > pr / 2 + limite:
         return meuble
     nouveau = q_mur + normale * (pr / 2 + 0.03)
     return {**meuble, "position": [round(float(nouveau[0]), 3), round(float(nouveau[1]), 3)]}
@@ -388,6 +395,17 @@ UNIQUES = ("canape", "lit", "fauteuil")
 EN_GRAPPE = ("chaise",)  # sorte plafonnée par grappe de voisines (plusieurs tablées possibles dans une pièce)
 LIEN_GRAPPE_M = 1.0  # deux chaises à moins de 1 m l'une de l'autre sont de la même grappe
 PRES_GRAPPE_M = 0.8  # une chaise vue sur une photo compte pour la grappe si elle est à moins de 0,8 m d'une de ses chaises
+
+
+def surete(m: dict) -> float:
+    """Ce qui fait garder un meuble plutôt qu'un autre quand il y en a trop : les photos qui l'ont vu × leur confiance, et,
+    quand on la connaît (moteur.meubles_photos.associer), divisé par l'incertitude de sa vue la plus proche — un fauteuil vu à
+    2 m sur une photo passe avant un fauteuil deviné deux fois au bord du cadre (app-001 : le vrai était retiré)."""
+    s = m["vues"] * m["confiance"]
+    if m.get("distance_min") is not None:
+        from moteur.meubles_photos import incertitude
+        s /= incertitude(m["distance_min"])
+    return s
 
 
 def plafonner(trouves: list[dict], par_photo: list[list[dict]], logement: dict) -> list[dict]:
@@ -410,7 +428,7 @@ def plafonner(trouves: list[dict], par_photo: list[list[dict]], logement: dict) 
             compte[k] = compte.get(k, 0) + 1
         for k, c in compte.items():
             plafond[k] = max(plafond.get(k, 0), c)
-    tri = sorted(trouves, key=lambda m: -m["vues"] * m["confiance"])
+    tri = sorted(trouves, key=lambda m: -surete(m))
     gardes, pris = [], {}
     for m in tri:
         if m["groupe"] in UNIQUES:
@@ -428,7 +446,7 @@ def plafonner(trouves: list[dict], par_photo: list[list[dict]], logement: dict) 
         for gr in grappes:
             maxi = max((sum(1 for v in liste if v["groupe"] == g
                             and any(math.dist(v["position"], x["position"]) < PRES_GRAPPE_M for x in gr)) for liste in par_photo), default=0)
-            gardes += sorted(gr, key=lambda m: -m["vues"] * m["confiance"])[:max(maxi, 1)]
+            gardes += sorted(gr, key=lambda m: -surete(m))[:max(maxi, 1)]
     return [m for m in trouves if any(m is x for x in gardes)]  # l'ordre d'origine est gardé
 
 

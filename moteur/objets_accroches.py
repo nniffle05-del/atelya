@@ -83,29 +83,24 @@ def suspensions_d_une_photo(objets: list[dict], repere: dict | None, camera: dic
             coeur = rgb[y0 + (y1 - y0) // 4:max(y0 + (y1 - y0) // 4 + 1, y1 - (y1 - y0) // 4),
                         x0 + (x1 - x0) // 4:max(x0 + (x1 - x0) // 4 + 1, x1 - (x1 - x0) // 4)].reshape(-1, 3)
             couleur = [int(v) for v in np.median(coeur, axis=0)] if len(coeur) else None
-        sortie.append({**p, "note": float(o["note"]), "photo": photo, "couleur": couleur})
+        sortie.append({**p, "note": float(o["note"]), "photo": photo, "couleur": couleur,
+                       "appareil": [float(camera["x"]), float(camera["y"])]})
     return sortie
 
 
 def fusionner(vus: list[dict]) -> list[dict]:
     """Le même luminaire vu sur plusieurs photos ne compte qu'une fois ; deux luminaires d'une même photo restent deux."""
-    restants = sorted(vus, key=lambda v: -v["note"])
+    from moteur.meubles_photos import reunir
+
+    # des vues les plus proches aux plus lointaines : un luminaire vu de l'autre bout de la pièce (place à 1 - 2 m près) rejoint
+    # celui qu'une photo proche a déjà placé, au lieu d'en faire un second (16/11/2026, « place et taille justes »)
     sortie = []
-    while restants:
-        tete = restants.pop(0)
-        paquet, photos = [tete], {tete["photo"]}
-        for v in sorted(restants, key=lambda v: math.dist(v["position"], tete["position"])):
-            ecart = math.dist(v["position"], tete["position"])
-            if ecart >= FUSION_M or (ecart >= MEME_LUMINAIRE_M and v["photo"] is not None and v["photo"] in photos):
-                continue
-            paquet.append(v)
-            photos.add(v["photo"])
-        restants = [v for v in restants if not any(v is p for p in paquet)]
-        poids = np.array([v["note"] for v in paquet])
+    for paquet in reunir(vus, FUSION_M, MEME_LUMINAIRE_M):
+        poids = np.array([v["note"] / max(float(v.get("distance") or 1.0), 0.5) ** 2 for v in paquet])
         position = (np.array([v["position"] for v in paquet]) * poids[:, None]).sum(0) / poids.sum()
         couleurs = [v["couleur"] for v in paquet if v.get("couleur")]
         sortie.append({"position": [round(float(position[0]), 3), round(float(position[1]), 3)], "vues": len(paquet),
-                       "note": round(float(poids.mean()), 3), "bas": float(np.median([v["bas"] for v in paquet])),
+                       "note": round(float(np.mean([v["note"] for v in paquet])), 3), "bas": float(np.median([v["bas"] for v in paquet])),
                        "haut": float(np.median([v["haut"] for v in paquet])), "largeur": float(np.median([v["largeur"] for v in paquet])),
                        "couleur": [int(c) for c in np.median(np.array(couleurs), axis=0)] if couleurs else None})
     return sortie
