@@ -64,6 +64,15 @@ def main() -> int:
     suspensions = [m for m in reperer_suspensions(releve, logement, RACINE, journal=print) if m["id"] not in pris]
     logement["meubles"] += suspensions
     nouveaux = nouveaux + suspensions
+    # ZÉRO COLLISION par défaut (NT, 16/11/2026) : aucun objet dans un mur ni dans un autre (moteur/collisions.py) ; ce qui a été
+    # placé par quelqu'un ne bouge pas
+    from moteur import collisions
+    logement, actions = collisions.reparer(logement, journal=print)
+    restes = collisions.mesurer(logement)
+    print(f"zéro collision : {collisions.bilan(actions)} ; il en reste {len(restes)}"
+          + ("" if not restes else " (objets placés par quelqu'un : à corriger à l'écran de vérification)"), flush=True)
+    gardes = {m["id"]: m for m in logement["meubles"]}
+    nouveaux = [gardes[m["id"]] for m in nouveaux if m["id"] in gardes]
     Logement.model_validate(logement)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     args.sortie.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")

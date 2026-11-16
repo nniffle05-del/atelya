@@ -88,12 +88,17 @@ def main() -> int:
                           equiper=not (a.detecteur or a.sans_equipements))
     logement["meubles"] = list(logement.get("meubles", [])) + r["meubles"]
     logement = eq.appliquer(logement, r["equipements"])
+    # ZÉRO COLLISION par défaut (NT, 16/11/2026) : aucun objet dans un mur, dans un autre objet ni dans un rideau
+    from moteur import collisions
+    logement, actions = collisions.reparer(logement, journal=print)
+    restes = collisions.mesurer(logement)
     Logement.model_validate(logement)
     a.sortie.parent.mkdir(parents=True, exist_ok=True)
     a.sortie.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
     e = r["equipements"]
     a.sortie.with_suffix(".equipements.json").write_text(json.dumps(e, ensure_ascii=False, indent=1), encoding="utf-8")
-    for m in r["meubles"] + e["meubles"]:
+    gardes = {m["id"]: m for m in logement["meubles"]}
+    for m in (gardes[x["id"]] for x in r["meubles"] + e["meubles"] if x["id"] in gardes):
         print(f"{str(m['piece']):14s} {m['categorie']:20s} {m['position']} face {m['face']}° ({m['source']})")
     for ident, rideau in e["rideaux"].items():
         print(f"{'':14s} {'rideaux':20s} fenêtre {ident} : {'voilage ' if rideau['voilage'] else ''}{'rideaux' if rideau['rideaux'] else ''}")
@@ -103,6 +108,8 @@ def main() -> int:
         print(f"{'':14s} {'muret ajouté':20s} {m['id']} de {m['debut']} à {m['fin']} (vide du plan refermé sous un passe-plat)")
     print(f"{len(r['meubles'])} meubles posés ; équipements : {len(e['meubles'])} posés, {len(e['rideaux'])} fenêtre(s) habillée(s), "
           f"{len(e['passe_plats'])} passe-plat(s), {len(e['non_poses'])} non posé(s) : {a.sortie}", flush=True)
+    print(f"zéro collision : {collisions.bilan(actions)} ; il en reste {len(restes)}"
+          + ("" if not restes else " (objets placés par quelqu'un : à corriger à l'écran de vérification)"), flush=True)
     return 0
 
 

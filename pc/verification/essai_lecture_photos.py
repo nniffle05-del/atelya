@@ -148,14 +148,17 @@ def noter_baies(depart: dict, refait: dict) -> dict:
 
 
 def _equipements(note: dict) -> str:
-    """Ce que la chaîne a fait des équipements lus (depuis le 16/11/2026 ils sont posés : moteur/equipements.py)."""
+    """Ce que la chaîne a fait des équipements lus (depuis le 16/11/2026 ils sont posés : moteur/equipements.py), et le contrôle
+    « zéro collision » (moteur/collisions.py)."""
+    c = note.get("collisions")
+    fin = f" | collisions : {c['total']}" + (f" (au pire {c['au_pire_cm']} cm)" if c and c["total"] else "") if c is not None else ""
     e = note.get("equipements")
     if e is None:
-        return ""
+        return fin
     if isinstance(e, list):  # ancien fichier : la liste des équipements vus, aucun n'était dessiné
-        return f" | équipements vus, non dessinés : {len(e)}"
+        return f" | équipements vus, non dessinés : {len(e)}" + fin
     return (f" | équipements : {len(e['meubles'])} posés, {len(e['rideaux'])} fenêtre(s) habillée(s), {len(e['passe_plats'])} passe-plat(s), "
-            f"{len(e['non_poses'])} non posé(s)")
+            f"{len(e['non_poses'])} non posé(s)") + fin
 
 
 def main() -> int:
@@ -177,7 +180,8 @@ def main() -> int:
                 refaire(cas, version, dossier)
                 dire(f"{cas} version {version} ({VERSIONS[version][0]}) : refait en {time.time() - debut:.0f} s")
             logement = lire(fait)
-            note = {"meubles_poses": len(logement.get("meubles", []))}
+            from moteur import collisions
+            note = {"meubles_poses": len(logement.get("meubles", [])), "collisions": collisions.resume(collisions.mesurer(logement))}
             if cas in VERITES:
                 note["meubles"] = noter_meubles(logement, lire(VERITES[cas]["meubles"])["meubles"], fiche)
                 note["sols"] = noter_sols(logement, lire(VERITES[cas]["sols"]))

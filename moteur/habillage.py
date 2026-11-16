@@ -184,7 +184,8 @@ def rideaux_du_plan(logement: Logement) -> list[dict]:
                        "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
                        "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),
                        "voilage": list(o.rideaux.voilage) if o.rideaux.voilage else None,
-                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None})
+                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None,
+                       "ecart": o.rideaux.ecart, "bas": o.rideaux.bas})
     return sortie
 
 

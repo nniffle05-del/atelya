@@ -84,6 +84,12 @@ class Rideaux(BaseModel):
 
     voilage: Couleur | None = None
     rideaux: Couleur | None = None
+    ecart: Annotated[float, Field(gt=0, le=0.5)] | None = Field(
+        default=None, description="Distance au mur de la nappe du voilage (m) ; les rideaux pendent 6 cm plus loin. Par défaut 10 cm. "
+                                  "Réglée par moteur/collisions.py pour passer DEVANT un radiateur.")
+    bas: Annotated[float, Field(ge=0)] | None = Field(
+        default=None, description="Hauteur du bas du tissu (m). Par défaut au ras du sol. Réglée par moteur/collisions.py quand "
+                                  "le rideau s'arrête au-dessus de ce qui est bâti sous la fenêtre.")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)

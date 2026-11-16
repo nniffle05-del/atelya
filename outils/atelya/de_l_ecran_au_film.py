@@ -203,6 +203,15 @@ def main() -> int:
             note("meubles", lancer("meubles", commande + (["--detecteur"] if a.sortes_du_detecteur else []), journaux))
         else:
             note("meubles", lancer("meubles", [py, "outils/habillage/reperer_meubles_photos.py", fiche, sols, meuble], journaux))
+        # LE CONTRÔLE « ZÉRO COLLISION » (NT, 16/11/2026) : mesuré sur le logement meublé, écrit dans le bilan. Les deux outils
+        # ci-dessus réparent eux-mêmes ; il ne peut rester que des objets placés par quelqu'un (jamais déplacés par Atelya).
+        from moteur import collisions
+        restes = collisions.mesurer(json.loads(meuble.read_text(encoding="utf-8")))
+        bilan["collisions"] = {**collisions.resume(restes), "detail": restes[:20]}
+        bilan_f.write_text(json.dumps(bilan, ensure_ascii=False, indent=1), encoding="utf-8")
+        dire(f"   contrôle : {len(restes)} collision(s) dans le logement meublé"
+             + ("" if not restes else " — objets placés par quelqu'un, à corriger à l'écran de vérification : "
+                + ", ".join(sorted({str(c['a']) for c in restes})[:8])))
     if "maquette" in faire:
         if d3.exists():
             shutil.rmtree(d3)

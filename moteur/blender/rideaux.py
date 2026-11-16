@@ -86,14 +86,19 @@ def poser_rideaux(scene, rideaux: list[dict]) -> int:
         racine.rotation_euler = (0.0, 0.0, math.radians(r["normale_deg"] - 90.0))  # y local = vers l'intérieur
         demi = r["largeur"] / 2
         haut = r["z_tringle"]
+        # zéro collision (16/11/2026, moteur/collisions.py) : la nappe peut être écartée du mur pour passer devant un radiateur
+        # (« ecart » : distance du voilage ; les rideaux pendent 6 cm plus loin), ou s'arrêter au-dessus d'un objet (« bas »)
+        ecart_voilage = r.get("ecart") or ECART_VOILAGE
+        ecart_rideaux = ecart_voilage + (ECART_RIDEAUX - ECART_VOILAGE) if r.get("ecart") else ECART_RIDEAUX
+        bas = r.get("bas") or 0.01
         if r.get("voilage"):
-            pan(f"Voilage_{r['id']}", -demi - 0.15, demi + 0.15, ECART_VOILAGE, 0.01, haut, "voilage",
+            pan(f"Voilage_{r['id']}", -demi - 0.15, demi + 0.15, ecart_voilage, bas, haut, "voilage",
                 materiau_voilage(r["voilage"]), racine, collection)
         if r.get("rideaux"):
             mat = materiau_rideaux(r["rideaux"])
             for cote in (-1, 1):
                 bord = cote * (demi + 0.15)
                 x0, x1 = sorted((bord, bord - cote * 0.45))
-                pan(f"Rideau_{r['id']}_{'g' if cote < 0 else 'd'}", x0, x1, ECART_RIDEAUX, 0.01, haut, "rideaux", mat, racine,
+                pan(f"Rideau_{r['id']}_{'g' if cote < 0 else 'd'}", x0, x1, ecart_rideaux, bas, haut, "rideaux", mat, racine,
                     collection)
     return len(rideaux)
