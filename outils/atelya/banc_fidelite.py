@@ -139,16 +139,61 @@ def planche(titre: str, fiche: dict, jugement: dict, sortie: Path, colonnes: int
     feuille.save(sortie, quality=88)
 
 
+# Les sortes qu'Atelya pose SEUL aujourd'hui d'après les photos (moteur/reperer_meubles.py) ou d'après le plan (portes, fenêtres).
+POSE_SEUL = ("lit", "canape", "fauteuil", "chaise", "table", "rangement", "tapis", "lampe", "plante", "baie", "porte")
+
+
+def ce_qu_atelya_possede() -> dict[str, dict]:
+    """Pour chaque sorte du banc, de quoi Atelya dispose pour la mettre dans une maquette (question de NT du 16/11/2026 :
+    « s'il a la capacité de repérer certains meubles mais qu'il ne les possède pas ») :
+    - `modeles` : nombre de modèles 3D de la bibliothèque (ABO) présents sur le disque pour les catégories de cette sorte ;
+    - `dessine` : Atelya sait la dessiner lui-même aux bonnes dimensions (« sur mesure » : cuisine, placard, télévision ; portes,
+      fenêtres et rideaux) ;
+    - `pose_seul` : Atelya la met déjà dans la maquette sans aide."""
+    from moteur import meubles as mb
+
+    bibliotheque = PC / "bibliotheque" / "meubles-abo"
+    liste = mb.charger_liste(bibliotheque) if (bibliotheque / "liste.json").is_file() else []
+    liste = [e for e in liste if mb.chemin_modele(bibliotheque, e["id"]) is not None]
+    sortie: dict[str, dict] = {}
+    for categorie, sorte in fp.SORTE_DU_MEUBLE.items():
+        if sorte is None:
+            continue
+        s = sortie.setdefault(sorte, {"modeles": 0, "dessine": False})
+        if categorie in mb.SUR_MESURE:
+            s["dessine"] = True
+        else:
+            s["modeles"] += len(mb.candidats(categorie, liste))
+    for sorte in ("baie", "porte", "rideaux"):
+        sortie[sorte] = {"modeles": 0, "dessine": True}
+    for sorte in set(fp.VOCABULAIRE.values()) - {None}:
+        sortie.setdefault(sorte, {"modeles": 0, "dessine": False})
+    for sorte, s in sortie.items():
+        s["pose_seul"] = sorte in POSE_SEUL
+    return sortie
+
+
+def _possede(s: dict | None) -> str:
+    if s is None:
+        return "?"
+    morceaux = ([f"{s['modeles']} modèles 3D"] if s["modeles"] else []) + (["dessiné par Atelya"] if s["dessine"] else [])
+    return " + ".join(morceaux) if morceaux else "RIEN"
+
+
 def tableau(bilan: dict) -> str:
     lignes = [f"BANC DE FIDÉLITÉ {bilan.get('titre', '')} ({bilan['date']})", ""]
     lignes.append(f"{'logement':14s} {'photos':>6s} {'fidélité':>9s} {'couverture':>11s} {'bien placé':>11s} {'justesse':>9s}")
     for nom, l in (*bilan["logements"].items(), ("ENSEMBLE", {"resume": bilan["ensemble"]})):
         r = l["resume"]
         lignes.append(f"{nom:14s} {r['photos']:6d} {r['fidelite']:8.1f}  {100 * r['couverture']:9.1f} %  {100 * r['bien_place']:9.1f} %  {100 * r['justesse']:7.1f} %")
+    possede = bilan.get("possede", {})
     lignes += ["", "Par sorte d'objet, tous logements (du plus lourd manque au plus léger) :",
-               f"{'sorte':20s} {'vus':>5s} {'présents':>9s} {'bien placés':>12s} {'dans la maquette':>17s} {'en trop':>8s} {'poids du manque':>16s}"]
+               f"{'sorte':20s} {'vus':>5s} {'présents':>9s} {'bien placés':>12s} {'dans la maquette':>17s} {'en trop':>8s} {'poids du manque':>16s}   "
+               f"{'posé seul ?':12s} ce qu'Atelya possède"]
     for sorte, s in sorted(bilan["ensemble"]["par_sorte"].items(), key=lambda kv: -kv[1]["poids_manque"]):
-        lignes.append(f"{NOMS.get(sorte, sorte):20s} {s['vus']:5d} {s['presents']:9d} {s['bien_places']:12d} {s['dans_la_maquette']:17d} {s['en_trop']:8d} {s['poids_manque']:16.2f}")
+        p = possede.get(sorte)
+        lignes.append(f"{NOMS.get(sorte, sorte):20s} {s['vus']:5d} {s['presents']:9d} {s['bien_places']:12d} {s['dans_la_maquette']:17d} {s['en_trop']:8d} {s['poids_manque']:16.2f}   "
+                      f"{('oui' if p and p['pose_seul'] else 'NON'):12s} {_possede(p)}")
     return "\n".join(lignes)
 
 
@@ -185,6 +230,7 @@ def main() -> int:
         planche(f"{nom} {a.titre} : fidélité {r['fidelite']:.0f}/100 (la maquette a {100 * r['couverture']:.0f} % de ce que les photos montrent)",
                 fiche, j, a.sortie / f"planche-{nom}.jpg")
     bilan["ensemble"] = fp.compter(toutes)
+    bilan["possede"] = ce_qu_atelya_possede()
     (a.sortie / "bilan.json").write_text(json.dumps(bilan, ensure_ascii=False, indent=1), encoding="utf-8")
     texte = tableau(bilan)
     (a.sortie / "bilan.txt").write_text(texte, encoding="utf-8")
