@@ -95,6 +95,11 @@ détaillé correspondant avant d'agir.
     Une correction faite à la main une fois (option, réglage, retouche d'un logement) devient le comportement par défaut
     d'Atelya, ou un chantier pour l'automatiser ; le bon résultat doit sortir SEUL de la chaîne, sans option à ajouter.
 
+22. **Zéro collision, et « le même que sur la photo »** (NT, 16/11/2026) : dans une maquette, aucun meuble n'entre dans un mur ni
+    dans un autre objet (« ça tu devrais le savoir ») : le mesurer sur TOUS les logements avant de montrer des images. Le but de la
+    maquette : que chaque meuble, chaque plinthe, chaque mur, chaque rideau soit le même que sur la photo du client ; juger chaque
+    progrès objet par objet, photo contre maquette. (État mesuré le 16/11 et voies possibles : fin de `produit-livre-client.md`.)
+
 ## 3. Licences (vendre Atelya exige des licences commerciales)
 
 - **INTERDITS** : CubiCasa5k, CVC-FP, RPLAN (recherche seulement ; NT pense que l'entraînement n'est pas
