@@ -87,8 +87,11 @@ def noter_meubles(logement: dict, verite: list[dict], fiche: dict) -> dict:
     from moteur.camera_photo import camera_depuis_dict
     from moteur.reperer_meubles import groupe, vu_sur_une_photo
 
+    from moteur.meubles import EQUIPEMENTS
+
     cams = [camera_depuis_dict(c["camera"]) for c in fiche["cameras"].values()]
-    poses = logement.get("meubles", [])
+    # les équipements (cheminée, radiateur, évier…) ne sont pas dans les relevés de meubles faits à la main : jugés à l'image
+    poses = [m for m in logement.get("meubles", []) if m["categorie"] not in EQUIPEMENTS]
     au_sol = lambda m: bool(groupe(m["categorie"])) and float(m.get("altitude") or 0) < 0.3 and m["categorie"] not in ACCROCHES
     vrais_sol = [v for v in verite if au_sol(v) and vu_sur_une_photo(v, cams, logement)]
     poses_sol = [m for m in poses if au_sol(m)]
@@ -144,6 +147,17 @@ def noter_baies(depart: dict, refait: dict) -> dict:
     return {"baies": len(avant), "changees_a_tort": changees}
 
 
+def _equipements(note: dict) -> str:
+    """Ce que la chaîne a fait des équipements lus (depuis le 16/11/2026 ils sont posés : moteur/equipements.py)."""
+    e = note.get("equipements")
+    if e is None:
+        return ""
+    if isinstance(e, list):  # ancien fichier : la liste des équipements vus, aucun n'était dessiné
+        return f" | équipements vus, non dessinés : {len(e)}"
+    return (f" | équipements : {len(e['meubles'])} posés, {len(e['rideaux'])} fenêtre(s) habillée(s), {len(e['passe_plats'])} passe-plat(s), "
+            f"{len(e['non_poses'])} non posé(s)")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Essai : ce que la lecture des photos par Claude apporte à la maquette")
     ap.add_argument("sortie", type=Path)
@@ -179,15 +193,14 @@ def main() -> int:
         lignes.append(cas)
         for v, n in versions.items():
             if "meubles" not in n:
-                lignes.append(f"  {v} {VERSIONS[v][0]:38s} {n['meubles_poses']} meubles posés"
-                              + (f", {len(n['equipements'])} équipements vus" if "equipements" in n else ""))
+                lignes.append(f"  {v} {VERSIONS[v][0]:38s} {n['meubles_poses']} meubles posés" + _equipements(n))
                 continue
             m, s, b = n["meubles"], n["sols"], n["baies"]
             lignes.append(f"  {v} {VERSIONS[v][0]:38s} au sol : retrouvés {m['retrouves']}/{m['a_trouver']}, bonne sorte {m['bonne_sorte']}/{m['a_trouver']}, "
                           f"en trop {m['en_trop']}, écart {m['ecart_moyen_m']} m | accrochés : {m['accroches_retrouves']}/{m['accroches_a_trouver']}, "
                           f"en trop {m['accroches_en_trop']} | sols : {s['pieces_justes']}/{s['pieces_jugees']} pièces, zones {s['zones_posees']} pour "
                           f"{s['zones_vraies']} | baies changées à tort : {len(b['changees_a_tort'])}/{b['baies']}"
-                          + (f" | équipements vus : {len(n['equipements'])}" if "equipements" in n else ""))
+                          + _equipements(n))
         lignes.append("")
     texte = "\n".join(lignes)
     (a.sortie / "bilan.txt").write_text(texte, encoding="utf-8")

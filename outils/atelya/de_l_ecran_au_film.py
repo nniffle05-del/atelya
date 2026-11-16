@@ -103,7 +103,8 @@ def main() -> int:
     ap.add_argument("--fiche", type=Path, help="banc : la fiche des photos placées à utiliser (ex. caméras relevées à la main)")
     ap.add_argument("--lecture-photos", type=Path,
                     help="essai : le dossier d'une lecture des photos (lecture.json et dossier envoi, outils/lecture_photos) ; les baies, "
-                         "les sols et les meubles suivent ce que la lecture dit")
+                         "les sols, les meubles et les équipements (cheminée, radiateurs, cuisine, salle de bains, rideaux, passe-plat : "
+                         "moteur/equipements.py) suivent ce que la lecture dit")
     ap.add_argument("--sortes-du-detecteur", action="store_true",
                     help="essai, avec --lecture-photos : les mêmes rectangles, mais avec la sorte du détecteur (la référence)")
     a = ap.parse_args()

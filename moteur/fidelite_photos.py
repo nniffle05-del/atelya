@@ -75,8 +75,12 @@ SORTE_DU_MEUBLE = {
     "miroir": "miroir", "plante": "plante", "television": "television",
     "meuble_cuisine_bas": "cuisine", "meuble_cuisine_haut": "cuisine", "colonne_cuisine": "cuisine", "ilot": "cuisine",
     "horloge": None, "coussin": None, "vase": None,
+    # équipements du logement, posés d'après la lecture des photos et dessinés par Atelya (16/11/2026, moteur/equipements.py)
+    "cheminee": "cheminee", "radiateur": "radiateur", "baignoire": "baignoire", "douche": "douche", "wc": "wc",
+    "lavabo": "lavabo", "evier": "lavabo", "refrigerateur": "electromenager", "four": "electromenager", "plaque": "electromenager",
+    "electromenager": "electromenager", "plafonnier": "luminaire", "applique": None, "hotte": None, "etagere_murale": "rangement",
 }
-SORTES_SANS_MAQUETTE = ("cheminee", "rideaux", "radiateur", "baignoire", "douche", "wc", "lavabo", "electromenager")
+SORTES_SANS_MAQUETTE = ("rideaux",)  # jugés nulle part : les rideaux sont un champ de la fenêtre, pas un meuble
 
 
 # ---------------------------------------------------------------- les rectangles

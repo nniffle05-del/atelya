@@ -92,7 +92,11 @@ def plan_de_construction(logement: Logement) -> dict:
 
 def calculer_briques(logement: Logement) -> list[Brique]:
     briques: list[Brique] = []
-    murs_lus, ouvertures = _reunir_les_bouts(logement.murs, logement.ouvertures)
+    # un passe-plat (trou sans menuiserie, lu sur les photos) se découpe dans son mur comme une fenêtre ; lui seul : rien
+    # d'autre n'en fait une ouverture (ni cadre, ni vitre, ni lumière du jour)
+    trous = [Ouverture(id=t.id, type="fenetre", mur=t.mur, position=t.position, largeur=t.largeur, hauteur=t.hauteur,
+                       allege=t.allege, statut=t.statut, source=t.source, confiance=t.confiance) for t in logement.passe_plats]
+    murs_lus, ouvertures = _reunir_les_bouts(logement.murs, [*logement.ouvertures, *trous])
     ajustements = _ajustements_aux_angles(murs_lus)
     _prolonger_jusqu_aux_faces(murs_lus, ajustements)
     ouvertures_par_mur: dict[str, list[Ouverture]] = {}

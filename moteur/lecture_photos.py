@@ -23,12 +23,16 @@ import re
 
 from moteur.meubles import NOMS_MEUBLES
 
-SCHEMA = "lecture-photos/0.1"
+SCHEMA = "lecture-photos/0.2"  # 0.2 (16/11/2026) : sortes précises des appareils de cuisine ; les fiches 0.1 se lisent pareil
 # ce que la maquette ne sait pas encore porter, mais que Claude doit pouvoir nommer (compté « vu, pas représenté »)
-EQUIPEMENTS = ("cheminee", "radiateur", "baignoire", "douche", "wc", "lavabo", "evier", "electromenager", "hotte", "applique",
-               "plafonnier", "passe_plat", "etagere_murale", "rideaux", "store")
+# les équipements du logement, que Claude nomme et qu'Atelya pose et dessine depuis le 16/11/2026 (moteur/equipements.py).
+# « electromenager » seul reste accepté (fiches 0.1 : la note dit lequel, « electromenager four encastré ») ; depuis la 0.2 la
+# consigne demande la sorte précise : refrigerateur, four, micro_ondes, plaque, lave_linge, lave_vaisselle.
+EQUIPEMENTS = ("cheminee", "radiateur", "baignoire", "douche", "wc", "lavabo", "evier", "electromenager", "refrigerateur", "four",
+               "micro_ondes", "plaque", "lave_linge", "lave_vaisselle", "hotte", "applique", "plafonnier", "passe_plat", "etagere_murale",
+               "rideaux", "store")
 OUVERTURES = ("fenetre", "porte_fenetre", "porte")
-SORTES = (*NOMS_MEUBLES, *EQUIPEMENTS, *OUVERTURES, "autre", "faux")
+SORTES = tuple(dict.fromkeys((*NOMS_MEUBLES, *EQUIPEMENTS, *OUVERTURES, "autre", "faux")))
 FAMILLES_DE_SOL = ("lames", "point_de_hongrie", "batons_rompus", "carreaux")
 COULEURS_DITES = ("blanc cassé", "bois clair", "bois foncé", "gris clair", "gris anthracite", "blanc", "blanche", "noir", "noire", "gris",
                   "grise", "bleu", "bleue", "jaune", "beige", "crème", "rouge", "vert", "verte", "rose", "mauve", "brun", "marron",
@@ -51,6 +55,10 @@ il se trompe souvent sur ce que c'est. Tu remplis une fiche JSON au format {SCHE
   Une armoire ou un placard à portes est un « placard » ; un buffet est un « rangement » ; les meubles de cuisine sont
   « meuble_cuisine_bas », « meuble_cuisine_haut » ou « colonne_cuisine » ; un luminaire qui pend du plafond est une
   « suspension », collé au plafond un « plafonnier », fixé au mur une « applique ». Un écran d'ordinateur n'est pas une « television ».
+  Un appareil de cuisine se nomme précisément : « refrigerateur », « four », « micro_ondes », « plaque », « lave_vaisselle »,
+  « lave_linge » ; un radiateur porte-serviettes : « radiateur » avec la note « sèche-serviettes » ; des voilages (rideaux fins
+  qui laissent passer le jour) : « rideaux » avec la note « voilages » ; une ouverture à mi-hauteur entre deux pièces, sans
+  vitre : « passe_plat ».
 - « meme_que » : seulement si ce rectangle montre le MÊME objet qu'un autre numéro (un morceau, ou deux rectangles pour un meuble).
 - « forme » (ronde, rectangulaire…) et « couleur » (bleu, blanc, bois clair…) : en un ou deux mots, si c'est net.
 - « sol » : la famille du sol de la pièce où se tient le photographe, parmi {", ".join(FAMILLES_DE_SOL)} ; « uniforme » : faux si

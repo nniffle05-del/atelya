@@ -141,6 +141,7 @@ def plan_habille(logement: Logement) -> dict:
     # sols qu'elles touchent, elles se chevauchaient et faisaient de fines lignes sombres au rendu.
     briques = [replace(b, z_bas=JOINT_SOL_Z, z_haut=JOINT_SOL_Z) if b.id.startswith("joint_sol__") else b for b in briques]
     briques += menuiseries(logement)
+    briques += tablettes_des_passe_plats(logement)
     briques += plinthes(briques, logement)
     briques += corniches(briques, logement)
     briques += portes_de_placard(briques, logement)
@@ -407,6 +408,23 @@ def menuiseries(logement: Logement) -> list[Brique]:
             gauche, droite = _cotes_dans_une_piece(o, mur, logement)
             briques += _fenetre(o, mur, cote_interieur=(1 if gauche else -1) if gauche != droite else 0)
     return briques
+
+
+DEBORD_TABLETTE = 0.03  # m : la tablette d'un passe-plat dépasse de chaque côté du mur et de chaque bord du trou
+EPAISSEUR_TABLETTE = 0.03
+
+
+def tablettes_des_passe_plats(logement: Logement) -> list[Brique]:
+    """La tablette posée au bas de chaque passe-plat (16/11/2026) : une planche blanche de 3 cm, qui dépasse de 3 cm de chaque
+    côté du mur. Sans elle, le trou montre la tranche brute du mur."""
+    murs = {m.id: m for m in logement.murs}
+    sortie = []
+    for t in logement.passe_plats:
+        mur = murs[t.mur]
+        demi = mur.epaisseur / 2 + DEBORD_TABLETTE
+        sortie.append(_boite(t, mur, "tablette", (0.0, t.largeur), (-demi, demi), (t.allege, t.allege + EPAISSEUR_TABLETTE),
+                             "menuiserie_blanche"))
+    return sortie
 
 
 def _boite(o: Ouverture, mur: Mur, nom: str, t: tuple[float, float],

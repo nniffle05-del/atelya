@@ -32,15 +32,26 @@ def _police(taille: int):
 
 
 def main() -> int:
-    planches, sortie = Path(sys.argv[1]), Path(sys.argv[2])
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Planche à trois colonnes : la photo, la maquette avant, la maquette après")
+    ap.add_argument("planches", type=Path)
+    ap.add_argument("sortie", type=Path)
+    ap.add_argument("demandes", nargs="+", help="<logement>:<photo>[,<photo>…]")
+    ap.add_argument("--avant", type=Path, help="le dossier des planches de la colonne du milieu, s'il n'est pas le même")
+    ap.add_argument("--suffixes", nargs=2, default=("a", "c"), help="les deux versions comparées (dossiers <logement>-<suffixe>)")
+    ap.add_argument("--titres", nargs=2, default=TITRES[1:], help="les titres des deux colonnes de droite")
+    a = ap.parse_args()
+    planches, sortie = a.planches, a.sortie
+    titres = (TITRES[0], *a.titres)
     lignes = []
-    for demande in sys.argv[3:]:
+    for demande in a.demandes:
         cas, photos = demande.split(":")
         fiche = json.loads(Path(CAS[cas]["fiche"]).read_text(encoding="utf-8"))
         for photo in photos.split(","):
             images = [Image.fromarray(lire_photo(fiche, photo))]
-            for version in ("a", "c"):
-                vue = planches / f"{cas}-{version}" / "vues" / "rendus" / f"vue-{photo}.png"
+            for dossier, version in ((a.avant or planches, a.suffixes[0]), (planches, a.suffixes[1])):
+                vue = dossier / f"{cas}-{version}" / "vues" / "rendus" / f"vue-{photo}.png"
                 if not vue.is_file():
                     print(f"PLANTÉ : vue absente : {vue}", flush=True)
                     return 2
@@ -54,7 +65,7 @@ def main() -> int:
     total = haut + sum(l[1][0].height + 30 for l in lignes)
     feuille = Image.new("RGB", (3 * LARGEUR + 4 * 10, total), "white")
     d = ImageDraw.Draw(feuille)
-    for k, titre in enumerate(TITRES):
+    for k, titre in enumerate(titres):
         d.text((10 + k * (LARGEUR + 10) + 6, 8), titre, fill="black", font=police)
     y = haut
     for nom, images in lignes:

@@ -9,8 +9,9 @@ Atelya, avec la place des appareils qu'il connaît déjà :
 - un objet AU MUR que la maquette sait porter (télévision, tableau, miroir, horloge, meubles hauts de cuisine) : la profondeur
   mesurée dans son rectangle donne sa place à 10-15 % près, puis il est collé au mur du PLAN le plus proche (à moins de 80 cm) ;
   loin de tout mur, il reste où il est mesuré (une télévision sur une cloison-meuble que le plan n'a pas) ;
-- les ÉQUIPEMENTS que la maquette ne sait pas encore dessiner (cheminée, radiateur, évier, four, baignoire, WC, appliques…) :
-  leur pièce et leur place sont notées dans `equipements`, rien n'est posé ;
+- les ÉQUIPEMENTS du logement (cheminée, radiateur, évier, four, baignoire, WC, appliques, rideaux, passe-plat…) : posés
+  par moteur/equipements.py (adossés à un mur, encastrés dans un meuble de cuisine, au plafond ; rideaux à leur fenêtre ;
+  passe-plat percé dans son mur), dessinés par moteur/blender/equipements.py (16/11/2026) ;
 - les BAIES : un rectangle lu « porte_fenetre » ou « fenetre » vote pour la baie du plan que ses rayons touchent ;
 - les SOLS : la famille que la lecture donne à la pièce où se tient le photographe.
 
@@ -28,14 +29,11 @@ VERSION = "0.1.0"
 AU_MUR = {"television": ((1.1, 0.08, 0.65), (0.3, 1.5)), "tableau": ((0.6, 0.03, 0.8), (0.6, 1.9)),
           "miroir": ((0.6, 0.04, 0.9), (0.0, 1.8)), "horloge": ((0.5, 0.05, 0.5), (1.0, 2.0)),
           "meuble_cuisine_haut": ((1.8, 0.35, 0.7), (1.3, 1.7))}
-EQUIPEMENTS = ("cheminee", "radiateur", "baignoire", "douche", "wc", "lavabo", "evier", "electromenager", "hotte", "applique",
-               "plafonnier", "passe_plat", "etagere_murale", "rideaux", "store")
 BAIES = ("fenetre", "porte_fenetre")
 COLLE_AU_MUR_M = 0.8  # un objet accroché mesuré à moins de 80 cm d'un mur est sur ce mur
 DE_BIAIS_MIN = 0.35  # borne de la correction de largeur d'un objet vu très de biais
 FUSION_MUR_M = 0.9  # deux vues de la même sorte à moins de 90 cm (photos différentes) sont le même objet accroché
 MEME_OBJET_M = 0.3  # … et à moins de 30 cm, même sur une seule photo
-FUSION_EQUIPEMENT_M = 1.2
 RAYONS_BAIE, RAYONS_MIN = 9, 3  # rayons tirés dans la largeur d'une baie lue ; il en faut 3 sur la même baie du plan
 LARGEUR_MAX_M = 3.5
 PASSE_PORTE_M = 0.12  # un rayon qui touche une porte repart 12 cm plus loin (l'épaisseur de la cloison)
@@ -333,56 +331,6 @@ def vers_meubles_au_mur(trouves: list[dict], logement: dict, source: str = "rep�
     return sortie
 
 
-# ---------------------------------------------------------------- 3. les équipements que la maquette ne dessine pas encore
-def equipements_d_une_photo(objets: list[dict], cam, camera: dict, plan: dict, repere: dict | None, largeur: int, hauteur: int,
-                            logement: dict, photo: int | None = None) -> list[dict]:
-    """Où sont les équipements qu'UNE photo montre (cheminée, radiateur, évier, four, WC…) : pièce et place, pour mémoire."""
-    from moteur import caler_photos as cp
-    from moteur.objets_accroches import place_dans_la_photo
-    from moteur.sol_a_plat import piece_de, piece_de_l_appareil
-
-    origine = np.array([float(cam[0]), float(cam[1])])
-    piece_cam, _ = piece_de_l_appareil(cam, logement["pieces"])
-    sortie = []
-    for o in objets:
-        if o["sorte"] not in EQUIPEMENTS:
-            continue
-        x0, y0, x1, y1 = (float(v) for v in o["boite"])
-        mesure = place_dans_la_photo(o["boite"], repere, camera, largeur, hauteur) if repere is not None else None
-        if mesure is not None:
-            position = np.asarray(mesure["position"], float)
-        else:
-            angle = rayon(cam, (x0 + x1) / 2, (y0 + y1) / 2)[0]
-            T, _, _ = cp.tirs(plan, origine[None], np.array([angle]))
-            if not np.isfinite(T[0, 0]):
-                continue
-            position = origine + float(T[0, 0]) * np.array([math.cos(math.radians(angle)), math.sin(math.radians(angle))])
-        piece = piece_de(position, logement["pieces"]) or piece_cam
-        sortie.append({"sorte": o["sorte"], "position": [round(float(position[0]), 2), round(float(position[1]), 2)],
-                       "piece": piece["id"] if piece else None, "photo": photo, "dit": o.get("dit"), "poids": (x1 - x0) * (y1 - y0)})
-    return sortie
-
-
-def fusionner_equipements(vus: list[dict]) -> list[dict]:
-    """Le même équipement vu sur plusieurs photos ne compte qu'une fois (même sorte, même pièce, à moins de FUSION_EQUIPEMENT_M)."""
-    restants = sorted(vus, key=lambda v: -v["poids"])
-    sortie = []
-    while restants:
-        tete = restants.pop(0)
-        paquet, photos = [tete], {tete["photo"]}
-        for v in restants:
-            if v["sorte"] != tete["sorte"] or v["piece"] != tete["piece"] or v["photo"] in photos \
-                    or math.dist(v["position"], tete["position"]) >= FUSION_EQUIPEMENT_M:
-                continue
-            paquet.append(v)
-            photos.add(v["photo"])
-        restants = [v for v in restants if not any(v is p for p in paquet)]
-        dits = [v["dit"] for v in paquet if v.get("dit")]
-        sortie.append({"sorte": tete["sorte"], "piece": tete["piece"], "position": tete["position"], "vues": len(paquet),
-                       "dit": dits[0] if dits else None})
-    return sortie
-
-
 # ---------------------------------------------------------------- 4. les baies
 def baies_d_une_photo(objets: list[dict], cam, plan: dict, logement: dict) -> dict[str, list[int]]:
     """Ce que la lecture d'UNE photo dit des baies du plan : {id de la baie: [fois lue « porte_fenetre », fois lue « fenetre »]}."""
@@ -483,14 +431,17 @@ def appliquer_les_sols(pieces: dict, lus: dict[str, dict]) -> dict:
 
 # ---------------------------------------------------------------- l'ensemble
 def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list[dict]], modele_moge=None, par_sorte: bool = True,
-          source: str = "repérage par lecture des photos", journal=lambda *_: None) -> dict:
+          source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True) -> dict:
     """Photos placées (fiche cameras-photos.json) + objets de chaque photo avec leur sorte → ce qu'Atelya en fait :
-    {"meubles": meubles à ajouter au logement (au sol rangés, suspendus, au mur), "equipements": [...], "baies": votes}."""
+    {"meubles": meubles à ajouter au logement (au sol rangés, suspendus, au mur), "baies": votes,
+     "equipements": ce que moteur.equipements.poser rend (équipements à ajouter, rideaux, passe-plats, non posés)}.
+    `equiper` faux : les équipements sont seulement comptés (rien n'est posé), comme avant le 16/11/2026."""
     from pathlib import Path
 
     import cv2
 
     from moteur import caler_photos as cp
+    from moteur import equipements as eq
     from moteur import meubles_photos, moge
     from moteur import objets_accroches as oa
     from moteur import reperer_meubles as rm
@@ -503,7 +454,8 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
     plan = cp.plan_du_logement(logement)
     hsp = float(logement.get("hauteur_sous_plafond", 2.5))
     dossier, fichier = Path(racine) / releve["photos"], releve.get("fichier", "{nom}.png")
-    vus, par_photo, suspendus, au_mur, equipements, baies = [], [], [], [], [], {}
+    vus, par_photo, suspendus, au_mur, vues_equipements, baies = [], [], [], [], [], {}
+    vides = eq.vides_du_plan(logement) if equiper else []
     for k, (nom, d) in enumerate(releve["cameras"].items()):
         objets = objets_par_photo.get(nom) or []
         image = lire_image(dossier / fichier.format(nom=nom))
@@ -522,19 +474,24 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
             [{"phrase": oa.PHRASES[0], "note": max(float(o["note"]), oa.NOTE_MIN), "boite": o["boite"]} for o in objets if o["sorte"] == "suspension"],
             repere, d["camera"], largeur, hauteur, logement, rgb, photo=k)
         au_mur += au_mur_d_une_photo(objets, cam, d["camera"], plan, repere, largeur, hauteur, logement, rgb, photo=k)
-        equipements += equipements_d_une_photo(objets, cam, d["camera"], plan, repere, largeur, hauteur, logement, photo=k)
+        vues_equipements += eq.vues_d_une_photo(objets, cam, d["camera"], plan, repere, largeur, hauteur, logement, rgb, photo=k, vides=vides)
         for ident, (pf, f) in baies_d_une_photo(objets, cam, plan, logement).items():
             t = baies.setdefault(ident, [0, 0])
             t[0] += pf
             t[1] += f
         journal(f"  {nom} : {len(de_la_photo)} meuble(s) au sol, {sum(1 for o in objets if o['sorte'] == 'suspension')} suspension(s), "
-                f"{sum(1 for o in objets if o['sorte'] in AU_MUR)} au mur, {sum(1 for o in objets if o['sorte'] in EQUIPEMENTS)} équipement(s)")
+                f"{sum(1 for o in objets if o['sorte'] in AU_MUR)} au mur, {sum(1 for o in objets if o['sorte'] in eq.SORTES_LUES)} équipement(s)")
     trouves = meubles_photos.fusionner(vus, par_sorte=par_sorte)
     trouves = [rm.coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
     trouves = rm.plafonner(trouves, par_photo, logement)
     nouveaux = rm.vers_meubles_du_logement(trouves, logement)
+    # d'où chaque meuble a été vu (clé privée, retirée avant de rendre les meubles) : un meuble mesuré dans une cheminée glisse
+    # le long de ce regard (moteur.equipements.faire_place). « reperage_k » est le k-ième des meubles trouvés.
+    regards = {f"reperage_{k}": [mes["appareil"] for mes in t.get("mesures", []) if mes.get("appareil")] for k, t in enumerate(trouves, start=1)}
     for m in nouveaux:
         m["source"] = m["source"].replace("repérage photos", source)
+        if equiper and regards.get(m["id"]):
+            m["_appareils"] = regards[m["id"]]
     deja = list(logement.get("meubles", []))
     ranges, _ = ranger(deja + nouveaux, logement, journal=journal)
     nouveaux = [m for m in ranges if not any(m["id"] == x["id"] for x in deja)]
@@ -546,4 +503,20 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         while m["id"] in pris:
             m["id"] += "b"
         pris.add(m["id"])
-    return {"meubles": nouveaux + accroches, "equipements": fusionner_equipements(equipements), "baies": baies}
+    poses = nouveaux + accroches
+    if equiper:
+        equipements = eq.poser(vues_equipements, logement, deja + poses, journal, vides=vides)
+        # une cheminée est bâtie : les meubles posés d'après les photos qui la traversaient se sont écartés (ou sont retirés)
+        ranges = {m["id"]: m for m in equipements.pop("meubles_ranges")}
+        poses = [ranges[m["id"]] for m in poses if m["id"] in ranges]
+        for m in equipements["meubles"]:
+            while m["id"] in pris:
+                m["id"] += "b"
+            pris.add(m["id"])
+    else:
+        equipements = {"meubles": [], "rideaux": {}, "passe_plats": [], "murs": [], "colonnes": [], "mesures": [],
+                       "non_poses": [{"sorte": v["sorte"] or v["lu"], "piece": v["piece"], "raison": "équipements non demandés"}
+                                     for v in vues_equipements]}
+    for m in poses:
+        m.pop("_appareils", None)
+    return {"meubles": poses, "equipements": equipements, "baies": baies}

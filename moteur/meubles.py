@@ -59,9 +59,29 @@ CATEGORIES: dict[str, tuple[str, tuple[str, ...] | None, tuple[str, ...], tuple[
     "caisson": ("Caisson, cloison meuble", None, (), ()),
     "placard": ("Placard, dressing", None, (), ()),
     "television": ("Télévision", None, (), ()),
+    # ÉQUIPEMENTS du logement (16/11/2026) : ni meubles de catalogue ni murs ; compris par la lecture des photos
+    # (moteur/equipements.py) et dessinés par Atelya, une forme par sorte (moteur/blender/equipements.py)
+    "cheminee": ("Cheminée", None, (), ()),
+    "radiateur": ("Radiateur, sèche-serviettes", None, (), ()),
+    "refrigerateur": ("Réfrigérateur", None, (), ()),
+    "four": ("Four ou micro-ondes encastré", None, (), ()),
+    "plaque": ("Plaque de cuisson", None, (), ()),
+    "hotte": ("Hotte", None, (), ()),
+    "evier": ("Évier", None, (), ()),
+    "electromenager": ("Lave-linge, lave-vaisselle", None, (), ()),
+    "lavabo": ("Lavabo, vasque", None, (), ()),
+    "baignoire": ("Baignoire", None, (), ()),
+    "douche": ("Douche", None, (), ()),
+    "wc": ("WC", None, (), ()),
+    "applique": ("Applique murale", None, (), ()),
+    "plafonnier": ("Plafonnier, spots", None, (), ()),
+    "etagere_murale": ("Étagères murales, niche", None, (), ()),
 }
 NOMS_MEUBLES = tuple(CATEGORIES)
 SUR_MESURE = {c for c, v in CATEGORIES.items() if v[1] is None}
+# les équipements du logement : fixés au bâti, jamais « rangés » comme des meubles (un évier est DANS son meuble)
+EQUIPEMENTS = ("cheminee", "radiateur", "refrigerateur", "four", "plaque", "hotte", "evier", "electromenager", "lavabo", "baignoire",
+               "douche", "wc", "applique", "plafonnier", "etagere_murale")
 
 # Couleurs des mots de couleur d'ABO (champ « color », souvent un nom commercial : on garde le premier mot connu).
 COULEURS_NOMMEES = {

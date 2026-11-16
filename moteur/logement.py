@@ -117,6 +117,19 @@ class Ouverture(Element):
     sens: SensPorte | None = Field(default=None, description="Gonds et côté d'ouverture (portes) ; sinon, réglage par défaut")
 
 
+class PassePlat(Element):
+    """Un TROU dans un mur, sans menuiserie ni vitre (16/11/2026) : le passe-plat entre une cuisine et un séjour, une baie
+    libre à mi-hauteur. Le plan ne le dessine presque jamais (NT, 15/11/2026 : « le plan ne veut pas tout dire ») : il est lu
+    sur les photos (moteur/equipements.py). Ce n'est PAS une ouverture : on n'y passe pas, il n'a ni cadre ni vitre, il ne
+    donne pas dehors ; le mur reste un mur pour tout le reste d'Atelya (place des photos, trajet de la caméra)."""
+
+    mur: str = Field(description="Identifiant du mur percé")
+    position: Annotated[float, Field(ge=0)] = Field(description="Distance le long du mur, de son début au premier bord du trou")
+    largeur: Longueur
+    hauteur: Longueur
+    allege: Annotated[float, Field(ge=0)] = Field(default=1.0, description="Hauteur entre le sol et le bas du trou")
+
+
 class Plinthes(BaseModel):
     """Les plinthes d'une pièce (B2, 08/11/2026) : décidées pièce par pièce, pas une règle fixe pour tout le logement.
 
@@ -306,6 +319,7 @@ class Logement(BaseModel):
     pieces: list[Piece] = Field(default_factory=list)
     meubles: list[Meuble] = Field(default_factory=list)
     balcons: list[Balcon] = Field(default_factory=list)
+    passe_plats: list[PassePlat] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _coherence(self) -> Logement:
@@ -320,13 +334,13 @@ def verifier_coherence(logement: Logement) -> list[str]:
     erreurs: list[str] = []
 
     tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces, *logement.meubles,
-                                   *logement.balcons]]
+                                   *logement.balcons, *logement.passe_plats]]
     doublons = sorted({i for i in tous_les_ids if tous_les_ids.count(i) > 1})
     if doublons:
         erreurs.append(f"identifiants en double : {', '.join(doublons)}")
 
     murs = {m.id: m for m in logement.murs}
-    for o in logement.ouvertures:
+    for o in [*logement.ouvertures, *logement.passe_plats]:
         mur = murs.get(o.mur)
         if mur is None:
             erreurs.append(f"l'ouverture {o.id} désigne un mur inconnu : {o.mur}")
