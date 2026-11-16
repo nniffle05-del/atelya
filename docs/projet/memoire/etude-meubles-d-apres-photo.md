@@ -206,3 +206,28 @@ dans `etude-meubles-gratuits-2026-11-16.md`, les six notes de recherche (citatio
   du code n'est pas lue ;
 - le « modèle exact du fabricant » : licite et gratuit pour ABO seulement.
 
+## 8. Premier essai demandé par NT : le canapé bleu d'app-004 (16/11/2026 au soir)
+
+NT : « Je veux bien qu'on teste les deux par exemple pour le canapé bleu de la photo », puis « Oui, j'ai bien les droits pour
+l'annonce. Et j'aimerais bien que tu le fasses toi-même » (accord écrit pour sortir l'image du canapé du PC vers les démonstrations).
+
+- **Le cas** : le canapé bleu d'app-004 est vu sur quatre photos (07 : entier, de trois quarts ; 02 : presque entier, de l'autre
+  côté ; 08 et 01 : coupé par le bord, de côté et de dos). Protocole : fabriquer d'après UNE photo (la 07), juger sur les trois autres
+  (elles montrent les faces que la 07 cache). Les photos portent le filigrane « Junot » en travers du canapé.
+- **Préparé sans rien installer** : détourage par la couleur (`..\atelya\b2\app-004\essai-canape-bleu\` : `canape-photo-0x-detoure.png`
+  avec fond transparent, `-recadre.jpg`, planche `contours-du-canape.jpg`).
+- **TRELLIS.2, démonstration publique officielle** (`huggingface.co/spaces/microsoft/TRELLIS.2`, sans compte ; outil
+  `pc/essais-meubles-photo/demo_trellis2.py`, bibliothèque standard seulement) : fabrication faite en **30 s** au premier passage, mais
+  l'export a échoué par une erreur de Claude (l'étape d'export attend une première valeur vide, « l'état gardé par le serveur » :
+  corrigé). Au second passage : « You have exceeded your ZeroGPU quota (120s requested vs. 152s left). Try again in 23:59 » → **le
+  quota gratuit sans compte ne laisse passer qu'environ UN objet par jour** ; à relancer le 17/11/2026 après 18 h 40 (une seule
+  commande). Un compte Hugging Face gratuit donne plus de quota (jeton à garder HORS du dépôt et du fil) : décision de NT.
+  Avis de la page : images gardées le temps de la session sur les serveurs de Hugging Face, « Users are advised against uploading
+  data containing sensitive or private information ». Export de la démonstration = outil non commercial : pour VOIR seulement.
+- **SAM 3D Objects, démonstration de Meta** (`aidemos.meta.com/segment-anything/editor/convert-image-to-3d`) : page ouverte sans
+  rien accepter. Elle affiche : « This is a research demo solely for your personal, non-commercial use », « By clicking Accept, you
+  agree to be bound by the Segment Anything Playground Terms of Service and Acceptable Use Policy », « Log in to continue ». **NON
+  UTILISÉE** : il faut un compte Meta personnel, accepter des conditions au nom de NT, et l'usage est limité au personnel non
+  commercial. La voie propre pour essayer SAM 3D Objects reste la machine louée avec les poids officiels (SAM License : commercial
+  permis), donc le formulaire nominatif de Meta + une location : accords écrits de NT.
+
