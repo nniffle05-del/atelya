@@ -264,6 +264,14 @@ NT : « Est-ce que tu peux juste essayer, juste sur le canapé ? », liste donn�
   `..\atelya\b2\app-004\chaine-v2\cameras-photos-seul.json`, maquette `equipements-1\sc-app-004-3d`).
 - **Reste à essayer** : la photo 01 (canapé coupé par le bord) ; un filigrane effacé avant fabrication ; finesse 1536 ; la photo
   recollée sur la face visible ; SAM 3D Objects (pas de voie gratuite propre : machine louée + formulaire Meta).
+- **Deux essais de plus (16/11, 21 h 30 ; NT : « D'accord allons-y »), ~11 min chacun** :
+  (1) photo 07 avec le FILIGRANE EFFACÉ avant fabrication (`pc/essais-meubles-photo/effacer_filigrane.py` : points plus clairs et
+  moins colorés que le tissu, rebouchés par OpenCV ; 9,9 % du meuble rebouché) → canapé propre, plus de taches ; restent deux ou
+  trois petits trous sombres sur l'assise et un dessous ondulé (`trellis2-photo-07-sans-filigrane.glb`,
+  `comparaison-canape-bleu-sans-filigrane.jpg`) ; (2) photo 01, canapé COUPÉ par le bord et vu de dos (`trellis2-photo-01.glb`) →
+  **raté** : objet plat de 0,28 de haut pour 1,00 de large (0,48 pour le bon), coussins couchés, planche mince à la place du
+  dossier, accoudoirs réduits à des boudins. Confirme la prévision : TRELLIS.2 recopie un meuble coupé tel quel. Conséquence :
+  choisir pour chaque meuble la photo où il est LE PLUS ENTIER, et garder le catalogue (ou SAM 3D Objects) pour les meubles mal vus.
 - **Rappel licence** : ici l'export est celui de ComfyUI (pas de nvdiffrast d'après son éditeur et le contrôle d'un agent sur 13
   fichiers, pas un audit complet) ; l'œil DINOv3 relève de la licence Meta (lue) ; ComfyUI est GPL-3 = outil à part.
 
