@@ -114,6 +114,11 @@ def _fixe(m: dict) -> bool:
     return m.get("statut") != "estime" or "repérage" not in str(m.get("source", ""))
 
 
+def _sorte_lue(m: dict) -> bool:
+    """La sorte de ce meuble vient d'une LECTURE des photos (et non du mot vague d'un détecteur) : elle est sûre."""
+    return "lecture" in str(m.get("source", ""))
+
+
 def _glisser(m: dict, direction: np.ndarray, accepte) -> dict | None:
     """Le meuble déplacé LE MOINS POSSIBLE jusqu'à ce que `accepte(meuble)` soit vrai : de proche en proche, d'abord dans
     `direction`, puis dans les directions voisines (8 en tout) ; None si rien ne convient à moins de GLISSE_MAX."""
@@ -178,8 +183,11 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
                 note(m, "retiré", f"le même meuble que {autre['id']}, vu deux fois")
                 continue
             chaise_et_table = {g_m, g_autre} == {"chaise", "table"}
-            # règle 4 : même groupe (une commode et un « rangement ») ou groupes qui se confondent, et fort recouvrement
-            if g[1] > MEME_OBJET and (g_m == g_autre or frozenset((g_m, g_autre)) in SE_CONFONDENT):
+            # règle 4 : même groupe (une commode et un « rangement ») ou groupes qui se confondent, et fort recouvrement.
+            # Sauf si les deux sortes ont été LUES sur les photos (moteur/photos_lues.py) : une armoire et une table de chevet
+            # lues comme telles sont deux vrais meubles, on les dégage l'un de l'autre au lieu d'en retirer un.
+            if g[1] > MEME_OBJET and not (_sorte_lue(m) and _sorte_lue(autre)) \
+                    and (g_m == g_autre or frozenset((g_m, g_autre)) in SE_CONFONDENT):
                 note(m, "retiré", f"au même endroit que {autre['categorie']} {autre['id']}")
                 continue
             ecart = np.asarray(m["position"], float) - np.asarray(autre["position"], float)

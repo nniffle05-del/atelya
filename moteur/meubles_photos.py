@@ -59,10 +59,27 @@ TAILLES = {
     "tapis": ((1.8, 1.3, 0.02), (0.6, 3.5), (0.02, 0.02)),
     "lampadaire": ((0.4, 0.4, 1.6), (0.3, 0.6), (1.2, 1.9)),
     "plante": ((0.5, 0.5, 1.0), (0.3, 0.9), (0.4, 2.0)),
+    # sortes que la phrase du détecteur ne donne jamais, mais qu'une LECTURE des photos nomme (moteur/photos_lues.py)
+    "tabouret_haut": ((0.45, 0.45, 1.0), (0.35, 0.55), (0.9, 1.15)),
+    "etagere_cubes": ((1.5, 0.4, 0.8), (0.4, 2.0), (0.4, 2.0)),
+    "lampe": ((0.3, 0.3, 0.5), (0.2, 0.5), (0.3, 0.8)),
+    "colonne_cuisine": ((0.6, 0.6, 2.2), (0.6, 2.4), (1.9, 2.5)),
+    "meuble_cuisine_haut": ((1.8, 0.35, 0.7), (0.6, 4.0), (0.6, 0.9)),
+    "ilot": ((2.0, 0.9, 0.9), (1.0, 3.0), (0.85, 1.1)),
+    "caisson": ((1.2, 0.3, 1.2), (0.5, 3.0), (0.8, 2.6)),
 }
 BORD_PX = 4  # un rectangle à moins de 4 px du bord de la photo est coupé par le cadre : il ne mesure rien de ce côté
 FUSION_M = {"chaise": 0.45, "fauteuil": 0.6}  # distance en dessous de laquelle deux vues sont le même meuble (comme avant)
 FUSION_DEFAUT = 1.8
+# Fusion par SORTE exacte (photos lues : la même sorte revient d'une photo à l'autre) : les petits meubles qui vont par deux
+# (chevets de part et d'autre d'un lit, lampes) ne se fondent qu'à moins de 90 cm ; le reste comme avant.
+# Les GRANDS meubles adossés (un buffet de 2 m, un linéaire de cuisine, une armoire) : chaque photo en voit un bout différent, leurs
+# vues s'étalent sur leur longueur ; elles se fondent jusqu'à 2,5 m (deux de la même photo restent toujours deux meubles).
+FUSION_SORTE_M = {"chaise": 0.45, "tabouret_haut": 0.45, "chaise_de_bureau": 0.6, "fauteuil": 0.6, "table_de_chevet": 0.9,
+                  "table_d_appoint": 0.9, "lampe": 0.9, "lampadaire": 0.9, "plante": 0.9,
+                  "rangement": 2.5, "meuble_cuisine_bas": 2.5, "placard": 2.5, "canape": 2.5, "meuble_tv": 2.5, "ilot": 2.5}
+# côté d'un meuble ROND de chaque sorte (une lecture des photos dit la forme : « table ronde »)
+COTE_ROND = {"table": 1.0, "table_basse": 0.8, "table_d_appoint": 0.5, "tapis": 1.6}
 
 
 def taille_courante(categorie: str) -> tuple[float, float, float]:
@@ -99,18 +116,22 @@ def mesurer(boite, cam, largeur: int, hauteur: int, rgb: np.ndarray | None) -> d
     return m
 
 
-def fusionner(vus: list[dict]) -> list[dict]:
+def fusionner(vus: list[dict], par_sorte: bool = False) -> list[dict]:
     """Le même meuble vu sur plusieurs photos ne compte qu'une fois : vues du même GROUPE à moins de FUSION_M du meuble le
     plus net… SAUF deux objets distincts d'une MÊME photo, qui restent deux meubles. La sorte du meuble est celle que ses vues
-    donnent le plus souvent (pondérée par leur poids et leur note) ; sa place est la moyenne pondérée, comme avant."""
+    donnent le plus souvent (pondérée par leur poids et leur note) ; sa place est la moyenne pondérée, comme avant.
+    `par_sorte` (photos lues) : seules les vues de la même SORTE exacte se fondent (un bureau et une table voisins restent deux)."""
     restants = sorted(vus, key=lambda m: -m["poids"])
     sortie = []
+    cle = "categorie" if par_sorte else "groupe"
     while restants:
         tete = restants.pop(0)
         seuil = FUSION_M.get(tete["groupe"], FUSION_DEFAUT)
+        if par_sorte:
+            seuil = FUSION_SORTE_M.get(tete["categorie"], seuil)
         paquet, photos = [tete], {tete.get("photo")}
         for m in sorted(restants, key=lambda m: math.dist(m["position"], tete["position"])):
-            if m["groupe"] != tete["groupe"] or math.dist(m["position"], tete["position"]) >= seuil:
+            if m[cle] != tete[cle] or math.dist(m["position"], tete["position"]) >= seuil:
                 continue
             if m.get("photo") is not None and m.get("photo") in photos:
                 continue  # un autre objet de la même photo : un autre meuble
@@ -123,12 +144,33 @@ def fusionner(vus: list[dict]) -> list[dict]:
         for m, w in zip(paquet, poids):
             if m.get("categorie"):
                 voix[m["categorie"]] = voix.get(m["categorie"], 0.0) + float(w)
-        sortie.append({"groupe": tete["groupe"], "categorie": max(voix, key=voix.get) if voix else None,
-                       "position": [round(float(pos[0]), 3), round(float(pos[1]), 3)], "vues": len(paquet),
-                       "confiance": round(float(np.mean([m["confiance"] for m in paquet])), 3),
-                       "largeur_vue": round(float(max(m["largeur_vue"] for m in paquet)), 2),
-                       "mesures": [m["mesure"] for m in paquet if m.get("mesure")]})
+        fusionne = {"groupe": tete["groupe"], "categorie": max(voix, key=voix.get) if voix else None,
+                    "position": [round(float(pos[0]), 3), round(float(pos[1]), 3)], "vues": len(paquet),
+                    "confiance": round(float(np.mean([m["confiance"] for m in paquet])), 3),
+                    "largeur_vue": round(float(max(m["largeur_vue"] for m in paquet)), 2),
+                    "mesures": [m["mesure"] for m in paquet if m.get("mesure")]}
+        formes: dict[str, float] = {}
+        for m, w in zip(paquet, poids):
+            if m.get("forme"):
+                formes[m["forme"]] = formes.get(m["forme"], 0.0) + float(w)
+        if formes:
+            fusionne["forme"] = max(formes, key=formes.get)
+        sortie.append(fusionne)
     return sortie
+
+
+def selon_la_forme(categorie: str, dims, forme: str | None) -> tuple[float, float, float]:
+    """La taille corrigée par ce qu'une lecture des photos dit de la forme : un meuble ROND a la même largeur et profondeur (la
+    table ronde d'app-004 était posée en table de 1,40 × 0,80 m) ; un lit « une place » fait 90 cm de large."""
+    l, p, h = dims
+    if not forme:
+        return l, p, h
+    if forme in ("ronde", "rond"):
+        c = COTE_ROND.get(categorie, min(l, p))
+        return c, c, h
+    if categorie == "lit" and forme == "une place":
+        return 0.9, p, h
+    return l, p, h
 
 
 def dimensions(categorie: str, face: float, position, mesures: list[dict]) -> tuple[float, float, float]:

@@ -217,7 +217,8 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
         if m.get("categorie"):  # repérage précis (16/11/2026) : la sorte, la taille et la couleur vues sur les photos
             from moteur import meubles_photos
             categorie = m["categorie"]
-            dims = meubles_photos.dimensions(categorie, face, m["position"], m.get("mesures", []))
+            dims = meubles_photos.selon_la_forme(categorie, meubles_photos.dimensions(categorie, face, m["position"], m.get("mesures", [])),
+                                                 m.get("forme"))
             teinte = meubles_photos.couleur(m.get("mesures", []))
         meuble = {"id": f"reperage_{k}", "categorie": categorie, "piece": piece["id"], "position": m["position"],
                   "face": face, "dimensions": list(dims), "statut": "estime",
@@ -301,37 +302,47 @@ def meubles_owl_d_une_photo(objets: list[dict], groupe_de: dict, cam, largeur: i
         g = groupe_de.get(o["nom"])
         if g not in TYPE_DE_GROUPE or o["note"] < seuils.get(g, seuil_defaut):
             continue
-        x0, y0, x1, y1 = o["boite"]
-        um = (x0 + x1) / 2
-        bas = min(y1, hauteur - 1)
-        pied = vers_le_sol(um, bas, cam)
-        gauche, droite = vers_le_sol(x0, bas, cam), vers_le_sol(x1, bas, cam)
-        if pied is None or math.dist(pied, cam[:2]) > 12:
-            continue
-        _, (l, p, h) = TYPE_DE_GROUPE[g]
         categorie = meubles_photos.CATEGORIE_DE.get(o["nom"]) if precis else None
-        if categorie:
-            p = meubles_photos.taille_courante(categorie)[1]
-        if g == "tapis":
-            haut = vers_le_sol(um, max(y0, 0), cam)
-            centre = np.asarray(pied) if haut is None or math.dist(haut, cam[:2]) > 12 else (np.asarray(pied) + np.asarray(haut)) / 2
-        else:
-            direction = np.asarray(pied, float) - np.asarray(cam[:2], float)
-            direction /= max(np.linalg.norm(direction), 1e-9)
-            centre = np.asarray(pied, float) + direction * p / 2
-        if piece is not None and not dans_polygone(np.array([centre[0]]), np.array([centre[1]]), piece["contour"])[0]:
+        vu = vu_au_sol(g, categorie, o["boite"], o["note"], cam, largeur, hauteur, piece)
+        if vu is None:
             continue
-        etendue = math.dist(gauche, droite) if gauche is not None and droite is not None else 0.0
-        poids = float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100)
-        if y1 >= hauteur - 3 and g != "tapis":
-            poids *= POIDS_COUPE  # coupé par le bas de la photo : son vrai pied est plus près, la place est peu sûre
-        vu = {"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": etendue,
-              "confiance": float(o["note"]), "poids": poids}
         if precis:
             vu.update(categorie=categorie, photo=photo, phrase=o["nom"],
                       mesure={**meubles_photos.mesurer(o["boite"], cam, largeur, hauteur, rgb), "appareil": [float(c) for c in cam[:3]]})
         sortie.append(vu)
     return sortie
+
+
+def vu_au_sol(g: str, categorie: str | None, boite, note: float, cam, largeur: int, hauteur: int, piece: dict | None) -> dict | None:
+    """Un meuble posé au sol, d'après son rectangle sur UNE photo placée : le bas du rectangle est son pied (reporté au sol par la
+    caméra), son milieu est une demi-profondeur plus loin (un tapis, à plat : entre le haut et le bas du rectangle). Rend groupe,
+    place, largeur vue, confiance, poids ; None si le pied tombe hors du sol, à plus de 12 m, ou hors de la pièce de l'appareil."""
+    from moteur.sol_a_plat import dans_polygone
+    x0, y0, x1, y1 = boite
+    um = (x0 + x1) / 2
+    bas = min(y1, hauteur - 1)
+    pied = vers_le_sol(um, bas, cam)
+    gauche, droite = vers_le_sol(x0, bas, cam), vers_le_sol(x1, bas, cam)
+    if pied is None or math.dist(pied, cam[:2]) > 12:
+        return None
+    _, (l, p, h) = TYPE_DE_GROUPE[g]
+    if categorie:
+        from moteur import meubles_photos
+        p = meubles_photos.taille_courante(categorie)[1]
+    if g == "tapis":
+        haut = vers_le_sol(um, max(y0, 0), cam)
+        centre = np.asarray(pied) if haut is None or math.dist(haut, cam[:2]) > 12 else (np.asarray(pied) + np.asarray(haut)) / 2
+    else:
+        direction = np.asarray(pied, float) - np.asarray(cam[:2], float)
+        direction /= max(np.linalg.norm(direction), 1e-9)
+        centre = np.asarray(pied, float) + direction * p / 2
+    if piece is not None and not dans_polygone(np.array([centre[0]]), np.array([centre[1]]), piece["contour"])[0]:
+        return None
+    etendue = math.dist(gauche, droite) if gauche is not None and droite is not None else 0.0
+    poids = float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100)
+    if y1 >= hauteur - 3 and g != "tapis":
+        poids *= POIDS_COUPE  # coupé par le bas de la photo : son vrai pied est plus près, la place est peu sûre
+    return {"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": etendue, "confiance": float(note), "poids": poids}
 
 
 def _profondeur(m: dict) -> float:

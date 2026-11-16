@@ -101,6 +101,11 @@ def main() -> int:
                     help="pas d'écran : le logement tel qu'il a été lu (verification.json) et les photos rangées par Atelya seul")
     ap.add_argument("--logement", type=Path, help="banc : partir de CE logement (au lieu de celui du dossier de lecture)")
     ap.add_argument("--fiche", type=Path, help="banc : la fiche des photos placées à utiliser (ex. caméras relevées à la main)")
+    ap.add_argument("--lecture-photos", type=Path,
+                    help="essai : le dossier d'une lecture des photos (lecture.json et dossier envoi, outils/lecture_photos) ; les baies, "
+                         "les sols et les meubles suivent ce que la lecture dit")
+    ap.add_argument("--sortes-du-detecteur", action="store_true",
+                    help="essai, avec --lecture-photos : les mêmes rectangles, mais avec la sorte du détecteur (la référence)")
     a = ap.parse_args()
 
     verifie, fiche = a.lecture / "logement-verifie.json", a.lecture / FICHE_PHOTOS
@@ -168,6 +173,15 @@ def main() -> int:
         logement = json.loads(depart.read_text(encoding="utf-8"))
         votes = ouvertures_photos.lire(logement, json.loads(fiche.read_text(encoding="utf-8")), RACINE, journal=lambda s: dire("   " + s))
         logement, changes = ouvertures_photos.corriger(logement, votes, journal=lambda s: dire("   " + s))
+        if a.lecture_photos and not a.sortes_du_detecteur:
+            # essai : la sorte de baie LUE sur les photos (« porte_fenetre » ou « fenetre ») prime sur la mesure du bas de la baie
+            sys.path.insert(0, str(RACINE / "outils" / "lecture_photos"))
+            import poser_photos_lues
+            lus = poser_photos_lues.baies_lues(logement, json.loads(fiche.read_text(encoding="utf-8")), a.lecture_photos)
+            logement, changes_lus, desaccords = poser_photos_lues.photos_lues.corriger_les_baies(
+                logement, lus, votes, journal=lambda s: dire("   lu : " + s))
+            bilan["baies_lues"] = {"votes": lus, "changements": changes_lus, "desaccords": desaccords}
+            changes = changes + changes_lus
         depart.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
         bilan["baies"] = {"votes": votes, "changements": changes}
         dire(f"   {len(changes)} baie(s) corrigée(s) d'après les photos, sur {len(votes)} vue(s)")
@@ -178,10 +192,16 @@ def main() -> int:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+    lecture_seule = a.lecture_photos and not a.sortes_du_detecteur
     if "sols" in faire:
-        note("sols", lancer("sols", [py, "outils/habillage/sols_photos.py", "logement", fiche, depart, MODELE_SOLS, sols], journaux))
+        commande = [py, "outils/habillage/sols_photos.py", "logement", fiche, depart, MODELE_SOLS, sols]
+        note("sols", lancer("sols", commande + (["--lecture", a.lecture_photos / "lecture.json"] if lecture_seule else []), journaux))
     if "meubles" in faire:
-        note("meubles", lancer("meubles", [py, "outils/habillage/reperer_meubles_photos.py", fiche, sols, meuble], journaux))
+        if a.lecture_photos:  # essai : les meubles posés d'après la lecture des photos (ou, en référence, la sorte du détecteur)
+            commande = [py, "outils/lecture_photos/poser_photos_lues.py", fiche, sols, meuble, a.lecture_photos]
+            note("meubles", lancer("meubles", commande + (["--detecteur"] if a.sortes_du_detecteur else []), journaux))
+        else:
+            note("meubles", lancer("meubles", [py, "outils/habillage/reperer_meubles_photos.py", fiche, sols, meuble], journaux))
     if "maquette" in faire:
         if d3.exists():
             shutil.rmtree(d3)

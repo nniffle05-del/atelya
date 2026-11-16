@@ -133,6 +133,14 @@ def commande_logement(args) -> int:
     bibliotheque = trouver_matieres()
     prototypes = prototypes_bibliotheque(oeil, bibliotheque) if bibliotheque else None
     resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
+    if getattr(args, "lecture", None):
+        # essai du 16/11/2026 : la famille du sol LUE sur les photos (moteur/lecture_photos.py) prime sur celle du petit classificateur
+        from moteur import photos_lues
+        lus = photos_lues.sols_lus(json.loads(args.lecture.read_text(encoding="utf-8")), releve, logement)
+        resultat["pieces"] = photos_lues.appliquer_les_sols(resultat["pieces"], lus)
+        for pid, s in resultat["pieces"].items():
+            if s.get("famille_brique") and s["famille_brique"] != s["famille"]:
+                print(f"{pid} : sol lu sur les photos « {s['famille']} » (la brique photos disait « {s['famille_brique']} »)")
     for p in logement["pieces"]:  # remis avant la règle des espaces ouverts : un sol choisi n'est remplacé par rien
         if p["id"] in choisis:
             p["sol"], p["zones_sol"] = choisis[p["id"]]
@@ -172,6 +180,7 @@ def main() -> int:
     g.add_argument("modele", type=Path)
     g.add_argument("sortie", type=Path, help="logement.json écrit")
     g.add_argument("--sans-pas-du-sol", action="store_true", help="ne PAS écarter lits, canapés, rangements (ancien comportement)")
+    g.add_argument("--lecture", type=Path, help="essai : la lecture des photos (lecture.json) ; la famille de sol lue prime")
     args = ap.parse_args()
     for f in (args.releve, args.logement):
         if not f.exists():
