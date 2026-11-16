@@ -139,3 +139,70 @@ librement, TRELLIS v1 de façon approximative, Pixal3D avec des caméras connues
 - Repli gratuit et local à comparer dans le même essai : Stable Fast 3D (≈ 6 Go, tient sur la RTX 2070 d'après sa fiche ; licence
   Stability : gratuite sous 1 M$ de revenu, inscription obligatoire pour un usage commercial) → téléchargement = accord écrit de NT.
 - À ne PAS faire sans avis juridique : Pixal3D (fermé à l'UE au téléchargement), tout ce qui dépend de nvdiffrast dans le produit.
+
+## 6. Relectures de la session principale (16/11/2026, soir) : textes gardés dans `..\atelya\licences\`
+
+Fichiers bruts récupérés sur les dépôts officiels et LUS EN ENTIER, mot à mot, par la session (plus par un agent). Une copie datée de
+chaque texte est rangée dans `..\atelya\licences\` : Meta peut modifier ses conditions « effective immediately », il faut pouvoir
+prouver ce qui était écrit le jour de la lecture.
+
+- **SAM License** (Meta, « Last Updated: November 19, 2025 » ; fichier `LICENSE` du dépôt `facebookresearch/sam-3d-objects` ; copie
+  `sam-license-sam-3d-objects-2026-11-16.txt`, SHA256 b3a5a0e2…290b2e9b). **Usage commercial permis, aucune exclusion de l'Europe.**
+  - § 1.a : « non-exclusive, worldwide, non-transferable and royalty-free limited license […] to use, reproduce, distribute, copy,
+    create derivative works of, and make modifications to the SAM Materials ». Aucune clause « non commercial ». Aucune exclusion de
+    territoire : le contractant est même « Meta Platforms Ireland Limited (if you are located in […] the EEA or Switzerland) ».
+  - § 1.a.i : licence de brevets (rédigée pour les « SAM 3 Materials »), perdue si on attaque en contrefaçon.
+  - § 1.b.i : redistribuer les « SAM Materials » (code, poids, dérivés) seulement sous cette même licence, avec une copie. Atelya ne
+    redistribue rien : les poids restent sur NOS machines. La licence ne revendique rien sur ce que le programme PRODUIT (elle ne
+    cite « any output and results » que pour exclure toute garantie, § 3) : les meubles fabriqués seraient à nous (lecture de la
+    session, pas un avis de juriste).
+  - § 1.b.iii : respecter les lois, « including […] applicable privacy and data protection laws » ; § 1.b.iv : pas de rétro-ingénierie ;
+    § 1.b.v : interdits = ITAR, « military or warfare purposes, nuclear industries or applications, espionage, or the development
+    or use of guns or illegal weapons ».
+  - **§ 5.b : « You will indemnify and hold harmless Meta from and against any claim by any third party arising out of or related
+    to your use or distribution of the SAM Materials. »** (on garantit Meta contre les réclamations de tiers : à montrer à un
+    juriste avant un usage en production) ; la licence tombe si on attaque Meta.
+  - § 6 : Meta peut résilier en cas de manquement → supprimer et cesser d'utiliser. § 7 : droit et tribunaux de Californie.
+  - **§ 8 : « Meta may modify this Agreement from time to time […] All such changes will be effective immediately. »**
+- **DINOv3 License** (Meta, « Last Updated: August 19, 2025 » ; `LICENSE.md` du dépôt `facebookresearch/dinov3` ; copie
+  `dinov3-license-2026-11-16.md`, SHA256 25d122eb…3904999e) : mêmes clauses que la licence SAM, presque mot pour mot (sans la
+  licence de brevets ; acceptation « By clicking “I Accept” below or by using or distributing »). Nécessaire à TRELLIS.2 (son œil
+  est DINOv3).
+- **Pixal3D : contradiction entre recherches LEVÉE.** La fiche officielle Hugging Face `TencentARC/Pixal3D` porte en tête
+  `license: mit`, `license_link: LICENSE` et **`extra_gated_eu_disallowed: true`**. Les deux lectures étaient vraies : texte MIT sans
+  clause de territoire, MAIS téléchargement officiel fermé à l'Union européenne. Reste écarté (avis juridique avant tout essai).
+- **Depth Anything 3 « LARGE 1.1 » : contradiction CONFIRMÉE chez l'éditeur lui-même.** Fiche Hugging Face
+  `depth-anything/DA3-LARGE-1.1` : `license: apache-2.0` et « License | Apache 2.0 » ; tableau du README officiel du dépôt GitHub
+  `ByteDance-Seed/Depth-Anything-3` : `DA3-LARGE-1.1` et `DA3-LARGE` = « CC BY-NC 4.0 » (`DA3-BASE`, `DA3-SMALL`,
+  `DA3METRIC-LARGE`, `DA3MONO-LARGE` = Apache 2.0). Lecture prudente gardée : **INTERDIT** tant que l'éditeur n'a pas confirmé par
+  écrit (§ 3 de CLAUDE.md inchangé).
+- **TripoSG** (VAST) : `LICENSE` = MIT (« Copyright (c) 2025 VAST-AI-Research and contributors ») ; fiche `VAST-AI/TripoSG` :
+  `license: mit`, et « CUDA-capable GPU (>8GB VRAM) » : il demande PLUS de 8 Go d'après sa propre fiche → pas garanti sur la RTX 2070.
+- **Infinigen** (Princeton) : `LICENSE` = BSD 3 clauses (« Copyright (c) 2023, Princeton University »).
+- **TRELLIS.2** : `LICENSE` MIT relu ; fiche `microsoft/TRELLIS.2-4B` : `license: mit` ; son exemple d'usage cite « nvdiffrast
+  limit » : l'export officiel passe bien par nvdiffrast (non commercial), d'où l'obligation d'un autre chemin d'export.
+- NON relus par la session (lus par les agents seulement) : les dépendances de SAM 3D Objects (pytorch3d, kaolin et son dossier
+  « non_commercial », gsplat, smplx), les nœuds TRELLIS.2 de ComfyUI, Stable Fast 3D / SPAR3D au-delà de la Community License,
+  TripoSR, SigLIP 2, les conditions des hébergeurs et des programmes de crédits. **À relire avant tout essai de l'un d'eux.**
+- Lus aussi le 16/11 au soir, pour la feuille de route proposée par NT : **SAM 2** = Apache 2.0 (poids 2.1 : tiny 38,9 M de paramètres,
+  small 46, base+ 80,8, large 224,4 ; taille des fichiers à donner à NT avant tout téléchargement) ; **Grounding DINO** (code du dépôt
+  `IDEA-Research/GroundingDINO`) = Apache 2.0 ; **VGGT** : « only the newly released checkpoint VGGT-1B-Commercial is licensed for
+  commercial usage — the original checkpoint remains non-commercial », accès par formulaire ; COLMAP : fichier non rouvert (BSD d'après
+  les agents).
+
+## 7. Suite : l'étude des solutions GRATUITES (16/11/2026 au soir)
+
+NT a demandé des solutions gratuites, en précisant que le produit tournera au lancement sur des machines louées. Le rapport complet est
+dans `etude-meubles-gratuits-2026-11-16.md`, les six notes de recherche (citations et adresses) dans
+`../etapes/etude-meubles-gratuits-notes-2026-11-16/`. Ce qu'il change à cette étude du matin :
+
+- la limite de 8 Go ne commande plus le choix du lancement : SAM 3D Objects et TRELLIS.2 redeviennent les deux candidats, sur machine
+  louée, pour 1 à 3 centimes de calcul par meuble (pas de service à l'objet) ;
+- la première chose à construire est gratuite et locale : la coque tirée de la photo (MoGe-2) avec la photo recollée dessus ; tout ce
+  travail (aligner, coller, boucher, noter l'origine de chaque morceau : vu, recopié par miroir, inventé) resservira avec un grand modèle ;
+- le repli « Stable Fast 3D sur le PC » conseillé le matin passe au rang de simple témoin ; TripoSG (forme seule, MIT) devient la
+  réserve pour donner un dos sans rien louer, sans garantie sur 8 Go ;
+- Amodal3R : poids CC BY 4.0 d'après la note du soir, « non commercial » d'après le matin (code) → non utilisable tant que la licence
+  du code n'est pas lue ;
+- le « modèle exact du fabricant » : licite et gratuit pour ABO seulement.
+
