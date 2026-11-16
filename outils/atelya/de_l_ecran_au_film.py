@@ -99,10 +99,17 @@ def main() -> int:
     ap.add_argument("--sans-vue", action="store_true", help="ne pas tirer la vue par les fenêtres des photos")
     ap.add_argument("--sans-verification", action="store_true",
                     help="pas d'écran : le logement tel qu'il a été lu (verification.json) et les photos rangées par Atelya seul")
+    ap.add_argument("--logement", type=Path, help="banc : partir de CE logement (au lieu de celui du dossier de lecture)")
+    ap.add_argument("--fiche", type=Path, help="banc : la fiche des photos placées à utiliser (ex. caméras relevées à la main)")
     a = ap.parse_args()
 
     verifie, fiche = a.lecture / "logement-verifie.json", a.lecture / FICHE_PHOTOS
     lu = a.lecture / "verification.json"
+    if a.logement is not None:  # le banc de ressemblance : un logement et une fiche donnés, rien à ranger
+        if a.fiche is None:
+            dire("PLANTÉ : --logement va avec --fiche")
+            return 2
+        verifie, fiche, a.sans_verification = a.logement, a.fiche, False
     attendus = (lu, a.photos, MODELE_SOLS) if a.sans_verification else (verifie, fiche, a.photos, MODELE_SOLS)
     for f in attendus:
         if not f.exists():

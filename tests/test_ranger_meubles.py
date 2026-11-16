@@ -84,8 +84,11 @@ def test_plafond_des_chaises_par_tablee():
     assert [m["position"] for m in gardes] == [[1.0, 1.0], [1.6, 1.0], [4.5, 3.5]]
 
 
-def test_plafond_des_tables_par_piece_et_rangements_libres():
-    trouves = [_vu("table", 1.0, 1.0, 3), _vu("table", 4.0, 3.0, 1), _vu("rangement", 2.0, 0.3), _vu("rangement", 4.0, 0.3)]
-    par_photo = [[_vu("table", 1.0, 1.0), _vu("rangement", 2.0, 0.3)], [_vu("table", 4.0, 3.0)]]
+def test_plafond_des_canapes_par_piece_tables_et_rangements_libres():
+    trouves = [_vu("canape", 1.0, 1.0, 3), _vu("canape", 4.0, 3.0, 1), _vu("rangement", 2.0, 0.3), _vu("rangement", 4.0, 0.3),
+               _vu("table", 2.0, 2.0, 2), _vu("table", 4.0, 1.0, 1)]
+    par_photo = [[_vu("canape", 1.0, 1.0), _vu("rangement", 2.0, 0.3), _vu("table", 2.0, 2.0)], [_vu("canape", 4.0, 3.0), _vu("table", 4.0, 1.0)]]
     gardes = plafonner(trouves, par_photo, LOGEMENT)
-    assert [m["groupe"] for m in gardes] == ["table", "rangement", "rangement"] and gardes[0]["position"] == [1.0, 1.0]
+    # un seul canapé par photo : un seul canapé dans la pièce (le plus vu) ; les deux tables restent (aucune photo ne montre
+    # les deux à la fois, mais ce sont deux meubles : les tables ne sont plus plafonnées depuis le 16/11/2026)
+    assert [m["groupe"] for m in gardes] == ["canape", "rangement", "rangement", "table", "table"] and gardes[0]["position"] == [1.0, 1.0]

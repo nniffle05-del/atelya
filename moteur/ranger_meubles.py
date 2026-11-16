@@ -16,6 +16,9 @@ la même place (deux chaises plantées dans la table). Ici, des règles de bon s
    GLISSE_MAX) ; sans place libre, une table ou un rangement est rétréci (table d'appoint, chevet) ; sinon retiré ;
 5. une chaise peut être glissée sous une table (jusqu'à SOUS_LA_TABLE de sa surface) ; au-delà elle est reculée et tournée vers
    la table.
+ÉCARTÉ après mesure (16/11/2026) : « aucun meuble là où se tenait le photographe ». Aucun effet avec les caméras relevées à la main
+(app-001, app-002) ; avec les caméras qu'Atelya place seul (app-004), c'est l'appareil qui est mal placé, pas le meuble (vu sur
+deux photos) : fidélité 41,8 → 37,8. À reprendre quand la place des photos sera sûre à 20 cm.
 Un tapis est à plat : il ne gêne personne et n'est gêné par personne. Les meubles déjà dans le logement (relevés, placés à
 l'écran : statut autre que « estime » ou source sans « repérage ») ne sont jamais déplacés ni retirés ; les autres s'y adaptent.
 """
@@ -26,7 +29,7 @@ import math
 import numpy as np
 
 VERSION = "0.1.0"
-RANG = {"lit": 0, "canape": 1, "rangement": 2, "table": 3, "fauteuil": 4, "chaise": 5, "lampadaire": 6, "plante": 7}
+RANG = {"lit": 0, "canape": 1, "rangement": 2, "table": 3, "fauteuil": 4, "chaise": 5, "lampe": 6, "plante": 7}  # par GROUPE
 A_PLAT = ("tapis",)
 PLUSIEURS_COTE_A_COTE = ("chaise", "fauteuil")  # sortes dont deux voisins qui se touchent un peu sont deux vrais meubles
 RETRECIT = ("table", "rangement")  # sortes qui existent en petit (table d'appoint, chevet) : rétrécies plutôt que retirées
@@ -41,6 +44,13 @@ DANS_LA_PIECE = 0.9  # part d'un meuble qui doit être dans sa pièce (le reste 
 GLISSE_MAX = 0.8  # m : déplacement maximal d'un meuble pour le dégager
 PAS = 0.05  # m
 GRILLE = 9  # points par côté pour mesurer un recouvrement
+
+
+def groupe_de(categorie: str) -> str:
+    """Le groupe d'une catégorie précise (« table_basse » → « table », « placard » → « rangement ») : les règles de rangement
+    parlent de groupes, les meubles ont depuis le 16/11/2026 leur catégorie précise."""
+    from moteur.reperer_meubles import GROUPE_DE
+    return GROUPE_DE.get(categorie) or categorie
 
 
 def _points(m: dict) -> np.ndarray:
@@ -116,17 +126,17 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
     """Les meubles rangés (ordre d'origine gardé) et la liste de ce qui a été fait : {"id", "action", "raison"}."""
     pieces = {p["id"]: p for p in logement.get("pieces", [])}
     actions: list[dict] = []
-    ordre = sorted(range(len(meubles)), key=lambda i: (not _fixe(meubles[i]), RANG.get(meubles[i]["categorie"], 9), -_score(meubles[i])))
+    ordre = sorted(range(len(meubles)), key=lambda i: (not _fixe(meubles[i]), RANG.get(groupe_de(meubles[i]["categorie"]), 9), -_score(meubles[i])))
     gardes: dict[int, dict] = {}
 
     def gene(m: dict, sauf: int | None = None) -> tuple[int, float] | None:
         """Le meuble gardé que `m` recouvre le plus (au-delà de ce qui est permis), et de combien."""
         pire = None
         for j, k in gardes.items():
-            if j == sauf or k["categorie"] in A_PLAT:
+            if j == sauf or groupe_de(k["categorie"]) in A_PLAT:
                 continue
             r = recouvrement(m, k)
-            permis = SOUS_LA_TABLE if {m["categorie"], k["categorie"]} == {"chaise", "table"} else TOUCHE
+            permis = SOUS_LA_TABLE if {groupe_de(m["categorie"]), groupe_de(k["categorie"])} == {"chaise", "table"} else TOUCHE
             if r > permis and (pire is None or r > pire[1]):
                 pire = (j, r)
         return pire
@@ -138,7 +148,8 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
 
     for i in ordre:
         m = dict(meubles[i])
-        if _fixe(m) or m["categorie"] in A_PLAT:
+        g_m = groupe_de(m["categorie"])
+        if _fixe(m) or g_m in A_PLAT:
             gardes[i] = m
             continue
         piece = pieces.get(m.get("piece"))
@@ -154,12 +165,14 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
         g = gene(m)
         if g is not None:
             autre = gardes[g[0]]
-            petits = m["categorie"] in PLUSIEURS_COTE_A_COTE  # des chaises voisines sont de VRAIES chaises voisines
+            g_autre = groupe_de(autre["categorie"])
+            petits = g_m in PLUSIEURS_COTE_A_COTE  # des chaises voisines sont de VRAIES chaises voisines
             if autre["categorie"] == m["categorie"] and (g[1] > MEME_OBJET or not petits):  # règle 3
                 note(m, "retiré", f"le même meuble que {autre['id']}, vu deux fois")
                 continue
-            chaise_et_table = {m["categorie"], autre["categorie"]} == {"chaise", "table"}
-            if g[1] > MEME_OBJET and frozenset((m["categorie"], autre["categorie"])) in SE_CONFONDENT:  # règle 4
+            chaise_et_table = {g_m, g_autre} == {"chaise", "table"}
+            # règle 4 : même groupe (une commode et un « rangement ») ou groupes qui se confondent, et fort recouvrement
+            if g[1] > MEME_OBJET and (g_m == g_autre or frozenset((g_m, g_autre)) in SE_CONFONDENT):
                 note(m, "retiré", f"au même endroit que {autre['categorie']} {autre['id']}")
                 continue
             ecart = np.asarray(m["position"], float) - np.asarray(autre["position"], float)
@@ -167,7 +180,7 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
                 a = math.radians(float(m.get("face", 0.0)))
                 ecart = -np.array([math.cos(a), math.sin(a)])
             degage = _glisser(m, ecart, bien_place)
-            if degage is None and m["categorie"] in RETRECIT:
+            if degage is None and g_m in RETRECIT:
                 # pas de place pour un meuble de taille courante : c'en est un petit (table d'appoint, table de chevet)
                 for part in (0.7, 0.5, 0.4):
                     l, pr = float(m["dimensions"][0]) * part, max(float(m["dimensions"][1]) * part, PROFONDEUR_MIN)
@@ -178,7 +191,7 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
             if degage is None:
                 note(m, "retiré", f"il traversait {autre['categorie']} {autre['id']}, sans place libre à côté")
                 continue
-            if m["categorie"] == "chaise" and autre["categorie"] == "table":  # règle 5 : la chaise regarde sa table
+            if g_m == "chaise" and g_autre == "table":  # règle 5 : la chaise regarde sa table
                 vers = np.asarray(autre["position"], float) - np.asarray(degage["position"], float)
                 degage["face"] = round(math.degrees(math.atan2(vers[1], vers[0])), 1)
                 if not bien_place(degage):
@@ -191,11 +204,11 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
 
 def chevauchements(meubles: list[dict]) -> list[tuple[str, str, float]]:
     """Les paires de meubles qui se recouvrent au-delà du permis (contrôle : doit être vide après `ranger`)."""
-    solides = [m for m in meubles if m["categorie"] not in A_PLAT]
+    solides = [m for m in meubles if groupe_de(m["categorie"]) not in A_PLAT]
     sortie = []
     for i, a in enumerate(solides):
         for b in solides[i + 1:]:
             r = recouvrement(a, b)
-            if r > (SOUS_LA_TABLE if {a["categorie"], b["categorie"]} == {"chaise", "table"} else TOUCHE):
+            if r > (SOUS_LA_TABLE if {groupe_de(a["categorie"]), groupe_de(b["categorie"])} == {"chaise", "table"} else TOUCHE):
                 sortie.append((a["id"], b["id"], round(r, 2)))
     return sortie
