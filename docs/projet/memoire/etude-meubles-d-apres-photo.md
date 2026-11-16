@@ -231,3 +231,39 @@ l'annonce. Et j'aimerais bien que tu le fasses toi-même » (accord écrit pour 
   commercial. La voie propre pour essayer SAM 3D Objects reste la machine louée avec les poids officiels (SAM License : commercial
   permis), donc le formulaire nominatif de Meta + une location : accords écrits de NT.
 
+## 9. TRELLIS.2 TOURNE SUR LE PC DE 8 Go, par ComfyUI (16/11/2026, nuit ; accord écrit de NT : « Ok » à la liste)
+
+NT : « Est-ce que tu peux juste essayer, juste sur le canapé ? », liste donnée (quoi, taille, licence, à quoi ça sert), puis « Ok ».
+
+- **Installé (outil d'ESSAI, à part, jamais dans le produit)** dans `D:\Atelya-Essais\comfyui` (dossier créé avec l'accord ; tout
+  supprimer = supprimer ce dossier) : ComfyUI 0.45.0 Windows portable `…nvidia_cu126.7z` (1 962 803 660 octets, SHA256 e7d1be2b…87d69d29,
+  GPL-3 ; apporte son Python 3.12 et torch 2.14.1+cu126, ne touche pas à Windows) ; `Comfy-Org/TRELLIS.2` (MIT) :
+  `trellis_2_int8_convrot.safetensors` 5 253 048 192 octets (d01952ad…0bad3a31), `dino_v3_vit_l.safetensors` 1 212 559 776 (5cb785e4…c63468ee,
+  licence DINOv3 de Meta), `trellis_2_shape_vae_bf16` 1 095 844 024 (de0cb494…a72341f4), `trellis_2_texture_vae_bf16` 948 461 364
+  (714e5ebf…ab73ab0e) ; `Comfy-Org/BiRefNet` (MIT) `birefnet.safetensors` 444 473 596 (9ab37426…e356a154, pas utilisé : notre détourage
+  suffit). Tout vérifié à l'arrivée (taille + SHA256 officiels). **Pixal3D ni téléchargé ni chargé.**
+- **Outils écrits** (`pc/essais-meubles-photo/`) : `telecharger_essai_comfyui.sh` ; `comfyui_trellis2.py` (traduit l'enchaînement
+  officiel `3d_pixal3d_trellis2_image_to_model.json` vers le format du service de ComfyUI en ne gardant QUE la branche TRELLIS.2 ;
+  s'arrête si un nœud Pixal3D ou MoGe reste) ; `voir_objet.py` (Blender : tourner autour d'un GLB) ; `meuble_dans_maquette.py`
+  (Blender : remplace un meuble de la maquette par le GLB et rend depuis les appareils des photos). Lancer ComfyUI :
+  `python_embeded\python.exe -s ComfyUI\main.py --windows-standalone-build --listen 127.0.0.1 --port 8188 --disable-auto-launch`.
+- **MESURÉ sur la RTX 2070** (finesse 1024, texture 2048, version compressée « int8 ») : **ça marche**, 908 s (~15 min) pour un
+  meuble, 5,2 Go de carte utilisés sur 8, 82 °C ; maillage brut 4,49 M de faces, livré à 700 000 faces, GLB de 38,6 Mo avec matières.
+  **La prévision de Claude (« très probablement trop juste ») était fausse** : elle venait de la notice de Microsoft (24 Go) ; la
+  version compressée de ComfyUI et son déchargement vers la mémoire ordinaire suffisent. Fermer Unreal / Blender pendant le calcul
+  (16 Go de mémoire vive).
+- **Résultat sur le canapé bleu (fabriqué d'après la SEULE photo 07, recadrage de 349 × 220 points)** : canapé deux places bleu,
+  deux coussins de dossier, accoudoirs arrondis : bien plus proche de la photo que le canapé de catalogue (trois places vert-bleu,
+  autre style). Proportions 0,99 × 0,61 × 0,49 → posé à 1,47 × 0,90 × 0,72 m. Dos inventé : lisse, plausible, cohérent avec la
+  photo 01 qui le voit de dos. **Défauts** : le filigrane « Junot » imprimé en taches blanches sur les coussins ; pas de pieds et un
+  dessous irrégulier (la chaise du premier plan cachait le bas) ; peau un peu floue (petit recadrage) ; ombres de la photo cuites.
+  Dans la maquette, la PLACE et la TAILLE restent celles d'Atelya (canapé trop à gauche / trop bas par rapport aux photos 02 et 08) :
+  c'est le chantier « place et taille », pas le programme.
+- Images : `..\atelya\b2\app-004\essai-canape-bleu\trellis2-photo-07-planche.jpg` (six angles),
+  `comparaison-canape-bleu.jpg` (photo | catalogue | fabriqué, quatre points de vue ; appareils de
+  `..\atelya\b2\app-004\chaine-v2\cameras-photos-seul.json`, maquette `equipements-1\sc-app-004-3d`).
+- **Reste à essayer** : la photo 01 (canapé coupé par le bord) ; un filigrane effacé avant fabrication ; finesse 1536 ; la photo
+  recollée sur la face visible ; SAM 3D Objects (pas de voie gratuite propre : machine louée + formulaire Meta).
+- **Rappel licence** : ici l'export est celui de ComfyUI (pas de nvdiffrast d'après son éditeur et le contrôle d'un agent sur 13
+  fichiers, pas un audit complet) ; l'œil DINOv3 relève de la licence Meta (lue) ; ComfyUI est GPL-3 = outil à part.
+

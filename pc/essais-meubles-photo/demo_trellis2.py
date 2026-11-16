@@ -80,7 +80,10 @@ def main():
     image = {"path": chemin, "meta": {"_type": "gradio.FileData"}, "orig_name": "objet.png", "mime_type": "image/png"}
     image = appeler(dependances, "preprocess_image", [image], session)[0]
     t0 = time.time()
-    appeler(dependances, "image_to_3d", [image, a.graine, a.resolution, 7.5, 0.7, 12, 5.0, 7.5, 0.5, 12, 3.0, 1.0, 0.0, 12, 3.0], session)
+    apercu = appeler(dependances, "image_to_3d",
+                     [image, a.graine, a.resolution, 7.5, 0.7, 12, 5.0, 7.5, 0.5, 12, 3.0, 1.0, 0.0, 12, 3.0], session)
+    # l'aperçu (vues de l'objet rendues par la démonstration) est gardé tout de suite : si l'export échoue, il reste de quoi juger
+    Path(a.sortie).with_suffix(".apercu.json").write_text(json.dumps(apercu, ensure_ascii=False), encoding="utf-8")
     t1 = time.time()
     sortie = appeler(dependances, "extract_glb", [None, 300000, 2048], session)  # None = l'état gardé par le serveur
     t2 = time.time()
