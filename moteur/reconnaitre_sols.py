@@ -534,11 +534,14 @@ def sols_des_espaces_ouverts(logement: dict) -> dict:
             voisins[cotes[1]].add(cotes[0])
     par_id = {p["id"]: p for p in pieces}
     reconnu = lambda p: str((p.get("sol") or {}).get("source", "")).startswith(("brique photos", "même sol que"))
+    # Seule une pièce SANS sol, ou au sol posé par la règle par défaut, reprend le sol de sa voisine : un sol choisi par quelqu'un
+    # (à l'écran de vérification, dans un relevé) n'est jamais remplacé (défaut trouvé par la série de tests le 16/11/2026).
+    libre = lambda p: p.get("sol") is None or p["sol"].get("source") == "regle_par_defaut"
     change = True
     while change:
         change = False
         for p in pieces:
-            if reconnu(p) or not p["id"].rsplit("_", 1)[0] in PIECES_SECHES:
+            if reconnu(p) or not libre(p) or not p["id"].rsplit("_", 1)[0] in PIECES_SECHES:
                 continue
             sources = [par_id[v] for v in sorted(voisins[p["id"]]) if reconnu(par_id[v])]
             if not sources:

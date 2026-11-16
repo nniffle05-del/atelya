@@ -58,6 +58,12 @@ def main() -> int:
             m["id"] += "b"
         pris.add(m["id"])
     logement["meubles"] = list(logement.get("meubles", [])) + nouveaux
+    # les LUMINAIRES SUSPENDUS (16/11/2026) : vus sur presque toutes les photos, placés par la profondeur (moteur/objets_accroches.py)
+    from moteur.objets_accroches import reperer_suspensions
+    pris = {m["id"] for m in logement["meubles"]} | {p["id"] for p in logement["pieces"]}
+    suspensions = [m for m in reperer_suspensions(releve, logement, RACINE, journal=print) if m["id"] not in pris]
+    logement["meubles"] += suspensions
+    nouveaux = nouveaux + suspensions
     Logement.model_validate(logement)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     args.sortie.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")

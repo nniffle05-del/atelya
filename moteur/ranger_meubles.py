@@ -19,7 +19,8 @@ la même place (deux chaises plantées dans la table). Ici, des règles de bon s
 ÉCARTÉ après mesure (16/11/2026) : « aucun meuble là où se tenait le photographe ». Aucun effet avec les caméras relevées à la main
 (app-001, app-002) ; avec les caméras qu'Atelya place seul (app-004), c'est l'appareil qui est mal placé, pas le meuble (vu sur
 deux photos) : fidélité 41,8 → 37,8. À reprendre quand la place des photos sera sûre à 20 cm.
-Un tapis est à plat : il ne gêne personne et n'est gêné par personne. Les meubles déjà dans le logement (relevés, placés à
+Un tapis est à plat : il ne gêne personne et n'est gêné par personne. Un meuble ACCROCHÉ (suspension, tableau, meuble haut :
+bas à plus de ACCROCHE_M) non plus : une suspension au-dessus d'une table n'est pas « dans » la table. Les meubles déjà dans le logement (relevés, placés à
 l'écran : statut autre que « estime » ou source sans « repérage ») ne sont jamais déplacés ni retirés ; les autres s'y adaptent.
 """
 from __future__ import annotations
@@ -42,6 +43,7 @@ MEME_OBJET = 0.5  # au-delà de cette part du plus petit : un seul objet pris po
 SOUS_LA_TABLE = 0.35  # part d'une chaise qui peut être sous une table
 DANS_LA_PIECE = 0.9  # part d'un meuble qui doit être dans sa pièce (le reste : quelques centimètres dans l'épaisseur du mur)
 GLISSE_MAX = 0.8  # m : déplacement maximal d'un meuble pour le dégager
+ACCROCHE_M = 1.2  # un meuble dont le bas est à plus de 1,20 m (suspension, meuble haut, tableau) ne gêne personne au sol
 PAS = 0.05  # m
 GRILLE = 9  # points par côté pour mesurer un recouvrement
 
@@ -102,6 +104,11 @@ def _score(m: dict) -> float:
     return vues * float(m.get("confiance", 0.5))
 
 
+def accroche(m: dict) -> bool:
+    """Suspendu au plafond ou accroché au mur, au-dessus des meubles : hors des règles de rangement au sol."""
+    return float(m.get("altitude") or 0.0) >= ACCROCHE_M
+
+
 def _fixe(m: dict) -> bool:
     """Un meuble relevé ou placé par quelqu'un : on n'y touche pas."""
     return m.get("statut") != "estime" or "repérage" not in str(m.get("source", ""))
@@ -133,7 +140,7 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
         """Le meuble gardé que `m` recouvre le plus (au-delà de ce qui est permis), et de combien."""
         pire = None
         for j, k in gardes.items():
-            if j == sauf or groupe_de(k["categorie"]) in A_PLAT:
+            if j == sauf or groupe_de(k["categorie"]) in A_PLAT or accroche(k):
                 continue
             r = recouvrement(m, k)
             permis = SOUS_LA_TABLE if {groupe_de(m["categorie"]), groupe_de(k["categorie"])} == {"chaise", "table"} else TOUCHE
@@ -149,7 +156,7 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
     for i in ordre:
         m = dict(meubles[i])
         g_m = groupe_de(m["categorie"])
-        if _fixe(m) or g_m in A_PLAT:
+        if _fixe(m) or g_m in A_PLAT or accroche(m):
             gardes[i] = m
             continue
         piece = pieces.get(m.get("piece"))
@@ -204,7 +211,7 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
 
 def chevauchements(meubles: list[dict]) -> list[tuple[str, str, float]]:
     """Les paires de meubles qui se recouvrent au-delà du permis (contrôle : doit être vide après `ranger`)."""
-    solides = [m for m in meubles if groupe_de(m["categorie"]) not in A_PLAT]
+    solides = [m for m in meubles if groupe_de(m["categorie"]) not in A_PLAT and not accroche(m)]
     sortie = []
     for i, a in enumerate(solides):
         for b in solides[i + 1:]:

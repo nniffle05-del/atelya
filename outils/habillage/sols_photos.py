@@ -122,6 +122,9 @@ def commande_logement(args) -> int:
     from moteur.reconnaitre_sols import Classifieur, prototypes_bibliotheque, reconnaitre, sols_vers_logement
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
     releve = fiche_ou_photos(args.releve, logement, (args.sortie if args.sortie.suffix == "" else args.sortie.parent) / "cameras-photos-seul.json")
+    # Les sols CHOISIS PAR QUELQU'UN à l'écran de vérification (statut « mesure ») sont gardés et repris tels quels à la fin : la
+    # personne a raison contre la photo (16/11/2026 ; avant, la brique photos les effaçait comme les autres).
+    choisis = {p["id"]: (p["sol"], p.get("zones_sol", [])) for p in logement["pieces"] if (p.get("sol") or {}).get("statut") == "mesure"}
     for p in logement["pieces"]:  # on part d'un logement sans sols : Atelya ne voit pas la bonne réponse
         p.pop("sol", None)
         p["zones_sol"] = []
@@ -130,6 +133,11 @@ def commande_logement(args) -> int:
     bibliotheque = trouver_matieres()
     prototypes = prototypes_bibliotheque(oeil, bibliotheque) if bibliotheque else None
     resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
+    for p in logement["pieces"]:  # remis avant la règle des espaces ouverts : un sol choisi n'est remplacé par rien
+        if p["id"] in choisis:
+            p["sol"], p["zones_sol"] = choisis[p["id"]]
+    for pid in choisis:
+        resultat["pieces"].pop(pid, None)
     sortie = sols_vers_logement(resultat, logement, bibliotheque, prototypes)
     Logement.model_validate(sortie)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)

@@ -71,3 +71,13 @@ def test_espace_ouvert_garde_le_sol_de_la_piece_voisine():
 def test_une_cloison_ou_une_piece_d_eau_ne_reprend_pas_le_sol():
     assert "sol" not in rs.sols_des_espaces_ouverts(_deux_pieces(cloison=True))["pieces"][1]
     assert "sol" not in rs.sols_des_espaces_ouverts(_deux_pieces(cloison=False, id_voisine="cuisine_1"))["pieces"][1]
+
+
+def test_un_sol_choisi_par_quelqu_un_n_est_jamais_remplace():
+    lg = _deux_pieces(cloison=False)
+    lg["pieces"][1]["sol"] = {"matiere": "tomettes", "statut": "mesure", "source": "verification"}  # choisi à l'écran
+    assert rs.sols_des_espaces_ouverts(lg)["pieces"][1]["sol"]["matiere"] == "tomettes"
+    lg["pieces"][1]["sol"] = {"matiere": "tomettes"}  # un sol sans provenance (relevé) : on n'y touche pas non plus
+    assert rs.sols_des_espaces_ouverts(lg)["pieces"][1]["sol"] == {"matiere": "tomettes"}
+    lg["pieces"][1]["sol"] = {"matiere": "carrelage_interieur", "statut": "ajoute", "source": "regle_par_defaut", "confiance": 0.5}
+    assert rs.sols_des_espaces_ouverts(lg)["pieces"][1]["sol"]["matiere"] == "chene_noeuds"  # la règle par défaut, elle, cède
