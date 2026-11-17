@@ -48,7 +48,11 @@ def main() -> int:
     a = ap.parse_args()
     import essai_lecture_photos as essai
 
+    from moteur.sol_a_plat import piece_de, piece_de_l_appareil
+
     fiche = json.loads(Path(CAS[a.cas]["fiche"]).read_text(encoding="utf-8"))
+    logement = json.loads(Path(CAS[a.cas]["logement"]).read_text(encoding="utf-8"))
+    logement = logement.get("logement", logement)
     origine = essai.lire(essai.VERITES[a.cas]["meubles"])["meubles"]
     comp_f = Path(essai.VERITES[a.cas]["meubles"]).with_name("meubles-complement.json")
     comp = essai.lire(comp_f) if comp_f.is_file() else {"meubles": [], "corrections": {}}
@@ -64,11 +68,17 @@ def main() -> int:
         if a.photos and nom not in a.photos:
             continue
         cam = camera_depuis_dict(d["camera"])
+        piece_cam, _ = piece_de_l_appareil(cam, logement["pieces"])
         im = Image.fromarray(lire_photo(fiche, nom))
         g = ImageDraw.Draw(im)
         for couleur, meubles in lots:
             for m in meubles:
                 if a.seuls and m["id"] not in a.seuls:
+                    continue
+                # seulement les meubles de la pièce où se tient l'appareil : dessiner ceux des pièces voisines à travers les murs
+                # (le meuble vasque de la salle d'eau « posé » sur le lit superposé) rendait le contrôle illisible et trompeur
+                piece_m = piece_de(m["position"], logement["pieces"])
+                if piece_cam is None or piece_m is None or piece_m["id"] != piece_cam["id"]:
                     continue
                 pts = [projeter(c, cam) for c in coins(m)]
                 if any(p[2] < 0.25 for p in pts) or not any(0 <= p[0] < im.width and 0 <= p[1] < im.height for p in pts):
