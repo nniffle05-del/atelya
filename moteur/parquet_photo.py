@@ -170,6 +170,15 @@ def _periode(profil: np.ndarray, resolution: float, mini: float | None = None, m
         return None
     haut = max(auto[d] for d in pics)
     d = next(d for d in pics if auto[d] >= 0.7 * haut)  # le PREMIER pic franc : la période, pas son double
+    # … et pas le double non plus quand un joint sur deux est discret (parquet aux joints serrés, peu de nuances : le pic de la
+    # vraie période passe sous le seuil et celui du double est retenu ; vu par la boucle de contrôle le 18/11/2026). Si la
+    # moitié de la période est elle aussi un pic, même faible, c'est elle la largeur des lames. (Pour de vraies lames de
+    # largeur d, la ressemblance à d / 2 est nulle ou négative : aucun risque de couper une vraie largeur en deux.)
+    m = d // 2
+    if m - 2 >= max(d_min, 1):
+        m = max(range(m - 2, m + 3), key=lambda k: auto[k])
+        if auto[m] >= 0.5 * auto[d] and auto[m] >= auto[m - 1] and auto[m] >= auto[m + 1]:
+            d = m
     # position fine du pic (parabole sur trois points)
     y0, y1, y2 = auto[d - 1], auto[d], auto[d + 1]
     fin = d + 0.5 * (y0 - y2) / (y0 - 2 * y1 + y2) if abs(y0 - 2 * y1 + y2) > 1e-9 else float(d)

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 MATIERE = "parquet_sur_mesure"  # le nom de la matière dans le format (moteur/matieres.py, moteur/logement.py)
 PREFIXE = "psm_"  # le nom d'un parquet dessiné : « psm_ » + sa clé (voir cle)
 BOIS = "chene_clair"  # la photo de chêne dont les lames sont tirées (fil du bois de haut en bas de l'image)
@@ -176,9 +176,10 @@ def _dessiner_hongrie(fiche_: dict, photo_bois: np.ndarray, px_par_m_bois: float
     relief = Image.fromarray(_normales(hauteur, 3.0 * float(np.clip(joint_mm / 1.5, 0.2, 1.0))))
     gris = np.asarray(image.convert("L"), np.float32) / 255
     mat = np.clip(0.78 + 0.15 * (1 - hauteur) + 0.10 * (gris - gris.mean()), 0, 1)
-    # l'image rendue : sa largeur est le travers des rangs, sa hauteur le long des rangs
+    # l'image rendue : sa largeur est le travers des rangs, sa hauteur le long des rangs. La taille est écrite [le long, en
+    # travers] : sur un sol, Blender étale la HAUTEUR de l'image sur la première taille et sa largeur sur la seconde
     return {"couleur": image, "relief": relief, "brillance": Image.fromarray((mat * 255).astype(np.uint8)),
-            "taille_m": [round(haut_m, 4), round(large_m, 4)], "plan": {"rang_m": rang_px / px, "pas_m": pas_px / px, "rangs": 2 * paires, "lames": lames}}
+            "taille_m": [round(large_m, 4), round(haut_m, 4)], "plan": {"rang_m": rang_px / px, "pas_m": pas_px / px, "rangs": 2 * paires, "lames": lames}}
 
 
 def dessiner(fiche_: dict, photo_bois: np.ndarray, px_par_m_bois: float, mm_par_px: float | None = None) -> dict:

@@ -75,14 +75,17 @@ def _aplatir(r):
 def uv_du_point(co, normale, p):
     """Le point de la photo (u, v) pour un point `co` d'une face de normale `normale` (repère de l'objet), comme Blender au
     rendu : rotation autour du haut, mise à l'échelle, puis projection « boîte » selon le grand axe de la normale
-    (dessus/dessous → x, y ; côtés face à x → y, z ; côtés face à y → x, z)."""
+    (dessus/dessous → y, x ; côtés face à x → y, z ; côtés face à y → x, z).
+    ATTENTION (mesuré dans le FILM Unreal le 18/11/2026, juge pc/verification/comparer_sens_photo_rendu.py sur trois logements :
+    lames un quart de tour à côté, 3 vues sur 3) : sur un sol, Blender pose une image avec sa LARGEUR le long de l'axe y (voir
+    moteur/matieres.py, ROTATION_PHOTO) ; ce calcul rendait (x, y) et tous les sols du film étaient tournés d'un quart de tour."""
     c, s = math.cos(p["angle"]), math.sin(p["angle"])
     x, y, z = co[0] * c - co[1] * s, co[0] * s + co[1] * c, co[2]
     x, y, z = (x * p["echelle"][0] + p["decalage"][0], y * p["echelle"][1] + p["decalage"][1],
                z * p["echelle"][2] + p["decalage"][2])
     nx, ny, nz = (abs(v) for v in normale)
     if nz >= nx and nz >= ny:
-        return x, y
+        return y, x
     if nx >= ny:
         return y, z
     return x, z
