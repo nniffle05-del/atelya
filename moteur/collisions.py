@@ -470,8 +470,20 @@ def reparer(logement: dict, journal=None) -> tuple[dict, list[dict]]:
         remettre(origine)
         return False
 
+    # une chaise rangée à sa table la suit (moteur/tablees.py, 17/11/2026) : avant, la table était poussée hors d'un obstacle,
+    # puis chaque chaise écartée de la table de son côté, et la tablée était défaite
+    from moteur.tablees import sieges_ranges
+
+    table_de = sieges_ranges(meubles)
+    depart_des_tables = {id(t): np.asarray(t["position"], float) for t in table_de.values()}
+
     def au_sol(liste: list[dict], jeu_mur: float) -> None:
         for m in liste:
+            table = table_de.get(id(m))
+            if table is not None and id(table) not in retires and mobile(m):
+                suivi = np.asarray(table["position"], float) - depart_des_tables[id(table)]
+                if float(np.linalg.norm(suivi)) > 1e-6:
+                    _deplacer([m], suivi)
             avant = list(m["position"])
             if not placer_au_sol(m, jeu_mur):
                 retirer(m, "aucune place libre à moins de 80 cm")

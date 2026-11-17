@@ -72,9 +72,15 @@ def main() -> int:
     ap.add_argument("--ancien", action="store_true")
     ap.add_argument("--sans-adosser", action="store_true", help="sans la mesure des meubles adossés sur leur mur (étape 2)")
     ap.add_argument("--sans-rangees", action="store_true", help="sans les rangées de cuisine dites par la lecture (17/11/2026)")
+    ap.add_argument("--sans-taille", action="store_true", help="sans la taille mesurée des meubles libres (étape 3, 17/11/2026)")
+    ap.add_argument("--sans-tablees", action="store_true", help="sans les chaises rangées autour de leur table (étape 3, 17/11/2026)")
     a = ap.parse_args()
     modele = moge.charger()
     options = {"associer": False, "adosser": False} if a.ancien else {"adosser": False} if a.sans_adosser else {}
+    if a.sans_taille:
+        options["mesurer_la_taille"] = False
+    if a.sans_tablees:
+        options["tablees"] = False
     lignes, total = [], {"retrouves": 0, "bonne_sorte": 0, "en_trop": 0, "a_trouver": 0, "acc": 0, "acc_trop": 0, "acc_a_trouver": 0}
     for cas in a.cas:
         debut = time.time()

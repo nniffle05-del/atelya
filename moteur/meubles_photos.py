@@ -240,6 +240,9 @@ def _resume(paquet: list[dict]) -> dict:
                       "coupe_mur": m.get("coupe_mur")} for m in paquet], "_vues": paquet}
     if formes:
         r["forme"] = max(formes, key=formes.get)
+    emprises = [m["emprise"] for m in paquet if m.get("emprise")]
+    if emprises:  # les mesures de son dessus, vue par vue (moteur.photos_lues.emprise_d_un_meuble) : sa vraie taille (`taille_mesuree`)
+        r["emprises"] = emprises
     # un meuble ADOSSÉ mesuré sur son mur (moteur.photos_lues.contre_le_mur) : sa largeur est celle de sa vue ENTIÈRE la plus
     # proche ; si toutes ses vues sont coupées par le cadre, la plus grande (chacune est un minimum) ; sa place est alors celle
     # de cette vue (le milieu de ce qu'elle voit), et non la moyenne de vues qui en voient des morceaux différents
@@ -353,6 +356,53 @@ def selon_la_forme(categorie: str, dims, forme: str | None) -> tuple[float, floa
     return l, p, h
 
 
+# ---------------------------------------------------------------- la VRAIE TAILLE d'un meuble libre (17/11/2026, étape 3)
+EMPRISE_LOIN_M = 4.5  # au-delà, le relief d'une photo ne mesure plus une taille (un canapé de 2,10 m vu à 6,4 m : 2,89 m)
+COUPE_NETTE = 1.15  # une vue coupée par le cadre ne corrige les vues entières que si elle montre 15 % de plus qu'elles
+PETIT_COTE = (0.85, 1.2)  # le petit côté mesuré est gardé entre 0,85 et 1,2 fois celui de la sorte (il est vu le long du regard,
+# là où le relief est le moins sûr : la table de 0,95 m d'app-001 mesurée 1,56 m)
+SENS_NET = 1.25  # le sens du grand côté n'est cru que si le meuble est mesuré 1,25 fois plus long que large
+LARGEURS_DE_LIT = (0.9, 1.4, 1.6, 1.8)
+
+
+def taille_mesuree(categorie: str, emprises: list[dict], forme: str | None = None) -> dict | None:
+    """La taille d'un meuble libre d'après les mesures de son dessus sur chaque photo (moteur.photos_lues.emprise_d_un_meuble) :
+    {"grand", "petit" (m), "sens" (direction du grand côté, degrés modulo 180, ou None s'il n'est pas net), "vues"}.
+    Les vues proches et entières font foi (leur médiane) ; une vue coupée par le cadre montre un minimum : seule, elle ne peut
+    que GRANDIR la taille courante de la sorte. Bornée par ce que la sorte peut être. None si aucune vue proche."""
+    proches = [e for e in emprises if e["distance"] <= EMPRISE_LOIN_M]
+    if not proches:
+        return None
+    (l0, p0, _), (mini, maxi), _ = TAILLES.get(categorie, TAILLES["rangement"])
+    g0, pt0 = max(l0, p0), min(l0, p0)
+    entieres = [e for e in proches if not e["coupe"]]
+    coupees = [e for e in proches if e["coupe"]]
+    if entieres:
+        grand = float(np.median([e["grand"] for e in entieres]))
+        petit = float(np.median([e["petit"] for e in entieres]))
+        if coupees and max(e["grand"] for e in coupees) > COUPE_NETTE * grand:
+            grand = max(e["grand"] for e in coupees)
+    else:
+        grand = max(max(e["grand"] for e in coupees), g0)
+        petit = max(max(e["petit"] for e in coupees), pt0)
+    if forme in ("ronde", "rond"):
+        cote = min(max((grand + petit) / 2, mini), maxi)
+        return {"grand": round(cote, 2), "petit": round(cote, 2), "sens": None, "vues": len(proches)}
+    if categorie == "lit":  # un lit fait toujours 2 m de long ; c'est sa LARGEUR qui change, par tailles courantes
+        large = min(LARGEURS_DE_LIT, key=lambda v: abs(v - petit))
+        grand, petit = min(max(grand, 1.9), 2.15), large
+    else:
+        grand = min(max(grand, mini), maxi)
+        petit = min(max(petit, PETIT_COTE[0] * pt0), PETIT_COTE[1] * pt0, grand)
+    # le sens du grand côté : celui que disent le plus de vues qui le voient nettement (les plus proches comptent le plus)
+    voix: dict[float, float] = {}
+    for e in entieres or coupees:
+        if e["grand"] >= SENS_NET * e["petit"]:
+            voix[round(e["sens"] % 180.0, 1)] = voix.get(round(e["sens"] % 180.0, 1), 0.0) + 1.0 / max(e["distance"], 0.5)
+    sens = max(voix, key=voix.get) if voix and grand >= SENS_NET * petit else None
+    return {"grand": round(grand, 2), "petit": round(petit, 2), "sens": sens, "vues": len(proches)}
+
+
 def dimensions(categorie: str, face: float, position, mesures: list[dict]) -> tuple[float, float, float]:
     """La taille du meuble : celle d'un meuble COURANT DE SA SORTE (une table de chevet de 45 cm, une armoire de 2,20 m de
     haut), et non plus du groupe (tout « rangement » = un buffet de 1,20 × 0,90 m).
@@ -361,8 +411,9 @@ def dimensions(categorie: str, face: float, position, mesures: list[dict]) -> tu
     la pente du regard vers son haut, vues de face seulement, la plus grande retenue) et comparé aux 30 meubles relevés à la
     main d'app-001 et app-002 (hors chaises et tapis). Écart moyen de largeur : taille courante du groupe 33 %, taille courante
     de la sorte 23 %, taille mesurée 28 % ; de hauteur : 34 %, 23 %, 24 %. La mesure ne fait pas mieux que la sorte : le
-    rectangle ne couvre souvent qu'un morceau du meuble et la place de l'appareil n'est connue qu'à 40 cm près. À reprendre
-    avec les points en mètres de MoGe-2 pris DANS le rectangle (pas fait)."""
+    rectangle ne couvre souvent qu'un morceau du meuble et la place de l'appareil n'est connue qu'à 40 cm près. Repris le
+    17/11/2026 avec les points en mètres de MoGe-2 pris DANS le rectangle, pour les meubles libres (canapé, table, table
+    basse, lit) : `taille_mesuree`, appliquée par moteur.reperer_meubles.selon_la_mesure ; les autres gardent cette taille."""
     return taille_courante(categorie)
 
 

@@ -50,7 +50,12 @@ def main() -> int:
     # logement (relevés, placés à l'écran) ne bougent pas, les nouveaux s'y adaptent
     from moteur.ranger_meubles import ranger
     deja = list(logement.get("meubles", []))
-    ranges, _ = ranger(deja + nouveaux, logement, journal=print)
+    # les chaises et tabourets autour de leur table, tournés vers elle (moteur/tablees.py, 17/11/2026)
+    from moteur import tablees
+
+    tous, _ = tablees.ranger(deja + nouveaux, logement, print)
+    ranges, _ = ranger(tous, logement, journal=print)
+    ranges, _ = tablees.ranger(ranges, logement)  # une table que le rangement a déplacée retrouve ses chaises
     nouveaux = [m for m in ranges if not any(m["id"] == d["id"] for d in deja)]
     pris = {m["id"] for m in logement.get("meubles", [])} | {p["id"] for p in logement["pieces"]}
     for m in nouveaux:

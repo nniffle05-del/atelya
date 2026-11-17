@@ -5,6 +5,8 @@ la sorte de chaque rectangle numéroté, les doublons, les faux, la famille du s
 Atelya, avec la place des appareils qu'il connaît déjà :
 - un meuble POSÉ AU SOL (canapé, bureau, commode, meubles de cuisine…) : par son pied, comme avant (moteur/reperer_meubles.py),
   mais avec la sorte lue au lieu du mot du détecteur ; deux vues ne se fondent que si elles ont la MÊME sorte ;
+- un meuble LIBRE (canapé, table, table basse, lit) prend sa VRAIE TAILLE, mesurée sur le dessus du meuble dans le relief de
+  la photo (`emprise_d_un_meuble`, 17/11/2026) ; les chaises et tabourets sont rangés autour de leur table (moteur/tablees.py) ;
 - un luminaire SUSPENDU : par la profondeur (moteur/objets_accroches.py), seulement là où la lecture dit « suspension » ;
 - un objet AU MUR que la maquette sait porter (télévision, tableau, miroir, horloge, meubles hauts de cuisine) : la profondeur
   mesurée dans son rectangle donne sa place à 10-15 % près, puis il est collé au mur du PLAN le plus proche (à moins de 80 cm) ;
@@ -160,6 +162,137 @@ def place_d_un_meuble(boite, repere: dict, camera: dict, largeur: int, hauteur: 
             "bas": bas, "haut": haut, "largeur": (x1 - x0) / float(camera["f"]) * en_3d, "distance": distance}
 
 
+# ---------------------------------------------------------------- la VRAIE TAILLE des meubles libres (17/11/2026, étape 3)
+# Un meuble qui n'est pas contre un mur (canapé, table, lit, îlot…) avait la taille d'un meuble courant de sa sorte : tout canapé
+# 2,00 m (les vrais : 1,5 à 2,7 m), toute table 1,40 m (les vraies : 1,9 m). Or le relief de la photo (MoGe-2) donne chaque point
+# en mètres ET dit s'il est sur une surface à plat ou debout. Vus de dessus, les points du DESSUS d'un meuble dessinent son
+# emprise : le plateau d'une table est la surface à plat à 75 cm du sol (les assises des chaises sont à 45 cm, le mur et les
+# dossiers sont debout) ; l'assise, les coussins et les accoudoirs d'un canapé sont tout ce qui n'est ni debout ni au sol (le mur
+# derrière lui, debout, n'est pas compté : il gonflait le canapé bleu d'app-004 de 1,5 à 2,8 m au premier essai).
+LIBRES = ("canape", "table", "table_basse", "lit")
+# Mesurés aussi le 17/11/2026, et laissés à la taille de leur sorte parce que la mesure ne fait pas mieux : le BUREAU (son plateau
+# est couvert d'objets et collé à un mur : 0,3 à 0,6 m mesurés pour 1,2 à 1,3 m) et l'ÎLOT (tabourets et objets : 1,6 et 2,2 m
+# pour 2,6 m). Diagnostic vue par vue : pc/verification/mesurer_emprises.py --sortes bureau ilot.
+# sortes à PLATEAU : la hauteur où chercher leur dessus (m) ; il est la surface à plat la plus fournie dans cette tranche
+PLATEAUX = {"table": (0.6, 0.95), "bureau": (0.6, 0.95), "table_basse": (0.25, 0.6), "ilot": (0.8, 1.15)}
+EPAISSEUR_PLATEAU_M = 0.06  # les points du plateau sont à moins de 6 cm de sa hauteur
+A_PLAT, PAS_DEBOUT = 0.85, 0.35  # part verticale de la normale d'une surface : à plat au-dessus de 0,85, debout en dessous de 0,35
+DESSUS_MIN_M = 0.25  # pour un canapé ou un lit : son dessus est à plus de 25 cm du sol (ni le tapis, ni le bas de sa jupe)
+CASE_M = 0.06  # l'emprise est comptée par cases de 6 cm vues de dessus
+POINTS_PAR_CASE = 3
+PLUS_PETIT = 0.6  # le rectangle d'un autre objet de la photo, plus petit que 60 % de celui du meuble, n'est pas lui (un chevet, un coussin)
+EMPRISE_MIN_CASES = 12
+CASE_CLAIRSEMEE = 0.25  # une case qui a moins du quart des points d'une case courante du meuble est un point perdu
+PONT_PLATEAU = 3  # cases (18 cm de chaque côté) : les bandes d'un plateau vu entre les chaises se rejoignent
+BORDS = (2.0, 98.0)  # les bords de l'emprise : entre le 2e et le 98e centième de ses cases, le long de chaque axe
+
+
+def axe_de_la_piece(piece: dict) -> float:
+    """La direction (degrés) du plus long mur de la pièce : les grands meubles libres sont posés droits, le long des murs."""
+    c = np.asarray(piece["contour"], float)
+    cotes = np.roll(c, -1, axis=0) - c
+    long = cotes[int(np.argmax(np.linalg.norm(cotes, axis=1)))]
+    return math.degrees(math.atan2(long[1], long[0]))
+
+
+def points_du_dessus(boite, sorte: str, repere: dict, camera: dict, largeur: int, hauteur: int, autres: list | None = None):
+    """Les points du DESSUS du meuble que ce rectangle encadre, vus de dessus (mètres, repère du plan), et la hauteur de son
+    plateau s'il en a un : (points (n, 2), dessus) ou None."""
+    from moteur import meubles_photos as mp
+
+    if "nh" not in repere:
+        return None
+    h, phi, r, M = repere["h"], repere["phi"], repere["r"], repere["M"]
+    Hm, Wm = M.shape
+    x0, y0, x1, y1 = (float(v) for v in boite)
+    u0, u1 = max(0, int(x0 * Wm / largeur)), min(Wm, int(math.ceil(x1 * Wm / largeur)))
+    v0, v1 = max(0, int(y0 * Hm / hauteur)), min(Hm, int(math.ceil(y1 * Hm / hauteur)))
+    if u1 - u0 < 4 or v1 - v0 < 4:
+        return None
+    zone = (slice(v0, v1), slice(u0, u1))
+    hz, plat = h[zone], np.abs(repere["nh"][zone])
+    ok = M[zone] & repere["devant"][zone]
+    dessus = None
+    if sorte in PLATEAUX:
+        bas, haut = PLATEAUX[sorte]
+        a_plat = ok & (plat >= A_PLAT) & (hz > bas) & (hz < haut)
+        if a_plat.sum() < 4 * POINTS_COEUR_MIN:
+            return None
+        compte, bords = np.histogram(hz[a_plat], bins=np.arange(bas, haut + 0.021, 0.02))
+        k = int(np.argmax(np.convolve(compte, np.ones(3), mode="same")))
+        dessus = float(bords[k] + 0.01)
+        ok = a_plat & (np.abs(hz - dessus) < EPAISSEUR_PLATEAU_M)
+    else:
+        libre = np.ones(M.shape, bool)
+        aire = (x1 - x0) * (y1 - y0)
+        for b in autres or []:
+            if (float(b[2]) - float(b[0])) * (float(b[3]) - float(b[1])) < PLUS_PETIT * aire:
+                libre[max(0, int(b[1] * Hm / hauteur)):int(math.ceil(b[3] * Hm / hauteur)),
+                      max(0, int(b[0] * Wm / largeur)):int(math.ceil(b[2] * Wm / largeur))] = False
+        haut = mp.TAILLES.get(sorte, mp.TAILLES["rangement"])[2][1] + 0.15
+        ok &= libre[zone] & (plat >= PAS_DEBOUT) & (hz > DESSUS_MIN_M) & (hz < haut)
+    if ok.sum() < 4 * POINTS_COEUR_MIN:
+        return None
+    angle = np.radians(float(camera["cap"]) + phi[zone][ok])
+    P = np.stack([float(camera["x"]) + r[zone][ok] * np.cos(angle), float(camera["y"]) + r[zone][ok] * np.sin(angle)], axis=1)
+    return P, dessus
+
+
+def emprise_d_un_meuble(boite, sorte: str, repere: dict, camera: dict, largeur: int, hauteur: int, logement: dict,
+                        autres: list | None = None) -> dict | None:
+    """L'emprise au sol du meuble que ce rectangle encadre, d'après le relief de la photo : {"position" (son milieu), "grand",
+    "petit" (ses deux côtés, m), "sens" (direction du grand côté, degrés modulo 180), "long", "travers" (ses côtés le long de l'axe
+    de la pièce et en travers), "axe", "distance", "coupe" (le cadre de la photo le coupe : la mesure est un minimum), "dessus"
+    (la hauteur de son plateau, pour une table), "points"}. None si rien de sûr ne se mesure.
+    `autres` : les rectangles des autres objets de la photo ; pour un meuble sans plateau, ceux qui sont plus petits que le sien
+    (un chevet contre un lit) sont retirés. Un plateau n'en a pas besoin : sa hauteur le sépare des chaises."""
+    import cv2
+
+    from moteur import meubles_photos as mp
+    from moteur.sol_a_plat import piece_de
+
+    vus = points_du_dessus(boite, sorte, repere, camera, largeur, hauteur, autres)
+    if vus is None:
+        return None
+    P, dessus = vus
+    x0, y0, x1, y1 = (float(v) for v in boite)
+    # vues de dessus : les cases où le meuble a des points. Les points perdus (au bord d'un objet, le relief « bave » le long du
+    # regard) sont clairsemés : une case compte si elle a au moins le quart des points d'une case courante du meuble.
+    origine = P.min(0) - CASE_M
+    cases = np.floor((P - origine) / CASE_M).astype(int)
+    grille = np.zeros(cases.max(0) + 2, np.int32)
+    np.add.at(grille, (cases[:, 0], cases[:, 1]), 1)
+    if not (grille >= POINTS_PAR_CASE).any():
+        return None
+    courante = float(np.median(grille[grille >= POINTS_PAR_CASE]))
+    pleines = (grille >= max(POINTS_PAR_CASE, CASE_CLAIRSEMEE * courante)).astype(np.uint8)
+    # le meuble est le plus grand morceau d'un seul tenant ; un PLATEAU vu entre les dossiers des chaises est en bandes : ses
+    # morceaux se rejoignent par-dessus 30 cm
+    pont = PONT_PLATEAU if sorte in PLATEAUX else 1
+    n, etiq = cv2.connectedComponents(cv2.dilate(pleines, np.ones((2 * pont + 1, 2 * pont + 1), np.uint8)), connectivity=8)
+    if n <= 1:
+        return None
+    ii, jj = np.nonzero(pleines)
+    tailles = np.bincount(etiq[ii, jj], minlength=n)
+    du_meuble = etiq[ii, jj] == int(np.argmax(tailles))
+    if du_meuble.sum() < EMPRISE_MIN_CASES:
+        return None
+    C = origine + (np.stack([ii, jj], axis=1)[du_meuble] + 0.5) * CASE_M
+    piece = piece_de(C.mean(0), logement["pieces"])
+    axe = axe_de_la_piece(piece) if piece is not None else 0.0
+    t = np.array([math.cos(math.radians(axe)), math.sin(math.radians(axe))])
+    n_ = np.array([-t[1], t[0]])
+    a, b = C @ t, C @ n_
+    (a0, a1), (b0, b1) = np.percentile(a, BORDS), np.percentile(b, BORDS)
+    long, travers = float(a1 - a0) + CASE_M, float(b1 - b0) + CASE_M
+    milieu = t * (a0 + a1) / 2 + n_ * (b0 + b1) / 2
+    coupe = x0 <= mp.BORD_PX or x1 >= largeur - mp.BORD_PX or y1 >= hauteur - mp.BORD_PX
+    return {"position": [float(milieu[0]), float(milieu[1])], "grand": max(long, travers), "petit": min(long, travers),
+            "sens": (axe if long >= travers else axe + 90.0) % 180.0, "long": long, "travers": travers, "axe": axe,
+            "distance": float(math.dist(milieu, (float(camera["x"]), float(camera["y"])))), "coupe": bool(coupe), "dessus": dessus,
+            "points": int(du_meuble.sum())}
+
+
 # ---------------------------------------------------------------- les grands meubles ADOSSÉS (17/11/2026, étape 2)
 # Un meuble adossé (armoire, buffet, bibliothèque, linéaire de cuisine…) a son dos sur un mur du PLAN, qui est exact. Les deux
 # bords de son rectangle sont deux directions sûres (à 3°) : là où elles coupent le mur, c'est le meuble — sa place le long du
@@ -271,7 +404,7 @@ def contre_le_mur(position, sorte: str, boite, cam, logement: dict, largeur: int
 # ---------------------------------------------------------------- 1. les meubles posés au sol
 def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piece: dict | None, rgb=None, photo: int | None = None,
                        repere: dict | None = None, camera: dict | None = None, plan: dict | None = None, logement: dict | None = None,
-                       adosser: bool = True) -> list[dict]:
+                       adosser: bool = True, mesurer_la_taille: bool = True) -> list[dict]:
     """Les meubles posés au sol qu'UNE photo montre, avec la sorte donnée (`objets` : {"sorte", "boite", "note"…}).
 
     Par le PIED, comme le repérage en service. Avec la profondeur de la photo (`repere`, MoGe-2) et le plan, trois cas que le pied
@@ -371,6 +504,13 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
                     vu["position"] = [float(centre[0]), float(centre[1])]
         if vu is None:
             continue
+        if mesurer_la_taille and repere is not None and logement is not None and o["sorte"] in LIBRES and not o.get("approche"):
+            # la VRAIE TAILLE d'un meuble libre : l'emprise de son dessus dans le relief de la photo (étape 3, 17/11/2026)
+            emprise = emprise_d_un_meuble(o["boite"], o["sorte"], repere, camera, largeur, hauteur, logement,
+                                          autres=[x["boite"] for x in objets if x is not o and rm.groupe(x["sorte"]) in rm.TYPE_DE_GROUPE
+                                                  and rm.groupe(x["sorte"]) != "tapis"])
+            if emprise is not None:
+                vu["emprise"] = emprise
         if logement is not None:
             # un rectangle approché (tracé à l'œil) ne mesure rien sur le mur, sauf si la lecture a dit où le meuble finit
             if adosser and o["sorte"] in ADOSSES and (not o.get("approche") or o.get("bouts")):
@@ -662,7 +802,8 @@ def appliquer_les_sols(pieces: dict, lus: dict[str, dict]) -> dict:
 # ---------------------------------------------------------------- l'ensemble
 def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list[dict]], modele_moge=None, par_sorte: bool = True,
           source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True, associer: bool = True,
-          adosser: bool = True, rangees_par_photo: dict[str, list[dict]] | None = None) -> dict:
+          adosser: bool = True, rangees_par_photo: dict[str, list[dict]] | None = None, mesurer_la_taille: bool = True,
+          tablees: bool = True) -> dict:
     """Photos placées (fiche cameras-photos.json) + objets de chaque photo avec leur sorte → ce qu'Atelya en fait :
     {"meubles": meubles à ajouter au logement (au sol rangés, suspendus, au mur), "baies": votes,
      "equipements": ce que moteur.equipements.poser rend (équipements à ajouter, rideaux, passe-plats, non posés)}.
@@ -721,7 +862,7 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         piece, _ = piece_de_l_appareil(cam, logement["pieces"])
         repere = cp.repere(cp.mesurer(modele_moge, rgb, float(d["camera"]["f"])), hsp) if objets else None
         de_la_photo = au_sol_d_une_photo(objets, cam, largeur, hauteur, piece, rgb, photo=k, repere=repere, camera=d["camera"], plan=plan,
-                                         logement=logement, adosser=adosser)
+                                         logement=logement, adosser=adosser, mesurer_la_taille=mesurer_la_taille)
         if deja_ranges and not (rangees_par_photo or {}).get(nom):
             de_la_photo = [v for v in de_la_photo if v.get("categorie") not in deja_ranges.get(v.get("piece"), ())]
         vus += de_la_photo
@@ -760,7 +901,14 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         if equiper and regards.get(m["id"]):
             m["_appareils"] = regards[m["id"]]
     deja = list(logement.get("meubles", [])) + rangees["meubles"]  # les rangées de cuisine sont en place : le reste se range autour
-    ranges, _ = ranger(deja + nouveaux, logement, journal=journal)
+    tous = deja + nouveaux
+    if tablees:  # les chaises et tabourets autour de leur table, tournés vers elle (moteur/tablees.py, 17/11/2026)
+        from moteur import tablees as tb
+
+        tous, _ = tb.ranger(tous, logement, journal)
+    ranges, _ = ranger(tous, logement, journal=journal)
+    if tablees:  # une table que le rangement a déplacée (sortie d'un mur) retrouve ses chaises
+        ranges, _ = tb.ranger(ranges, logement)
     nouveaux = [m for m in ranges if not any(m["id"] == x["id"] for x in deja)]
     accroches = oa.vers_meubles(oa.fusionner(suspendus), logement) + vers_meubles_au_mur(fusionner_au_mur(au_mur), logement, source)
     for m in accroches:

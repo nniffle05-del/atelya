@@ -189,7 +189,7 @@ def orienter(meuble: dict, piece: dict) -> float:
         return math.degrees(math.atan2(normale[1], normale[0]))
     centre = c.mean(0) - p
     face = math.degrees(math.atan2(centre[1], centre[0]))
-    if meuble.get("categorie") and meuble["groupe"] in DROITS_DANS_LA_PIECE:
+    if meuble.get("categorie") and (meuble["groupe"] in DROITS_DANS_LA_PIECE or meuble["categorie"] in DROITS_AUSSI):
         # une table, un tapis, un canapé au milieu de la pièce sont posés droits, le long des murs (pas « vers le centre »,
         # qui donnait une table tournée de 37°)
         cotes = np.roll(c, -1, axis=0) - c
@@ -201,6 +201,7 @@ def orienter(meuble: dict, piece: dict) -> float:
 
 LITERIE_PAR_DEFAUT = {"couette": [242, 241, 236], "oreillers": 2}
 DROITS_DANS_LA_PIECE = ("table", "tapis", "canape", "lit")  # groupes posés le long des murs quand ils ne sont pas contre un mur
+DROITS_AUSSI = ("ilot",)  # … et un îlot de cuisine (17/11/2026 : il sortait tourné de 16°, ses tabourets avec lui)
 
 
 def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
@@ -220,6 +221,9 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
             dims = meubles_photos.selon_la_forme(categorie, meubles_photos.dimensions(categorie, face, m["position"], m.get("mesures", [])),
                                                  m.get("forme"))
             teinte = meubles_photos.couleur(m.get("mesures", []))
+            mesuree = meubles_photos.taille_mesuree(categorie, m["emprises"], m.get("forme")) if m.get("emprises") else None
+            if mesuree is not None:  # meuble libre mesuré dans le relief des photos (17/11/2026, étape 3) : sa vraie taille
+                dims, face = selon_la_mesure(categorie, dims, face, mesuree)
             if m.get("largeur_mur"):  # meuble adossé mesuré sur son mur (17/11/2026) : sa vraie largeur, dos à ce mur
                 dims = (round(float(m["largeur_mur"]), 2), dims[1], dims[2])
                 face = round(math.degrees(math.atan2(m["normale"][1], m["normale"][0])), 1)
@@ -236,6 +240,25 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
             meuble["literie"] = dict(LITERIE_PAR_DEFAUT)
         sortie.append(meuble)
     return sortie
+
+
+def selon_la_mesure(categorie: str, dims, face: float, mesuree: dict) -> tuple[tuple, float]:
+    """La taille et l'orientation d'un meuble libre d'après la mesure de son dessus (moteur.meubles_photos.taille_mesuree).
+    Le grand côté mesuré devient la largeur du meuble (sa longueur pour un lit, plus long que large). Une TABLE que la mesure
+    voit nettement dans l'autre sens que l'orientation choisie est tournée d'un quart de tour (ses deux bouts se valent).
+    Un canapé ou un lit garde son orientation : la mesure dit le sens de son grand côté, pas de quel côté est son dos — tourné
+    au jugé vers le mur le plus proche, le lit d'app-002 (tête contre un panneau au milieu de la chambre) se retrouvait dans le
+    meuble télé, qui était retiré."""
+    l, p, h = dims
+    en_long = p > l  # un lit : son grand côté est sa profondeur, le long de sa face
+    dims = (mesuree["petit"], mesuree["grand"], h) if en_long else (mesuree["grand"], mesuree["petit"], h)
+    if mesuree.get("sens") is None or GROUPE_DE.get(categorie) in CONTRE_LE_MUR:
+        return dims, face
+    grand_cote = face if en_long else face + 90.0  # la direction du grand côté avec l'orientation choisie
+    if abs((grand_cote - mesuree["sens"] + 90.0) % 180.0 - 90.0) <= 45.0:
+        return dims, face
+    base = mesuree["sens"] if en_long else mesuree["sens"] - 90.0
+    return dims, round((base + 180.0) % 360.0 - 180.0, 1)
 
 
 def vu_sur_une_photo(m: dict, cameras: list, logement: dict, largeur: int = 1206, hauteur: int = 804) -> bool:
