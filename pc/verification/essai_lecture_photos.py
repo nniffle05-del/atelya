@@ -67,18 +67,93 @@ def refaire(cas: str, version: str, sortie: Path) -> Path:
     return sortie / "logement-meuble.json"
 
 
+GLOUTON = False  # True : l'appariement d'avant le 17/11/2026 (dans l'ordre du relevé), pour retrouver les anciens chiffres
+INTERDIT = 1e3
+
+
+def affectation(cout: list[list[float]]) -> list[int]:
+    """L'affectation de coût total minimal (méthode hongroise) : pour chaque ligne, sa colonne. Il faut lignes ≤ colonnes."""
+    n, m = len(cout), len(cout[0]) if cout else 0
+    u, v, p, chemin = [0.0] * (n + 1), [0.0] * (m + 1), [0] * (m + 1), [0] * (m + 1)
+    for i in range(1, n + 1):
+        p[0] = i
+        j0, mini, pris = 0, [math.inf] * (m + 1), [False] * (m + 1)
+        while True:
+            pris[j0] = True
+            i0, delta, j1 = p[j0], math.inf, 0
+            for j in range(1, m + 1):
+                if not pris[j]:
+                    c = cout[i0 - 1][j - 1] - u[i0] - v[j]
+                    if c < mini[j]:
+                        mini[j], chemin[j] = c, j0
+                    if mini[j] < delta:
+                        delta, j1 = mini[j], j
+            for j in range(m + 1):
+                if pris[j]:
+                    u[p[j]] += delta
+                    v[j] -= delta
+                else:
+                    mini[j] -= delta
+            j0 = j1
+            if p[j0] == 0:
+                break
+        while j0:
+            p[j0] = p[chemin[j0]]
+            j0 = chemin[j0]
+    sortie = [0] * n
+    for j in range(1, m + 1):
+        if p[j]:
+            sortie[p[j] - 1] = j - 1
+    return sortie
+
+
 def _paires(a_trouver: list[dict], trouves: list[dict], meme) -> tuple[list[tuple[dict, dict]], list[dict]]:
-    """Paires (vrai meuble, meuble posé) au plus près, à moins de PRES_M, quand `meme(vrai, posé)` ; et les posés restés seuls."""
-    libres = list(range(len(trouves)))
-    paires = []
-    for v in a_trouver:
-        cands = [(math.dist(trouves[i]["position"], v["position"]), i) for i in libres if meme(v, trouves[i])]
-        cands = [c for c in cands if c[0] <= PRES_M]
-        if cands:
-            _, i = min(cands)
-            libres.remove(i)
-            paires.append((v, trouves[i]))
-    return paires, [trouves[i] for i in libres]
+    """Paires (vrai meuble, meuble posé) à moins de PRES_M, quand `meme(vrai, posé)` ; et les posés restés seuls.
+    Depuis le 17/11/2026 l'appariement est le MEILLEUR possible (le plus de paires, puis la plus petite distance totale) : avant,
+    chaque vrai meuble prenait dans l'ordre du relevé le posé le plus proche, et la 6e chaise d'une tablée pouvait être comptée
+    « en trop » à 60 cm de sa place parce qu'une voisine lui avait pris sa case (GLOUTON = True : l'ancienne façon)."""
+    if GLOUTON:
+        libres = list(range(len(trouves)))
+        paires = []
+        for v in a_trouver:
+            cands = [(math.dist(trouves[i]["position"], v["position"]), i) for i in libres if meme(v, trouves[i])]
+            cands = [c for c in cands if c[0] <= PRES_M]
+            if cands:
+                _, i = min(cands)
+                libres.remove(i)
+                paires.append((v, trouves[i]))
+        return paires, [trouves[i] for i in libres]
+    if not a_trouver or not trouves:
+        return [], list(trouves)
+    cout = [[d if meme(v, t) and (d := math.dist(t["position"], v["position"])) <= PRES_M else INTERDIT for t in trouves] for v in a_trouver]
+    if len(a_trouver) <= len(trouves):
+        choix = [(i, j) for i, j in enumerate(affectation(cout))]
+    else:
+        choix = [(i, j) for j, i in enumerate(affectation([list(c) for c in zip(*cout)]))]
+    paires = [(a_trouver[i], trouves[j]) for i, j in sorted(choix) if cout[i][j] < INTERDIT]
+    pris = {id(t) for _, t in paires}
+    return paires, [t for t in trouves if id(t) not in pris]
+
+
+def charger_releve(cas: str, complet: bool = True) -> list[dict]:
+    """Le relevé des meubles fait à la main ; `complet` : avec son complément du 17/11/2026 (verites/<logement>/
+    meubles-complement.json : vrais meubles oubliés, places corrigées), contrôlé par pc/verification/boites_sur_photos.py."""
+    meubles = [dict(m) for m in lire(VERITES[cas]["meubles"])["meubles"]]
+    f = Path(VERITES[cas]["meubles"]).with_name("meubles-complement.json")
+    if complet and f.is_file():
+        comp = lire(f)
+        for m in meubles:
+            m.update(comp.get("corrections", {}).get(m["id"], {}))
+        meubles += [dict(m, statut="estime") for m in comp["meubles"]]
+    return meubles
+
+
+def _dans_l_emprise(point, v: dict, marge: float = 0.1) -> bool:
+    """Le point est-il dans l'emprise au sol du meuble `v` (à `marge` près) ?"""
+    a = math.radians(v.get("face", 0.0) or 0.0)
+    dx, dy = point[0] - v["position"][0], point[1] - v["position"][1]
+    en_avant, de_cote = dx * math.cos(a) + dy * math.sin(a), -dx * math.sin(a) + dy * math.cos(a)
+    return abs(de_cote) <= v["dimensions"][0] / 2 + marge and abs(en_avant) <= v["dimensions"][1] / 2 + marge
 
 
 def noter_meubles(logement: dict, verite: list[dict], fiche: dict) -> dict:
@@ -102,6 +177,11 @@ def noter_meubles(logement: dict, verite: list[dict], fiche: dict) -> dict:
     # un meuble posé qui tombe sur un vrai meuble qu'aucune photo de SA pièce ne montre (vu par une porte) n'est pas « en trop »
     hors_liste = [v for v in verite if au_sol(v) and not any(v is x for x in vrais_sol)]
     _, en_trop = _paires(hors_liste, en_trop, lambda v, m: groupe(v["categorie"]) == groupe(m["categorie"]))
+    # un MORCEAU d'un grand meuble du relevé n'est pas « en trop » : la seconde colonne d'un bloc de colonnes relevé d'un seul
+    # tenant, le second meuble bas d'un linéaire de 3,60 m (son milieu est dans l'emprise du vrai meuble, même groupe)
+    morceaux = [] if GLOUTON else [m for m in en_trop if any(groupe(v["categorie"]) == groupe(m["categorie"]) and _dans_l_emprise(m["position"], v)
+                                                             for v in verite if au_sol(v))]
+    en_trop = [m for m in en_trop if not any(m is x for x in morceaux)]
     vrais_acc = [v for v in verite if v["categorie"] in ACCROCHES and vu_sur_une_photo(v, cams, logement)]
     poses_acc = [m for m in poses if m["categorie"] in ACCROCHES]
     acc, acc_en_trop = _paires(vrais_acc, poses_acc, lambda v, m: v["categorie"] == m["categorie"])
@@ -116,7 +196,7 @@ def noter_meubles(logement: dict, verite: list[dict], fiche: dict) -> dict:
     return {"a_trouver": len(vrais_sol), "retrouves": len(exacts) + len(proches), "bonne_sorte": len(exacts), "en_trop": len(en_trop),
             "ecart_moyen_m": round(sum(ecarts) / len(ecarts), 2) if ecarts else None,
             "accroches_a_trouver": len(vrais_acc), "accroches_retrouves": len(acc), "accroches_en_trop": len(acc_en_trop),
-            "poses": len(poses), "manques_bonne_sorte": {k: f"{a}/{b}" for k, (a, b) in sorted(par_sorte.items()) if a < b},
+            "morceaux": len(morceaux), "poses": len(poses), "manques_bonne_sorte": {k: f"{a}/{b}" for k, (a, b) in sorted(par_sorte.items()) if a < b},
             "en_trop_detail": sorted(m["categorie"] for m in en_trop), "accroches_en_trop_detail": sorted(m["categorie"] for m in acc_en_trop)}
 
 
@@ -167,7 +247,11 @@ def main() -> int:
     ap.add_argument("--cas", nargs="*", default=list(CAS))
     ap.add_argument("--versions", nargs="*", default=list(VERSIONS))
     ap.add_argument("--sans-chaine", action="store_true", help="reprendre les logements déjà refaits dans ce dossier")
+    ap.add_argument("--ancien-juge", action="store_true", help="le juge d'avant le 17/11/2026 : relevé d'origine, appariement dans l'ordre")
+    ap.add_argument("--bilan", default="bilan", help="nom des fichiers du bilan (bilan.json, bilan.txt)")
     a = ap.parse_args()
+    global GLOUTON
+    GLOUTON = a.ancien_juge
     bilan = {"date": time.strftime("%Y-%m-%d %H:%M"), "versions": {v: VERSIONS[v][0] for v in a.versions}, "logements": {}}
     for cas in a.cas:
         fiche = lire(CAS[cas]["fiche"])
@@ -183,7 +267,7 @@ def main() -> int:
             from moteur import collisions
             note = {"meubles_poses": len(logement.get("meubles", [])), "collisions": collisions.resume(collisions.mesurer(logement))}
             if cas in VERITES:
-                note["meubles"] = noter_meubles(logement, lire(VERITES[cas]["meubles"])["meubles"], fiche)
+                note["meubles"] = noter_meubles(logement, charger_releve(cas, complet=not a.ancien_juge), fiche)
                 note["sols"] = noter_sols(logement, lire(VERITES[cas]["sols"]))
                 note["baies"] = noter_baies(lire(dossier / "logement-du-banc.json"), logement)
             equip = dossier / "logement-meuble.equipements.json"
@@ -191,7 +275,7 @@ def main() -> int:
                 note["equipements"] = lire(equip)
             bilan["logements"][cas][version] = note
     a.sortie.mkdir(parents=True, exist_ok=True)
-    (a.sortie / "bilan.json").write_text(json.dumps(bilan, ensure_ascii=False, indent=1), encoding="utf-8")
+    (a.sortie / f"{a.bilan}.json").write_text(json.dumps(bilan, ensure_ascii=False, indent=1), encoding="utf-8")
     lignes = [f"ESSAI « CLAUDE LIT LES PHOTOS » ({bilan['date']})", ""]
     for cas, versions in bilan["logements"].items():
         lignes.append(cas)
@@ -201,13 +285,13 @@ def main() -> int:
                 continue
             m, s, b = n["meubles"], n["sols"], n["baies"]
             lignes.append(f"  {v} {VERSIONS[v][0]:38s} au sol : retrouvés {m['retrouves']}/{m['a_trouver']}, bonne sorte {m['bonne_sorte']}/{m['a_trouver']}, "
-                          f"en trop {m['en_trop']}, écart {m['ecart_moyen_m']} m | accrochés : {m['accroches_retrouves']}/{m['accroches_a_trouver']}, "
+                          f"en trop {m['en_trop']}, morceaux {m.get('morceaux', 0)}, écart {m['ecart_moyen_m']} m | accrochés : {m['accroches_retrouves']}/{m['accroches_a_trouver']}, "
                           f"en trop {m['accroches_en_trop']} | sols : {s['pieces_justes']}/{s['pieces_jugees']} pièces, zones {s['zones_posees']} pour "
                           f"{s['zones_vraies']} | baies changées à tort : {len(b['changees_a_tort'])}/{b['baies']}"
                           + _equipements(n))
         lignes.append("")
     texte = "\n".join(lignes)
-    (a.sortie / "bilan.txt").write_text(texte, encoding="utf-8")
+    (a.sortie / f"{a.bilan}.txt").write_text(texte, encoding="utf-8")
     dire(texte)
     return 0
 

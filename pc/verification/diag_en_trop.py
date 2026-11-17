@@ -111,7 +111,7 @@ def main() -> int:
     for cas in a.cas:
         f = a.dossier / cas / a.version / "logement-meuble.json"
         logement = essai.lire(f)
-        verite = essai.lire(essai.VERITES[cas]["meubles"])["meubles"]
+        verite = essai.charger_releve(cas)
         d = detail(logement, verite, essai.lire(CAS[cas]["fiche"]))
         print(f"\n===== {cas} version {a.version} : à trouver {len(d['vrais_sol'])}, bonne sorte {len(d['exacts'])}, même famille {len(d['proches'])}, "
               f"en trop {len(d['en_trop'])}, seuls {len(d['seuls'])} | accrochés {len(d['acc'])}, en trop {len(d['acc_en_trop'])}, seuls {len(d['acc_seuls'])}")

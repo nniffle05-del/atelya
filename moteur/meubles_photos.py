@@ -50,7 +50,7 @@ TAILLES = {
     "lit_superpose": ((1.0, 2.0, 1.7), (0.9, 1.6), (1.4, 2.0)),
     "commode": ((0.9, 0.45, 0.85), (0.6, 1.6), (0.6, 1.3)),
     "rangement": ((1.2, 0.45, 0.9), (0.5, 2.4), (0.5, 2.3)),
-    "bibliotheque": ((0.8, 0.3, 1.8), (0.5, 2.5), (1.0, 2.5)),
+    "bibliotheque": ((0.8, 0.3, 1.8), (0.5, 3.5), (1.0, 2.5)),
     "meuble_tv": ((1.4, 0.4, 0.5), (0.8, 2.4), (0.3, 0.7)),
     "table_de_chevet": ((0.45, 0.4, 0.55), (0.35, 0.65), (0.4, 0.7)),
     "banc": ((1.1, 0.4, 0.45), (0.7, 1.8), (0.35, 0.6)),
@@ -236,9 +236,31 @@ def _resume(paquet: list[dict]) -> dict:
          "mesures": [m["mesure"] for m in paquet if m.get("mesure")],
          "distance_min": round(min(eloignement(m) for m in paquet), 2), "photos": sorted({m.get("photo") for m in paquet}),
          "membres": [{"photo": m.get("photo"), "numero": m.get("numero"), "position": m["position"], "distance": m.get("distance"),
-                      "categorie": m.get("categorie"), "approche": m.get("approche", False)} for m in paquet], "_vues": paquet}
+                      "categorie": m.get("categorie"), "approche": m.get("approche", False), "largeur_mur": m.get("largeur_mur"),
+                      "coupe_mur": m.get("coupe_mur")} for m in paquet], "_vues": paquet}
     if formes:
         r["forme"] = max(formes, key=formes.get)
+    # un meuble ADOSSÉ mesuré sur son mur (moteur.photos_lues.contre_le_mur) : sa largeur est celle de sa vue ENTIÈRE la plus
+    # proche ; si toutes ses vues sont coupées par le cadre, la plus grande (chacune est un minimum) ; sa place est alors celle
+    # de cette vue (le milieu de ce qu'elle voit), et non la moyenne de vues qui en voient des morceaux différents
+    sur_mur = [m for m in paquet if m.get("largeur_mur")]
+    if sur_mur and len(sur_mur) * 2 >= len(paquet):
+        entieres = [m for m in sur_mur if not m.get("coupe_mur") and not m.get("coupe")]
+        # la vue ENTIÈRE la plus proche ; à défaut la vue la plus proche, coupée par le cadre : ce qu'elle voit est un minimum,
+        # le meuble a au moins la largeur courante de sa sorte. (Essayés et retirés, mesurés : « caché par un meuble de devant =
+        # vue partielle » — les rectangles se recouvrent trop souvent sans rien cacher ; la plus grande des vues partielles —
+        # une vue lointaine gonflait un buffet de 1,20 m à 2,10 m.)
+        choisie = min(entieres or sur_mur, key=eloignement)
+        large = float(choisie["largeur_mur"])
+        # entre plusieurs vues entières PROCHES, la plus large : un meuble de devant cache souvent un bout (l'étagère derrière
+        # l'îlot : 0,40 m d'un côté, 1,41 m de l'autre, vraie largeur 1,47 m) ; une vue ne montre jamais plus que le meuble
+        pres = [m for m in entieres if eloignement(m) <= VUE_PROCHE_M]
+        if len(pres) > 1:
+            large = max(float(m["largeur_mur"]) for m in pres)
+        if not entieres:
+            large = max(large, taille_courante(r["categorie"] or "rangement")[0])
+        r.update(largeur_mur=round(large, 2), normale=choisie["normale"], mur_entier=bool(entieres),
+                 position=[round(float(choisie["position"][0]), 3), round(float(choisie["position"][1]), 3)])
     return r
 
 
@@ -273,6 +295,7 @@ def associer(vus: list[dict], par_sorte: bool = True) -> list[dict]:
     return [_resume(p) for p in paquets]
 
 
+VUE_PROCHE_M = 5.0  # en dessous, la largeur mesurée sur le mur est sûre (au-delà, 3° d'erreur font 30 cm de chaque côté)
 PROFONDEUR = 0.25  # × distance : ce dont une place tirée de la PROFONDEUR de la photo peut se tromper le long du regard
 
 

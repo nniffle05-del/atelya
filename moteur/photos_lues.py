@@ -160,9 +160,93 @@ def place_d_un_meuble(boite, repere: dict, camera: dict, largeur: int, hauteur: 
             "bas": bas, "haut": haut, "largeur": (x1 - x0) / float(camera["f"]) * en_3d, "distance": distance}
 
 
+# ---------------------------------------------------------------- les grands meubles ADOSSÉS (17/11/2026, étape 2)
+# Un meuble adossé (armoire, buffet, bibliothèque, linéaire de cuisine…) a son dos sur un mur du PLAN, qui est exact. Les deux
+# bords de son rectangle sont deux directions sûres (à 3°) : là où elles coupent le mur, c'est le meuble — sa place le long du
+# mur ET sa largeur, sans passer par la distance (ce que la photo mesure mal). Avant : tout meuble avait la largeur courante de
+# sa sorte (un placard de 1,50 m pour un dressing de 3 m, une étagère de 1,50 m pour une colonne de 50 cm), posée là où
+# tombait le milieu du bas du rectangle ; les meubles d'un même mur se chassaient les uns les autres.
+ADOSSES = ("rangement", "commode", "bibliotheque", "placard", "meuble_tv", "etagere_cubes", "colonne_cuisine", "meuble_cuisine_bas")
+ADOSSES_HAUTS = ("bibliotheque", "placard", "colonne_cuisine")  # assez hauts pour être vus par-dessus ce qui cache leur pied
+RASANT = 0.3  # un regard qui fait moins de 17° avec le mur ne mesure rien dessus (sinus de l'angle)
+JEU_AU_MUR_M = 0.03
+
+
+def face_la_plus_proche(point, logement: dict, vers) -> dict | None:
+    """Comme mur_le_plus_proche, avec les deux bouts de la face : {"pied", "normale", "distance", "a", "b"}."""
+    from moteur.sol_a_plat import dans_polygone
+
+    p, v = np.asarray(point, float), np.asarray(vers, float)
+    meilleur = None
+    for piece in logement["pieces"]:
+        c = np.asarray(piece["contour"], float)
+        for a, b in zip(c, np.roll(c, -1, axis=0)):
+            ab = b - a
+            L2 = float(ab @ ab)
+            if L2 < 1e-9:
+                continue
+            q = a + float(np.clip((p - a) @ ab / L2, 0.0, 1.0)) * ab
+            d = float(np.linalg.norm(p - q))
+            if meilleur is not None and d >= meilleur["distance"]:
+                continue
+            n = np.array([-ab[1], ab[0]]) / math.sqrt(L2)
+            if (v - q) @ n < 0:
+                n = -n
+            dedans = q + 0.05 * n
+            if not dans_polygone(np.array([dedans[0]]), np.array([dedans[1]]), piece["contour"])[0]:
+                continue
+            meilleur = {"pied": q, "normale": n, "distance": d, "a": a, "b": b}
+    return meilleur
+
+
+def contre_le_mur(position, sorte: str, boite, cam, logement: dict, largeur: int, distance: float) -> dict | None:
+    """Le meuble adossé que ce rectangle montre, mesuré SUR LE MUR : {"position" (son milieu), "largeur_mur", "coupe_mur"
+    (un de ses bords est coupé par le cadre de la photo : la largeur est un minimum), "normale"}. None s'il n'est pas contre
+    un mur (plus loin que ce dont la vue peut se tromper), ou si le regard rase le mur."""
+    from moteur import meubles_photos as mp
+
+    profondeur = mp.taille_courante(sorte)[1]
+    origine = np.array([float(cam[0]), float(cam[1])])
+    f = face_la_plus_proche(position, logement, origine)
+    if f is None or f["distance"] > profondeur / 2 + min(1.0, mp.incertitude(distance) + 0.2):
+        return None
+    n = f["normale"]
+    t = np.array([-n[1], n[0]])
+    base = f["pied"] + n * (profondeur / 2 + JEU_AU_MUR_M)  # la ligne à mi-profondeur du meuble
+    x0, y0, x1, y1 = (float(v) for v in boite)
+    bords, biais = [], []
+    for u in (x0, x1):
+        angle = math.radians(rayon(cam, u, (y0 + y1) / 2)[0])
+        d = np.array([math.cos(angle), math.sin(angle)])
+        if abs(float(d @ n)) < RASANT:
+            return None
+        k = float((base - origine) @ n) / float(d @ n)
+        if k <= 0:
+            return None
+        bords.append(float((origine + k * d - base) @ t))
+        biais.append(float(d @ t) / float(d @ n))
+    # vu de côté, un meuble profond paraît plus large : d'un bord on voit son coin de devant, de l'autre son coin du fond
+    # (une demi-profondeur × la tangente de l'angle de vue, de chaque côté) ; son milieu, lui, ne bouge pas
+    trop = profondeur / 2 * (abs(biais[0]) + abs(biais[1])) / 2
+    bords = [min(bords) + trop, max(bords) - trop] if max(bords) - min(bords) > 2 * trop + 0.2 else bords
+    # le meuble ne dépasse pas des bouts de son mur
+    sa, sb = sorted((float((f["a"] - base) @ t), float((f["b"] - base) @ t)))
+    s0, s1 = max(min(bords), sa), min(max(bords), sb)
+    mini, maxi = mp.TAILLES.get(sorte, mp.TAILLES["rangement"])[1]
+    if s1 - s0 < 0.5 * mini:
+        return None
+    coupe = x0 <= mp.BORD_PX or x1 >= largeur - mp.BORD_PX
+    large = min(max(s1 - s0, mini), maxi, sb - sa)
+    milieu = min(max((s0 + s1) / 2, sa + large / 2), sb - large / 2)
+    centre = base + milieu * t
+    return {"position": [float(centre[0]), float(centre[1])], "largeur_mur": float(large), "coupe_mur": bool(coupe),
+            "normale": [float(n[0]), float(n[1])]}
+
+
 # ---------------------------------------------------------------- 1. les meubles posés au sol
 def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piece: dict | None, rgb=None, photo: int | None = None,
-                       repere: dict | None = None, camera: dict | None = None, plan: dict | None = None, logement: dict | None = None) -> list[dict]:
+                       repere: dict | None = None, camera: dict | None = None, plan: dict | None = None, logement: dict | None = None,
+                       adosser: bool = True) -> list[dict]:
     """Les meubles posés au sol qu'UNE photo montre, avec la sorte donnée (`objets` : {"sorte", "boite", "note"…}).
 
     Par le PIED, comme le repérage en service. Avec la profondeur de la photo (`repere`, MoGe-2) et le plan, trois cas que le pied
@@ -209,6 +293,22 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
                 centre = point + direction * meubles_photos.taille_courante(o["sorte"])[1] / 2
                 vu = {"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": float(mesure["largeur"]),
                       "confiance": float(o["note"]), "poids": float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100) * POIDS_PROFONDEUR}
+            def par_le_regard() -> dict | None:
+                """Un meuble HAUT adossé dont le pied est caché (une bibliothèque derrière un canapé) : le bas de son rectangle
+                n'est pas son pied, il « tombe » derrière le mur. Sa place : contre le mur plein que son regard touche."""
+                if o["sorte"] not in ADOSSES_HAUTS or o.get("approche"):
+                    return None
+                angle = rayon(cam, (x0 + x1) / 2, (y0 + y1) / 2)[0]
+                mur, plein = premier_mur(plan, origine, angle, pieces=logement["pieces"])
+                if not math.isfinite(mur) or plein != 0:
+                    return None
+                recul = mur - meubles_photos.taille_courante(o["sorte"])[1] / 2 - JEU_AU_MUR_M
+                place = origine + recul * np.array([math.cos(math.radians(angle)), math.sin(math.radians(angle))])
+                return {"groupe": g, "position": [float(place[0]), float(place[1])], "largeur_vue": float((x1 - x0) / float(cam[5]) * mur),
+                        "confiance": float(o["note"]), "poids": float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100) * POIDS_PROFONDEUR}
+
+            if vu is None:
+                vu = par_le_regard()
             if vu is None:
                 continue
             centre = np.asarray(vu["position"], float)
@@ -216,8 +316,12 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
             if dans is None:  # un peu derrière un mur : ramené contre lui, dedans
                 m = mur_le_plus_proche(centre, logement, origine)
                 if m is None or m[2] > DERRIERE_LE_MUR_M:
-                    continue
-                centre = m[0] + m[1] * (meubles_photos.taille_courante(o["sorte"])[1] / 2 + 0.03)
+                    vu = par_le_regard()
+                    if vu is None:
+                        continue
+                    centre = np.asarray(vu["position"], float)
+                else:
+                    centre = m[0] + m[1] * (meubles_photos.taille_courante(o["sorte"])[1] / 2 + 0.03)
                 dans = piece_de(centre, logement["pieces"])
                 if dans is None:
                     continue
@@ -240,6 +344,11 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
         if vu is None:
             continue
         if logement is not None:
+            if adosser and o["sorte"] in ADOSSES and not o.get("approche"):
+                sur = contre_le_mur(vu["position"], o["sorte"], o["boite"], cam, logement, largeur,
+                                    float(np.linalg.norm(np.asarray(vu["position"], float) - origine)))
+                if sur is not None and piece_de(sur["position"], logement["pieces"]) is not None:
+                    vu.update(sur)
             vu["piece"] = (piece_de(vu["position"], logement["pieces"]) or {}).get("id")
         vu.update(categorie=o["sorte"], photo=photo, phrase=o.get("dit") or o["sorte"], forme=o.get("forme"), numero=o.get("numero"),
                   distance=float(np.linalg.norm(np.asarray(vu["position"], float) - origine)), approche=bool(o.get("approche")),
@@ -523,7 +632,8 @@ def appliquer_les_sols(pieces: dict, lus: dict[str, dict]) -> dict:
 
 # ---------------------------------------------------------------- l'ensemble
 def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list[dict]], modele_moge=None, par_sorte: bool = True,
-          source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True, associer: bool = True) -> dict:
+          source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True, associer: bool = True,
+          adosser: bool = True) -> dict:
     """Photos placées (fiche cameras-photos.json) + objets de chaque photo avec leur sorte → ce qu'Atelya en fait :
     {"meubles": meubles à ajouter au logement (au sol rangés, suspendus, au mur), "baies": votes,
      "equipements": ce que moteur.equipements.poser rend (équipements à ajouter, rideaux, passe-plats, non posés)}.
@@ -560,7 +670,7 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         piece, _ = piece_de_l_appareil(cam, logement["pieces"])
         repere = cp.repere(cp.mesurer(modele_moge, rgb, float(d["camera"]["f"])), hsp) if objets else None
         de_la_photo = au_sol_d_une_photo(objets, cam, largeur, hauteur, piece, rgb, photo=k, repere=repere, camera=d["camera"], plan=plan,
-                                         logement=logement)
+                                         logement=logement, adosser=adosser)
         vus += de_la_photo
         par_photo.append(de_la_photo)
         suspendus += oa.suspensions_d_une_photo(
@@ -583,7 +693,8 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         trouves = meubles_photos.fusionner(vus, par_sorte=par_sorte)
     for t in trouves:
         t.pop("_vues", None)
-    trouves = [rm.coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
+    # un meuble mesuré SUR son mur (contre_le_mur) y est déjà : le coller de nouveau le déplacerait vers un autre mur
+    trouves = [m if m.get("largeur_mur") else rm.coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
     trouves = rm.plafonner(trouves, par_photo, logement)
     nouveaux = rm.vers_meubles_du_logement(trouves, logement)
     # d'où chaque meuble a été vu (clé privée, retirée avant de rendre les meubles) : un meuble mesuré dans une cheminée glisse

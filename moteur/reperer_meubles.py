@@ -220,6 +220,13 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
             dims = meubles_photos.selon_la_forme(categorie, meubles_photos.dimensions(categorie, face, m["position"], m.get("mesures", [])),
                                                  m.get("forme"))
             teinte = meubles_photos.couleur(m.get("mesures", []))
+            if m.get("largeur_mur"):  # meuble adossé mesuré sur son mur (17/11/2026) : sa vraie largeur, dos à ce mur
+                dims = (round(float(m["largeur_mur"]), 2), dims[1], dims[2])
+                face = round(math.degrees(math.atan2(m["normale"][1], m["normale"][0])), 1)
+                if categorie == "bibliotheque" and dims[0] > MEUBLE_MURAL_M:
+                    # une « bibliothèque » de plus de 2 m de large est un meuble mural (cases et portes sur tout un mur) : aucun
+                    # modèle du catalogue n'a cette taille (il sortait une petite étagère échelle) ; il est bâti sur mesure
+                    categorie, dims = "placard", (dims[0], PROFONDEUR_MURAL_M, max(dims[2], HAUTEUR_MURAL_M))
         meuble = {"id": f"reperage_{k}", "categorie": categorie, "piece": piece["id"], "position": m["position"],
                   "face": face, "dimensions": list(dims), "statut": "estime",
                   "source": f"repérage photos ({m['vues']} photo(s))", "confiance": min(1.0, m["confiance"])}
@@ -354,6 +361,7 @@ def _profondeur(m: dict) -> float:
 
 
 CONTRE_LE_MUR = ("lit", "canape", "rangement")  # meubles presque toujours dos (tête) au mur
+MEUBLE_MURAL_M, PROFONDEUR_MURAL_M, HAUTEUR_MURAL_M = 2.0, 0.45, 2.2  # un grand meuble mural lu « bibliothèque »
 MARGE_COLLER_M = 0.2  # … ou, quand on connaît la distance de la vue la plus proche, son incertitude + 20 cm
 COLLER_MAX_M = 1.0  # le mur le plus proche à au plus une demi-profondeur + 1 m : on y colle le meuble
 

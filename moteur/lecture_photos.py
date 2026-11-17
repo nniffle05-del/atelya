@@ -98,7 +98,7 @@ def controler(fiche: dict, numeros: set[int]) -> list[str]:
     return defauts
 
 
-def objets_lus(fiche: dict, liste: list[dict], manquants: bool = True) -> list[dict]:
+def objets_lus(fiche: dict, liste: list[dict], manquants: bool = True, reunir: bool = True) -> list[dict]:
     """Les objets d'une photo tels que Claude les a compris : la liste numérotée d'Atelya (`liste` : numero, boite, note…)
     avec la sorte de Claude ; les « faux » et les doublons (« meme_que ») retirés ; les « manquants » ajoutés (rectangle
     approché : `approche` vrai, note 0,5). Un numéro que Claude n'a pas rempli garde ce que le détecteur croyait."""
@@ -111,7 +111,16 @@ def objets_lus(fiche: dict, liste: list[dict], manquants: bool = True) -> list[d
             continue
         if l.get("sorte") == "faux" or l.get("meme_que") is not None:
             continue
-        sortie.append({"numero": o["numero"], "boite": o["boite"], "note": o["note"], "sorte": l["sorte"], "forme": l.get("forme"),
+        boite = list(o["boite"])
+        if reunir:
+            # les autres rectangles du MÊME objet (« meme_que ») en sont des morceaux : l'objet entier est leur réunion (un linéaire
+            # de cuisine encadré en trois fois, un canapé en deux) — avant le 17/11/2026 ils étaient jetés et l'objet restait un bout
+            for autre in liste:
+                la = lus.get(str(autre["numero"])) or {}
+                if la.get("meme_que") is not None and int(la["meme_que"]) == int(o["numero"]):
+                    b = autre["boite"]
+                    boite = [min(boite[0], b[0]), min(boite[1], b[1]), max(boite[2], b[2]), max(boite[3], b[3])]
+        sortie.append({"numero": o["numero"], "boite": boite, "note": o["note"], "sorte": l["sorte"], "forme": l.get("forme"),
                        "couleur_dite": l.get("couleur"), "dit": l.get("note")})
     if manquants:
         for k, m in enumerate(fiche.get("manquants") or [], start=1):

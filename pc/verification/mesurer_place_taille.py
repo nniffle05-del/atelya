@@ -55,11 +55,12 @@ def refaire(cas: str, depart: Path, sortie: Path, modele, options: dict) -> dict
         lignes.append(f"reperage_{k:<3d} {t['categorie']:18s} {t['position']} {t['vues']} vue(s) conf {t['confiance']} {fin}")
         for v in t.get("membres", []):
             lignes.append(f"      {photos[v['photo']]} n°{v['numero']} {v['categorie']} à {v['distance']:.1f} m  {[round(c, 2) for c in v['position']]}"
-                          + ("  (rectangle approché)" if v["approche"] else ""))
+                          + ("  (rectangle approché)" if v["approche"] else "")
+                          + (f"  sur le mur : {v['largeur_mur']:.2f} m" + (" au moins" if v.get("coupe_mur") else "") if v.get("largeur_mur") else ""))
     (d / "trace.txt").write_text("\n".join(lignes), encoding="utf-8")
     note = {"meubles_poses": len(logement["meubles"]), "collisions": collisions.resume(collisions.mesurer(logement)), "equipements": r["equipements"]}
     if cas in essai.VERITES:
-        note["meubles"] = essai.noter_meubles(logement, essai.lire(essai.VERITES[cas]["meubles"])["meubles"], fiche)
+        note["meubles"] = essai.noter_meubles(logement, essai.charger_releve(cas), fiche)
     return note
 
 
@@ -69,9 +70,10 @@ def main() -> int:
     ap.add_argument("sortie", type=Path)
     ap.add_argument("--cas", nargs="*", default=list(CAS))
     ap.add_argument("--ancien", action="store_true")
+    ap.add_argument("--sans-adosser", action="store_true", help="sans la mesure des meubles adossés sur leur mur (étape 2)")
     a = ap.parse_args()
     modele = moge.charger()
-    options = {"associer": False} if a.ancien else {}
+    options = {"associer": False, "adosser": False} if a.ancien else {"adosser": False} if a.sans_adosser else {}
     lignes, total = [], {"retrouves": 0, "bonne_sorte": 0, "en_trop": 0, "a_trouver": 0, "acc": 0, "acc_trop": 0, "acc_a_trouver": 0}
     for cas in a.cas:
         debut = time.time()

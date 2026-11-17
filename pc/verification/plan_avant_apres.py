@@ -73,7 +73,7 @@ def main() -> int:
     ap.add_argument("sortie", type=Path)
     ap.add_argument("--version", default="c")
     a = ap.parse_args()
-    verite = essai.lire(essai.VERITES[a.cas]["meubles"])["meubles"]
+    verite = essai.charger_releve(a.cas)
     fiche = essai.lire(CAS[a.cas]["fiche"])
     images, titres = [], []
     for nom, dossier in (("AVANT", a.avant), ("APRÈS", a.apres)):
