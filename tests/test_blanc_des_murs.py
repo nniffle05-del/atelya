@@ -50,5 +50,6 @@ def test_sols_ecrits_dans_le_logement_sans_bibliotheque():
     sortie = sols_vers_logement(resultat, logement, None, None)
     s = sortie["pieces"][0]
     assert s["sol"]["matiere"] == "carrelage_interieur" and s["sol"]["statut"] == "estime" and s["sol"]["confiance"] == 0.8
-    assert s["zones_sol"][0]["sol"]["matiere"] == "chene_naturel_photo"
+    # des lames droites : depuis le 18/11/2026, un parquet sur mesure (ici rien n'a été mesuré : toute sa fiche est supposée)
+    assert s["zones_sol"][0]["sol"]["matiere"] == "parquet_sur_mesure" and len(s["zones_sol"][0]["sol"]["parquet"]["supposes"]) == 5
     assert sortie["pieces"][1]["sol"] == {"matiere": "tomettes"}  # pièce non vue : inchangée

@@ -1399,10 +1399,13 @@
       // B2-3 : le sol de la pièce.
       const sol = el("select", { id: "f-sol" },
         ...(e.sol ? [] : [el("option", { value: "", texte: "Au choix d'Atelya (rien de vu)" })]),
+        // le parquet dessiné sur mesure d'après les photos (moteur/parquet_sur_mesure.py) : montré tel quel, remplaçable
+        ...(e.sol && e.sol.matiere === "parquet_sur_mesure" ? [el("option", { value: "parquet_sur_mesure",
+          texte: `Parquet sur mesure, d'après vos photos${e.sol.parquet ? ` (lames de ${Math.round(e.sol.parquet.largeur * 100)} cm)` : ""}` })] : []),
         ...Object.entries(C.SOLS).map(([k, n]) => el("option", { value: k, texte: n })));
       sol.value = e.sol ? e.sol.matiere : "";
       sol.addEventListener("change", () => {
-        if (sol.value) corriger((x) => C.reglerSol(x, e.id, sol.value), `Sol : ${C.SOLS[sol.value]}.`);
+        if (sol.value && sol.value in C.SOLS) corriger((x) => C.reglerSol(x, e.id, sol.value), `Sol : ${C.SOLS[sol.value]}.`);
       });
       const manuelle = (etat.v.contours_manuels || []).includes(e.id);
       const alertesP = C.alertesPiece(etat.v.logement, e.id);

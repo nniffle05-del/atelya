@@ -23,7 +23,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from moteur.matieres import NOMS_SOLS
+from moteur.matieres import NOMS_SOLS, SUR_MESURE
 from moteur.meubles import NOMS_MEUBLES
 
 VERSION_SCHEMA = "logement/0.1"
@@ -84,6 +84,12 @@ class Rideaux(BaseModel):
 
     voilage: Couleur | None = None
     rideaux: Couleur | None = None
+    ecart: Annotated[float, Field(gt=0, le=0.5)] | None = Field(
+        default=None, description="Distance au mur de la nappe du voilage (m) ; les rideaux pendent 6 cm plus loin. Par défaut 10 cm. "
+                                  "Réglée par moteur/collisions.py pour passer DEVANT un radiateur.")
+    bas: Annotated[float, Field(ge=0)] | None = Field(
+        default=None, description="Hauteur du bas du tissu (m). Par défaut au ras du sol. Réglée par moteur/collisions.py quand "
+                                  "le rideau s'arrête au-dessus de ce qui est bâti sous la fenêtre.")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
@@ -115,6 +121,19 @@ class Ouverture(Element):
     )
     rideaux: Rideaux | None = Field(default=None, description="Voilage et rideaux côté intérieur (fenêtres seulement)")
     sens: SensPorte | None = Field(default=None, description="Gonds et côté d'ouverture (portes) ; sinon, réglage par défaut")
+
+
+class PassePlat(Element):
+    """Un TROU dans un mur, sans menuiserie ni vitre (16/11/2026) : le passe-plat entre une cuisine et un séjour, une baie
+    libre à mi-hauteur. Le plan ne le dessine presque jamais (NT, 15/11/2026 : « le plan ne veut pas tout dire ») : il est lu
+    sur les photos (moteur/equipements.py). Ce n'est PAS une ouverture : on n'y passe pas, il n'a ni cadre ni vitre, il ne
+    donne pas dehors ; le mur reste un mur pour tout le reste d'Atelya (place des photos, trajet de la caméra)."""
+
+    mur: str = Field(description="Identifiant du mur percé")
+    position: Annotated[float, Field(ge=0)] = Field(description="Distance le long du mur, de son début au premier bord du trou")
+    largeur: Longueur
+    hauteur: Longueur
+    allege: Annotated[float, Field(ge=0)] = Field(default=1.0, description="Hauteur entre le sol et le bas du trou")
 
 
 class Plinthes(BaseModel):
@@ -150,8 +169,33 @@ class PortesPlacard(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class Parquet(BaseModel):
+    """Un parquet à lames droites fait SUR MESURE d'après les photos du client (18/11/2026) : ce qu'Atelya a mesuré sur les
+    photos (moteur/parquet_photo.py) et qu'il dessine à la construction (moteur/parquet_sur_mesure.py).
+
+    « supposes » liste les valeurs qui n'ont PAS pu être mesurées (sol trop peu vu) et sont donc des suppositions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pose: Literal["lames", "point_de_hongrie"] = "lames"
+    angle: Annotated[float, Field(ge=30, le=60)] | None = Field(
+        default=None, description="Point de Hongrie : angle de coupe des lames (degrés), entre la lame et le rang de chevrons")
+    largeur: Annotated[float, Field(ge=0.04, le=0.35)] = Field(description="Largeur d'une lame (m)")
+    longueur: Annotated[float, Field(ge=0.25, le=2.5)] = Field(description="Longueur moyenne des lames (m) ; elles vont de la "
+                                                                 "moitié à une fois et demie cette longueur")
+    nuance: Annotated[float, Field(ge=0, le=0.25)] = Field(description="De combien la clarté change d'une lame à l'autre "
+                                                           "(0,10 = des lames 10 % plus claires ou plus foncées que la moyenne)")
+    chaleur: Annotated[float, Field(ge=0, le=0.12)] = Field(description="De combien la couleur change d'une lame à l'autre "
+                                                            "(plus rousse ou plus grise)")
+    joint_mm: Annotated[float, Field(ge=0, le=3.0)] = Field(description="Force du joint entre deux lames, en millimètres de "
+                                                            "noir (0 = joint invisible, 2 = joint très marqué d'un vieux parquet)")
+    bois: str = Field(default="chene_clair", min_length=1, description="La photo de bois de la bibliothèque dont les lames sont tirées")
+    supposes: list[Literal["largeur", "longueur", "nuance", "chaleur", "joint_mm"]] = Field(default_factory=list)
+
+
 class Sol(BaseModel):
-    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py).
+    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py), ou un parquet
+    fait sur mesure d'après les photos (matière « parquet_sur_mesure », décrit par le champ « parquet »).
 
     Même provenance que Plinthes : « ajoute » (règle par défaut), « estime » (vu sur une photo), « mesure » (choisi à
     l'écran de vérification).
@@ -159,7 +203,9 @@ class Sol(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    matiere: Literal[*NOMS_SOLS]
+    matiere: Literal[*NOMS_SOLS, SUR_MESURE]
+    parquet: Parquet | None = Field(default=None, description="Le parquet sur mesure (obligatoire si la matière est "
+                                    "« parquet_sur_mesure », ignoré sinon)")
     teinte: tuple[Annotated[float, Field(ge=0.02, le=4.0)], Annotated[float, Field(ge=0.02, le=4.0)],
                   Annotated[float, Field(ge=0.02, le=4.0)]] | None = Field(
         default=None, description="Correction de couleur (rouge, vert, bleu) qui rapproche la matière de la photo du client")
@@ -169,9 +215,18 @@ class Sol(BaseModel):
         "même photo servant d'étalon (moteur/teinte_photo.py) : la cible du réglage de la teinte au rendu (moteur/blender/regler_teintes.py)")
     echelle: Annotated[float, Field(ge=0.3, le=3.0)] | None = Field(
         default=None, description="Taille du motif par rapport à la matière du catalogue (1,13 = chevrons 13 % plus grands)")
+    sens: Annotated[float, Field(ge=0, lt=180)] | None = Field(
+        default=None, description="Sens des lames de ce sol, en degrés dans le repère du logement (0 = le long de l'axe x, 90 = le "
+        "long de l'axe y), lu sur les photos du client (moteur/sens_des_lames.py) ; absent : le sens général du logement")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _sur_mesure_decrit(self) -> "Sol":
+        if self.matiere == SUR_MESURE and self.parquet is None:
+            raise ValueError("un sol « parquet_sur_mesure » doit décrire son parquet (champ « parquet »)")
+        return self
 
 
 class Corniche(BaseModel):
@@ -306,6 +361,7 @@ class Logement(BaseModel):
     pieces: list[Piece] = Field(default_factory=list)
     meubles: list[Meuble] = Field(default_factory=list)
     balcons: list[Balcon] = Field(default_factory=list)
+    passe_plats: list[PassePlat] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _coherence(self) -> Logement:
@@ -320,13 +376,13 @@ def verifier_coherence(logement: Logement) -> list[str]:
     erreurs: list[str] = []
 
     tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces, *logement.meubles,
-                                   *logement.balcons]]
+                                   *logement.balcons, *logement.passe_plats]]
     doublons = sorted({i for i in tous_les_ids if tous_les_ids.count(i) > 1})
     if doublons:
         erreurs.append(f"identifiants en double : {', '.join(doublons)}")
 
     murs = {m.id: m for m in logement.murs}
-    for o in logement.ouvertures:
+    for o in [*logement.ouvertures, *logement.passe_plats]:
         mur = murs.get(o.mur)
         if mur is None:
             erreurs.append(f"l'ouverture {o.id} désigne un mur inconnu : {o.mur}")

@@ -12,6 +12,9 @@ Depuis le dossier du dépôt (atelya-code) :
     # 2. La fiche rendue par Claude (lecture-claude/0.1) → logement.json, verification.json, ecran.html (double-clic)…
     ..\atelya\.venv\Scripts\python.exe outils\lecture_claude\traduire_fiche.py traduire mon-plan.pdf --fiche fiche.json --sortie ..\atelya\lectures-claude
 
+Ajouter « --photos <dossier des photos du client> » à traduire : si le plan n'écrit pas la hauteur sous plafond, elle est
+estimée d'après les photos (hauteur-photos.json) au lieu de 2,50 m par défaut.
+
 Sorties dans <sortie>\<nom du plan>\ : envoi.png et consigne.txt (preparer) ; ecran.html, plan.png, verification.json,
 logement.json, lecture.json, coloriage.png = la fiche dessinée en classes du U-Net (traduire).
 Une fiche refusée n'est pas un plantage : la commande le dit et finit normalement. Un plantage finit par un code ≠ 0.
@@ -65,6 +68,9 @@ def main() -> int:
     ap.add_argument("--sortie", type=Path, required=True)
     ap.add_argument("--fiche", type=Path, help="traduire : la fiche lecture-claude/0.1 rendue par Claude")
     ap.add_argument("--page", type=int, help="PDF : la page lue (par défaut, celle que choisit le tri)")
+    ap.add_argument("--photos", type=Path,
+                    help="traduire : le dossier des photos du client ; si le plan n'écrit pas la hauteur sous plafond, elle est "
+                         "estimée d'après elles (moteur.hauteur_photos) au lieu de 2,50 m par défaut")
     ap.add_argument("--textes-atelya", action="store_true",
                     help="traduire : textes du plan lus par l'OCR d'Atelya (fiche tirée d'une vérité, qui n'a pas de textes)")
     a = ap.parse_args()
@@ -96,7 +102,18 @@ def main() -> int:
         source.textes, _ = lire_textes_et_echelle(np.asarray(Image.fromarray(source.image).convert("L")))
     envoi, facteur = image_pour_claude(source.image)
     controlee = controler_fiche(json.loads(a.fiche.read_text(encoding="utf-8")), (envoi.shape[1], envoi.shape[0]))
-    plan = traduire(source, controlee, facteur)
+    hauteur = None
+    if a.photos is not None:  # jointure « photos → hauteur sous plafond » (examen app-004, 15/11/2026)
+        if not a.photos.is_dir():
+            print(f"PLANTÉ : dossier des photos introuvable : {a.photos}", flush=True)
+            return 2
+        from moteur.hauteur_photos import estimer_dossier
+
+        estimation = estimer_dossier(a.photos, journal=lambda *m: print(*m, flush=True))
+        hauteur = estimation["hauteur"]
+        dossier.mkdir(parents=True, exist_ok=True)
+        (dossier / "hauteur-photos.json").write_text(json.dumps(estimation, ensure_ascii=False, indent=1), encoding="utf-8")
+    plan = traduire(source, controlee, facteur, hauteur_estimee=hauteur)
     duree = time.time() - t0
     ecrire(plan, dossier, duree)
     g = plan.gardee

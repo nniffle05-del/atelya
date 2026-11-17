@@ -1,0 +1,196 @@
+{
+ "note": "Complément du relevé des meubles d'app-001 (17/11/2026, « place et taille justes », étape 2), REFAIT le même jour après le doute de NT (« des meubles mis dans le vide ») : la première version avait 13 défauts mesurés (un meuble dans un autre, dans un mur). Règle depuis : le relevé doit passer le contrôle « zéro collision » (moteur/collisions.py) ; chaque meuble adossé est calé au nu de son mur, les meubles d'un même mur sont rangés bout à bout dans l'ordre où la photo les montre. Le relevé du 09/11/2026 (meubles.json) oubliait de vrais meubles que les photos montrent et plaçait mal un bureau. RÉSERVE : ces places ont été relevées APRÈS avoir vu où Atelya posait ces meubles ; précision ± 30-40 cm le long des murs. « corrections » : meubles du relevé d'origine dont la place est corrigée (le fichier d'origine n'est pas modifié). Contrôle à l'œil : pc/verification/boites_sur_photos.py.",
+ "meubles": [
+  {
+   "id": "buffet_repas_avant",
+   "categorie": "rangement",
+   "piece": "sejour_1",
+   "position": [
+    11.4,
+    3.0
+   ],
+   "face": 0,
+   "dimensions": [
+    1.8,
+    0.45,
+    1.0
+   ],
+   "source": "photos 04, 01, 03 (son long côté file vers le fond, façade vers la table)"
+  },
+  {
+   "id": "buffet_repas_fond",
+   "categorie": "rangement",
+   "piece": "sejour_1",
+   "position": [
+    13.6,
+    0.35
+   ],
+   "face": 90,
+   "dimensions": [
+    1.2,
+    0.45,
+    1.25
+   ],
+   "source": "photos 04, 01"
+  },
+  {
+   "id": "armoire_blanche_2",
+   "categorie": "placard",
+   "piece": "chambre_2",
+   "position": [
+    7.38,
+    3.14
+   ],
+   "face": 180,
+   "dimensions": [
+    1.0,
+    0.6,
+    2.2
+   ],
+   "source": "photo 10"
+  },
+  {
+   "id": "colonne_tiroirs_2",
+   "categorie": "commode",
+   "piece": "chambre_2",
+   "position": [
+    7.455,
+    3.95
+   ],
+   "face": 180,
+   "dimensions": [
+    0.6,
+    0.45,
+    1.9
+   ],
+   "source": "photo 10"
+  },
+  {
+   "id": "etagere_bacs_2",
+   "categorie": "etagere_cubes",
+   "piece": "chambre_2",
+   "position": [
+    7.48,
+    4.485
+   ],
+   "face": 180,
+   "dimensions": [
+    0.45,
+    0.4,
+    1.3
+   ],
+   "source": "photo 10"
+  },
+  {
+   "id": "bibliotheque_blanche_2",
+   "categorie": "bibliotheque",
+   "piece": "chambre_2",
+   "position": [
+    7.53,
+    6.28
+   ],
+   "face": 180,
+   "dimensions": [
+    0.5,
+    0.3,
+    1.9
+   ],
+   "source": "photo 10"
+  },
+  {
+   "id": "chaise_bureau_3",
+   "categorie": "chaise_de_bureau",
+   "piece": "chambre_2",
+   "position": [
+    4.3,
+    5.4
+   ],
+   "face": 180,
+   "dimensions": [
+    0.55,
+    0.55,
+    0.9
+   ],
+   "source": "photos 10, 11 : rentrée sous son bureau (les deux photos la voient dans la même direction que lui)"
+  },
+  {
+   "id": "lampadaire_chambre_1",
+   "categorie": "lampadaire",
+   "piece": "chambre_1",
+   "position": [
+    3.25,
+    2.95
+   ],
+   "face": 180,
+   "dimensions": [
+    0.4,
+    0.4,
+    1.85
+   ],
+   "source": "photo 08"
+  },
+  {
+   "id": "fauteuil_chambre_1",
+   "categorie": "fauteuil",
+   "piece": "chambre_1",
+   "position": [
+    2.5,
+    2.98
+   ],
+   "face": 90,
+   "dimensions": [
+    0.65,
+    0.65,
+    0.75
+   ],
+   "source": "photo 08 (petit fauteuil noir, derrière le lit)"
+  },
+  {
+   "id": "meuble_vasque",
+   "categorie": "rangement",
+   "piece": "salle_d_eau_1",
+   "position": [
+    5.605,
+    10.63
+   ],
+   "face": 180,
+   "dimensions": [
+    1.2,
+    0.45,
+    0.85
+   ],
+   "source": "photo 12"
+  }
+ ],
+ "corrections": {
+  "bureau_3": {
+   "position": [
+    3.96,
+    5.4
+   ],
+   "face": 0,
+   "source": "photos 10 et 11 recoupées : le bureau est contre le mur ouest, au nord de l'armoire en bois ; le relevé d'origine le plaçait contre le mur sud, où la photo 10 montre le sol nu"
+  },
+  "bureau_2": {
+   "position": [
+    7.39,
+    5.37
+   ],
+   "source": "photo 10 : entre l'étagère à bacs et la bibliothèque blanche (sa boîte d'origine tombait 40 cm trop au sud, sur l'étagère)"
+  },
+  "chaise_bureau_2": {
+   "position": [
+    6.8,
+    5.37
+   ],
+   "source": "devant son bureau recalé"
+  },
+  "bibliotheque": {
+   "position": [
+    10.35,
+    2.79
+   ],
+   "source": "le relevé d'origine la mettait 27 cm DANS le mur sud (y = 2,50 pour un nu de mur à 2,63)"
+  }
+ }
+}

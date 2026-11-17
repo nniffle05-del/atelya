@@ -80,16 +80,52 @@ SOLS: dict[str, tuple[str, str]] = {
     # Dessinés par Atelya d'après les photos d'app-001 (outils/bibliotheque/dessiner_carreaux.py, 09/11/2026).
     "carreaux_cubes": ("Carreaux de ciment en cubes (losanges)", "carrelage"),
     "petits_carreaux_clairs": ("Petits carreaux clairs, 10 cm", "carrelage"),
+    # Ajoutés le 17/11/2026 (accord écrit de NT : « Ok », ambientCG, CC0) : six des 62 parquets téléchargés ce jour-là, gardés
+    # après les avoir regardés un par un (pc/verification/trier_parquets.py). Les 56 autres restent dans la bibliothèque sous
+    # leur nom provisoire (parquet_acg_NNN) : motifs dessinés par ordinateur, mosaïques, bois trop rustiques ou trop unis.
+    "lames_chene_miel": ("Chêne miel, lames à l'anglaise", "bois"),
+    "lames_chene_clair": ("Chêne clair, lames à l'anglaise", "bois"),
+    "lames_chene_dore": ("Chêne doré, lames à l'anglaise", "bois"),
+    "lames_miel_fines": ("Parquet miel, lames fines", "bois"),
+    "lames_miel_moyennes": ("Parquet miel, lames moyennes", "bois"),
+    "pin_clair_larges": ("Pin clair, larges lames", "bois"),
+    # Dessiné par Atelya le 17/11/2026 (outils/bibliotheque/dessiner_parquet.py) d'après la vraie photo de chêne de la
+    # bibliothèque : le parquet le plus courant des appartements français, que ni Poly Haven ni ambientCG n'avaient (NT).
+    "lames_chene_anglaise": ("Chêne à l'anglaise, lames de 10 cm", "bois"),
 }
 # Écartées après essai à l'œil (08/11/2026) : « granito » (la photo terrazzo_tiles, brune et mouchetée, ressemble à du liège ou
 # à de la moquette une fois posée : pas réaliste ; à remplacer par un vrai granito gris à éclats).
 NOMS_SOLS = tuple(SOLS)
 
+# Le parquet SUR MESURE (18/11/2026, NT : « je veux que le sens soit le même, et aussi le parquet ») : pas une matière du
+# catalogue, mais un parquet dessiné par Atelya d'après ce qu'il a mesuré sur les photos du client (largeur et longueur des
+# lames, nuances, joints : champ « parquet » du sol, moteur/parquet_photo.py et moteur/parquet_sur_mesure.py). Dans la
+# maquette, sa matière s'appelle « psm_ » + la clé de sa fiche : deux pièces au même parquet partagent la même image.
+SUR_MESURE = "parquet_sur_mesure"
+LIBELLE_SUR_MESURE = "Parquet sur mesure (d'après les photos)"
+
 # Dessinées par un calcul dans Blender (moteur/blender/materiaux.py), à partir d'une photo de la bibliothèque ou de rien.
 CALCULEES = {"point_de_hongrie": "chene_clair", "carreaux_ciment": None}
 
-# Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (degrés).
-ROTATION_PHOTO = {"carrelage_interieur": 45.0}
+# Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (degrés). Et, depuis le 17/11/2026,
+# photos de parquet tournées d'un quart de tour pour que les lames de TOUTES les matières suivent le sens demandé (NT : « la
+# direction du parquet »). ATTENTION, MESURÉ dans Blender le 17/11/2026 au soir : sur un sol, Blender pose une image avec SA
+# LARGEUR le long de l'axe y de la maquette (projection « boîte »). Sans rotation, ce sont donc les photos aux lames DE HAUT
+# EN BAS qui suivent le sens demandé ; celles aux lames EN TRAVERS de l'image (de gauche à droite) doivent être tournées :
+# ce sont elles qui sont listées ici. (La première correction, l'après-midi, avait fait l'inverse : tous les parquets
+# étaient d'accord entre eux, et tous en travers des photos — vu par le juge pc/verification/comparer_sens_photo_rendu.py.)
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "stratifie": 90.0, "chene_clair_moderne": 90.0, "chene_grise": 90.0,
+                  "chene_naturel_photo": 90.0, "parquet_use": 90.0, "lames_bois": 90.0, "stratifie_2": 90.0, "lames_foncees_2": 90.0,
+                  "lames_chene_miel": 90.0, "lames_chene_clair": 90.0, "lames_chene_dore": 90.0, "lames_miel_fines": 90.0,
+                  "lames_miel_moyennes": 90.0, "lames_chene_anglaise": 90.0}
+
+# Les parquets à LAMES DROITES qu'Atelya peut choisir seul d'après une photo, et la largeur de leurs lames (m), mesurée sur la
+# photo de la matière. Les autres « bois » du catalogue ont un motif (posé en diagonale, mosaïque, pavés) : ils ne sont posés
+# que si quelqu'un les choisit (avant : la brique photos prenait « parquet posé en diagonale » pour des lames droites).
+LAMES_DROITES = {"parquet_chene_lames": 0.18, "stratifie": 0.20, "chene_clair_moderne": 0.07, "chene_grise": 0.08, "chene_noeuds": 0.17,
+                 "chene_clair_photo": 0.19, "chene_naturel_photo": 0.15, "vieux_parquet": 0.08, "lames_parquet_2": 0.11,
+                 "parquet_use": 0.15, "lames_bois": 0.07, "stratifie_2": 0.04, "lames_foncees_2": 0.23,
+                 "lames_chene_miel": 0.08, "lames_chene_clair": 0.08, "lames_chene_dore": 0.08, "lames_miel_fines": 0.08, "lames_miel_moyennes": 0.12, "pin_clair_larges": 0.19, "lames_chene_anglaise": 0.10}
 
 # Essayées le 08/11/2026 dans le séjour de fr-031 et ÉCARTÉES du choix (téléchargées, gardées dans la bibliothèque) : chêne
 # beige (WoodFloor062) et lames foncées (WoodFloor064) trop unis, effet plastique ; Versailles clair et chaud (WoodFloor055,
@@ -99,12 +135,15 @@ ROTATION_PHOTO = {"carrelage_interieur": 45.0}
 SOL_PAR_SORTE = {"bois": "chene_naturel_photo", "carrelage": "carrelage_interieur"}  # NT 08/11 : l'ancien défaut (parquet_chene_lames) était trop foncé
 
 
-def nom_materiau(matiere: str, teinte=None, echelle: float | None = None) -> str:
-    """Le nom du matériau d'une brique : la matière, son échelle de motif si elle n'est pas 1 (« @1.13 »), puis sa teinte
-    s'il y en a une (« hongrie_naturel@1.13~1.20,1.00,0.80 »)."""
+def nom_materiau(matiere: str, teinte=None, echelle: float | None = None, sens: float | None = None) -> str:
+    """Le nom du matériau d'une brique : la matière, son échelle de motif si elle n'est pas 1 (« @1.13 »), le sens de ses
+    lames s'il a été lu sur les photos (« ^90 », degrés dans le repère du logement), puis sa teinte s'il y en a une
+    (« hongrie_naturel@1.13~1.20,1.00,0.80 », « chene_clair_photo^90~1.20,1.00,0.80 »)."""
     nom = matiere
     if echelle and abs(echelle - 1.0) > 0.005:
         nom += f"@{echelle:.2f}"
+    if sens is not None:
+        nom += f"^{float(sens) % 180.0:.0f}"
     if not teinte:
         return nom
     return nom + "~" + ",".join(f"{g:.2f}" for g in teinte)
@@ -113,7 +152,7 @@ def nom_materiau(matiere: str, teinte=None, echelle: float | None = None) -> str
 def matiere_et_teinte(nom: str) -> tuple[str, tuple[float, float, float] | None]:
     """L'inverse de nom_materiau (sans l'échelle du motif, voir echelle_du_nom)."""
     matiere, _, gains = nom.partition("~")
-    matiere = matiere.split("@", 1)[0]
+    matiere = matiere.split("^", 1)[0].split("@", 1)[0]
     if not gains:
         return matiere, None
     return matiere, tuple(float(g) for g in gains.split(","))
@@ -121,12 +160,18 @@ def matiere_et_teinte(nom: str) -> tuple[str, tuple[float, float, float] | None]
 
 def echelle_du_nom(nom: str) -> float:
     """L'échelle du motif écrite dans le nom d'un matériau (1 si rien n'est écrit)."""
-    debut = nom.partition("~")[0]
+    debut = nom.partition("~")[0].split("^", 1)[0]
     return float(debut.split("@", 1)[1]) if "@" in debut else 1.0
 
 
+def sens_du_nom(nom: str) -> float | None:
+    """Le sens des lames écrit dans le nom d'un matériau (degrés, repère du logement) ; None : le sens général du logement."""
+    debut = nom.partition("~")[0]
+    return float(debut.split("^", 1)[1]) if "^" in debut else None
+
+
 def sorte(matiere: str) -> str:
-    """« bois » ou « carrelage » (un nom inconnu, ancien « parquet » compris, compte comme du bois)."""
+    """« bois » ou « carrelage » (un nom inconnu, ancien « parquet » et parquets sur mesure compris, compte comme du bois)."""
     matiere = matiere_et_teinte(matiere)[0]
     if matiere in SOLS:
         return SOLS[matiere][1]

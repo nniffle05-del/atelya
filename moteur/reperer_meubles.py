@@ -184,14 +184,24 @@ def orienter(meuble: dict, piece: dict) -> float:
         d = float(np.linalg.norm(p - q))
         if d < meilleur and d > 1e-6:
             meilleur, normale = d, (p - q) / d
-    _, (l, pr, h) = TYPE_DE_GROUPE[meuble["groupe"]]
+    pr = _profondeur(meuble)
     if normale is not None and meilleur < CONTRE_MUR_M + pr / 2:
         return math.degrees(math.atan2(normale[1], normale[0]))
     centre = c.mean(0) - p
-    return math.degrees(math.atan2(centre[1], centre[0]))
+    face = math.degrees(math.atan2(centre[1], centre[0]))
+    if meuble.get("categorie") and (meuble["groupe"] in DROITS_DANS_LA_PIECE or meuble["categorie"] in DROITS_AUSSI):
+        # une table, un tapis, un canapé au milieu de la pièce sont posés droits, le long des murs (pas « vers le centre »,
+        # qui donnait une table tournée de 37°)
+        cotes = np.roll(c, -1, axis=0) - c
+        long = cotes[np.argmax(np.linalg.norm(cotes, axis=1))]
+        axe = math.degrees(math.atan2(long[1], long[0]))
+        face = axe + round((face - axe) / 90.0) * 90.0
+    return face
 
 
 LITERIE_PAR_DEFAUT = {"couette": [242, 241, 236], "oreillers": 2}
+DROITS_DANS_LA_PIECE = ("table", "tapis", "canape", "lit")  # groupes posés le long des murs quand ils ne sont pas contre un mur
+DROITS_AUSSI = ("ilot",)  # … et un îlot de cuisine (17/11/2026 : il sortait tourné de 16°, ses tabourets avec lui)
 
 
 def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
@@ -203,13 +213,52 @@ def vers_meubles_du_logement(trouves: list[dict], logement: dict) -> list[dict]:
         if piece is None:
             continue
         categorie, dims = TYPE_DE_GROUPE[m["groupe"]]
+        face = round(orienter(m, piece), 1)
+        teinte = None
+        if m.get("categorie"):  # repérage précis (16/11/2026) : la sorte, la taille et la couleur vues sur les photos
+            from moteur import meubles_photos
+            categorie = m["categorie"]
+            dims = meubles_photos.selon_la_forme(categorie, meubles_photos.dimensions(categorie, face, m["position"], m.get("mesures", [])),
+                                                 m.get("forme"))
+            teinte = meubles_photos.couleur(m.get("mesures", []))
+            mesuree = meubles_photos.taille_mesuree(categorie, m["emprises"], m.get("forme")) if m.get("emprises") else None
+            if mesuree is not None:  # meuble libre mesuré dans le relief des photos (17/11/2026, étape 3) : sa vraie taille
+                dims, face = selon_la_mesure(categorie, dims, face, mesuree)
+            if m.get("largeur_mur"):  # meuble adossé mesuré sur son mur (17/11/2026) : sa vraie largeur, dos à ce mur
+                dims = (round(float(m["largeur_mur"]), 2), dims[1], dims[2])
+                face = round(math.degrees(math.atan2(m["normale"][1], m["normale"][0])), 1)
+                if categorie == "bibliotheque" and dims[0] > MEUBLE_MURAL_M:
+                    # une « bibliothèque » de plus de 2 m de large est un meuble mural (cases et portes sur tout un mur) : aucun
+                    # modèle du catalogue n'a cette taille (il sortait une petite étagère échelle) ; il est bâti sur mesure
+                    categorie, dims = "placard", (dims[0], PROFONDEUR_MURAL_M, max(dims[2], HAUTEUR_MURAL_M))
         meuble = {"id": f"reperage_{k}", "categorie": categorie, "piece": piece["id"], "position": m["position"],
-                  "face": round(orienter(m, piece), 1), "dimensions": list(dims), "statut": "estime",
+                  "face": face, "dimensions": list(dims), "statut": "estime",
                   "source": f"repérage photos ({m['vues']} photo(s))", "confiance": min(1.0, m["confiance"])}
+        if teinte is not None and categorie != "lit":
+            meuble["couleur"] = teinte
         if categorie == "lit":  # linge par défaut (le plus courant sur les photos d'annonce), modifiable à l'écran de vérification
             meuble["literie"] = dict(LITERIE_PAR_DEFAUT)
         sortie.append(meuble)
     return sortie
+
+
+def selon_la_mesure(categorie: str, dims, face: float, mesuree: dict) -> tuple[tuple, float]:
+    """La taille et l'orientation d'un meuble libre d'après la mesure de son dessus (moteur.meubles_photos.taille_mesuree).
+    Le grand côté mesuré devient la largeur du meuble (sa longueur pour un lit, plus long que large). Une TABLE que la mesure
+    voit nettement dans l'autre sens que l'orientation choisie est tournée d'un quart de tour (ses deux bouts se valent).
+    Un canapé ou un lit garde son orientation : la mesure dit le sens de son grand côté, pas de quel côté est son dos — tourné
+    au jugé vers le mur le plus proche, le lit d'app-002 (tête contre un panneau au milieu de la chambre) se retrouvait dans le
+    meuble télé, qui était retiré."""
+    l, p, h = dims
+    en_long = p > l  # un lit : son grand côté est sa profondeur, le long de sa face
+    dims = (mesuree["petit"], mesuree["grand"], h) if en_long else (mesuree["grand"], mesuree["petit"], h)
+    if mesuree.get("sens") is None or GROUPE_DE.get(categorie) in CONTRE_LE_MUR:
+        return dims, face
+    grand_cote = face if en_long else face + 90.0  # la direction du grand côté avec l'orientation choisie
+    if abs((grand_cote - mesuree["sens"] + 90.0) % 180.0 - 90.0) <= 45.0:
+        return dims, face
+    base = mesuree["sens"] if en_long else mesuree["sens"] - 90.0
+    return dims, round((base + 180.0) % 360.0 - 180.0, 1)
 
 
 def vu_sur_une_photo(m: dict, cameras: list, logement: dict, largeur: int = 1206, hauteur: int = 804) -> bool:
@@ -264,44 +313,79 @@ POIDS_COUPE = 0.1  # poids dans la fusion d'un meuble coupé par le bas de la ph
 
 
 def meubles_owl_d_une_photo(objets: list[dict], groupe_de: dict, cam, largeur: int, hauteur: int, piece: dict | None,
-                            seuils: dict | None = None, seuil_defaut: float = SEUIL_OWL_DEFAUT) -> list[dict]:
+                            seuils: dict | None = None, seuil_defaut: float = SEUIL_OWL_DEFAUT, rgb: np.ndarray | None = None,
+                            photo: int | None = None, precis: bool = False) -> list[dict]:
     """Meubles vus sur une photo d'après les rectangles d'OWLv2 (moteur/owlv2.py, objets()) : le BAS du rectangle est le pied
     du meuble (son bord avant, côté appareil) ; la caméra calée le reporte au sol ; le milieu est une demi-profondeur plus loin.
     Un tapis est à plat : son milieu est entre le haut et le bas du rectangle reportés au sol. Rend groupe, place, largeur vue."""
     from moteur.sol_a_plat import dans_polygone
     seuils = SEUILS_OWL if seuils is None else seuils
     sortie = []
+    if precis:
+        # un seul rectangle par meuble (16/11/2026) : deux phrases pour le même meuble, un tiroir et son armoire ne font qu'un ;
+        # deux objets du même groupe qui restent sur cette photo sont deux meubles différents (jamais fondus ensuite)
+        from moteur import meubles_photos
+        from moteur.owlv2 import objets_distincts
+        objets = [{"nom": o["phrase"], "note": o["note"], "boite": o["boite"]}
+                  for o in objets_distincts(objets, {n: g for n, g in groupe_de.items() if g in TYPE_DE_GROUPE}, seuils, seuil_defaut)]
     for o in objets:
         g = groupe_de.get(o["nom"])
         if g not in TYPE_DE_GROUPE or o["note"] < seuils.get(g, seuil_defaut):
             continue
-        x0, y0, x1, y1 = o["boite"]
-        um = (x0 + x1) / 2
-        bas = min(y1, hauteur - 1)
-        pied = vers_le_sol(um, bas, cam)
-        gauche, droite = vers_le_sol(x0, bas, cam), vers_le_sol(x1, bas, cam)
-        if pied is None or math.dist(pied, cam[:2]) > 12:
+        categorie = meubles_photos.CATEGORIE_DE.get(o["nom"]) if precis else None
+        vu = vu_au_sol(g, categorie, o["boite"], o["note"], cam, largeur, hauteur, piece)
+        if vu is None:
             continue
-        _, (l, p, h) = TYPE_DE_GROUPE[g]
-        if g == "tapis":
-            haut = vers_le_sol(um, max(y0, 0), cam)
-            centre = np.asarray(pied) if haut is None or math.dist(haut, cam[:2]) > 12 else (np.asarray(pied) + np.asarray(haut)) / 2
-        else:
-            direction = np.asarray(pied, float) - np.asarray(cam[:2], float)
-            direction /= max(np.linalg.norm(direction), 1e-9)
-            centre = np.asarray(pied, float) + direction * p / 2
-        if piece is not None and not dans_polygone(np.array([centre[0]]), np.array([centre[1]]), piece["contour"])[0]:
-            continue
-        etendue = math.dist(gauche, droite) if gauche is not None and droite is not None else 0.0
-        poids = float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100)
-        if y1 >= hauteur - 3 and g != "tapis":
-            poids *= POIDS_COUPE  # coupé par le bas de la photo : son vrai pied est plus près, la place est peu sûre
-        sortie.append({"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": etendue,
-                       "confiance": float(o["note"]), "poids": poids})
+        if precis:
+            vu.update(categorie=categorie, photo=photo, phrase=o["nom"],
+                      mesure={**meubles_photos.mesurer(o["boite"], cam, largeur, hauteur, rgb), "appareil": [float(c) for c in cam[:3]]})
+        sortie.append(vu)
     return sortie
 
 
+def vu_au_sol(g: str, categorie: str | None, boite, note: float, cam, largeur: int, hauteur: int, piece: dict | None) -> dict | None:
+    """Un meuble posé au sol, d'après son rectangle sur UNE photo placée : le bas du rectangle est son pied (reporté au sol par la
+    caméra), son milieu est une demi-profondeur plus loin (un tapis, à plat : entre le haut et le bas du rectangle). Rend groupe,
+    place, largeur vue, confiance, poids ; None si le pied tombe hors du sol, à plus de 12 m, ou hors de la pièce de l'appareil."""
+    from moteur.sol_a_plat import dans_polygone
+    x0, y0, x1, y1 = boite
+    um = (x0 + x1) / 2
+    bas = min(y1, hauteur - 1)
+    pied = vers_le_sol(um, bas, cam)
+    gauche, droite = vers_le_sol(x0, bas, cam), vers_le_sol(x1, bas, cam)
+    if pied is None or math.dist(pied, cam[:2]) > 12:
+        return None
+    _, (l, p, h) = TYPE_DE_GROUPE[g]
+    if categorie:
+        from moteur import meubles_photos
+        p = meubles_photos.taille_courante(categorie)[1]
+    if g == "tapis":
+        haut = vers_le_sol(um, max(y0, 0), cam)
+        centre = np.asarray(pied) if haut is None or math.dist(haut, cam[:2]) > 12 else (np.asarray(pied) + np.asarray(haut)) / 2
+    else:
+        direction = np.asarray(pied, float) - np.asarray(cam[:2], float)
+        direction /= max(np.linalg.norm(direction), 1e-9)
+        centre = np.asarray(pied, float) + direction * p / 2
+    if piece is not None and not dans_polygone(np.array([centre[0]]), np.array([centre[1]]), piece["contour"])[0]:
+        return None
+    etendue = math.dist(gauche, droite) if gauche is not None and droite is not None else 0.0
+    poids = float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100)
+    if y1 >= hauteur - 3 and g != "tapis":
+        poids *= POIDS_COUPE  # coupé par le bas de la photo : son vrai pied est plus près, la place est peu sûre
+    return {"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": etendue, "confiance": float(note), "poids": poids}
+
+
+def _profondeur(m: dict) -> float:
+    """La profondeur du meuble : celle de sa catégorie si elle est connue, sinon celle du meuble courant de son groupe."""
+    if m.get("categorie"):
+        from moteur.meubles_photos import taille_courante
+        return taille_courante(m["categorie"])[1]
+    return TYPE_DE_GROUPE[m["groupe"]][1][1]
+
+
 CONTRE_LE_MUR = ("lit", "canape", "rangement")  # meubles presque toujours dos (tête) au mur
+MEUBLE_MURAL_M, PROFONDEUR_MURAL_M, HAUTEUR_MURAL_M = 2.0, 0.45, 2.2  # un grand meuble mural lu « bibliothèque »
+MARGE_COLLER_M = 0.2  # … ou, quand on connaît la distance de la vue la plus proche, son incertitude + 20 cm
 COLLER_MAX_M = 1.0  # le mur le plus proche à au plus une demi-profondeur + 1 m : on y colle le meuble
 
 
@@ -313,7 +397,7 @@ def coller_au_mur(meuble: dict, piece: dict) -> dict:
         return meuble
     c = np.asarray(piece["contour"], float)
     p = np.asarray(meuble["position"], float)
-    _, (l, pr, h) = TYPE_DE_GROUPE[meuble["groupe"]]
+    pr = _profondeur(meuble)
     meilleur, q_mur, normale = math.inf, None, None
     for a, b in zip(c, np.roll(c, -1, axis=0)):
         ab = b - a
@@ -322,29 +406,109 @@ def coller_au_mur(meuble: dict, piece: dict) -> dict:
         d = float(np.linalg.norm(p - q))
         if d < meilleur and d > 1e-6 and 0.0 < t < 1.0:
             meilleur, q_mur, normale = d, q, (p - q) / d
-    if q_mur is None or meilleur > pr / 2 + COLLER_MAX_M:
+    limite = COLLER_MAX_M
+    if meuble.get("distance_min") is not None:
+        # le mur corrige la profondeur dans la limite de ce dont la vue peut se tromper : une commode vue à 2 m (place sûre à
+        # 50 cm) et mesurée à 90 cm d'un mur n'est pas contre ce mur (app-002 : elle est derrière la tête de lit, au milieu)
+        from moteur.meubles_photos import incertitude
+        limite = min(COLLER_MAX_M, incertitude(meuble["distance_min"]) + MARGE_COLLER_M)
+    if q_mur is None or meilleur > pr / 2 + limite:
         return meuble
     nouveau = q_mur + normale * (pr / 2 + 0.03)
     return {**meuble, "position": [round(float(nouveau[0]), 3), round(float(nouveau[1]), 3)]}
 
 
+# Sortes plafonnées par pièce au nombre vu ensemble sur une même photo. Les TABLES en sont sorties le 16/11/2026 : depuis que deux
+# objets distincts d'une même photo ne sont plus fondus (moteur/meubles_photos.fusionner), le plafond ne retirait plus des doublons
+# mais de vraies tables quand aucune photo ne montre les deux à la fois (app-004 : la table ronde perdue au profit du meuble
+# télé). Banc de fidélité des trois logements : 48,0 → 49,4 ; relevés à la main : app-001 24 → 23 retrouvés sur 34, en trop 12 → 15.
+UNIQUES = ("canape", "lit", "fauteuil")
+EN_GRAPPE = ("chaise",)  # sorte plafonnée par grappe de voisines (plusieurs tablées possibles dans une pièce)
+LIEN_GRAPPE_M = 1.0  # deux chaises à moins de 1 m l'une de l'autre sont de la même grappe
+PRES_GRAPPE_M = 0.8  # une chaise vue sur une photo compte pour la grappe si elle est à moins de 0,8 m d'une de ses chaises
+
+
+def surete(m: dict) -> float:
+    """Ce qui fait garder un meuble plutôt qu'un autre quand il y en a trop : les photos qui l'ont vu × leur confiance, et,
+    quand on la connaît (moteur.meubles_photos.associer), divisé par l'incertitude de sa vue la plus proche — un fauteuil vu à
+    2 m sur une photo passe avant un fauteuil deviné deux fois au bord du cadre (app-001 : le vrai était retiré)."""
+    s = m["vues"] * m["confiance"]
+    if m.get("distance_min") is not None:
+        from moteur.meubles_photos import incertitude
+        s /= incertitude(m["distance_min"])
+    return s
+
+
+def plafonner(trouves: list[dict], par_photo: list[list[dict]], logement: dict) -> list[dict]:
+    """Moins de meubles EN TROP (NT, 15/11/2026, app-004 : 5 chaises posées pour 2 vraies, le meuble télé posé en « table ») :
+    le même meuble vu de plusieurs endroits est posé plusieurs fois quand les photos sont placées à 40-50 cm près. Une photo,
+    elle, ne se trompe pas sur le NOMBRE de meubles qu'elle montre ensemble. Donc :
+    - tables, canapés, lits, fauteuils : dans une pièce, pas plus que le plus grand nombre vu sur UNE photo de cette pièce ;
+    - chaises : par grappe de chaises voisines (une tablée), pas plus que le plus grand nombre vu sur une photo dans cette
+      grappe (une grande pièce peut avoir deux tablées : le plafond par pièce en faisait perdre 4 vraies sur app-001) ;
+    - rangements et le reste : pas de plafond (essayé : autant de vrais perdus que de faux retirés).
+    Les plus sûrs sont gardés (photos qui l'ont vu × confiance). Mesuré avec le rangement (moteur.ranger_meubles), caméras
+    relevées à la main : app-001 en trop 18 → 11 (retrouvés 25 → 23 sur 34), app-002 en trop 9 → 3 (retrouvés 22 → 21 sur 30)."""
+    from moteur.sol_a_plat import piece_de
+    piece_id = lambda m: (piece_de(m["position"], logement["pieces"]) or {}).get("id")
+    plafond: dict[tuple, int] = {}
+    for liste in par_photo:
+        compte: dict[tuple, int] = {}
+        for m in liste:
+            k = (piece_id(m), m["groupe"])
+            compte[k] = compte.get(k, 0) + 1
+        for k, c in compte.items():
+            plafond[k] = max(plafond.get(k, 0), c)
+    tri = sorted(trouves, key=lambda m: -surete(m))
+    gardes, pris = [], {}
+    for m in tri:
+        if m["groupe"] in UNIQUES:
+            k = (piece_id(m), m["groupe"])
+            if pris.get(k, 0) < max(plafond.get(k, 0), 1):
+                pris[k] = pris.get(k, 0) + 1
+                gardes.append(m)
+        elif m["groupe"] not in EN_GRAPPE:
+            gardes.append(m)
+    for g in EN_GRAPPE:
+        grappes: list[list[dict]] = []
+        for m in (x for x in tri if x["groupe"] == g):
+            liees = [gr for gr in grappes if any(math.dist(m["position"], x["position"]) < LIEN_GRAPPE_M for x in gr)]
+            grappes = [gr for gr in grappes if not any(gr is l for l in liees)] + [[m] + [x for gr in liees for x in gr]]
+        for gr in grappes:
+            maxi = max((sum(1 for v in liste if v["groupe"] == g
+                            and any(math.dist(v["position"], x["position"]) < PRES_GRAPPE_M for x in gr)) for liste in par_photo), default=0)
+            gardes += sorted(gr, key=lambda m: -surete(m))[:max(maxi, 1)]
+    return [m for m in trouves if any(m is x for x in gardes)]  # l'ordre d'origine est gardé
+
+
 def reperer_owl(photos: list, logement: dict, objets_par_photo: list[list[dict]], groupe_de: dict,
-                seuils: dict | None = None, coller: bool = True) -> list[dict]:
+                seuils: dict | None = None, coller: bool = True, plafond: bool = True, images: list | None = None,
+                precis: bool = True) -> list[dict]:
     """photos : [(largeur, hauteur, caméra 8 nombres)] ; objets_par_photo : rectangles d'OWLv2 de chaque photo → meubles
     trouvés (fusionnés entre photos ET entre phrases : « a bed » et « a bed with a duvet » sur le même lit ne font qu'un)."""
     from moteur.sol_a_plat import piece_de_l_appareil
-    vus = []
-    for (largeur, hauteur, cam), objets in zip(photos, objets_par_photo):
+    vus, par_photo = [], []
+    for k, ((largeur, hauteur, cam), objets) in enumerate(zip(photos, objets_par_photo)):
         piece, _ = piece_de_l_appareil(cam, logement["pieces"])
-        vus += meubles_owl_d_une_photo(objets, groupe_de, cam, largeur, hauteur, piece, seuils)
-    trouves = fusionner(vus)
+        de_la_photo = meubles_owl_d_une_photo(objets, groupe_de, cam, largeur, hauteur, piece, seuils,
+                                              rgb=images[k] if images else None, photo=k, precis=precis)
+        vus += de_la_photo
+        # les meubles distincts que CETTE photo montre ensemble (repérage précis : déjà un rectangle par meuble)
+        par_photo.append(de_la_photo if precis else fusionner(de_la_photo))
+    if precis:
+        from moteur import meubles_photos
+        trouves = meubles_photos.fusionner(vus)
+    else:
+        trouves = fusionner(vus)
     if coller:
         from moteur.sol_a_plat import piece_de
         trouves = [coller_au_mur(m, piece_de(m["position"], logement["pieces"])) for m in trouves]
+    if plafond:
+        trouves = plafonner(trouves, par_photo, logement)
     return trouves
 
 
-def reperer_depuis_releve(releve: dict, logement: dict, racine, owl=None, journal=lambda *_: None) -> list[dict]:
+def reperer_depuis_releve(releve: dict, logement: dict, racine, owl=None, journal=lambda *_: None, precis: bool = True) -> list[dict]:
     """Photos calées du client (cameras-photos.json) → meubles trouvés par OWLv2 (groupe, place, vues, confiance). Pour les
     poser dans le logement : vers_meubles_du_logement()."""
     from pathlib import Path
@@ -358,7 +522,7 @@ def reperer_depuis_releve(releve: dict, logement: dict, racine, owl=None, journa
     groupe_de = {n: g for n, g in REQUETES.items() if g in TYPE_DE_GROUPE}
     dossier = Path(racine) / releve["photos"]
     modele = releve.get("fichier", "{nom}.png")
-    photos, objs = [], []
+    photos, objs, images = [], [], []
     for nom, d in releve["cameras"].items():
         img = lire_image(dossier / modele.format(nom=nom))
         if img is None:
@@ -367,5 +531,6 @@ def reperer_depuis_releve(releve: dict, logement: dict, racine, owl=None, journa
         o = objets(owl.detecter(rgb, requetes), NOMS, seuil=0.1)
         photos.append((rgb.shape[1], rgb.shape[0], camera_depuis_dict(d["camera"])))
         objs.append(o)
+        images.append(rgb)
         journal(f"  {nom} : {sum(1 for x in o if x['nom'] in groupe_de and x['note'] >= SEUILS_OWL.get(groupe_de[x['nom']], 1))} meuble(s) vu(s)")
-    return reperer_owl(photos, logement, objs, groupe_de)
+    return reperer_owl(photos, logement, objs, groupe_de, images=images, precis=precis)

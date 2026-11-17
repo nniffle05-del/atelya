@@ -122,6 +122,9 @@ def commande_logement(args) -> int:
     from moteur.reconnaitre_sols import Classifieur, prototypes_bibliotheque, reconnaitre, sols_vers_logement
     logement = json.loads(args.logement.read_text(encoding="utf-8"))
     releve = fiche_ou_photos(args.releve, logement, (args.sortie if args.sortie.suffix == "" else args.sortie.parent) / "cameras-photos-seul.json")
+    # Les sols CHOISIS PAR QUELQU'UN à l'écran de vérification (statut « mesure ») sont gardés et repris tels quels à la fin : la
+    # personne a raison contre la photo (16/11/2026 ; avant, la brique photos les effaçait comme les autres).
+    choisis = {p["id"]: (p["sol"], p.get("zones_sol", [])) for p in logement["pieces"] if (p.get("sol") or {}).get("statut") == "mesure"}
     for p in logement["pieces"]:  # on part d'un logement sans sols : Atelya ne voit pas la bonne réponse
         p.pop("sol", None)
         p["zones_sol"] = []
@@ -129,7 +132,25 @@ def commande_logement(args) -> int:
     oeil = charger(clf.oeil)
     bibliotheque = trouver_matieres()
     prototypes = prototypes_bibliotheque(oeil, bibliotheque) if bibliotheque else None
-    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
+    lus = des_photos = None
+    if getattr(args, "lecture", None):
+        # La lecture des photos (moteur/lecture_photos.py) dit QUELS sols, Atelya dit OÙ (17/11/2026) : chaque photo ne vote que
+        # parmi les sols lus sur elle, le sol principal de la pièce est celui qui est lu, et les zones sont découpées ENSUITE.
+        # (Essai du 16/11/2026 : la lecture était appliquée après la décision — photos_lues.appliquer_les_sols — et le sol que la
+        # brique avait pris pour principal était effacé au lieu de devenir une zone : les lames de l'entrée d'app-001.)
+        from moteur import photos_lues
+        lecture = json.loads(args.lecture.read_text(encoding="utf-8"))
+        lus, des_photos = photos_lues.sols_lus(lecture, releve, logement), photos_lues.sols_des_photos(lecture)
+    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args), lus=lus,
+                           sols_des_photos=des_photos)
+    for pid, s in resultat["pieces"].items():
+        if s.get("famille_brique") and s["famille_brique"] != s["famille"]:
+            print(f"{pid} : sol lu sur les photos « {s['famille']} » (sans la lecture, Atelya disait « {s['famille_brique']} »)")
+    for p in logement["pieces"]:  # remis avant la règle des espaces ouverts : un sol choisi n'est remplacé par rien
+        if p["id"] in choisis:
+            p["sol"], p["zones_sol"] = choisis[p["id"]]
+    for pid in choisis:
+        resultat["pieces"].pop(pid, None)
     sortie = sols_vers_logement(resultat, logement, bibliotheque, prototypes)
     Logement.model_validate(sortie)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
@@ -164,6 +185,7 @@ def main() -> int:
     g.add_argument("modele", type=Path)
     g.add_argument("sortie", type=Path, help="logement.json écrit")
     g.add_argument("--sans-pas-du-sol", action="store_true", help="ne PAS écarter lits, canapés, rangements (ancien comportement)")
+    g.add_argument("--lecture", type=Path, help="essai : la lecture des photos (lecture.json) ; la famille de sol lue prime")
     args = ap.parse_args()
     for f in (args.releve, args.logement):
         if not f.exists():

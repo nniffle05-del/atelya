@@ -262,7 +262,7 @@ def repere(mes: dict, hsp: float) -> dict | None:
     if sol is None:
         sol = plaf - hsp / ech
     return {"h": (h - sol) * ech, "phi": np.degrees(np.arctan2(-a, b)), "r": np.hypot(a, b) * ech, "M": M,
-            "vert": np.abs(nh) < 0.35, "devant": b > 0.2, "ech": ech, "z": -sol * ech}
+            "vert": np.abs(nh) < 0.35, "devant": b > 0.2, "ech": ech, "z": -sol * ech, "nh": nh}
 
 
 def _mur_par_direction(R, hsp):

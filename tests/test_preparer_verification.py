@@ -133,3 +133,22 @@ def test_un_logement_que_la_3d_refuse_donne_un_doute_sur_l_ouverture_en_cause():
     [d] = doutes_de_construction({**base, "ouvertures": [porte, fenetre]})
     assert d["code"] == "construction" and d["element"] == "F" and d["gravite"] == "fort"
     assert "3D" in d["raison"]
+
+
+def test_limites_sans_mur_entre_deux_pieces_nommees():
+    """Deux pièces que le plan nomme sans cloison entre elles (cuisine ouverte sur l'entrée) : la limite est donnée à l'écran,
+    seulement là où aucun mur ne passe ; rien entre deux pièces séparées par un mur."""
+    from moteur.preparer_verification import limites_sans_mur
+    logement = {"murs": [{"id": "m1", "debut": [0, 3], "fin": [6, 3], "epaisseur": 0.2},          # mur du haut
+                         {"id": "m2", "debut": [3, 3], "fin": [3, 2.2], "epaisseur": 0.2},        # bout de mur entre cuisine et entrée
+                         {"id": "m3", "debut": [6, 0], "fin": [6, 3], "epaisseur": 0.1}],          # cloison entrée / chambre
+                "pieces": [{"id": "cuisine_1", "contour": [[0, 0], [3, 0], [3, 2.9], [0, 2.9]]},
+                           {"id": "entree_1", "contour": [[3, 0], [5.95, 0], [5.95, 2.9], [3, 2.9]]},
+                           {"id": "chambre_1", "contour": [[6.05, 0], [9, 0], [9, 2.9], [6.05, 2.9]]}]}
+    limites = limites_sans_mur(logement)
+    assert len(limites) == 1                                             # cuisine / entrée seulement ; le mur m3 sépare déjà la chambre
+    (x0, y0), (x1, y1) = limites[0]["debut"], limites[0]["fin"]
+    # depuis le 15/11/2026 la limite TRAVERSE le mur qu'elle rejoint (ici le bout de mur m2, puis le mur du haut) : si la personne
+    # raccourcit ce mur à l'écran, la limite tient toujours et les deux pièces ne fondent pas en une seule
+    assert abs(x0 - 3) < 0.01 and abs(x1 - 3) < 0.01 and min(y0, y1) < 0.0 and 2.9 < max(y0, y1) <= 3.25
+    assert limites_sans_mur({"murs": [], "pieces": [logement["pieces"][0]]}) == []

@@ -61,7 +61,7 @@ from dataclasses import asdict, replace
 
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
-from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, matiere_et_teinte, nom_materiau, sorte
+from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, SUR_MESURE, matiere_et_teinte, nom_materiau, sorte
 
 VERSION_PLAN = "construction/0.2"
 
@@ -141,6 +141,7 @@ def plan_habille(logement: Logement) -> dict:
     # sols qu'elles touchent, elles se chevauchaient et faisaient de fines lignes sombres au rendu.
     briques = [replace(b, z_bas=JOINT_SOL_Z, z_haut=JOINT_SOL_Z) if b.id.startswith("joint_sol__") else b for b in briques]
     briques += menuiseries(logement)
+    briques += tablettes_des_passe_plats(logement)
     briques += plinthes(briques, logement)
     briques += corniches(briques, logement)
     briques += portes_de_placard(briques, logement)
@@ -157,6 +158,8 @@ def plan_habille(logement: Logement) -> dict:
         # la sorte (bois ou carrelage) de chaque matière du catalogue : Blender en a besoin pour la brillance et le relief,
         # sans pouvoir lire moteur/matieres.py (catalogue passé à 61 matières le 09/11/2026)
         "sortes_sols": {nom: sorte(nom) for nom in NOMS_SOLS},
+        # les parquets faits sur mesure d'après les photos : {nom de la matière : sa fiche} ; moteur.construire les dessine
+        "parquets_sur_mesure": parquets_sur_mesure(logement),
         "rideaux": rideaux_du_plan(logement),
     }
 
@@ -183,7 +186,8 @@ def rideaux_du_plan(logement: Logement) -> list[dict]:
                        "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
                        "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),
                        "voilage": list(o.rideaux.voilage) if o.rideaux.voilage else None,
-                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None})
+                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None,
+                       "ecart": o.rideaux.ecart, "bas": o.rideaux.bas})
     return sortie
 
 
@@ -368,6 +372,24 @@ def completer_finitions(logement: dict) -> dict:
     return sortie
 
 
+def matiere_d_un_sol(sol) -> str:
+    """La matière d'un sol dans la maquette : celle du catalogue, ou le nom du parquet dessiné sur mesure (« psm_… »)."""
+    if sol.matiere == SUR_MESURE and sol.parquet is not None:
+        from moteur.parquet_sur_mesure import nom
+        return nom(sol.parquet.model_dump())
+    return sol.matiere
+
+
+def parquets_sur_mesure(logement: Logement) -> dict:
+    """Les parquets sur mesure du logement : {nom de la matière (« psm_… ») : fiche du parquet}."""
+    sortie = {}
+    for p in logement.pieces:
+        for sol in ([p.sol] if p.sol is not None else []) + [z.sol for z in p.zones_sol]:
+            if sol.matiere == SUR_MESURE and sol.parquet is not None:
+                sortie[matiere_d_un_sol(sol)] = sol.parquet.model_dump()
+    return sortie
+
+
 def materiau_de(brique: Brique, logement: Logement) -> str:
     """Le matériau d'une brique des murs, sols et plafonds."""
     if brique.categorie == "mur":
@@ -379,11 +401,37 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
         piece = pieces[brique.element]
         if brique.id.startswith("zone_sol__"):  # « zone_sol__<pièce>__<n° de la zone, à partir de 1> »
             zone = piece.zones_sol[int(brique.id.rsplit("__", 1)[1]) - 1]
-            return nom_materiau(zone.sol.matiere, zone.sol.teinte, zone.sol.echelle)
+            return nom_materiau(matiere_d_un_sol(zone.sol), zone.sol.teinte, zone.sol.echelle, zone.sol.sens)
         if piece.sol is None:
-            return nom_materiau(matiere_du_sol(piece))
-        return nom_materiau(piece.sol.matiere, piece.sol.teinte, piece.sol.echelle)
+            return nom_materiau(matiere_du_sol(piece), sens=sens_par_defaut(piece, matiere_du_sol(piece), logement))
+        sens = piece.sol.sens if piece.sol.sens is not None else sens_par_defaut(piece, piece.sol.matiere, logement)
+        return nom_materiau(matiere_d_un_sol(piece.sol), piece.sol.teinte, piece.sol.echelle, sens)
     return "seuil"  # le sol sous une porte
+
+
+PIECE_ALLONGEE = 1.3  # une pièce au moins 1,3 fois plus longue que large a un « grand côté »
+
+
+def sens_par_defaut(piece: Piece, matiere: str, logement: Logement) -> float | None:
+    """Le sens des lames d'un parquet à lames droites quand les photos ne l'ont pas donné : le long du GRAND CÔTÉ de la pièce,
+    si elle est nettement allongée. None : le sens général du logement (moteur.habillage.orientation_sols).
+
+    Pourquoi (17/11/2026) : la règle d'avant (« le même sens partout, celui des murs les plus longs du logement ») était fausse
+    dans les chambres de deux logements sur trois. Sur les quatre pièces où les photos donnent le sens sans doute possible
+    (chambres d'app-001, séjours d'app-002 et d'app-004), le grand côté de la pièce le donne quatre fois, la règle générale
+    deux fois. Ce n'est qu'une supposition (aucune photo ne tranche) ; un sens lu sur les photos passe toujours devant."""
+    from moteur.matieres import LAMES_DROITES
+
+    if (matiere not in LAMES_DROITES and matiere != SUR_MESURE) or len(piece.contour) < 3:
+        return None
+    general = orientation_sols(logement)
+    c, s = math.cos(-general), math.sin(-general)
+    xs = [x * c - y * s for x, y in piece.contour]  # la pièce vue dans le repère des murs du logement
+    ys = [x * s + y * c for x, y in piece.contour]
+    long_, large = max(xs) - min(xs), max(ys) - min(ys)
+    if large < long_ * PIECE_ALLONGEE:  # le grand côté est le sens général (ou la pièce n'est pas allongée) : rien à dire
+        return None
+    return round((math.degrees(general) + 90.0) % 180.0, 1)
 
 
 # ------------------------------------------------------------- menuiseries
@@ -407,6 +455,23 @@ def menuiseries(logement: Logement) -> list[Brique]:
             gauche, droite = _cotes_dans_une_piece(o, mur, logement)
             briques += _fenetre(o, mur, cote_interieur=(1 if gauche else -1) if gauche != droite else 0)
     return briques
+
+
+DEBORD_TABLETTE = 0.03  # m : la tablette d'un passe-plat dépasse de chaque côté du mur et de chaque bord du trou
+EPAISSEUR_TABLETTE = 0.03
+
+
+def tablettes_des_passe_plats(logement: Logement) -> list[Brique]:
+    """La tablette posée au bas de chaque passe-plat (16/11/2026) : une planche blanche de 3 cm, qui dépasse de 3 cm de chaque
+    côté du mur. Sans elle, le trou montre la tranche brute du mur."""
+    murs = {m.id: m for m in logement.murs}
+    sortie = []
+    for t in logement.passe_plats:
+        mur = murs[t.mur]
+        demi = mur.epaisseur / 2 + DEBORD_TABLETTE
+        sortie.append(_boite(t, mur, "tablette", (0.0, t.largeur), (-demi, demi), (t.allege, t.allege + EPAISSEUR_TABLETTE),
+                             "menuiserie_blanche"))
+    return sortie
 
 
 def _boite(o: Ouverture, mur: Mur, nom: str, t: tuple[float, float],

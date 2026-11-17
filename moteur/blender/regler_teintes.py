@@ -5,10 +5,27 @@ le réglage de pellicule de Blender (AgX) changent ce que l'œil voit : app-001,
 fait donc comme un photographe qui ajuste sa couleur : pour chaque sol à régler (plan de construction, clé « reglages_teinte »),
 une petite image depuis une caméra posée dans la pièce, avec le même réglage d'exposition et de balance des blancs que l'image
 finale (rendre.reglage_de_photographe) ; on y mesure le sol contre les murs blancs, exactement comme sur la photo du client (mur
-blanc = étalon), et on corrige la teinte du matériau ; TOURS fois. La maquette est enregistrée avec les teintes réglées.
+blanc = étalon), et on corrige la teinte du matériau ; plusieurs tours. La maquette est enregistrée avec les teintes réglées.
 
-Utilisation (lancé par moteur/construire.py) :
-    blender -b --factory-startup maquette.blend --python regler_teintes.py -- construction.json reglages.json
+REFAIT le 17/11/2026 (étape 4 : parquets « trop foncés et trop rouges » sur TOUS les logements — mesuré sur 8 photos de trois
+logements : le parquet de la maquette renvoyait deux fois moins de lumière que celui des photos, à murs blancs égaux). Causes :
+1. le réglage se faisait au SOLEIL (scène d'origine) : les taches de soleil au sol, comptées dans une MOYENNE, faisaient croire
+   le parquet trop clair → assombri ; sous le ciel voilé des images et du film, il sortait bien plus foncé ;
+2. il se faisait SANS LES MEUBLES : dans la pièce meublée (ombres des meubles), le sol est plus sombre que ce qui avait été réglé ;
+3. après le dernier tour, une dernière correction était appliquée SANS ÊTRE VÉRIFIÉE, même quand les tours ne s'approchaient pas
+   de la cible (séjour d'app-001 : le bleu divisé par 30, d'où le rouge).
+Maintenant : réglage dans la scène « Jour voilé » quand elle existe (lumière douce, comme la plupart des photos d'annonce),
+meubles en place (seul le sol réellement VISIBLE est mesuré), couleur du sol = MÉDIANE (une tache claire ne compte pas plus
+qu'un coin d'ombre), et la teinte gardée est celle du tour MESURÉ le plus proche de la cible.
+
+ÉTEINT PAR DÉFAUT depuis le 17/11/2026 (moteur.construire.BORNE_REGLAGE_TEINTES = 1) : mesurée sur 12 photos de trois logements,
+la teinte calculée sur la photo posée TELLE QUELLE est aussi juste que ce réglage, et moins rouge. Raison trouvée : face à une
+fenêtre, le reflet de la fenêtre sur le sol ne dépend pas de la teinte ; le réglage assombrit alors le bois sans jamais
+atteindre sa cible (chambres d'app-001 : teinte divisée par 8). D'où la BORNE : le réglage ne s'écarte jamais de plus de ce
+facteur de la teinte de départ. Piste si on le rallume : régler depuis les appareils des photos du client, dos aux fenêtres.
+
+Utilisation (lancé par moteur/construire.py, APRÈS la pose des éclairages, si BORNE_REGLAGE_TEINTES > 1) :
+    blender -b --factory-startup maquette.blend --python regler_teintes.py -- construction.json reglages.json [ambiance] [borne]
 """
 
 import json
@@ -20,9 +37,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from poser_briques import orienter  # noqa: E402
-from rendre import reglage_de_photographe  # noqa: E402
+from rendre import choisir_processeur, reglage_de_photographe  # noqa: E402
 
-TOURS = 3
+AMBIANCE = "jour_voile"  # la scène où l'on règle (moteur/eclairages.py) ; absente : la scène active
+TOURS = 5
+BORNE = 2.0  # le réglage ne s'écarte pas de plus de ce facteur de la teinte calculée sur la photo (≤ 1 : aucun réglage au rendu)
+TOLERANCE = 0.05  # écart relatif (par couleur) en dessous duquel le réglage est fini
 ECHANTILLONS = 64
 LARGEUR, HAUTEUR = 480, 300
 BLANC_PEINTURE = 0.86  # même étalon que moteur/teinte_photo.py
@@ -51,12 +71,13 @@ def rendre_vers(scene, chemin: Path, echantillons: int, transparent: bool) -> np
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
     scene.render.filepath = str(chemin)
-    bpy.ops.render.render(write_still=True)
+    bpy.ops.render.render(write_still=True, scene=scene.name)
     return lire(chemin)
 
 
 def masque(scene, objets_gardes: set, chemin: Path) -> np.ndarray:
-    """Les pixels où l'on voit ces objets (tous les autres « découpés »)."""
+    """Les pixels où l'on voit ces objets (tous les autres maillages « découpés »). Les meubles du catalogue, posés par
+    renvoi à leur modèle, ne se découpent pas : ils restent visibles dans ce masque (voir `visible`)."""
     maillages = [o for o in scene.objects if o.type == "MESH"]
     for o in maillages:
         o.is_holdout = o.name not in objets_gardes
@@ -71,27 +92,49 @@ def noeud_teinte(materiau):
     return next((n for n in materiau.node_tree.nodes if n.type == "RGB" and n.name.startswith("teinte")), None)
 
 
+def teinte_du_nom(nom: str):
+    """La teinte de départ d'un matériau « matiere~r,g,b » (celle calculée sur la photo, moteur/teinte_photo.py), ou None."""
+    try:
+        return np.array([float(v) for v in nom.split("~")[1].split("@")[0].split(",")[:3]], dtype=float)
+    except (IndexError, ValueError):
+        return None
+
+
+def ecart(vu, cible) -> float:
+    """Le plus grand écart relatif entre la couleur vue et la couleur visée (0,05 = 5 %)."""
+    return float(np.max(np.abs(np.log(np.maximum(vu, 1e-4) / np.maximum(cible, 1e-4)))))
+
+
 def main() -> None:
-    plan_json, sortie_json = sys.argv[sys.argv.index("--") + 1:][:2]
+    arguments = sys.argv[sys.argv.index("--") + 1:]
+    plan_json, sortie_json = arguments[:2]
+    ambiance = arguments[2] if len(arguments) > 2 else AMBIANCE
+    borne = float(arguments[3]) if len(arguments) > 3 else BORNE
     plan = json.loads(Path(plan_json).read_text(encoding="utf-8"))
-    scene = bpy.context.scene
+    scene = next((s for s in bpy.data.scenes if s.get("ambiance") == ambiance), bpy.context.scene)
+    avant = (scene.render.engine, scene.render.resolution_x, scene.render.resolution_y, scene.render.resolution_percentage,
+             scene.cycles.samples, scene.cycles.use_denoising, scene.render.film_transparent, scene.render.image_settings.file_format,
+             scene.render.image_settings.color_mode, scene.camera, scene.view_settings.exposure, scene.view_settings.use_curve_mapping,
+             tuple(scene.view_settings.curve_mapping.white_level), scene.render.filepath)
     scene.render.engine = "CYCLES"
     scene.render.resolution_x, scene.render.resolution_y, scene.render.resolution_percentage = LARGEUR, HAUTEUR, 100
     scene.cycles.sample_clamp_indirect = 10.0
+    # la scène (meubles et leurs photos de matière compris) reste chargée d'une petite image à la suivante : sans cela chaque
+    # image de réglage rechargeait tout, et le réglage d'un logement meublé prenait un quart d'heure
+    persistant_avant, scene.render.use_persistent_data = scene.render.use_persistent_data, True
+    print(f"Réglage des teintes dans la scène « {scene.name} », calcul sur : {choisir_processeur(scene)}")
     dossier = Path(sortie_json).resolve().parent / "_reglage"
     dossier.mkdir(exist_ok=True)
     murs = {o.name for c in scene.collection.children if c.name == "Murs" for o in c.objects}
-    camera_avant, mode_avant = scene.camera, scene.render.image_settings.color_mode
-    # B4 (09/11/2026) : les meubles masqués pendant la mesure. Sinon la caméra de réglage voit le tapis et le canapé à la place
-    # du parquet, le croit trop clair et l'assombrit à chaque tour (app-001 meublé : point de Hongrie réglé à 0,22 ; 0,02 ; 0,02).
-    meubles = [c for c in scene.collection.children if c.name == "Meubles"]
-    for c in meubles:
-        c.hide_render = True
+    # Les meubles restent en place (17/11/2026) : leurs ombres comptent, comme sur la photo. Pour ne mesurer que le sol VISIBLE
+    # (B4, 09/11/2026 : la caméra de réglage prenait le tapis et le canapé pour du parquet), on retire des masques tout pixel
+    # où l'on voit un meuble.
+    meubles = {o.name for c in scene.collection.children if c.name == "Meubles" for o in c.all_objects if o.type == "MESH"}
     resultats = []
     for r in plan.get("reglages_teinte", []):
         materiau = bpy.data.materials.get(r["materiau"])
         teinte = noeud_teinte(materiau) if materiau else None
-        ligne = {"materiau": r["materiau"], "piece": r["piece"], "cible": r["cible"]}
+        ligne = {"materiau": r["materiau"], "piece": r["piece"], "cible": r["cible"], "scene": scene.name}
         if teinte is None:
             resultats.append({**ligne, "erreur": "matériau sans teinte"})
             continue
@@ -106,41 +149,56 @@ def main() -> None:
         try:
             sols = {o.name for o in scene.objects if o.type == "MESH" and o.active_material is not None
                     and o.active_material.name == r["materiau"]}
-            m_sol, m_mur = masque(scene, sols, dossier / "sol.png"), masque(scene, murs, dossier / "murs.png")
+            m_meuble = masque(scene, meubles, dossier / "meubles.png")
+            m_sol = masque(scene, sols, dossier / "sol.png") & ~m_meuble
+            m_mur = masque(scene, murs, dossier / "murs.png") & ~m_meuble
             if m_sol.sum() < PIXELS_MIN or m_mur.sum() < PIXELS_MIN:
                 resultats.append({**ligne, "erreur": f"trop peu visible ({int(m_sol.sum())} px de sol, {int(m_mur.sum())} px de murs)"})
                 continue
-            gains = np.array(teinte.outputs[0].default_value[:3], dtype=float)
+            depart = teinte_du_nom(r["materiau"])
+            gains = depart.copy() if depart is not None else np.array(teinte.outputs[0].default_value[:3], dtype=float)
+            if depart is None:
+                depart = gains.copy()
             cible = np.asarray(r["cible"], dtype=float)
+            if borne <= 1.0:  # pas de réglage au rendu : la teinte calculée sur la photo, telle quelle
+                teinte.outputs[0].default_value = (*depart, 1.0)
+                resultats.append({**ligne, "teinte_finale": [round(float(g), 3) for g in depart], "tours": []})
+                continue
             tours = []
-            for _ in range(TOURS):
+            for tour in range(TOURS):
+                teinte.outputs[0].default_value = (*gains, 1.0)
                 exposition, blanc = reglage_de_photographe(scene, dossier)
                 scene.view_settings.exposure = exposition
                 scene.view_settings.use_curve_mapping = True
                 scene.view_settings.curve_mapping.white_level = blanc
                 scene.view_settings.curve_mapping.update()
                 pixels = rendre_vers(scene, dossier / "essai.png", ECHANTILLONS, False)[:, :3]
-                sol = lineaire(pixels[m_sol]).mean(axis=0)
+                sol = np.median(lineaire(pixels[m_sol]), axis=0)  # médiane : une tache claire ne compte pas plus qu'une ombre
                 mur = lineaire(pixels[m_mur])
                 clarte = mur @ np.array([0.2126, 0.7152, 0.0722])
                 bas, haut = np.percentile(clarte, [50, 90])  # les murs bien éclairés, comme le morceau de mur blanc choisi sur la photo
                 etalon = mur[(clarte >= bas) & (clarte <= haut)].mean(axis=0)
                 vu = sol / max(float(etalon.max()), 1e-6) * BLANC_PEINTURE
-                tours.append({"teinte": [round(float(g), 3) for g in gains], "vu": [round(float(v), 4) for v in vu]})
-                gains = np.clip(gains * cible / np.maximum(vu, 1e-4), GAIN_MIN, GAIN_MAX)
-                teinte.outputs[0].default_value = (*gains, 1.0)
-            resultats.append({**ligne, "teinte_finale": [round(float(g), 3) for g in gains], "tours": tours})
-            print(f"Teinte réglée : {r['materiau']} → {tuple(round(float(g), 2) for g in gains)} (vu {tours[-1]['vu']}, visé {r['cible']})")
+                tours.append({"teinte": [round(float(g), 3) for g in gains], "vu": [round(float(v), 4) for v in vu],
+                              "ecart": round(ecart(vu, cible), 3)})
+                if tours[-1]["ecart"] <= TOLERANCE:
+                    break
+                gains = np.clip(gains * cible / np.maximum(vu, 1e-4), np.maximum(depart / borne, GAIN_MIN), np.minimum(depart * borne, GAIN_MAX))
+            meilleur = min(tours, key=lambda t: t["ecart"])  # la teinte gardée a été MESURÉE (jamais une correction non vérifiée)
+            teinte.outputs[0].default_value = (*meilleur["teinte"], 1.0)
+            resultats.append({**ligne, "teinte_finale": meilleur["teinte"], "ecart_final": meilleur["ecart"], "tours": tours})
+            print(f"Teinte réglée : {r['materiau']} → {tuple(meilleur['teinte'])} (vu {meilleur['vu']}, visé {r['cible']}, "
+                  f"écart {100 * meilleur['ecart']:.0f} % en {len(tours)} tours)")
         finally:
             bpy.data.objects.remove(camera)
             bpy.data.cameras.remove(donnees)
-    for c in meubles:
-        c.hide_render = False
-    scene.view_settings.exposure = 0.0
-    scene.view_settings.use_curve_mapping = False
-    scene.render.film_transparent = False
-    scene.render.image_settings.color_mode = mode_avant
-    scene.camera = camera_avant
+    (scene.render.engine, scene.render.resolution_x, scene.render.resolution_y, scene.render.resolution_percentage,
+     scene.cycles.samples, scene.cycles.use_denoising, scene.render.film_transparent, scene.render.image_settings.file_format,
+     scene.render.image_settings.color_mode, scene.camera, scene.view_settings.exposure, scene.view_settings.use_curve_mapping,
+     blanc_avant, scene.render.filepath) = avant
+    scene.render.use_persistent_data = persistant_avant
+    scene.view_settings.curve_mapping.white_level = blanc_avant
+    scene.view_settings.curve_mapping.update()
     for f in dossier.glob("*"):
         f.unlink()
     dossier.rmdir()

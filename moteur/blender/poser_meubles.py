@@ -15,6 +15,8 @@ import bpy
 from mathutils import Vector
 
 ECART_FORME = 0.15
+A_PLAT_AU_MUR = ("tableau", "miroir", "horloge")
+PENDUS = ("suspension",)
 TEXTURE_RENDU, TEXTURE_VUE = "2048", "1024"  # les modèles ABO ont des photos de 4096 points : trop pour 8 Go de carte graphique
 
 
@@ -87,12 +89,22 @@ def instancier(scene, m: dict, racine, collection) -> None:
     voulu = [largeur / max(taille.x, 1e-4), profondeur / max(taille.y, 1e-4), hauteur / max(taille.z, 1e-4)]
     med = sorted(voulu)[1]
     echelle = [min(max(s, med * (1 - ECART_FORME)), med * (1 + ECART_FORME)) for s in voulu]
+    # ZÉRO COLLISION (NT, 16/11/2026) : le contrôle (moteur/collisions.py) juge la BOÎTE demandée ; le modèle ne doit donc jamais
+    # en dépasser vu de dessus. Sans cela, un modèle plus profond que prévu (jusqu'à 15 %) entrait dans le mur alors que sa boîte
+    # ne le touchait pas. S'il dépasse, il est réduit d'un bloc (sans le déformer) jusqu'à tenir dedans. Un objet accroché à plat
+    # (tableau, miroir, horloge) n'est jugé que sur sa largeur : son épaisseur de cadre ne gêne personne.
+    axes = (0,) if m["categorie"] in A_PLAT_AU_MUR else (0, 1)
+    depasse = max(echelle[k] / voulu[k] for k in axes)
+    if depasse > 1.0:
+        echelle = [e / depasse for e in echelle]
     inst = bpy.data.objects.new("Modele_" + m["id"], None)
     inst.instance_type = "COLLECTION"
     inst.instance_collection = coll
     collection.objects.link(inst)
     inst.parent = racine
     inst.scale = echelle
+    if m["categorie"] in PENDUS:  # un luminaire reste accroché au plafond : c'est son HAUT qui est à la hauteur demandée
+        inst.location = (0.0, 0.0, max(0.0, hauteur - taille.z * echelle[2]))
 
 
 def bloc(m: dict, racine, collection) -> None:

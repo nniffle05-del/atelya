@@ -92,7 +92,11 @@ def plan_de_construction(logement: Logement) -> dict:
 
 def calculer_briques(logement: Logement) -> list[Brique]:
     briques: list[Brique] = []
-    murs_lus, ouvertures = _reunir_les_bouts(logement.murs, logement.ouvertures)
+    # un passe-plat (trou sans menuiserie, lu sur les photos) se découpe dans son mur comme une fenêtre ; lui seul : rien
+    # d'autre n'en fait une ouverture (ni cadre, ni vitre, ni lumière du jour)
+    trous = [Ouverture(id=t.id, type="fenetre", mur=t.mur, position=t.position, largeur=t.largeur, hauteur=t.hauteur,
+                       allege=t.allege, statut=t.statut, source=t.source, confiance=t.confiance) for t in logement.passe_plats]
+    murs_lus, ouvertures = _reunir_les_bouts(logement.murs, [*logement.ouvertures, *trous])
     ajustements = _ajustements_aux_angles(murs_lus)
     _prolonger_jusqu_aux_faces(murs_lus, ajustements)
     ouvertures_par_mur: dict[str, list[Ouverture]] = {}
@@ -117,7 +121,10 @@ def calculer_briques(logement: Logement) -> list[Brique]:
         for k, zone in enumerate(p.zones_sol, start=1):
             morceau = _couper_par_convexe(contour, _sens_direct([_arrondi(pt) for pt in zone.contour]))
             if len(morceau) >= 3 and abs(_aire_signee(morceau)) > 1e-4:
-                briques.append(Brique(f"zone_sol__{p.id}__{k}", "sol", p.id, _sens_direct(morceau), ZONE_SOL_Z, ZONE_SOL_Z))
+                # chaque zone un demi-millimètre au-dessus de la précédente (17/11/2026) : deux zones qui se recouvrent un peu
+                # (enveloppes de deux sols voisins) se disputaient chaque point au rendu (tache noire au pied de l'îlot
+                # d'app-001) ; la dernière de la liste l'emporte, comme dans le format (les petites sont rangées après les grandes)
+                briques.append(Brique(f"zone_sol__{p.id}__{k}", "sol", p.id, _sens_direct(morceau), ZONE_SOL_Z * k, ZONE_SOL_Z * k))
 
     murs = {m.id: m for m in murs_lus}
     for o in ouvertures:

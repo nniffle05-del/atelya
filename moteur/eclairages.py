@@ -30,7 +30,11 @@ AMBIANCES = [
      "lampes": True, "clarte_murs": 0.45, "balance": 0.35},
     {"id": "nuit", "nom": "5 Nuit", "ciel": "nuit", "lampes": True, "clarte_murs": 0.35, "balance": 0.30},
 ]
-AMBIANCE_DE_REFERENCE = "jour_soleil"  # la teinte des sols vus sur photo est réglée dans celle-ci (regler_teintes.py)
+# L'ambiance où la teinte des sols vus sur photo serait réglée au rendu (regler_teintes.py ; éteint par défaut, voir
+# moteur.construire.BORNE_REGLAGE_TEINTES). Le jour VOILÉ depuis le 17/11/2026 (avant : le jour ensoleillé) : c'est la lumière
+# douce de la plupart des photos d'annonce, des images de contrôle et du film ; réglés au soleil (taches de soleil au sol), les
+# parquets sortaient deux fois trop foncés partout ailleurs.
+AMBIANCE_DE_REFERENCE = "jour_voile"
 
 COULEUR_COUVERT = (0.92, 0.95, 1.0)  # ciel couvert : blanc à peine bleuté
 FORCE_COUVERT = 1.2
