@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 MATIERE = "parquet_sur_mesure"  # le nom de la matière dans le format (moteur/matieres.py, moteur/logement.py)
 PREFIXE = "psm_"  # le nom d'un parquet dessiné : « psm_ » + sa clé (voir cle)
 BOIS = "chene_clair"  # la photo de chêne dont les lames sont tirées (fil du bois de haut en bas de l'image)
@@ -52,12 +52,15 @@ def fiche(mesures: dict | None = None, **forces) -> dict:
     valeurs = {"largeur": m.get("largeur_m", m.get("largeur")), "longueur": m.get("longueur_m", m.get("longueur")),
                "nuance": m.get("nuance"), "chaleur": m.get("chaleur"), "joint_mm": m.get("creux_mm", m.get("joint_mm"))}
     supposes = [k for k, v in valeurs.items() if v is None]
+    pose = m.get("pose", "lames")
     for k in supposes:
         valeurs[k] = DEFAUTS[k] if k != "longueur" else None
-    if valeurs["longueur"] is None:
-        valeurs["longueur"] = longueur_supposee(valeurs["largeur"])
+    if valeurs["longueur"] is None:  # un chevron de point de Hongrie : cinq à six fois plus long que large
+        valeurs["longueur"] = longueur_supposee(valeurs["largeur"]) if pose == "lames" else 5.5 * valeurs["largeur"]
     pas = {"largeur": 0.005, "longueur": 0.05, "nuance": 0.01, "chaleur": 0.005, "joint_mm": 0.1}
-    sortie = {"pose": "lames"}
+    sortie = {"pose": pose}
+    if pose == "point_de_hongrie":
+        sortie["angle"] = float(np.clip(round(float(m.get("angle", 45.0)) / 5) * 5, 30, 60))
     for k, v in valeurs.items():
         v = float(np.clip(v, *BORNES[k]))
         sortie[k] = round(round(v / pas[k]) * pas[k], 3)
@@ -69,7 +72,8 @@ def fiche(mesures: dict | None = None, **forces) -> dict:
 
 def cle(fiche_: dict) -> str:
     """La clé d'un parquet : huit caractères tirés de ce qui change son DESSIN (pas de la liste des valeurs supposées)."""
-    dessin = {k: fiche_[k] for k in ("pose", "largeur", "longueur", "nuance", "chaleur", "joint_mm", "bois") if k in fiche_}
+    dessin = {k: fiche_[k] for k in ("pose", "largeur", "longueur", "nuance", "chaleur", "joint_mm", "bois", "angle")
+              if fiche_.get(k) is not None}
     return hashlib.sha1((json.dumps(dessin, sort_keys=True) + VERSION).encode()).hexdigest()[:8]
 
 
@@ -111,12 +115,80 @@ def _image(lumiere: np.ndarray) -> np.ndarray:
     return (np.where(c <= 0.0031308, c * 12.92, 1.055 * c ** (1 / 2.4) - 0.055) * 255 + 0.5).astype(np.uint8)
 
 
+def _dessiner_hongrie(fiche_: dict, photo_bois: np.ndarray, px_par_m_bois: float, mm_par_px: float | None = None) -> dict:
+    """Le POINT DE HONGRIE dessiné en vraie image (18/11/2026 : dans le film Unreal, le point de Hongrie calculé par Blender
+    n'existait pas, le séjour d'app-001 avait un sol brun tout uni). Des RANGS de lames coupées en biais (angle de la fiche),
+    penchées d'un côté puis de l'autre d'un rang au suivant : les pointes des chevrons se rejoignent. Chaque lame est un morceau
+    de la vraie photo de chêne, avec sa nuance. Dessin de travail : les rangs à l'horizontale ; image rendue : rangs de HAUT EN
+    BAS (comme les lames droites : le « sens » du sol est celui des rangs, donc des longs joints entre les rangs)."""
+    import cv2
+    from PIL import Image, ImageFilter
+
+    mm = mm_par_px or 1.0
+    px = 1000.0 / mm  # pixels par mètre du dessin de travail
+    largeur, longueur, angle = fiche_["largeur"], fiche_["longueur"], math.radians(float(fiche_.get("angle", 45.0)))
+    rang_px = max(6, int(round(longueur * math.sin(angle) * px)))  # hauteur d'un rang de chevrons
+    pas_px = max(4, int(round(largeur / math.sin(angle) * px)))  # écart entre deux lames le long du rang
+    paires = max(1, int(round(COTE_M * px / (2 * rang_px))))
+    lames = max(2, int(round(COTE_M * px / pas_px)))
+    haut, large = 2 * paires * rang_px, lames * pas_px  # nombres entiers de rangs et de lames : raccord sans couture
+    source = Image.fromarray(photo_bois)
+    taille = (max(8, int(round(source.width / px_par_m_bois * px))), max(8, int(round(source.height / px_par_m_bois * px))))
+    bois = _lineaire(np.asarray(source.resize(taille, Image.LANCZOS).rotate(90, expand=True), np.float32))  # fil de gauche à droite
+    yy, xx = np.mgrid[0:haut, 0:large].astype(np.float32)
+    rang = (yy // rang_px).astype(np.int32)
+    dans_rang = yy - rang * rang_px
+    monte = rang % 2 == 0
+    glisse = xx - np.where(monte, dans_rang, rang_px - dans_rang) / math.tan(angle)  # constant le long d'une lame
+    lame = np.floor(glisse / pas_px).astype(np.int32)
+    en_travers = (glisse / pas_px - lame) * (largeur * px)  # pixels en travers de la lame
+    le_long = dans_rang / math.sin(angle)  # pixels le long de la lame
+    r, l = rang % (2 * paires), lame % lames
+    alea = np.random.default_rng(int(cle(fiche_), 16))
+    forme = (2 * paires, lames)
+    long_px, large_px = longueur * px, largeur * px
+    depart_long = alea.uniform(0, max(1.0, bois.shape[1] - long_px - 1), forme).astype(np.float32)
+    depart_travers = alea.uniform(0, max(1.0, bois.shape[0] - large_px - 1), forme).astype(np.float32)
+    retourne = alea.random(forme) < 0.5
+    n = max(float(fiche_["nuance"]), 1e-6)
+    clarte = np.exp(np.clip(alea.normal(0.0, n, forme), -2.2 * n, 2.2 * n)).astype(np.float32) if fiche_["nuance"] > 0 else np.ones(forme, np.float32)
+    c = max(float(fiche_["chaleur"]), 1e-6)
+    chaud = np.clip(alea.normal(0.0, c, forme), -2.2 * c, 2.2 * c).astype(np.float32) if fiche_["chaleur"] > 0 else np.zeros(forme, np.float32)
+    carte_x = depart_long[r, l] + np.where(retourne[r, l], long_px - le_long, le_long)
+    carte_y = depart_travers[r, l] + en_travers
+    couleur = cv2.remap(bois, carte_x.astype(np.float32), carte_y.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    couleur *= clarte[r, l][..., None]
+    couleur[..., 0] *= np.exp(chaud[r, l] / 2)
+    couleur[..., 2] *= np.exp(-chaud[r, l] / 2)
+    # les joints : entre deux lames d'un rang, et le long joint entre deux rangs
+    joint_mm = float(fiche_["joint_mm"])
+    demi = max(1, int(math.ceil(joint_mm / (0.85 * 2 * mm))))
+    sombre = float(np.clip(joint_mm / (2 * demi * mm), 0.0, 0.85))
+    bord = (glisse / pas_px - lame) * pas_px
+    creux = np.ones((haut, large), np.float32)
+    creux[(bord < demi) | (bord > pas_px - demi) | (dans_rang < demi) | (dans_rang > rang_px - demi)] = 0.0
+    doux = np.asarray(Image.fromarray((creux * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6)), np.float32) / 255
+    couleur *= (1.0 - sombre * (1.0 - doux))[..., None]
+    haut_m, large_m = haut / px, large / px
+    sortie = (int(min(PIXELS_MAX, round(large_m * PX_PAR_M_SORTIE / 4) * 4)), int(min(PIXELS_MAX, round(haut_m * PX_PAR_M_SORTIE / 4) * 4)))
+    image = Image.fromarray(_image(couleur)).resize(sortie, Image.LANCZOS).transpose(Image.ROTATE_90)
+    hauteur = np.asarray(Image.fromarray((doux * 255).astype(np.uint8)).resize(sortie, Image.LANCZOS).transpose(Image.ROTATE_90), np.float32) / 255
+    relief = Image.fromarray(_normales(hauteur, 3.0 * float(np.clip(joint_mm / 1.5, 0.2, 1.0))))
+    gris = np.asarray(image.convert("L"), np.float32) / 255
+    mat = np.clip(0.78 + 0.15 * (1 - hauteur) + 0.10 * (gris - gris.mean()), 0, 1)
+    # l'image rendue : sa largeur est le travers des rangs, sa hauteur le long des rangs
+    return {"couleur": image, "relief": relief, "brillance": Image.fromarray((mat * 255).astype(np.uint8)),
+            "taille_m": [round(haut_m, 4), round(large_m, 4)], "plan": {"rang_m": rang_px / px, "pas_m": pas_px / px, "rangs": 2 * paires, "lames": lames}}
+
+
 def dessiner(fiche_: dict, photo_bois: np.ndarray, px_par_m_bois: float, mm_par_px: float | None = None) -> dict:
     """Dessine le parquet de `fiche_` avec le bois de `photo_bois` (RGB uint8, fil de haut en bas, `px_par_m_bois` pixels par
     mètre). Rend {"couleur", "relief", "brillance" (images PIL), "taille_m" (côté), "plan" (les lames posées : pour les tests)}.
     mm_par_px : finesse du dessin de travail (1 mm par défaut ; plus grossier pour un essai rapide)."""
     from PIL import Image, ImageFilter
 
+    if fiche_.get("pose") == "point_de_hongrie":
+        return _dessiner_hongrie(fiche_, photo_bois, px_par_m_bois, mm_par_px)
     cote_m, rangs = cote(fiche_)
     mm = mm_par_px or (1.0 if cote_m <= 3.0 else 1.5)
     h_lame = max(3, int(round(fiche_["largeur"] * 1000 / mm)))
@@ -231,10 +303,11 @@ def ecrire(fiche_: dict, bibliotheque: Path, dossier: Path) -> dict:
     cible.mkdir(parents=True, exist_ok=True)
     for cle_, fichier in (("couleur", "couleur.jpg"), ("relief", "relief.jpg"), ("brillance", "brillance.jpg")):
         d[cle_].save(cible / fichier, quality=92)
-    sortie = {"description": f"parquet sur mesure d'après les photos du client : lames de {100 * fiche_['largeur']:.1f} cm, "
+    sortie = {"description": f"parquet sur mesure d'après les photos du client ({fiche_.get('pose', 'lames')}) : lames de {100 * fiche_['largeur']:.1f} cm, "
                              f"longues de {fiche_['longueur']:.2f} m en moyenne (dessiné par Atelya)",
               "source": f"dessiné par Atelya (moteur/parquet_sur_mesure.py {VERSION}) d'après la photo de chêne « {fiche_.get('bois', BOIS)} »",
               "identifiant": n, "licence": "CC0 1.0 (photo d'origine : Poly Haven, oak_veneer_01)", "auteurs": ["Atelya"],
-              "taille_image_m": [d["taille_m"], d["taille_m"]], "parquet": fiche_}
+              "taille_image_m": list(d["taille_m"]) if isinstance(d["taille_m"], (list, tuple)) else [d["taille_m"], d["taille_m"]],
+              "parquet": fiche_}
     fiche_matiere.write_text(json.dumps(sortie, ensure_ascii=False, indent=1), encoding="utf-8")
     return {**sortie, "dossier": str(cible.resolve())}

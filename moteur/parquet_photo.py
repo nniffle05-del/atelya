@@ -152,7 +152,7 @@ def _profil(clarte: np.ndarray, ok: np.ndarray):
     return creux, moyenne
 
 
-def _periode(profil: np.ndarray, resolution: float):
+def _periode(profil: np.ndarray, resolution: float, mini: float | None = None, maxi: float | None = None):
     """La période du profil (m) et sa force (0 à 1) : premier pic de la ressemblance du profil avec lui-même décalé."""
     bon = np.isfinite(profil)
     if bon.sum() < 0.85 * len(profil):
@@ -160,7 +160,7 @@ def _periode(profil: np.ndarray, resolution: float):
     p = np.maximum(np.where(bon, profil, 0.0), 0.0)  # seuls les creux comptent (une lame plus claire n'est pas un joint)
     p = np.where(bon, p - p[bon].mean(), 0.0)
     n = len(p)
-    d_min, d_max = int(LARGEUR_MIN_M / resolution), min(int(LARGEUR_MAX_M / resolution), n // 2)
+    d_min, d_max = int((mini or LARGEUR_MIN_M) / resolution), min(int((maxi or LARGEUR_MAX_M) / resolution), n // 2)
     energie = float((p * p).sum())
     if energie <= 1e-12 or d_max <= d_min + 2:
         return None
@@ -193,10 +193,12 @@ def _redresser(clarte: np.ndarray, ok: np.ndarray, resolution: float):
     return meilleur[1:] if meilleur else None
 
 
-def largeurs_par_fenetre(image: np.ndarray, propre: np.ndarray, resolution: float = RESOLUTION_M) -> list[dict]:
-    """La largeur des lames mesurée dans chaque fenêtre assez pleine : [{"largeur_m", "force", "penche", "ligne", "colonne"}]."""
+def largeurs_par_fenetre(image: np.ndarray, propre: np.ndarray, resolution: float = RESOLUTION_M, travers_m: float = FENETRE_TRAVERS_M,
+                         mini: float | None = None, maxi: float | None = None) -> list[dict]:
+    """La largeur des lames mesurée dans chaque fenêtre assez pleine : [{"largeur_m", "force", "penche", "ligne", "colonne"}].
+    travers_m, mini, maxi : pour mesurer autre chose que des lames (les RANGS d'un point de Hongrie, larges de 30 à 50 cm)."""
     clarte = _clarte(image)
-    fl, ft = int(FENETRE_LONG_M / resolution), int(FENETRE_TRAVERS_M / resolution)
+    fl, ft = int(FENETRE_LONG_M / resolution), int(travers_m / resolution)
     sortie = []
     h, w = propre.shape
     plein = cv2.boxFilter(propre.astype(np.float32), -1, (fl, ft), anchor=(0, 0), borderType=cv2.BORDER_CONSTANT)
@@ -209,7 +211,7 @@ def largeurs_par_fenetre(image: np.ndarray, propre: np.ndarray, resolution: floa
             if r is None:
                 continue
             penche, _, _, profil, _ = r
-            periode = _periode(profil, resolution)
+            periode = _periode(profil, resolution, mini, maxi)
             if periode is None:
                 continue
             sortie.append({"largeur_m": periode[0], "force": periode[1], "penche": float(penche), "ligne": ligne, "colonne": colonne})

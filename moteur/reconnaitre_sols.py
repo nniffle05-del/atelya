@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import cv2
+import math
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -193,6 +195,14 @@ def voter(carte_votes: np.ndarray, centres_px: np.ndarray, probabilites: np.ndar
         carte_votes[l0:l1, c0:c1] += w * p
 
 
+def matiere_jugee(sol: dict) -> str:
+    """La matière d'un sol pour les juges : un parquet SUR MESURE posé en point de Hongrie compte comme un point de Hongrie
+    (sa matière, « parquet_sur_mesure », ne dit pas sa pose : c'est le champ « parquet » qui la dit)."""
+    if (sol.get("parquet") or {}).get("pose") == "point_de_hongrie":
+        return "point_de_hongrie"
+    return sol["matiere"]
+
+
 def matieres_verite(logement: dict, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     """La matière du sol en chaque point (X, Y) d'après un logement dont les pièces ont leur `sol` (et leurs `zones_sol`) ;
     "" hors des pièces ou pour une pièce sans sol connu."""
@@ -202,9 +212,9 @@ def matieres_verite(logement: dict, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         if not p.get("sol"):
             continue
         dedans = dans_polygone(X, Y, p["contour"])
-        sortie[dedans] = p["sol"]["matiere"]
+        sortie[dedans] = matiere_jugee(p["sol"])
         for z in p.get("zones_sol", []):
-            sortie[dedans & dans_polygone(X, Y, z["contour"])] = z["sol"]["matiere"]
+            sortie[dedans & dans_polygone(X, Y, z["contour"])] = matiere_jugee(z["sol"])
     return sortie
 
 
@@ -553,8 +563,9 @@ def parquets_des_sols(pieces: dict, vues, logement: dict, pas_du_sol=None) -> No
         for z in s["zones"]:
             groupes.setdefault(z["famille"], []).append(z)
         for cle, sols in groupes.items():
-            if sols[0]["famille"] != "lames" or sols[0].get("sens") is None:
+            if sols[0]["famille"] not in ("lames", "point_de_hongrie") or sols[0].get("sens") is None:
                 continue
+            hongrie = sols[0]["famille"] == "point_de_hongrie"
             zones = [z["contour"] for z in s["zones"]] if cle == "" else [z["contour"] for z in sols]
 
             def garder(X, Y, zones=zones, dedans=(cle != "")):
@@ -575,7 +586,17 @@ def parquets_des_sols(pieces: dict, vues, logement: dict, pas_du_sol=None) -> No
                 images.append((image, pp.bois_propre(image, vu), pp.bois_vu(image, vu)))
             if not images:
                 continue
-            mesure = pp.mesurer_parquet(images)
+            if hongrie:
+                # le point de Hongrie : la hauteur d'un RANG de chevrons (l'écart entre les longs joints qui séparent les rangs)
+                fenetres = []
+                for image, _, large in images:
+                    fenetres += pp.largeurs_par_fenetre(image, large, travers_m=1.5, mini=0.22, maxi=0.60)
+                rang = pp.largeur_retenue(fenetres)
+                mesure = {"sol_m2": round(float(sum(p.sum() for _, p, _ in images)) * pp.RESOLUTION_M ** 2, 2), "fenetres": len(fenetres)}
+                if rang is not None:
+                    mesure["rang_m"], mesure["rang"] = rang["largeur_m"], rang
+            else:
+                mesure = pp.mesurer_parquet(images)
             mesure["photos"] = len(images)
             for sol in sols:
                 sol["parquet_mesure"] = mesure
@@ -766,6 +787,22 @@ def memes_parquets(pieces: dict) -> None:
                 sortie[cle] = float(sum(v * p for v, p in avec) / sum(p for _, p in avec))
         return sortie
 
+    # LE POINT DE HONGRIE : un seul par logement (le même partout), dessiné lui aussi en vraie image (dans le film Unreal, celui que
+    # Blender calculait n'existait pas). La hauteur d'un rang de chevrons, si elle a été mesurée (la plus appuyée), donne la taille
+    # des lames (coupe supposée à 45°, lame cinq fois et demie plus longue que large) ; le reste est SUPPOSÉ et dit comme tel.
+    chevrons = [sol for s in pieces.values() for sol in [s] + list(s.get("zones", [])) if sol.get("famille") == "point_de_hongrie"]
+    if chevrons:
+        rangs_mesures = [sol["parquet_mesure"] for sol in chevrons if (sol.get("parquet_mesure") or {}).get("rang_m")]
+        if rangs_mesures:
+            rang = max(rangs_mesures, key=lambda m: m["rang"]["fenetres"])["rang_m"]
+            longueur = rang / math.sin(math.radians(45.0))
+            fiche_h = {**psm.fiche({"pose": "point_de_hongrie", "largeur_m": longueur / 5.5, "longueur_m": longueur, "nuance": 0.10, "chaleur": 0.02,
+                                    "creux_mm": 0.8}), "supposes": ["chaleur", "joint_mm", "nuance"]}
+        else:
+            fiche_h = {**psm.fiche({"pose": "point_de_hongrie", "largeur_m": 0.09, "longueur_m": 0.50, "nuance": 0.10, "chaleur": 0.02, "creux_mm": 0.8}),
+                       "supposes": ["chaleur", "joint_mm", "largeur", "longueur", "nuance"]}
+        for sol in chevrons:
+            sol["parquet"] = fiche_h
     fiches = [(g, psm.fiche(reunir(g))) for g in groupes]
     principal = max(fiches, key=lambda gf: sum(appui(m) for m in gf[0]))[1] if fiches else None
     for sol, m in sols:

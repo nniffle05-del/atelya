@@ -76,7 +76,7 @@ def test_boucle_dessiner_puis_mesurer(largeur, longueur, nuance, joint):
     m = pp.mesurer_parquet([(photo, np.ones(photo.shape[:2], bool))])
     assert m["largeur_m"] == pytest.approx(largeur, rel=0.04)
     assert m["nuance"] == pytest.approx(nuance, abs=max(0.35 * nuance, 0.03))  # (le grain du bois d'essai compte pour ~3 %)
-    assert m["creux_mm"] == pytest.approx(joint, abs=0.7)  # (le bois d'essai a un grain très marqué)
+    assert m["creux_mm"] == pytest.approx(joint, abs=0.9)  # (la mesure la moins fine ; le bois d'essai a un grain très marqué)
     assert m["longueur_m"] == pytest.approx(longueur, rel=0.6)  # la longueur moyenne n'est connue qu'à moitié près…
 
 
@@ -119,7 +119,7 @@ def test_le_meme_parquet_dans_les_pieces_qui_montrent_le_meme():
     assert psm.cle(p["chambre_2"]) == psm.cle(p["entree"]) and len(p["chambre_2"]["supposes"]) == 5
     # la zone de lames du séjour, mesurée par l'ancienne mesure seulement (11 cm) : le même parquet aussi
     assert psm.cle(pieces["sejour"]["zones"][0]["parquet"]) == psm.cle(p["entree"])
-    assert p["sejour"] is None and p["cuisine"] is None  # ni le point de Hongrie ni le carrelage ne sont concernés
+    assert p["sejour"]["pose"] == "point_de_hongrie" and p["cuisine"] is None  # le point de Hongrie a sa propre fiche ; pas le carrelage
 
 
 def test_sans_aucune_mesure_un_parquet_suppose_et_dit_comme_tel():
@@ -163,7 +163,7 @@ def test_le_plan_de_construction_porte_les_parquets_et_la_construction_les_dessi
                     "statut": "mesure", "source": "essai"}]})
     plan = plan_habille(logement)
     nom = psm.nom(f)
-    assert plan["parquets_sur_mesure"] == {nom: {**f, "supposes": []}}
+    assert plan["parquets_sur_mesure"] == {nom: {**f, "supposes": [], "angle": None}}
     sols = {b["materiau"] for b in plan["briques"] if b["categorie"] == "sol" and b["element"] == "chambre_1"}
     assert sols == {f"{nom}^90~1.10,1.00,0.90"}
     # la bibliothèque d'essai : une seule photo de bois
@@ -244,3 +244,36 @@ def test_de_la_photo_a_la_mesure(sens):
     # la part de la pièce à garder (le sol d'une zone) : rien hors d'elle
     image, vu = pp.sol_dans_le_sens(photo, cam, contour, sens, garder=lambda X, Y: X > 100)
     assert not vu.any()
+
+
+def test_le_point_de_hongrie_est_une_vraie_image_qui_se_raccorde():
+    """Le point de Hongrie dessiné en vraie image (dans le film Unreal, celui que Blender calculait n'existait pas)."""
+    f = psm.fiche({"pose": "point_de_hongrie", "largeur_m": 0.09, "longueur_m": 0.5, "nuance": 0.1, "chaleur": 0.0, "creux_mm": 1.0})
+    assert f["pose"] == "point_de_hongrie" and f["angle"] == 45.0 and psm.cle(f) != psm.cle({**f, "pose": "lames"})
+    assert psm.fiche({"pose": "point_de_hongrie", "largeur_m": 0.08})["longueur"] == pytest.approx(0.45, abs=0.03)  # supposée : 5,5 fois la largeur
+    d = psm.dessiner(f, bois_d_essai(), 900 / 1.8, mm_par_px=2.0)
+    travers_m, long_m = d["taille_m"]
+    rang = 0.5 * np.sin(np.radians(45))
+    assert d["plan"]["rangs"] % 2 == 0 and travers_m == pytest.approx(d["plan"]["rangs"] * rang, rel=0.02)  # un nombre pair de rangs
+    image = np.asarray(d["couleur"], np.float32).mean(-1)
+    assert image.shape[1] / image.shape[0] == pytest.approx(travers_m / long_m, rel=0.02)  # largeur de l'image = travers des rangs
+    # les longs joints entre les rangs de chevrons sont des COLONNES de l'image (rangs de haut en bas), espacées d'un rang
+    colonnes = image.mean(0)
+    sombres = np.nonzero(colonnes < np.median(colonnes) - 6)[0]
+    ecarts = np.diff(sombres)
+    assert len(sombres) >= d["plan"]["rangs"] - 1
+    assert np.bincount(ecarts[ecarts > 3]).argmax() == pytest.approx(rang / travers_m * image.shape[1], rel=0.06)
+    # raccord sans couture dans les deux sens
+    assert float(np.abs(image[0] - image[-1]).mean()) < 4 * float(np.abs(image[10] - image[11]).mean()) + 4
+    assert float(np.abs(image[:, 0] - image[:, -1]).mean()) < 25  # (la première et la dernière colonne tombent sur un long joint)
+    # dans le format, et un seul point de Hongrie par logement, à la taille mesurée sur les photos quand elle l'a été
+    Sol.model_validate({"matiere": SUR_MESURE, "parquet": f, "statut": "estime", "source": "brique photos"})
+    pieces = {"sejour": {"famille": "point_de_hongrie", "zones": [], "parquet_mesure": {"rang_m": 0.30, "rang": {"fenetres": 8}}},
+              "chambre": {"famille": "point_de_hongrie", "zones": []}}
+    rs.memes_parquets(pieces)
+    h = pieces["sejour"]["parquet"]
+    assert h == pieces["chambre"]["parquet"] and h["pose"] == "point_de_hongrie"
+    assert h["longueur"] == pytest.approx(0.30 / np.sin(np.radians(45)), abs=0.03) and "largeur" not in h["supposes"]
+    seul = {"chambre": {"famille": "point_de_hongrie", "zones": []}}
+    rs.memes_parquets(seul)
+    assert seul["chambre"]["parquet"]["largeur"] == 0.09 and "largeur" in seul["chambre"]["parquet"]["supposes"]

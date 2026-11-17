@@ -177,7 +177,9 @@ class Parquet(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    pose: Literal["lames"] = "lames"
+    pose: Literal["lames", "point_de_hongrie"] = "lames"
+    angle: Annotated[float, Field(ge=30, le=60)] | None = Field(
+        default=None, description="Point de Hongrie : angle de coupe des lames (degrés), entre la lame et le rang de chevrons")
     largeur: Annotated[float, Field(ge=0.04, le=0.35)] = Field(description="Largeur d'une lame (m)")
     longueur: Annotated[float, Field(ge=0.25, le=2.5)] = Field(description="Longueur moyenne des lames (m) ; elles vont de la "
                                                                  "moitié à une fois et demie cette longueur")

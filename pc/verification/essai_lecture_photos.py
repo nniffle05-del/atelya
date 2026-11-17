@@ -204,7 +204,7 @@ def noter_meubles(logement: dict, verite: list[dict], fiche: dict) -> dict:
 
 def noter_sols(logement: dict, verite: dict) -> dict:
     """La famille du sol de chaque pièce du logement refait contre celle du relevé (pièces dont les deux sont connus)."""
-    from moteur.reconnaitre_sols import famille
+    from moteur.reconnaitre_sols import famille, matiere_jugee
 
     vraies = {p["id"]: p for p in verite["pieces"] if p.get("sol")}
     justes, details, zones = 0, {}, [0, 0]
@@ -213,7 +213,7 @@ def noter_sols(logement: dict, verite: dict) -> dict:
         sol = p.get("sol") or {}
         if v is None or not str(sol.get("source", "")).startswith("brique photos"):
             continue
-        trouve, attendu = famille(sol["matiere"]), famille(v["sol"]["matiere"])
+        trouve, attendu = famille(matiere_jugee(sol)), famille(matiere_jugee(v["sol"]))
         justes += trouve == attendu
         details[p["id"]] = {"trouve": trouve, "attendu": attendu}
         zones[0] += len(p.get("zones_sol", []))
