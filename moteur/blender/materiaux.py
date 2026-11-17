@@ -29,8 +29,10 @@ SORTES = {"parquet_chene_lames": "bois", "parquet_batons_rompus": "bois", "point
           "damier_pierre": "carrelage", "pierre_beige": "carrelage", "carreaux_cubes": "carrelage",
           "petits_carreaux_clairs": "carrelage"}
 # Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (même liste que moteur/matieres.py).
-ROTATION_PHOTO = {"carrelage_interieur": 45.0, "parquet_chene_lames": 90.0, "chene_noeuds": 90.0, "chene_clair_photo": 90.0,
-                  "vieux_parquet": 90.0, "lames_parquet_1": 90.0, "lames_parquet_2": 90.0, "pin_clair_larges": 90.0}
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "stratifie": 90.0, "chene_clair_moderne": 90.0, "chene_grise": 90.0,
+                  "chene_naturel_photo": 90.0, "parquet_use": 90.0, "lames_bois": 90.0, "stratifie_2": 90.0, "lames_foncees_2": 90.0,
+                  "lames_chene_miel": 90.0, "lames_chene_clair": 90.0, "lames_chene_dore": 90.0, "lames_miel_fines": 90.0,
+                  "lames_miel_moyennes": 90.0, "lames_chene_anglaise": 90.0}
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
 # B2 temps 2 (09/11/2026) : un parquet d'appartement est vitrifié SATINÉ, pas ciré. Avec la brillance des photos de la
 # bibliothèque (presque miroir) et le reflet normal, le bois renvoyait le ciel vu en biais : app-001, parquet miel sur la photo,

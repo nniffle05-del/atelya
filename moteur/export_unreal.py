@@ -35,8 +35,10 @@ SCHEMA = "scene-unreal/0.1"
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
 RUGOSITE_BOIS = (0.6, 0.85)
 REFLET_BOIS = 0.15
-ROTATION_PHOTO = {"carrelage_interieur": 45.0, "parquet_chene_lames": 90.0, "chene_noeuds": 90.0, "chene_clair_photo": 90.0,
-                  "vieux_parquet": 90.0, "lames_parquet_1": 90.0, "lames_parquet_2": 90.0, "pin_clair_larges": 90.0}
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "stratifie": 90.0, "chene_clair_moderne": 90.0, "chene_grise": 90.0,
+                  "chene_naturel_photo": 90.0, "parquet_use": 90.0, "lames_bois": 90.0, "stratifie_2": 90.0, "lames_foncees_2": 90.0,
+                  "lames_chene_miel": 90.0, "lames_chene_clair": 90.0, "lames_chene_dore": 90.0, "lames_miel_fines": 90.0,
+                  "lames_miel_moyennes": 90.0, "lames_chene_anglaise": 90.0}
 RUGOSITE_PEINTURE = (0.8, 0.95)  # moteur/blender/materiaux._enduit : une peinture mate
 RELIEF_PEINTURE = 0.25
 ALPHA_VERRE = 0.06  # moteur/blender/exporter_gltf.ALPHA_VERRE

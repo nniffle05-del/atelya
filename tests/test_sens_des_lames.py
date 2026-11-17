@@ -68,7 +68,10 @@ def test_les_photos_de_parquet_sont_posees_dans_le_meme_sens():
 
     from moteur import export_unreal as eu
 
-    assert ROTATION_PHOTO["chene_clair_photo"] == 90.0 and "stratifie" not in ROTATION_PHOTO
+    # Blender pose une image de sol avec sa largeur le long de l'axe y : ce sont les photos aux lames EN TRAVERS de l'image
+    # (stratifié, chêne à l'anglaise dessiné…) qui sont tournées, pas celles aux lames de haut en bas (chêne clair, vieux parquet)
+    assert ROTATION_PHOTO["stratifie"] == 90.0 and ROTATION_PHOTO["lames_chene_anglaise"] == 90.0
+    assert "chene_clair_photo" not in ROTATION_PHOTO and "vieux_parquet" not in ROTATION_PHOTO
     assert eu.ROTATION_PHOTO == ROTATION_PHOTO
     texte = (Path(__file__).resolve().parents[1] / "moteur" / "blender" / "materiaux.py").read_text(encoding="utf-8")
     for nom, angle in ROTATION_PHOTO.items():

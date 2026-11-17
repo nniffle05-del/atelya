@@ -101,11 +101,16 @@ NOMS_SOLS = tuple(SOLS)
 CALCULEES = {"point_de_hongrie": "chene_clair", "carreaux_ciment": None}
 
 # Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (degrés). Et, depuis le 17/11/2026,
-# photos de parquet dont les lames vont DE HAUT EN BAS de l'image : tournées d'un quart de tour, pour que les lames de TOUTES
-# les matières suivent le sens demandé (avant, la moitié des parquets étaient posés en travers : NT, « la direction du
-# parquet » ; sens de chaque photo mesuré, pc/verification/planche_parquets.py pour les voir).
-ROTATION_PHOTO = {"carrelage_interieur": 45.0, "parquet_chene_lames": 90.0, "chene_noeuds": 90.0, "chene_clair_photo": 90.0,
-                  "vieux_parquet": 90.0, "lames_parquet_1": 90.0, "lames_parquet_2": 90.0, "pin_clair_larges": 90.0}
+# photos de parquet tournées d'un quart de tour pour que les lames de TOUTES les matières suivent le sens demandé (NT : « la
+# direction du parquet »). ATTENTION, MESURÉ dans Blender le 17/11/2026 au soir : sur un sol, Blender pose une image avec SA
+# LARGEUR le long de l'axe y de la maquette (projection « boîte »). Sans rotation, ce sont donc les photos aux lames DE HAUT
+# EN BAS qui suivent le sens demandé ; celles aux lames EN TRAVERS de l'image (de gauche à droite) doivent être tournées :
+# ce sont elles qui sont listées ici. (La première correction, l'après-midi, avait fait l'inverse : tous les parquets
+# étaient d'accord entre eux, et tous en travers des photos — vu par le juge pc/verification/comparer_sens_photo_rendu.py.)
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "stratifie": 90.0, "chene_clair_moderne": 90.0, "chene_grise": 90.0,
+                  "chene_naturel_photo": 90.0, "parquet_use": 90.0, "lames_bois": 90.0, "stratifie_2": 90.0, "lames_foncees_2": 90.0,
+                  "lames_chene_miel": 90.0, "lames_chene_clair": 90.0, "lames_chene_dore": 90.0, "lames_miel_fines": 90.0,
+                  "lames_miel_moyennes": 90.0, "lames_chene_anglaise": 90.0}
 
 # Les parquets à LAMES DROITES qu'Atelya peut choisir seul d'après une photo, et la largeur de leurs lames (m), mesurée sur la
 # photo de la matière. Les autres « bois » du catalogue ont un motif (posé en diagonale, mosaïque, pavés) : ils ne sont posés
