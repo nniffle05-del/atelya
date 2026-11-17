@@ -20,10 +20,14 @@ NOTES = {
                            "7 suspension rotin ; 8 suspension dans la chambre ; 9 rideaux ; 10 meuble_tv banc bas, bois clair ; "
                            "11 television ; 12 table_de_chevet ; 13 lampe",
                  "sol": "lames"},
-    "photo-05": {"objets": "1 meuble_cuisine_haut blanc ; 2 colonne_cuisine blanc ; 3 meuble_cuisine_bas plan de travail bois ; "
+    "photo-05": {"objets": "1 meuble_cuisine_haut blanc ; 2 colonne_cuisine grand placard en bois, deux portes ; 3 meuble_cuisine_bas plan de travail bois ; "
                            "4 meuble_cuisine_bas blanc {g=coin d=coin} ; 5 tapis chevrons, gris ; 6 fenetre sur allège ; 7 = 2 ; 8 autre ; 9 = 6 ; "
-                           "10 = 4 ; 11 = 4 ; 12 applique ; 13 meuble_cuisine_haut blanc ; 14 = 4 ; 15 faux ; 16 faux ; 17 faux",
-                 "sol": "carreaux"},
+                           "10 = 4 ; 11 meuble_cuisine_bas blanc, sous l'évier, le long du mur de droite ; 12 applique ; 13 meuble_cuisine_haut blanc ; 14 = 4 ; 15 faux ; 16 faux ; 17 faux",
+                 "sol": "carreaux",
+                 # sous la fenêtre : les meubles bas blancs, d'un mur à l'autre ; mur de droite : le meuble de l'évier, de l'angle
+                 # jusqu'au pilier blanc ; passé le pilier, le grand placard en bois à deux portes (une largeur et demie), puis le
+                 # mur nu. Le banc (3) et son meuble haut, encore plus à droite, sont dans l'entrée : pas dits.
+                 "rangees": "vers6 : coin bas*(4) coin ; droite6 : angle bas*(11) coin ; droite6+1 : coin colonnex1.5(2) cadre"},
     "photo-06": {"objets": "1 meuble_cuisine_bas blanc ; 2 electromenager four encastré ; 3 passe_plat ; 4 evier ; 5 colonne_cuisine blanc ; "
                            "6 meuble_cuisine_haut blanc ; 7 rangement meuble bas blanc à deux portes, sous le passe-plat ; "
                            "8 suspension noire ; 9 suspension rotin, celle du séjour vue à travers le passe-plat"},

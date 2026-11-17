@@ -35,10 +35,12 @@ def detail(logement: dict, verite: list[dict], fiche: dict) -> dict:
     """La même notation que essai.noter_meubles, mais en gardant les objets : paires, en trop, restés seuls."""
     from moteur.camera_photo import camera_depuis_dict
     from moteur.meubles import EQUIPEMENTS
-    from moteur.reperer_meubles import groupe, vu_sur_une_photo
+    from moteur.reperer_meubles import groupe as _groupe, vu_sur_une_photo
+    # un réfrigérateur posé vaut la « colonne » que le relevé du 10/11/2026 appelait réfrigérateur (la sorte n'existait pas encore)
+    groupe = lambda c: _groupe("colonne_cuisine" if c == "refrigerateur" else c)
 
     cams = [camera_depuis_dict(c["camera"]) for c in fiche["cameras"].values()]
-    poses = [m for m in logement.get("meubles", []) if m["categorie"] not in EQUIPEMENTS]
+    poses = [m for m in logement.get("meubles", []) if m["categorie"] not in EQUIPEMENTS or m["categorie"] == "refrigerateur"]
     au_sol = lambda m: bool(groupe(m["categorie"])) and float(m.get("altitude") or 0) < 0.3 and m["categorie"] not in essai.ACCROCHES
     vrais_sol = [v for v in verite if au_sol(v) and vu_sur_une_photo(v, cams, logement)]
     poses_sol = [m for m in poses if au_sol(m)]

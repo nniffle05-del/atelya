@@ -44,6 +44,12 @@ def objets_des_photos(fiche: dict, dossier: Path, detecteur: bool = False) -> di
     return sortie
 
 
+def rangees_des_photos(fiche: dict, dossier: Path) -> dict[str, list[dict]]:
+    """Pour chaque photo placée : les rangées de cuisine que sa lecture dit (moteur/rangees.py) ; vide si elle n'en dit pas."""
+    lecture = json.loads((dossier / "lecture.json").read_text(encoding="utf-8"))
+    return {nom: f["rangees"] for nom, f in lecture["photos"].items() if nom in fiche["cameras"] and f.get("rangees")}
+
+
 def baies_lues(logement: dict, fiche: dict, dossier: Path) -> dict[str, list[int]]:
     """Les votes de la lecture pour chaque baie du plan : {id: [fois lue « porte_fenetre », fois lue « fenetre »]}."""
     from moteur import caler_photos as cp
@@ -85,7 +91,8 @@ def main() -> int:
 
     r = photos_lues.poser(fiche, logement, RACINE, objets, par_sorte=not a.detecteur,
                           source="repérage photos" if a.detecteur else "repérage par lecture des photos", journal=print,
-                          equiper=not (a.detecteur or a.sans_equipements))
+                          equiper=not (a.detecteur or a.sans_equipements),
+                          rangees_par_photo=None if a.detecteur else rangees_des_photos(fiche, a.lecture))
     logement["meubles"] = list(logement.get("meubles", [])) + r["meubles"]
     logement = eq.appliquer(logement, r["equipements"])
     # ZÉRO COLLISION par défaut (NT, 16/11/2026) : aucun objet dans un mur, dans un autre objet ni dans un rideau

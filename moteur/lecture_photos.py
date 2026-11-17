@@ -39,6 +39,14 @@ SCHEMA = "lecture-photos/0.3"  # 0.2 (16/11/2026) : sortes précises des apparei
 #   rien      : la lecture ne dit rien, le bord du rectangle est pris tel quel.
 # « pied_cache » : le bas du rectangle n'est pas le pied du meuble (caché par ce qui est devant) : sa place vient de son mur.
 BOUT = re.compile(r"^(coin|bord|cadre|[gd]\d+|u\d+)$")
+# Les RANGÉES de cuisine (17/11/2026, moteur/rangees.py) : par photo, `rangees` = [{"mur": {"repere": "vers" | "gauche" | "droite",
+# "numero": n}, "suite": [{"sorte": "coin" | "angle" | "cadre" | "colonne_cuisine" | "meuble_cuisine_bas" | "refrigerateur" | "vide",
+# "modules": 2, "reste": true, "numeros": [4, 7]}]}] — la suite des éléments d'un mur, de la gauche vers la droite de l'image.
+# Notes courtes : « vers12 : coin colonne(4) bas*(24) coin ; gauche12 : cadre colonne(3) colonne angle » ; « bas x3(7) ».
+SORTES_DE_RANGEE = {"coin": "coin", "angle": "angle", "cadre": "cadre", "colonne": "colonne_cuisine", "bas": "meuble_cuisine_bas",
+                    "frigo": "refrigerateur", "vide": "vide"}
+MUR_DE_RANGEE = re.compile(r"^(vers|gauche|droite)(\d+)(?:\+(\d))?$")  # « droite6+1 » : le mur d'après, passé un pilier
+ELEMENT_DE_RANGEE = re.compile(r"^(coin|angle|cadre|colonne|bas|frigo|vide)(\*)?(?:x(\d+(?:\.\d+)?))?(?:\(([\d,]+)\))?$")
 # ce que la maquette ne sait pas encore porter, mais que Claude doit pouvoir nommer (compté « vu, pas représenté »)
 # les équipements du logement, que Claude nomme et qu'Atelya pose et dessine depuis le 16/11/2026 (moteur/equipements.py).
 # « electromenager » seul reste accepté (fiches 0.1 : la note dit lequel, « electromenager four encastré ») ; depuis la 0.2 la
@@ -86,6 +94,12 @@ il se trompe souvent sur ce que c'est. Tu remplis une fiche JSON au format {SCHE
   gauche du rectangle n), « u<abscisse en pixels> » (bout caché, à peu près là), « bord » (le bord du rectangle est bien le
   vrai bout : on voit le meuble finir là), « cadre » (le meuble sort de la photo de ce côté). Ne mets rien si tu ne sais pas.
   « pied_cache » : vrai si un autre objet cache le bas du meuble (un linéaire de cuisine derrière un îlot).
+- Pour une CUISINE, ajoute « rangees » : pour chaque mur garni, {{"mur": {{"repere": "vers", "numero": n}}, "suite": […]}} où le mur
+  est celui que touche le regard vers le rectangle n (ou « gauche » / « droite » : le mur voisin, au bout gauche / droit de celui-là
+  à l'image ; avec « saut » : 1, le mur d'après, de l'autre côté d'un pilier) et la suite donne, de la GAUCHE vers la DROITE de l'image : « coin » (le bout du mur, seulement si tu VOIS la rangée
+  le toucher), « angle » (le bout du mur, quand le coin est pris par la rangée du mur voisin), « cadre » (la rangée sort de la
+  photo), puis chaque élément : « colonne_cuisine », « meuble_cuisine_bas », « refrigerateur », « vide », avec « numeros » (ses
+  rectangles), « modules » (combien de largeurs de 60 cm, 1 par défaut) ou « reste » (il remplit ce qui reste du mur).
 - Ne donne aucune mesure en mètres. Ne recopie aucun nom ni aucune adresse.
 
 Réponds uniquement par la fiche JSON."""
@@ -119,6 +133,18 @@ def controler(fiche: dict, numeros: set[int]) -> list[str]:
         if len(m.get("boite") or []) != 4:
             defauts.append(f"manquant {m.get('sorte')} : rectangle absent")
         defauts += [f"manquant {m.get('sorte')} : {d}" for d in _defauts_des_bouts(m, numeros)]
+    for k, r in enumerate(fiche.get("rangees") or [], start=1):
+        mur, suite = r.get("mur") or {}, r.get("suite") or []
+        if mur.get("repere") not in ("vers", "gauche", "droite") or int(mur.get("numero", -1)) not in numeros:
+            defauts.append(f"rangée {k} : mur {mur!r} illisible ou numéro inconnu")
+        if not any(e.get("sorte") in ("coin", "angle") for e in suite[:1] + suite[-1:]):
+            defauts.append(f"rangée {k} : aucun bout calé sur un coin")
+        if not any(e.get("sorte") in ("colonne_cuisine", "meuble_cuisine_bas", "refrigerateur") for e in suite):
+            defauts.append(f"rangée {k} : aucun élément")
+        for e in suite:
+            if e.get("sorte") not in SORTES_DE_RANGEE.values():
+                defauts.append(f"rangée {k} : élément {e.get('sorte')!r} inconnu")
+            defauts += [f"rangée {k} : numéro {n} inconnu" for n in e.get("numeros") or [] if int(n) not in numeros]
     return defauts
 
 
@@ -245,7 +271,37 @@ def _reperes(dit: str) -> tuple[str, dict]:
     return (dit[:m.start()] + dit[m.end():]).strip(), champs
 
 
-def fiche_depuis_notes(objets: str, sol: str | None = None, manquants: str = "") -> dict:
+def rangees_depuis_notes(texte: str) -> list[dict]:
+    """« vers12 : coin colonne(4) bas*(24) coin ; gauche12 : cadre colonne(3) colonne angle » → le champ `rangees` d'une fiche."""
+    sortie = []
+    for morceau in (m.strip() for m in texte.split(";")):
+        if not morceau:
+            continue
+        mur, _, reste = morceau.partition(":")
+        m = MUR_DE_RANGEE.match(mur.strip())
+        if not m:
+            raise ValueError(f"mur de rangée illisible : {mur!r}")
+        suite = []
+        for mot in reste.split():
+            e = ELEMENT_DE_RANGEE.match(mot)
+            if not e:
+                raise ValueError(f"élément de rangée illisible : {mot!r} dans {morceau!r}")
+            el: dict = {"sorte": SORTES_DE_RANGEE[e.group(1)]}
+            if e.group(2):
+                el["reste"] = True
+            if e.group(3):
+                el["modules"] = float(e.group(3))
+            if e.group(4):
+                el["numeros"] = [int(v) for v in e.group(4).split(",")]
+            suite.append(el)
+        mur = {"repere": m.group(1), "numero": int(m.group(2))}
+        if m.group(3):
+            mur["saut"] = int(m.group(3))
+        sortie.append({"mur": mur, "suite": suite})
+    return sortie
+
+
+def fiche_depuis_notes(objets: str, sol: str | None = None, manquants: str = "", rangees: str = "") -> dict:
     """Une fiche lecture-photos/0.1 depuis des notes courtes (verites/<logement>/lecture_des_photos.py) :
     - objets : « 1 canape bleu ; 2 table ronde, bois ; 3 = 1 ; 4 faux » (numéro, sorte, puis ce qu'on en dit ; « = n » : même objet) ;
     - sol : « lames », ou « lames + carreaux » si la pièce a deux sols ;
@@ -289,10 +345,12 @@ def fiche_depuis_notes(objets: str, sol: str | None = None, manquants: str = "")
             if (f := _mots(dit[0], FORMES_DITES)):
                 m["forme"] = f
         fiche["manquants"].append(m)
+    if rangees.strip():
+        fiche["rangees"] = rangees_depuis_notes(rangees)
     return fiche
 
 
 def lecture_depuis_notes(notes: dict[str, dict]) -> dict:
     """Toutes les photos d'un logement : {photo: {"objets": …, "sol": …, "manquants": …}} → {"schema", "photos": {photo: fiche}}."""
-    return {"schema": SCHEMA, "photos": {nom: fiche_depuis_notes(n.get("objets", ""), n.get("sol"), n.get("manquants", ""))
+    return {"schema": SCHEMA, "photos": {nom: fiche_depuis_notes(n.get("objets", ""), n.get("sol"), n.get("manquants", ""), n.get("rangees", ""))
                                          for nom, n in notes.items()}}

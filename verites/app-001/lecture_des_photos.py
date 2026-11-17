@@ -7,6 +7,8 @@ Lues dans la conversation, une par une, sur les photos numérotées de ..\atelya
 LES BOUTS DES GRANDS MEUBLES (17/11/2026, « vas-y » de NT ; lecture-photos/0.3) : les repères entre accolades ({g=… d=… pied}) disent
 où un meuble adossé finit vraiment de chaque côté de l'image (coin du mur, bord d'un autre rectangle, abscisse, cadre de la photo)
 et si son pied est caché. Relus sur les mêmes photos numérotées, SANS regarder le relevé des meubles ni le plan.
+LES RANGÉES DE CUISINE (17/11/2026, « travaille tous ces points-là » de NT) : la clé "rangees" dit la suite des éléments le long de
+chaque mur garni, de la gauche vers la droite de l'image (moteur/rangees.py). Écrites d'après les seules photos.
 Format des notes : moteur/lecture_photos.fiche_depuis_notes. Fiche écrite par : outils/lecture_photos/ecrire_lecture.py app-001
 """
 NOTES = {
@@ -39,13 +41,17 @@ NOTES = {
                            "11 = 3 ; 12 meuble_cuisine_haut gris ; 13 fenetre ; 14 = 12 ; 15 electromenager four encastré ; "
                            "16 suspension cage noire ; 17 suspension cage noire ; 18 suspension cage noire ; 19 = 12 ; 20 = 12 ; 21 = 12 ; "
                            "22 = 12 ; 23 electromenager plaque de cuisson ; 24 meuble_cuisine_bas gris, linéaire du fond {g=d4 d=coin pied}",
-                 "sol": "lames + carreaux", "manquants": "fenetre 735,95,860,345"},
+                 "sol": "lames + carreaux", "manquants": "fenetre 735,95,860,345",
+                 # mur du fond : une colonne dans le coin de gauche, puis le meuble bas jusqu'au mur de la fenêtre (on voit le plan de
+                 # travail le toucher) ; mur de gauche : deux colonnes visibles (dont celle du four), le reste sort de la photo
+                 "rangees": "vers12 : coin colonne(4) bas*(24) coin ; gauche12 : cadre colonne(3) colonne angle"},
     "photo-06": {"objets": "1 colonne_cuisine grise ; 2 ilot bar gris, plan blanc ; 3 tabouret_haut jaune ; 4 tabouret_haut jaune ; 5 = 1 ; "
                            "6 etagere_cubes blanc ; 7 tabouret_haut jaune ; 8 meuble_cuisine_bas gris {d=coin} ; 9 meuble_cuisine_haut gris ; 10 = 9 ; "
                            "11 = 9 ; 12 = 8 ; 13 = 2 ; 14 = 9 ; 15 = 9 ; 16 suspension cage noire ; 17 suspension cage noire ; 18 = 9 ; "
                            "19 fenetre ; 20 = 19 ; 21 = 9 ; 22 = 8 ; 23 = 9 ; 24 autre petit électroménager posé ; 25 = 9 ; 26 = 2 ; "
                            "27 electromenager plaque de cuisson",
-                 "sol": "carreaux + lames", "manquants": "fenetre 640,150,790,360 ; tabouret_haut 850,400,940,600 jaune"},
+                 "sol": "carreaux + lames", "manquants": "fenetre 640,150,790,360 ; tabouret_haut 850,400,940,600 jaune",
+                 "rangees": "vers9 : cadre colonne(1) bas*(8) coin"},
     "photo-07": {"objets": "1 etagere_cubes blanc ; 2 porte blanche ; 3 rangement buffet bois et blanc ; 4 banc noir, à chaussures ; "
                            "5 colonne_cuisine grise, vue par l'ouverture ; 6 fenetre ; 7 fenetre",
                  "sol": "lames",

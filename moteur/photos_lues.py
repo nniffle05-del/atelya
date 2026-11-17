@@ -242,8 +242,9 @@ def contre_le_mur(position, sorte: str, boite, cam, logement: dict, largeur: int
         vers = 1.0 if bords[1] >= bords[0] else -1.0
         bords = [bords[0] + vers * trop, bords[1] - vers * trop]
     # un bout « au coin » : le bout du mur, du côté de l'image que la lecture a dit (le sens de l'image le long du mur)
-    a0, a1 = (math.radians(rayon(cam, u, (y0 + y1) / 2)[0]) for u in (x0, x1))
-    sens = 1.0 if float(np.array([math.cos(a1) - math.cos(a0), math.sin(a1) - math.sin(a0)]) @ t) > 0 else -1.0
+    from moteur.rangees import sens_de_l_image
+
+    sens = sens_de_l_image(f, cam) * (1.0 if float((f["b"] - f["a"]) @ t) > 0 else -1.0)
     if bouts.get("gauche") == "coin":
         bords[0] = sa if sens > 0 else sb
     if bouts.get("droite") == "coin":
@@ -661,7 +662,7 @@ def appliquer_les_sols(pieces: dict, lus: dict[str, dict]) -> dict:
 # ---------------------------------------------------------------- l'ensemble
 def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list[dict]], modele_moge=None, par_sorte: bool = True,
           source: str = "repérage par lecture des photos", journal=lambda *_: None, equiper: bool = True, associer: bool = True,
-          adosser: bool = True) -> dict:
+          adosser: bool = True, rangees_par_photo: dict[str, list[dict]] | None = None) -> dict:
     """Photos placées (fiche cameras-photos.json) + objets de chaque photo avec leur sorte → ce qu'Atelya en fait :
     {"meubles": meubles à ajouter au logement (au sol rangés, suspendus, au mur), "baies": votes,
      "equipements": ce que moteur.equipements.poser rend (équipements à ajouter, rideaux, passe-plats, non posés)}.
@@ -686,8 +687,30 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
     dossier, fichier = Path(racine) / releve["photos"], releve.get("fichier", "{nom}.png")
     vus, par_photo, suspendus, au_mur, vues_equipements, baies, tailles = [], [], [], [], [], {}, []
     vides = eq.vides_du_plan(logement) if equiper else []
+    # les RANGÉES de cuisine dites par la lecture (moteur/rangees.py) : rangées d'abord le long de leur mur ; leurs rectangles
+    # ne sont plus posés un par un
+    rangees = {"meubles": [], "pris": set()}
+    if rangees_par_photo:
+        from moteur import rangees as rg
+
+        declarations = []
+        for nom, d in releve["cameras"].items():
+            if not rangees_par_photo.get(nom):
+                continue
+            image = lire_image(dossier / fichier.format(nom=nom))
+            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) if image is not None else None
+            boites = {int(o["numero"]): o["boite"] for o in objets_par_photo.get(nom) or []}
+            couleurs = {n: _couleur(rgb, b) for n, b in boites.items()}
+            declarations += [{"photo": nom, "cam": camera_depuis_dict(d["camera"]), "mur": r["mur"], "suite": r["suite"], "boites": boites,
+                              "couleurs": couleurs} for r in rangees_par_photo[nom]]
+        rangees = rg.poser(declarations, logement, plan, journal)
+    # ce que les rangées ont déjà rangé, par pièce : une AUTRE photo qui aperçoit la même cuisine (par une porte, de loin) sans
+    # en dire les rangées ne la pose pas une seconde fois
+    deja_ranges: dict[str, set] = {}
+    for m in rangees["meubles"]:
+        deja_ranges.setdefault(m["piece"], set()).add(m["categorie"])
     for k, (nom, d) in enumerate(releve["cameras"].items()):
-        objets = objets_par_photo.get(nom) or []
+        objets = [o for o in objets_par_photo.get(nom) or [] if (nom, int(o["numero"])) not in rangees["pris"]]
         image = lire_image(dossier / fichier.format(nom=nom))
         if image is None:
             raise FileNotFoundError(dossier / fichier.format(nom=nom))
@@ -699,13 +722,17 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         repere = cp.repere(cp.mesurer(modele_moge, rgb, float(d["camera"]["f"])), hsp) if objets else None
         de_la_photo = au_sol_d_une_photo(objets, cam, largeur, hauteur, piece, rgb, photo=k, repere=repere, camera=d["camera"], plan=plan,
                                          logement=logement, adosser=adosser)
+        if deja_ranges and not (rangees_par_photo or {}).get(nom):
+            de_la_photo = [v for v in de_la_photo if v.get("categorie") not in deja_ranges.get(v.get("piece"), ())]
         vus += de_la_photo
         par_photo.append(de_la_photo)
         suspendus += oa.suspensions_d_une_photo(
             [{"phrase": oa.PHRASES[0], "note": max(float(o["note"]), oa.NOTE_MIN), "boite": o["boite"]} for o in objets if o["sorte"] == "suspension"],
             repere, d["camera"], largeur, hauteur, logement, rgb, photo=k)
         au_mur += au_mur_d_une_photo(objets, cam, d["camera"], plan, repere, largeur, hauteur, logement, rgb, photo=k)
-        vues_equipements += eq.vues_d_une_photo(objets, cam, d["camera"], plan, repere, largeur, hauteur, logement, rgb, photo=k, vides=vides)
+        vues_equipements += [v for v in eq.vues_d_une_photo(objets, cam, d["camera"], plan, repere, largeur, hauteur, logement, rgb, photo=k,
+                                                            vides=vides)
+                             if not (v.get("sorte") == "refrigerateur" and "refrigerateur" in deja_ranges.get(v.get("piece"), ()))]
         for ident, (pf, f) in baies_d_une_photo(objets, cam, plan, logement).items():
             t = baies.setdefault(ident, [0, 0])
             t[0] += pf
@@ -732,7 +759,7 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         m["source"] = m["source"].replace("repérage photos", source)
         if equiper and regards.get(m["id"]):
             m["_appareils"] = regards[m["id"]]
-    deja = list(logement.get("meubles", []))
+    deja = list(logement.get("meubles", [])) + rangees["meubles"]  # les rangées de cuisine sont en place : le reste se range autour
     ranges, _ = ranger(deja + nouveaux, logement, journal=journal)
     nouveaux = [m for m in ranges if not any(m["id"] == x["id"] for x in deja)]
     accroches = oa.vers_meubles(oa.fusionner(suspendus), logement) + vers_meubles_au_mur(fusionner_au_mur(au_mur), logement, source)
@@ -743,7 +770,8 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         while m["id"] in pris:
             m["id"] += "b"
         pris.add(m["id"])
-    poses = nouveaux + accroches
+    poses = rangees["meubles"] + nouveaux + accroches
+    deja = list(logement.get("meubles", []))
     if equiper:
         equipements = eq.poser(vues_equipements, logement, deja + poses, journal, vides=vides)
         # une cheminée est bâtie : les meubles posés d'après les photos qui la traversaient se sont écartés (ou sont retirés)

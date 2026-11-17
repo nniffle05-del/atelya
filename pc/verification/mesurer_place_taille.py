@@ -33,13 +33,13 @@ from moteur import collisions, moge, photos_lues  # noqa: E402
 from moteur import equipements as eq  # noqa: E402
 
 
-def refaire(cas: str, depart: Path, sortie: Path, modele, options: dict) -> dict:
+def refaire(cas: str, depart: Path, sortie: Path, modele, options: dict, sans_rangees: bool = False) -> dict:
     fiche = essai.lire(CAS[cas]["fiche"])
     logement = essai.lire(depart / cas / "c" / "logement-sols.json")
     objets = ppl.objets_des_photos(fiche, PC / "lectures-photos" / cas)
     journal: list[str] = []
     r = photos_lues.poser(fiche, logement, RACINE, objets, modele_moge=modele, journal=lambda *a: journal.append(" ".join(str(x) for x in a)),
-                          **options)
+                          rangees_par_photo=None if sans_rangees else ppl.rangees_des_photos(fiche, PC / "lectures-photos" / cas), **options)
     logement["meubles"] = list(logement.get("meubles", [])) + r["meubles"]
     logement = eq.appliquer(logement, r["equipements"])
     logement, actions = collisions.reparer(logement, journal=lambda *a: journal.append(" ".join(str(x) for x in a)))
@@ -71,13 +71,14 @@ def main() -> int:
     ap.add_argument("--cas", nargs="*", default=list(CAS))
     ap.add_argument("--ancien", action="store_true")
     ap.add_argument("--sans-adosser", action="store_true", help="sans la mesure des meubles adossés sur leur mur (étape 2)")
+    ap.add_argument("--sans-rangees", action="store_true", help="sans les rangées de cuisine dites par la lecture (17/11/2026)")
     a = ap.parse_args()
     modele = moge.charger()
     options = {"associer": False, "adosser": False} if a.ancien else {"adosser": False} if a.sans_adosser else {}
     lignes, total = [], {"retrouves": 0, "bonne_sorte": 0, "en_trop": 0, "a_trouver": 0, "acc": 0, "acc_trop": 0, "acc_a_trouver": 0}
     for cas in a.cas:
         debut = time.time()
-        n = refaire(cas, a.depart, a.sortie, modele, options)
+        n = refaire(cas, a.depart, a.sortie, modele, options, a.sans_rangees)
         e, c = n["equipements"], n["collisions"]
         fin = (f" | équipements {len(e['meubles'])} posés, {len(e['non_poses'])} non posés | collisions {c['total']} | {n['meubles_poses']} objets "
                f"| {time.time() - debut:.0f} s")

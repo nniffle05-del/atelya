@@ -41,13 +41,22 @@ NOTES = {
                            "5 electromenager four encastré ; 6 = 3 ; 7 meuble_cuisine_bas tiroirs, bois {d=g3} ; "
                            "8 electromenager micro-ondes encastré ; 9 meuble_cuisine_bas sous l'évier, bois {g=d10 d=g15} ; 10 meuble_cuisine_bas bois ; "
                            "11 faux ; 12 plafonnier rampe de spots ; 13 = 3 ; 14 electromenager plaque de cuisson ; 15 = 7 ; 16 = 3 ; 17 evier",
-                 "sol": "carreaux", "manquants": "fenetre 205,235,465,420"},
+                 "sol": "carreaux", "manquants": "fenetre 205,235,465,420",
+                 # RÉSERVE : PREMIÈRE lecture (coin donné à la rangée de la plaque ; plaque, colonne et réfrigérateur sur un seul mur)
+                 # FAUSSE, corrigée APRÈS avoir vu le relevé fait à la main. Ce que la photo montrait et que je n'avais pas compris :
+                 # on voit le FLANC de la colonne des fours (rectangle 13) → elle avance, le mur fait un décroché ; le dernier meuble
+                 # sous la fenêtre (15) est vu de face → c'est la rangée de la fenêtre qui tient le coin. La note de ce logement est
+                 # donc flattée pour la cuisine. Mur de la fenêtre : meubles bas, du bord caché par la porte jusqu'au coin (3 modules
+                 # comptés) ; mur de droite : de l'angle jusqu'au décroché ; pan qui avance : colonne des fours, réfrigérateur.
+                 "rangees": "vers9 : cadre basx3(9,10,15) coin ; droite9 : angle bas*(7) coin ; vers3 : coin colonne(3) frigo(1) cadre"},
     "photo-09": {"objets": "1 meuble_cuisine_bas linéaire avec évier, bois {g=cadre d=g2} ; 2 meuble_cuisine_bas tiroirs sous la plaque, bois ; 3 evier ; "
                            "4 electromenager réfrigérateur inox ; 5 = 1 ; 6 colonne_cuisine bois ; "
                            "7 porte porte d'entrée, dans le couloir ; 8 meuble_cuisine_bas petit meuble à droite, bois ; "
                            "9 electromenager fours encastrés ; 10 plafonnier rampe de spots ; 11 = 6 ; "
                            "12 electromenager plaque de cuisson ; 13 = 6 ; 14 = 2",
-                 "sol": "carreaux", "manquants": "hotte 395,65,775,215 blanche"},
+                 "sol": "carreaux", "manquants": "hotte 395,65,775,215 blanche",
+                 # même réserve ; pan qui avance : colonne, réfrigérateur, petit meuble bas, jusqu'au mur de la porte
+                 "rangees": "vers2 : angle bas*(2) coin ; vers4 : coin colonne(6) frigo(4) bas(8) coin ; gauche2 : cadre basx3(1) coin"},
     "photo-10": {"objets": "1 commode blanche, trois tiroirs ; 2 miroir posé au sol, cadre blanc ; 3 lit une place, blanc ; "
                            "4 meuble_tv blanc, bas ; 5 bibliotheque colonne blanche, étroite ; 6 suspension globe blanc ; 7 television",
                  "sol": "lames",
