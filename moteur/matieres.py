@@ -97,6 +97,13 @@ SOLS: dict[str, tuple[str, str]] = {
 # à de la moquette une fois posée : pas réaliste ; à remplacer par un vrai granito gris à éclats).
 NOMS_SOLS = tuple(SOLS)
 
+# Le parquet SUR MESURE (18/11/2026, NT : « je veux que le sens soit le même, et aussi le parquet ») : pas une matière du
+# catalogue, mais un parquet dessiné par Atelya d'après ce qu'il a mesuré sur les photos du client (largeur et longueur des
+# lames, nuances, joints : champ « parquet » du sol, moteur/parquet_photo.py et moteur/parquet_sur_mesure.py). Dans la
+# maquette, sa matière s'appelle « psm_ » + la clé de sa fiche : deux pièces au même parquet partagent la même image.
+SUR_MESURE = "parquet_sur_mesure"
+LIBELLE_SUR_MESURE = "Parquet sur mesure (d'après les photos)"
+
 # Dessinées par un calcul dans Blender (moteur/blender/materiaux.py), à partir d'une photo de la bibliothèque ou de rien.
 CALCULEES = {"point_de_hongrie": "chene_clair", "carreaux_ciment": None}
 
@@ -164,7 +171,7 @@ def sens_du_nom(nom: str) -> float | None:
 
 
 def sorte(matiere: str) -> str:
-    """« bois » ou « carrelage » (un nom inconnu, ancien « parquet » compris, compte comme du bois)."""
+    """« bois » ou « carrelage » (un nom inconnu, ancien « parquet » et parquets sur mesure compris, compte comme du bois)."""
     matiere = matiere_et_teinte(matiere)[0]
     if matiere in SOLS:
         return SOLS[matiere][1]

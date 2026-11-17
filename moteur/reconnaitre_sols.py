@@ -488,6 +488,7 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
             s["empreinte"] = te[hors_zones].mean(0) if hors_zones.any() else None
     zones_d_un_meme_sol(pieces)
     sens_des_sols(pieces, vues, logement, pas_du_sol)
+    parquets_des_sols(pieces, vues, logement, pas_du_sol)
     return {"pieces": pieces, "carte": carte, "image": image, "finesse": finesse, "origine": v0.origine,
             "resolution": v0.resolution}
 
@@ -499,8 +500,10 @@ def sens_des_sols(pieces: dict, vues, logement: dict, pas_du_sol=None) -> None:
     """Le SENS des lames de chaque parquet (pièce, zones d'un même sol) et, quand elle se mesure, leur LARGEUR, lus sur les
     photos (moteur/sens_des_lames.py ; 17/11/2026, NT : « pas ressemblants […] sur la direction du parquet »). Clés « sens »
     (degrés, repère du logement ; absente si les photos ne tranchent pas : le sens général du logement reste) et
-    « largeur_lames » (m). Lames droites : le sens des joints. Point de Hongrie, bâtons rompus : le sens des longs joints qui
-    séparent les rangs de chevrons, tourné d'un quart de tour (c'est ainsi que la maquette oriente ces motifs)."""
+    « largeur_lames » (m). Lames droites : le sens des joints. Point de Hongrie : le sens des longs joints qui séparent les
+    rangs de chevrons (MESURÉ le 18/11/2026 sur le séjour d'app-001, photo contre maquette : avec le quart de tour ajouté
+    jusque-là, les rangs de chevrons partaient en travers de ceux de la photo). Bâtons rompus : quart de tour gardé (pas
+    encore vérifié sur une photo : aucun des logements d'essai n'en a)."""
     from moteur import sens_des_lames as sl
     from moteur.sol_a_plat import dans_polygone
 
@@ -530,10 +533,52 @@ def sens_des_sols(pieces: dict, vues, logement: dict, pas_du_sol=None) -> None:
             droites = sols[0]["famille"] == "lames"
             largeur = sl.largeur_des_lames(les_traits, choix["sens"]) if droites else None
             for sol in sols:
-                sol["sens"] = choix["sens"] if droites else (choix["sens"] + 90.0) % 180.0
+                sol["sens"] = choix["sens"] if droites or sol["famille"] == "point_de_hongrie" else (choix["sens"] + 90.0) % 180.0
                 sol["sens_note"] = [choix["note"], choix["autre"]]
                 if largeur and largeur["ecarts"] >= LARGEUR_ECARTS_MIN:
                     sol["largeur_lames"] = largeur["largeur_m"]
+
+
+def parquets_des_sols(pieces: dict, vues, logement: dict, pas_du_sol=None) -> None:
+    """Le PARQUET de chaque sol à lames droites, MESURÉ sur les photos (moteur/parquet_photo.py ; 18/11/2026, NT : « je veux que
+    le sens soit le même, et aussi le parquet ») : largeur et longueur des lames, nuances d'une lame à l'autre, force des
+    joints. Clé « parquet_mesure » du sol (pièce, ou zones d'une même famille) ; absente si le sens des lames n'a pas été lu
+    (sans lui, on ne sait pas dans quel sens regarder) ou si aucune photo prise dans la pièce ne montre ce sol."""
+    from moteur import parquet_photo as pp
+    from moteur.sol_a_plat import dans_polygone
+
+    contours = {p["id"]: p["contour"] for p in logement["pieces"]}
+    for pid, s in pieces.items():
+        groupes: dict[str, list] = {"": [s]}  # "" : le sol de la pièce ; sinon les zones d'une même famille
+        for z in s["zones"]:
+            groupes.setdefault(z["famille"], []).append(z)
+        for cle, sols in groupes.items():
+            if sols[0]["famille"] != "lames" or sols[0].get("sens") is None:
+                continue
+            zones = [z["contour"] for z in s["zones"]] if cle == "" else [z["contour"] for z in sols]
+
+            def garder(X, Y, zones=zones, dedans=(cle != "")):
+                dans = np.zeros(np.shape(X), bool)
+                for c in zones:
+                    dans |= dans_polygone(X, Y, c)
+                return dans if dedans else ~dans
+
+            images = []
+            for nom, piece_vue, vue in vues:
+                if piece_vue != pid or vue.photo is None:
+                    continue
+                masque = pas_du_sol(nom, vue.photo) if pas_du_sol is not None else None
+                image, vu = pp.sol_dans_le_sens(vue.photo, vue.camera, contours[pid], sols[0]["sens"], masque, vue.point_de_vue,
+                                                garder=garder if zones else None)
+                if vu.sum() * pp.RESOLUTION_M ** 2 < 0.1:
+                    continue
+                images.append((image, pp.bois_propre(image, vu), pp.bois_vu(image, vu)))
+            if not images:
+                continue
+            mesure = pp.mesurer_parquet(images)
+            mesure["photos"] = len(images)
+            for sol in sols:
+                sol["parquet_mesure"] = mesure
 
 
 def zones_d_un_meme_sol(pieces: dict) -> None:
@@ -676,16 +721,84 @@ def choisir_matiere(famille_: str, empreinte, prototypes: dict | None, largeur_l
     return max(candidates, key=lambda m: float(np.asarray(prototypes[m]) @ e))
 
 
+PARQUET_SUR_MESURE = True  # les lames droites : parquet dessiné sur mesure d'après les photos (False : matière du catalogue, comme avant le 18/11/2026)
+MEME_LARGEUR = 0.18  # deux parquets dont les lames ont la même largeur à 18 % près sont le MÊME parquet (la mesure n'est pas plus fine d'une photo à l'autre)
+
+
+def memes_parquets(pieces: dict) -> None:
+    """« Le même parquet dans toutes les pièces quand les photos montrent le même » (NT, 17/11/2026). Pose sur chaque sol à
+    lames droites sa FICHE de parquet sur mesure (clé « parquet », moteur/parquet_sur_mesure.fiche) :
+    - les sols dont la largeur des lames a été mesurée sont regroupés par largeur (à MEME_LARGEUR près) : un groupe = un
+      parquet, dont chaque valeur réunit les mesures de ses pièces (la plus appuyée compte le plus) ;
+    - un sol trop peu vu pour être mesuré prend le parquet du groupe le plus appuyé du logement (dans un logement, les parquets
+      à lames sont presque toujours les mêmes), et toute sa fiche est marquée SUPPOSÉE ;
+    - sans aucune mesure dans le logement : un parquet aux valeurs supposées (lames de 9 cm), dit comme tel."""
+    from moteur import parquet_sur_mesure as psm
+
+    sols, vus = [], set()
+    for s in pieces.values():
+        for sol in [s] + list(s.get("zones", [])):
+            if sol.get("famille") == "lames":
+                m = dict(sol.get("parquet_mesure") or {})
+                if "largeur_m" not in m and sol.get("largeur_lames"):  # l'ancienne mesure (écart entre les traits des joints)
+                    m["largeur_m"], m["fenetres"] = float(sol["largeur_lames"]), 2
+                sols.append((sol, m))
+    mesures = []  # une mesure par parquet réellement mesuré (les zones d'une même famille partagent la leur)
+    for _, m in sols:
+        if "largeur_m" in m and id(m) not in vus and not any(m is autre for autre in mesures):
+            mesures.append(m)
+    appui = lambda m: float(m.get("largeur", {}).get("fenetres", m.get("fenetres", 1))) + 0.2 * float(m.get("rangs_m", 0.0))
+    groupes: list[list[dict]] = []
+    for m in sorted(mesures, key=appui, reverse=True):
+        for g in groupes:
+            if abs(m["largeur_m"] / g[0]["largeur_m"] - 1.0) <= MEME_LARGEUR:
+                g.append(m)
+                break
+        else:
+            groupes.append([m])
+
+    def reunir(groupe: list[dict]) -> dict:
+        sortie = {}
+        for cle, poids_de in (("largeur_m", appui), ("longueur_m", lambda m: m.get("rangs_m", 0.0)), ("nuance", lambda m: m.get("rangs_m", 0.0)),
+                              ("chaleur", lambda m: m.get("rangs_m", 0.0)), ("creux_mm", lambda m: m.get("rangs_m", 0.0))):
+            avec = [(m[cle], max(poids_de(m), 1e-3)) for m in groupe if m.get(cle) is not None]
+            if avec:
+                sortie[cle] = float(sum(v * p for v, p in avec) / sum(p for _, p in avec))
+        return sortie
+
+    fiches = [(g, psm.fiche(reunir(g))) for g in groupes]
+    principal = max(fiches, key=lambda gf: sum(appui(m) for m in gf[0]))[1] if fiches else None
+    for sol, m in sols:
+        fiche = next((f for g, f in fiches if any(m is x for x in g)), None)
+        if fiche is None:  # pas mesuré ici : le parquet le plus appuyé du logement, ou des valeurs supposées
+            fiche = {**(principal or psm.fiche({})), "supposes": ["chaleur", "joint_mm", "largeur", "longueur", "nuance"]}
+        sol["parquet"] = fiche
+
+
 def sols_vers_logement(resultat: dict, logement: dict, bibliotheque, prototypes: dict | None = None) -> dict:
     """Le logement avec les sols reconnus sur les photos : matière, zones (convexes), teinte et couleur visée au rendu ;
-    statut « estime » (vu sur photo), source « brique photos », confiance = part des avis. Les pièces non vues gardent leur sol."""
+    statut « estime » (vu sur photo), source « brique photos », confiance = part des avis. Les pièces non vues gardent leur sol.
+    Lames droites (18/11/2026) : un parquet SUR MESURE, dessiné d'après ce qui a été mesuré sur les photos (memes_parquets)."""
     import json as _json
     from pathlib import Path
     from moteur.teinte_photo import albedo_de_la_matiere, teinte_pour
 
     def sol(s, part):
-        from moteur.matieres import LAMES_DROITES
+        from moteur.matieres import LAMES_DROITES, SUR_MESURE
 
+        if s.get("parquet") and PARQUET_SUR_MESURE:
+            from moteur import parquet_sur_mesure as psm
+
+            mesure = s.get("parquet_mesure") or {}
+            d = {"matiere": SUR_MESURE, "parquet": s["parquet"], "statut": "estime", "confiance": round(float(min(max(part, 0.05), 1.0)), 2),
+                 "source": f"brique photos ({s.get('photos_couleur', 0)} photos pour la couleur ; parquet mesuré sur "
+                           f"{mesure.get('photos', 0)} photos, {mesure.get('sol_m2', 0)} m² de sol)"}
+            if s.get("sens") is not None:
+                d["sens"] = round(float(s["sens"]) % 180.0, 1)
+            if s.get("couleur_photo") and bibliotheque is not None:
+                d["couleur_photo"] = s["couleur_photo"]
+                d["teinte"] = list(teinte_pour(psm.albedo(s["parquet"], Path(bibliotheque)), s["couleur_photo"]))
+            return d
         matiere = choisir_matiere(s["famille"], s.get("empreinte"), prototypes, s.get("largeur_lames"))
         d = {"matiere": matiere, "statut": "estime", "confiance": round(float(min(max(part, 0.05), 1.0)), 2),
              "source": f"brique photos ({s.get('photos_couleur', 0)} photos pour la couleur)"}
@@ -701,6 +814,8 @@ def sols_vers_logement(resultat: dict, logement: dict, bibliotheque, prototypes:
         return d
 
     couleur_sure_du_bois(resultat["pieces"])
+    if PARQUET_SUR_MESURE:
+        memes_parquets(resultat["pieces"])
     sortie = _json.loads(_json.dumps(logement))
     for p in sortie["pieces"]:
         s = resultat["pieces"].get(p["id"])
@@ -771,7 +886,7 @@ def sols_des_espaces_ouverts(logement: dict) -> dict:
             if not sources:
                 continue
             origine = max(sources, key=lambda q: float(q["sol"].get("confiance", 0.0)))
-            p["sol"] = {**{k: v for k, v in origine["sol"].items() if k in ("matiere", "teinte", "couleur_photo", "echelle", "sens")},
+            p["sol"] = {**{k: v for k, v in origine["sol"].items() if k in ("matiere", "parquet", "teinte", "couleur_photo", "echelle", "sens")},
                         "statut": "ajoute", "confiance": round(0.8 * float(origine["sol"].get("confiance", 0.5)), 2),
                         "source": f"même sol que {origine['id']} (espace ouvert, sans cloison)"}
             change = True

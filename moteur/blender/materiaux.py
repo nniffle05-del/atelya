@@ -44,7 +44,7 @@ REFLET_BOIS = 0.15  # « Specular IOR Level » (0,5 = reflet normal d'un vernis)
 class Materiaux(dict):
     """Les matériaux de la maquette, créés à la demande par leur nom (les sols : seulement ceux du logement)."""
 
-    def __init__(self, bibliotheque=None, orientation=0.0):
+    def __init__(self, bibliotheque=None, orientation=0.0, sur_mesure=None):
         super().__init__()
         self.bibliotheque = Path(bibliotheque) if bibliotheque else None
         self.fiches = {}
@@ -53,6 +53,10 @@ class Materiaux(dict):
         else:
             self.bibliotheque = None
         self.orientation = orientation
+        # Les parquets dessinés SUR MESURE pour ce logement (moteur/parquet_sur_mesure.py) : {nom : fiche avec son « dossier »}.
+        # Ce sont des images comme celles de la bibliothèque, rangées à côté de la maquette.
+        self.sur_mesure = {n: f for n, f in (sur_mesure or {}).items() if (Path(f["dossier"]) / "couleur.jpg").is_file()}
+        self.fiches.update(self.sur_mesure)
 
     def __missing__(self, nom):
         materiau = bpy.data.materials.new(nom)
@@ -62,16 +66,18 @@ class Materiaux(dict):
         return materiau
 
     def photo(self, nom):
-        """(dossier, taille en m) d'une matière de la bibliothèque, ou None."""
+        """(dossier, taille en m) d'une matière de la bibliothèque (ou d'un parquet sur mesure du logement), ou None."""
+        if nom in self.sur_mesure:
+            return Path(self.sur_mesure[nom]["dossier"]), (self.sur_mesure[nom].get("taille_image_m") or [1.0, 1.0])[0]
         if self.bibliotheque is None or nom not in self.fiches or not (self.bibliotheque / nom / "couleur.jpg").is_file():
             return None
         taille = (self.fiches[nom].get("taille_image_m") or [1.0, 1.0])[0]
         return self.bibliotheque / nom, taille
 
 
-def creer_materiaux(bibliotheque=None, orientation=0.0) -> dict:
+def creer_materiaux(bibliotheque=None, orientation=0.0, sur_mesure=None) -> dict:
     """Les matériaux connus, créés à la demande quand une brique les demande par leur nom."""
-    return Materiaux(bibliotheque, orientation)
+    return Materiaux(bibliotheque, orientation, sur_mesure)
 
 
 def _peinture(couleur, rugosite):
@@ -348,7 +354,7 @@ def _photo(materiau, m, nom, echelle=1.0):
         normale.inputs["Strength"].default_value = 1.0
         liens.new(relief.outputs["Color"], normale.inputs["Color"])
         liens.new(normale.outputs["Normal"], bsdf.inputs["Normal"])
-    materiau.diffuse_color = (0.5, 0.4, 0.3, 1.0) if SORTES.get(nom) == "bois" else (0.75, 0.73, 0.7, 1.0)
+    materiau.diffuse_color = (0.5, 0.4, 0.3, 1.0) if _sorte(nom) == "bois" else (0.75, 0.73, 0.7, 1.0)
 
 
 def _enduit(materiau, m, couleur):

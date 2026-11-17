@@ -23,7 +23,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from moteur.matieres import NOMS_SOLS
+from moteur.matieres import NOMS_SOLS, SUR_MESURE
 from moteur.meubles import NOMS_MEUBLES
 
 VERSION_SCHEMA = "logement/0.1"
@@ -169,8 +169,31 @@ class PortesPlacard(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class Parquet(BaseModel):
+    """Un parquet à lames droites fait SUR MESURE d'après les photos du client (18/11/2026) : ce qu'Atelya a mesuré sur les
+    photos (moteur/parquet_photo.py) et qu'il dessine à la construction (moteur/parquet_sur_mesure.py).
+
+    « supposes » liste les valeurs qui n'ont PAS pu être mesurées (sol trop peu vu) et sont donc des suppositions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pose: Literal["lames"] = "lames"
+    largeur: Annotated[float, Field(ge=0.04, le=0.35)] = Field(description="Largeur d'une lame (m)")
+    longueur: Annotated[float, Field(ge=0.25, le=2.5)] = Field(description="Longueur moyenne des lames (m) ; elles vont de la "
+                                                                 "moitié à une fois et demie cette longueur")
+    nuance: Annotated[float, Field(ge=0, le=0.25)] = Field(description="De combien la clarté change d'une lame à l'autre "
+                                                           "(0,10 = des lames 10 % plus claires ou plus foncées que la moyenne)")
+    chaleur: Annotated[float, Field(ge=0, le=0.12)] = Field(description="De combien la couleur change d'une lame à l'autre "
+                                                            "(plus rousse ou plus grise)")
+    joint_mm: Annotated[float, Field(ge=0, le=3.0)] = Field(description="Force du joint entre deux lames, en millimètres de "
+                                                            "noir (0 = joint invisible, 2 = joint très marqué d'un vieux parquet)")
+    bois: str = Field(default="chene_clair", min_length=1, description="La photo de bois de la bibliothèque dont les lames sont tirées")
+    supposes: list[Literal["largeur", "longueur", "nuance", "chaleur", "joint_mm"]] = Field(default_factory=list)
+
+
 class Sol(BaseModel):
-    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py).
+    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py), ou un parquet
+    fait sur mesure d'après les photos (matière « parquet_sur_mesure », décrit par le champ « parquet »).
 
     Même provenance que Plinthes : « ajoute » (règle par défaut), « estime » (vu sur une photo), « mesure » (choisi à
     l'écran de vérification).
@@ -178,7 +201,9 @@ class Sol(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    matiere: Literal[*NOMS_SOLS]
+    matiere: Literal[*NOMS_SOLS, SUR_MESURE]
+    parquet: Parquet | None = Field(default=None, description="Le parquet sur mesure (obligatoire si la matière est "
+                                    "« parquet_sur_mesure », ignoré sinon)")
     teinte: tuple[Annotated[float, Field(ge=0.02, le=4.0)], Annotated[float, Field(ge=0.02, le=4.0)],
                   Annotated[float, Field(ge=0.02, le=4.0)]] | None = Field(
         default=None, description="Correction de couleur (rouge, vert, bleu) qui rapproche la matière de la photo du client")
@@ -194,6 +219,12 @@ class Sol(BaseModel):
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _sur_mesure_decrit(self) -> "Sol":
+        if self.matiere == SUR_MESURE and self.parquet is None:
+            raise ValueError("un sol « parquet_sur_mesure » doit décrire son parquet (champ « parquet »)")
+        return self
 
 
 class Corniche(BaseModel):

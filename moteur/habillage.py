@@ -61,7 +61,7 @@ from dataclasses import asdict, replace
 
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
-from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, matiere_et_teinte, nom_materiau, sorte
+from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, SUR_MESURE, matiere_et_teinte, nom_materiau, sorte
 
 VERSION_PLAN = "construction/0.2"
 
@@ -158,6 +158,8 @@ def plan_habille(logement: Logement) -> dict:
         # la sorte (bois ou carrelage) de chaque matière du catalogue : Blender en a besoin pour la brillance et le relief,
         # sans pouvoir lire moteur/matieres.py (catalogue passé à 61 matières le 09/11/2026)
         "sortes_sols": {nom: sorte(nom) for nom in NOMS_SOLS},
+        # les parquets faits sur mesure d'après les photos : {nom de la matière : sa fiche} ; moteur.construire les dessine
+        "parquets_sur_mesure": parquets_sur_mesure(logement),
         "rideaux": rideaux_du_plan(logement),
     }
 
@@ -370,6 +372,24 @@ def completer_finitions(logement: dict) -> dict:
     return sortie
 
 
+def matiere_d_un_sol(sol) -> str:
+    """La matière d'un sol dans la maquette : celle du catalogue, ou le nom du parquet dessiné sur mesure (« psm_… »)."""
+    if sol.matiere == SUR_MESURE and sol.parquet is not None:
+        from moteur.parquet_sur_mesure import nom
+        return nom(sol.parquet.model_dump())
+    return sol.matiere
+
+
+def parquets_sur_mesure(logement: Logement) -> dict:
+    """Les parquets sur mesure du logement : {nom de la matière (« psm_… ») : fiche du parquet}."""
+    sortie = {}
+    for p in logement.pieces:
+        for sol in ([p.sol] if p.sol is not None else []) + [z.sol for z in p.zones_sol]:
+            if sol.matiere == SUR_MESURE and sol.parquet is not None:
+                sortie[matiere_d_un_sol(sol)] = sol.parquet.model_dump()
+    return sortie
+
+
 def materiau_de(brique: Brique, logement: Logement) -> str:
     """Le matériau d'une brique des murs, sols et plafonds."""
     if brique.categorie == "mur":
@@ -381,11 +401,11 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
         piece = pieces[brique.element]
         if brique.id.startswith("zone_sol__"):  # « zone_sol__<pièce>__<n° de la zone, à partir de 1> »
             zone = piece.zones_sol[int(brique.id.rsplit("__", 1)[1]) - 1]
-            return nom_materiau(zone.sol.matiere, zone.sol.teinte, zone.sol.echelle, zone.sol.sens)
+            return nom_materiau(matiere_d_un_sol(zone.sol), zone.sol.teinte, zone.sol.echelle, zone.sol.sens)
         if piece.sol is None:
             return nom_materiau(matiere_du_sol(piece), sens=sens_par_defaut(piece, matiere_du_sol(piece), logement))
         sens = piece.sol.sens if piece.sol.sens is not None else sens_par_defaut(piece, piece.sol.matiere, logement)
-        return nom_materiau(piece.sol.matiere, piece.sol.teinte, piece.sol.echelle, sens)
+        return nom_materiau(matiere_d_un_sol(piece.sol), piece.sol.teinte, piece.sol.echelle, sens)
     return "seuil"  # le sol sous une porte
 
 
@@ -402,7 +422,7 @@ def sens_par_defaut(piece: Piece, matiere: str, logement: Logement) -> float | N
     deux fois. Ce n'est qu'une supposition (aucune photo ne tranche) ; un sens lu sur les photos passe toujours devant."""
     from moteur.matieres import LAMES_DROITES
 
-    if matiere not in LAMES_DROITES or len(piece.contour) < 3:
+    if (matiere not in LAMES_DROITES and matiere != SUR_MESURE) or len(piece.contour) < 3:
         return None
     general = orientation_sols(logement)
     c, s = math.cos(-general), math.sin(-general)

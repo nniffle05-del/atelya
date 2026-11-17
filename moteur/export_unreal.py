@@ -132,6 +132,10 @@ def fiche_materiau(nom: str, fiches_bibliotheque: dict, teintes: dict, orientati
             taille = fiches_bibliotheque[base].get("taille_image_m") or [1.0, 1.0]
             f["photos"] = {"dossier": f"matieres/{base}", "taille_m": _arrondi([t * echelle for t in taille], 3)}
             f["credit"] = base
+            if fiches_bibliotheque[base].get("dossier"):  # un parquet sur mesure : ses images sont à côté de la maquette
+                f["photos"]["source"] = fiches_bibliotheque[base]["dossier"]
+                f["parquet"] = fiches_bibliotheque[base].get("parquet")
+                f["credit"] = (fiches_bibliotheque[base].get("parquet") or {}).get("bois", base)
         if f["sorte"] == "bois":
             f["rugosite"], f["reflet"] = list(RUGOSITE_BOIS), REFLET_BOIS
         return f
@@ -158,6 +162,8 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
     eclairages = _lire(dossier_3d / "eclairages.json", [])
     reglages = _lire(dossier_3d / "reglages_teinte.json")
     fiches = _lire(bibliotheque / "matieres.json", {}) if bibliotheque else {}
+    # les parquets dessinés sur mesure pour ce logement (moteur/parquet_sur_mesure.py) : des images comme celles de la bibliothèque
+    fiches = {**fiches, **(construction.get("matieres_sur_mesure") or {})}
     orientation = float(construction.get("orientation_sols") or 0.0)
     teintes = teintes_reglees(construction, reglages)
     meubles = construction.get("meubles") or []
@@ -230,15 +236,15 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
 
 def copier_photos(fiche: dict, bibliotheque: Path | None, sortie: Path) -> list[str]:
     """Copie dans le paquet les photos des matières utilisées (et le grain de la peinture), pour les matériaux natifs d'Unreal."""
-    if not bibliotheque:
-        return []
     noms = {f["photos"]["dossier"].split("/", 1)[1] for f in fiche["materiaux"].values() if f.get("photos")}
-    if any(f.get("grain") for f in fiche["materiaux"].values()):
+    ailleurs = {f["photos"]["dossier"].split("/", 1)[1]: Path(f["photos"]["source"]) for f in fiche["materiaux"].values()
+                if (f.get("photos") or {}).get("source")}  # les parquets sur mesure, dessinés à côté de la maquette
+    if bibliotheque and any(f.get("grain") for f in fiche["materiaux"].values()):
         noms.add("enduit_peint_blanc")
     copies = []
     for nom in sorted(noms):
-        source = bibliotheque / nom
-        if not source.is_dir():
+        source = ailleurs.get(nom) or (bibliotheque / nom if bibliotheque else None)
+        if source is None or not source.is_dir():
             continue
         cible = sortie / "matieres" / nom
         cible.mkdir(parents=True, exist_ok=True)

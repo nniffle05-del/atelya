@@ -124,6 +124,18 @@ def lancer_blender(*arguments: str) -> None:
         raise RuntimeError(f"Blender a échoué :\n{resultat.stdout}\n{resultat.stderr}")
 
 
+def dessiner_parquets(parquets: dict, matieres: Path | None, dossier: Path) -> dict:
+    """Dessine les parquets SUR MESURE du logement (moteur/parquet_sur_mesure.py, 18/11/2026) dans
+    <dossier>/matieres-sur-mesure/<nom>/ : de vraies images de matière (couleur, relief, brillance), que Blender pose comme
+    une photo de la bibliothèque et que le paquet pour Unreal emporte. Rend {nom : fiche de matière, avec son dossier}.
+    Sans la bibliothèque de matières (Mac, tests) : rien n'est dessiné, Blender retombe sur son parquet dessiné par calcul."""
+    if not parquets or matieres is None:
+        return {}
+    from moteur import parquet_sur_mesure as psm
+
+    return {nom: psm.ecrire(fiche, matieres, dossier / "matieres-sur-mesure") for nom, fiche in parquets.items()}
+
+
 def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     """Lit et vérifie le logement, calcule et habille les briques, fait construire Blender."""
     logement = charger_logement(chemin_logement)
@@ -131,11 +143,12 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     dossier.mkdir(parents=True, exist_ok=True)
 
     plan = dossier / "construction.json"
-    plan.write_text(json.dumps(choisir_modeles(plan_habille(logement), trouver_meubles()), indent=2, ensure_ascii=False),
-                    encoding="utf-8")
+    contenu = choisir_modeles(plan_habille(logement), trouver_meubles())
+    matieres = trouver_matieres()
+    contenu["matieres_sur_mesure"] = dessiner_parquets(contenu.get("parquets_sur_mesure") or {}, matieres, dossier)
+    plan.write_text(json.dumps(contenu, indent=2, ensure_ascii=False), encoding="utf-8")
 
     maquette = dossier / "maquette.blend"
-    matieres = trouver_matieres()
     lancer_blender("--python", str(DOSSIER_SCRIPTS / "poser_briques.py"),
                    "--", str(plan), str(maquette), *([str(matieres.resolve())] if matieres else []))
     if json.loads(plan.read_text(encoding="utf-8")).get("vues"):
