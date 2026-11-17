@@ -487,8 +487,53 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
                 z["empreinte"] = te[dz].mean(0) if dz.any() else None
             s["empreinte"] = te[hors_zones].mean(0) if hors_zones.any() else None
     zones_d_un_meme_sol(pieces)
+    sens_des_sols(pieces, vues, logement, pas_du_sol)
     return {"pieces": pieces, "carte": carte, "image": image, "finesse": finesse, "origine": v0.origine,
             "resolution": v0.resolution}
+
+
+LARGEUR_ECARTS_MIN = 25  # la largeur des lames n'est retenue que mesurée sur au moins 25 écarts entre joints voisins
+
+
+def sens_des_sols(pieces: dict, vues, logement: dict, pas_du_sol=None) -> None:
+    """Le SENS des lames de chaque parquet (pièce, zones d'un même sol) et, quand elle se mesure, leur LARGEUR, lus sur les
+    photos (moteur/sens_des_lames.py ; 17/11/2026, NT : « pas ressemblants […] sur la direction du parquet »). Clés « sens »
+    (degrés, repère du logement ; absente si les photos ne tranchent pas : le sens général du logement reste) et
+    « largeur_lames » (m). Lames droites : le sens des joints. Point de Hongrie, bâtons rompus : le sens des longs joints qui
+    séparent les rangs de chevrons, tourné d'un quart de tour (c'est ainsi que la maquette oriente ces motifs)."""
+    from moteur import sens_des_lames as sl
+    from moteur.sol_a_plat import dans_polygone
+
+    axes = sl.axes_du_logement(logement)
+    traits = []
+    for nom, _, vue in vues:
+        if vue.photo is None:
+            continue
+        masque = pas_du_sol(nom, vue.photo) if pas_du_sol is not None else None
+        traits += sl.traits_du_sol(vue.photo, vue.camera, logement, masque)
+    for pid, s in pieces.items():
+        groupes: dict[str, tuple[list, list]] = {"": ([s], [])}  # "" : le sol de la pièce ; sinon les zones d'une même famille
+        for z in s["zones"]:
+            groupes.setdefault(z["famille"], ([], []))[0].append(z)
+        for tr in (x for x in traits if x["piece"] == pid):
+            cle = ""
+            for z in s["zones"]:  # la dernière zone qui contient le trait l'emporte (les petites sont posées après les grandes)
+                if dans_polygone(np.array([tr["milieu"][0]]), np.array([tr["milieu"][1]]), z["contour"])[0]:
+                    cle = z["famille"]
+            groupes[cle][1].append(tr)
+        for sols, les_traits in groupes.values():
+            if sols[0]["famille"] not in BOIS:
+                continue
+            choix = sl.sens_parmi(les_traits, axes)
+            if choix is None or not choix["sur"]:
+                continue
+            droites = sols[0]["famille"] == "lames"
+            largeur = sl.largeur_des_lames(les_traits, choix["sens"]) if droites else None
+            for sol in sols:
+                sol["sens"] = choix["sens"] if droites else (choix["sens"] + 90.0) % 180.0
+                sol["sens_note"] = [choix["note"], choix["autre"]]
+                if largeur and largeur["ecarts"] >= LARGEUR_ECARTS_MIN:
+                    sol["largeur_lames"] = largeur["largeur_m"]
 
 
 def zones_d_un_meme_sol(pieces: dict) -> None:
@@ -599,13 +644,31 @@ MATIERE_PAR_DEFAUT = {"lames": "chene_naturel_photo", "point_de_hongrie": "point
                       "batons_rompus": "parquet_batons_rompus", "carreaux": "carrelage_interieur"}
 
 
-def choisir_matiere(famille_: str, empreinte, prototypes: dict | None) -> str:
+LAMES_LARGES_M = 0.145  # à partir de 14,5 cm, des lames sont « larges »
+LAMES_COURANTES = ("lames_chene_anglaise", "vieux_parquet")  # le choix d'Atelya pour des lames étroites ou moyennes
+ECHELLE_LAMES = (0.6, 1.6)  # de combien une matière peut être agrandie ou réduite pour avoir des lames de la largeur mesurée
+
+
+def choisir_matiere(famille_: str, empreinte, prototypes: dict | None, largeur_lames: float | None = None) -> str:
     """La matière du catalogue de cette famille dont l'aspect (empreinte moyenne de l'œil sur la bibliothèque) est le plus
-    proche de ce que montrent les photos. Le point de Hongrie garde la matière dessinée par Atelya (la plus réaliste au rendu)."""
-    from moteur.matieres import NOMS_SOLS
+    proche de ce que montrent les photos. Le point de Hongrie garde la matière dessinée par Atelya (la plus réaliste au rendu).
+    Lames droites (17/11/2026) : seulement parmi les vrais parquets à lames droites du catalogue (moteur.matieres.LAMES_DROITES ;
+    avant, « parquet posé en diagonale » et les mosaïques pouvaient être choisis pour des lames droites) et, si la largeur
+    des lames a été mesurée sur les photos, parmi ceux dont les lames ont à peu près cette largeur."""
+    from moteur.matieres import LAMES_DROITES, NOMS_SOLS
     if famille_ == "point_de_hongrie" or empreinte is None or not prototypes:
         return MATIERE_PAR_DEFAUT[famille_]
     candidates = [m for m in NOMS_SOLS if famille(m) == famille_ and m in prototypes]
+    if famille_ == "lames":
+        candidates = [m for m in candidates if m in LAMES_DROITES]
+        if largeur_lames is not None and largeur_lames >= LAMES_LARGES_M:
+            # de LARGES lames : parmi les parquets à larges lames du catalogue, le plus ressemblant
+            candidates = [m for m in candidates if LAMES_DROITES[m] >= LAMES_LARGES_M] or candidates
+        else:
+            # lames étroites ou moyennes, ou largeur non mesurée : le parquet de chêne « à l'anglaise » (le plus courant des
+            # appartements français, dessiné par Atelya à la largeur voulue), ou le vieux parquet si c'est lui qui ressemble.
+            # Laissé à lui-même, l'œil prenait de petites lamelles courtes pour les longues lames de l'entrée d'app-001.
+            candidates = [m for m in LAMES_COURANTES if m in candidates] or candidates
     if not candidates:
         return MATIERE_PAR_DEFAUT[famille_]
     e = np.asarray(empreinte, float)
@@ -621,9 +684,17 @@ def sols_vers_logement(resultat: dict, logement: dict, bibliotheque, prototypes:
     from moteur.teinte_photo import albedo_de_la_matiere, teinte_pour
 
     def sol(s, part):
-        matiere = choisir_matiere(s["famille"], s.get("empreinte"), prototypes)
+        from moteur.matieres import LAMES_DROITES
+
+        matiere = choisir_matiere(s["famille"], s.get("empreinte"), prototypes, s.get("largeur_lames"))
         d = {"matiere": matiere, "statut": "estime", "confiance": round(float(min(max(part, 0.05), 1.0)), 2),
              "source": f"brique photos ({s.get('photos_couleur', 0)} photos pour la couleur)"}
+        if s.get("sens") is not None:  # le sens des lames lu sur les photos
+            d["sens"] = round(float(s["sens"]) % 180.0, 1)
+        if s.get("largeur_lames") and matiere in LAMES_DROITES:  # les lames à la largeur mesurée sur les photos
+            echelle = float(np.clip(s["largeur_lames"] / LAMES_DROITES[matiere], *ECHELLE_LAMES))
+            if abs(echelle - 1.0) > 0.05:
+                d["echelle"] = round(echelle, 2)
         if s.get("couleur_photo") and bibliotheque is not None:
             d["couleur_photo"] = s["couleur_photo"]
             d["teinte"] = list(teinte_pour(albedo_de_la_matiere(Path(bibliotheque), matiere), s["couleur_photo"]))
@@ -700,7 +771,7 @@ def sols_des_espaces_ouverts(logement: dict) -> dict:
             if not sources:
                 continue
             origine = max(sources, key=lambda q: float(q["sol"].get("confiance", 0.0)))
-            p["sol"] = {**{k: v for k, v in origine["sol"].items() if k in ("matiere", "teinte", "couleur_photo", "echelle")},
+            p["sol"] = {**{k: v for k, v in origine["sol"].items() if k in ("matiere", "teinte", "couleur_photo", "echelle", "sens")},
                         "statut": "ajoute", "confiance": round(0.8 * float(origine["sol"].get("confiance", 0.5)), 2),
                         "source": f"même sol que {origine['id']} (espace ouvert, sans cloison)"}
             change = True

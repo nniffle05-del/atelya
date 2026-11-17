@@ -381,11 +381,37 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
         piece = pieces[brique.element]
         if brique.id.startswith("zone_sol__"):  # « zone_sol__<pièce>__<n° de la zone, à partir de 1> »
             zone = piece.zones_sol[int(brique.id.rsplit("__", 1)[1]) - 1]
-            return nom_materiau(zone.sol.matiere, zone.sol.teinte, zone.sol.echelle)
+            return nom_materiau(zone.sol.matiere, zone.sol.teinte, zone.sol.echelle, zone.sol.sens)
         if piece.sol is None:
-            return nom_materiau(matiere_du_sol(piece))
-        return nom_materiau(piece.sol.matiere, piece.sol.teinte, piece.sol.echelle)
+            return nom_materiau(matiere_du_sol(piece), sens=sens_par_defaut(piece, matiere_du_sol(piece), logement))
+        sens = piece.sol.sens if piece.sol.sens is not None else sens_par_defaut(piece, piece.sol.matiere, logement)
+        return nom_materiau(piece.sol.matiere, piece.sol.teinte, piece.sol.echelle, sens)
     return "seuil"  # le sol sous une porte
+
+
+PIECE_ALLONGEE = 1.3  # une pièce au moins 1,3 fois plus longue que large a un « grand côté »
+
+
+def sens_par_defaut(piece: Piece, matiere: str, logement: Logement) -> float | None:
+    """Le sens des lames d'un parquet à lames droites quand les photos ne l'ont pas donné : le long du GRAND CÔTÉ de la pièce,
+    si elle est nettement allongée. None : le sens général du logement (moteur.habillage.orientation_sols).
+
+    Pourquoi (17/11/2026) : la règle d'avant (« le même sens partout, celui des murs les plus longs du logement ») était fausse
+    dans les chambres de deux logements sur trois. Sur les quatre pièces où les photos donnent le sens sans doute possible
+    (chambres d'app-001, séjours d'app-002 et d'app-004), le grand côté de la pièce le donne quatre fois, la règle générale
+    deux fois. Ce n'est qu'une supposition (aucune photo ne tranche) ; un sens lu sur les photos passe toujours devant."""
+    from moteur.matieres import LAMES_DROITES
+
+    if matiere not in LAMES_DROITES or len(piece.contour) < 3:
+        return None
+    general = orientation_sols(logement)
+    c, s = math.cos(-general), math.sin(-general)
+    xs = [x * c - y * s for x, y in piece.contour]  # la pièce vue dans le repère des murs du logement
+    ys = [x * s + y * c for x, y in piece.contour]
+    long_, large = max(xs) - min(xs), max(ys) - min(ys)
+    if large < long_ * PIECE_ALLONGEE:  # le grand côté est le sens général (ou la pièce n'est pas allongée) : rien à dire
+        return None
+    return round((math.degrees(general) + 90.0) % 180.0, 1)
 
 
 # ------------------------------------------------------------- menuiseries

@@ -1099,6 +1099,13 @@
     vieux_carrelage: "Vieux carrelage",
     carreaux_cubes: "Carreaux de ciment en cubes (losanges)",
     petits_carreaux_clairs: "Petits carreaux clairs, 10 cm",
+    lames_chene_miel: "Chêne miel, lames à l'anglaise",
+    lames_chene_clair: "Chêne clair, lames à l'anglaise",
+    lames_chene_dore: "Chêne doré, lames à l'anglaise",
+    lames_miel_fines: "Parquet miel, lames fines",
+    lames_miel_moyennes: "Parquet miel, lames moyennes",
+    pin_clair_larges: "Pin clair, larges lames",
+    lames_chene_anglaise: "Chêne à l'anglaise, lames de 10 cm",
   };
 
   /** Le sol d'une pièce, choisi par la personne. */

@@ -117,6 +117,24 @@ AMBIENTCG = [
     ("pastilles_rondes", "Tiles129B", "petites pastilles rondes", "api"),
     ("pastilles_rondes_2", "Tiles120", "petites pastilles rondes (2)", "api"),
 ]
+# Parquets en plus (accord écrit de NT le 17/11/2026 : « Ok » à la liste exacte, à la taille — 1 220 Mo d'archives — et à la
+# licence CC0, relue le jour même sur docs.ambientcg.com/license) : les 62 « WoodFloor » d'ambientCG qui manquaient (74 en
+# tout, tous faits d'après de vraies photos de sols). Posés sous un nom PROVISOIRE ; ils n'entrent au catalogue d'Atelya
+# (moteur/matieres.py) qu'une fois triés un par un (sens et largeur des lames, motif, réalisme à l'image).
+# Six d'entre eux, gardés après tri, portent leur nom du catalogue (taille « estimée » : ambientCG ne la donne pas).
+AMBIENTCG += [
+    ("lames_chene_miel", "WoodFloor065A", "chêne miel, lames à l'anglaise", (1.3, "estimée")),
+    ("lames_chene_clair", "WoodFloor066A", "chêne clair, lames à l'anglaise", (1.3, "estimée")),
+    ("lames_chene_dore", "WoodFloor067A", "chêne doré, lames à l'anglaise", (1.3, "estimée")),
+    ("lames_miel_fines", "WoodFloor061", "parquet miel, lames fines", (1.3, "estimée")),
+    ("lames_miel_moyennes", "WoodFloor063", "parquet miel, lames moyennes", (1.3, "estimée")),
+    ("pin_clair_larges", "WoodFloor039", "pin clair, larges lames", 1.9),
+]
+_DEJA_LA = {39, 40, 51, 52, 53, 55, 56, 57, 58, 60, 61, 62, 63, 64, 69}
+AMBIENTCG += [(f"parquet_acg_{i:03d}", f"WoodFloor{i:03d}", f"parquet « WoodFloor{i:03d} » d'ambientCG (à trier)", "api")
+              for i in range(1, 72) if i not in _DEJA_LA and i not in (65, 66, 67)]
+AMBIENTCG += [(f"parquet_acg_{i:03d}{v.lower()}", f"WoodFloor{i:03d}{v}", f"parquet « WoodFloor{i:03d}{v} » d'ambientCG (à trier)", "api")
+              for i in (65, 66, 67) for v in "B"]  # les versions « A » (propres) sont au catalogue, ci-dessus
 # fin du nom de fichier dans le zip ambientCG → nom Atelya
 CARTES_ACG = {"_Color.jpg": "couleur.jpg", "_NormalGL.jpg": "relief.jpg", "_Roughness.jpg": "brillance.jpg"}
 

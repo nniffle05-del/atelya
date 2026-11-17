@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 
 from moteur.geometrie import rectangles
-from moteur.matieres import CALCULEES, echelle_du_nom, matiere_et_teinte
+from moteur.matieres import CALCULEES, echelle_du_nom, matiere_et_teinte, sens_du_nom
 
 SCHEMA = "scene-unreal/0.1"
 
@@ -35,7 +35,8 @@ SCHEMA = "scene-unreal/0.1"
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
 RUGOSITE_BOIS = (0.6, 0.85)
 REFLET_BOIS = 0.15
-ROTATION_PHOTO = {"carrelage_interieur": 45.0}
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "parquet_chene_lames": 90.0, "chene_noeuds": 90.0, "chene_clair_photo": 90.0,
+                  "vieux_parquet": 90.0, "lames_parquet_1": 90.0, "lames_parquet_2": 90.0, "pin_clair_larges": 90.0}
 RUGOSITE_PEINTURE = (0.8, 0.95)  # moteur/blender/materiaux._enduit : une peinture mate
 RELIEF_PEINTURE = 0.25
 ALPHA_VERRE = 0.06  # moteur/blender/exporter_gltf.ALPHA_VERRE
@@ -116,8 +117,10 @@ def fiche_materiau(nom: str, fiches_bibliotheque: dict, teintes: dict, orientati
     matiere, gains = matiere_et_teinte(nom)
     if matiere in fiches_bibliotheque or matiere in CALCULEES:
         echelle = echelle_du_nom(nom)
+        sens = sens_du_nom(nom)  # le sens des lames lu sur les photos pour CE sol, sinon le sens général du logement
         f = {"genre": "dessin" if matiere in CALCULEES else "photo", "matiere": matiere, "sorte": sortes.get(matiere, "bois"),
-             "echelle": round(echelle, 3), "rotation_deg": round(orientation_deg + ROTATION_PHOTO.get(matiere, 0.0), 3),
+             "echelle": round(echelle, 3),
+             "rotation_deg": round((orientation_deg if sens is None else sens) + ROTATION_PHOTO.get(matiere, 0.0), 3),
              "teinte": _arrondi(teintes.get(nom) or gains), "placage": "monde : vu d'en haut sur les sols, de face sur les côtés"}
         base = CALCULEES.get(matiere, matiere) if matiere in CALCULEES else matiere
         if matiere in CALCULEES:

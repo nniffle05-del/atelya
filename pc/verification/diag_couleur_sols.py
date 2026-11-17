@@ -45,9 +45,13 @@ def main() -> int:
         print(f"== {cas}")
         for pid, s in r["pieces"].items():
             print(f"  {pid} {s['famille']} : couleur {s.get('couleur_photo')} sur {s.get('photos_couleur', 0)} photo(s)"
-                  + (f" (seule : {s['couleur_photo_seule']})" if s.get("couleur_photo_seule") else ""))
+                  + (f" (seule : {s['couleur_photo_seule']})" if s.get("couleur_photo_seule") else "")
+                  + (f" | sens {s['sens']:.0f}° (joints {s['sens_note']})" if s.get("sens") is not None else " | sens non lu")
+                  + (f", lames de {100 * s['largeur_lames']:.0f} cm" if s.get("largeur_lames") else ""))
             for k, z in enumerate(s["zones"]):
-                print(f"     zone {k} {z['famille']} {z['surface_m2']} m² : couleur {z.get('couleur_photo')} sur {z.get('photos_couleur', 0)} photo(s)")
+                print(f"     zone {k} {z['famille']} {z['surface_m2']} m² : couleur {z.get('couleur_photo')} sur {z.get('photos_couleur', 0)} photo(s)"
+                      + (f" | sens {z['sens']:.0f}° (joints {z['sens_note']})" if z.get("sens") is not None else " | sens non lu")
+                      + (f", lames de {100 * z['largeur_lames']:.0f} cm" if z.get("largeur_lames") else ""))
         for m in mesures:
             print(f"     {m['photo']} {m['region']} : {np.round(m['albedo'], 3).tolist()} sur {m['pixels']} points (blanc des murs {np.round(m['blanc'], 3).tolist()})")
     return 0

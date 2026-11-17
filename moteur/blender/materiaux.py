@@ -29,7 +29,8 @@ SORTES = {"parquet_chene_lames": "bois", "parquet_batons_rompus": "bois", "point
           "damier_pierre": "carrelage", "pierre_beige": "carrelage", "carreaux_cubes": "carrelage",
           "petits_carreaux_clairs": "carrelage"}
 # Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (même liste que moteur/matieres.py).
-ROTATION_PHOTO = {"carrelage_interieur": 45.0}
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "parquet_chene_lames": 90.0, "chene_noeuds": 90.0, "chene_clair_photo": 90.0,
+                  "vieux_parquet": 90.0, "lames_parquet_1": 90.0, "lames_parquet_2": 90.0, "pin_clair_larges": 90.0}
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
 # B2 temps 2 (09/11/2026) : un parquet d'appartement est vitrifié SATINÉ, pas ciré. Avec la brillance des photos de la
 # bibliothèque (presque miroir) et le reflet normal, le bois renvoyait le ciel vu en biais : app-001, parquet miel sur la photo,
@@ -85,16 +86,23 @@ def _sol(materiau, m):
     Un nom « matiere~r,g,b » porte une teinte : la couleur est multipliée par ces trois nombres (rouge, vert, bleu), pour
     rapprocher la matière de ce que montrent les photos du client."""
     nom, _, gains = materiau.name.partition("~")
+    nom, _, sens = nom.partition("^")  # « matiere^90 » : lames dans ce sens (degrés, lu sur les photos ; champ sens du sol)
     nom, _, echelle = nom.partition("@")  # « matiere@1.13 » : motif 13 % plus grand (champ echelle du sol)
     echelle = float(echelle) if echelle else 1.0
-    if nom == "carreaux_ciment":
-        _carreaux_ciment(materiau, m, echelle)
-    elif nom == "point_de_hongrie" and m.photo("chene_clair"):
-        _point_de_hongrie(materiau, m, echelle)
-    elif m.photo(nom):
-        _photo(materiau, m, nom, echelle)
-    else:
-        (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
+    generale = m.orientation
+    if sens:
+        m.orientation = math.radians(float(sens))  # ce sol a son propre sens ; les autres gardent le sens général
+    try:
+        if nom == "carreaux_ciment":
+            _carreaux_ciment(materiau, m, echelle)
+        elif nom == "point_de_hongrie" and m.photo("chene_clair"):
+            _point_de_hongrie(materiau, m, echelle)
+        elif m.photo(nom):
+            _photo(materiau, m, nom, echelle)
+        else:
+            (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
+    finally:
+        m.orientation = generale
     if gains:
         _teinter(materiau, [float(g) for g in gains.split(",")])
 

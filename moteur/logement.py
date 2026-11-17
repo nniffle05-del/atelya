@@ -188,6 +188,9 @@ class Sol(BaseModel):
         "même photo servant d'étalon (moteur/teinte_photo.py) : la cible du réglage de la teinte au rendu (moteur/blender/regler_teintes.py)")
     echelle: Annotated[float, Field(ge=0.3, le=3.0)] | None = Field(
         default=None, description="Taille du motif par rapport à la matière du catalogue (1,13 = chevrons 13 % plus grands)")
+    sens: Annotated[float, Field(ge=0, lt=180)] | None = Field(
+        default=None, description="Sens des lames de ce sol, en degrés dans le repère du logement (0 = le long de l'axe x, 90 = le "
+        "long de l'axe y), lu sur les photos du client (moteur/sens_des_lames.py) ; absent : le sens général du logement")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
