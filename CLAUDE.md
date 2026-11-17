@@ -8,6 +8,30 @@ détaillé correspondant avant d'agir.
 
 ---
 
+## 0. À RELIRE À CHAQUE MESSAGE : LE PRODUIT EST LA VISITE 3D ET LA CINÉMATIQUE, PAS DES PHOTOS
+
+**Règle écrite à la demande de NT le 18/11/2026** (« qu'on sache bien que ça soit de la visite 3D et des cinématiques, et qu'on
+arrête, vu que ça fait plusieurs fois, sur plusieurs discussions, que tu essayes de te concentrer que sur des photos »).
+
+- **Ce qu'Atelya livre** : une CINÉMATIQUE (un film du logement) et une VISITE LIBRE en 3D, en temps réel, dans Unreal. **Aucune
+  image fixe n'est un livrable.** Blender est l'atelier qui construit et exporte ; ses images fixes ne sont pas le produit.
+- **Les photos du client ne sont qu'un MODÈLE** : elles servent à reconnaître les sols, les meubles, les couleurs, et à comparer.
+  Elles ne sont jamais le but. Ne pas chercher à « refaire la photo ».
+- **Tout progrès se juge dans le film ou la visite** : sur des images du film Unreal (prises, pour comparer, depuis la place des
+  photos du client), et en mouvement. Pas sur des rendus fixes de Blender. Un chiffre ou une image fixe qui progresse sans que
+  le film change n'est pas un progrès.
+- **Tout ce qu'on fabrique doit tenir quand la caméra bouge** : vu de près, de loin, sous tous les angles. Des matières « à plat »
+  (pas de lumière ni de reflet peints dedans : la lumière vient du moteur), de vraies images qui passent dans Unreal, des objets
+  complets (pas seulement la face vue sur la photo).
+- **Avant de proposer ou de commencer un travail**, se poser la question : « est-ce que cela se verra dans le film ou dans la
+  visite ? » Si cela ne sert qu'à une image fixe, ne pas le faire et le dire à NT.
+- **Dans les messages à NT**, parler du film et de la visite ; ne pas décrire le produit avec des mots de photographie.
+
+(Rappels : recadrage de NT du 10/11/2026, fin du § 1 ; le 18/11/2026, une journée entière sur les parquets a été jugée sur des
+images fixes de Blender, sans regarder une seule fois le résultat dans Unreal.)
+
+---
+
 ## 1. Qui, quoi, pourquoi
 
 - **NT** (GitHub `nniffle05-del`) = associé 2. Il construit le moteur 3D **Atelya**. Il n'est **pas
@@ -99,6 +123,14 @@ détaillé correspondant avant d'agir.
     dans un autre objet (« ça tu devrais le savoir ») : le mesurer sur TOUS les logements avant de montrer des images. Le but de la
     maquette : que chaque meuble, chaque plinthe, chaque mur, chaque rideau soit le même que sur la photo du client ; juger chaque
     progrès objet par objet, photo contre maquette. (État mesuré le 16/11 et voies possibles : fin de `produit-livre-client.md`.)
+
+23. **Le produit est la visite 3D et la cinématique, pas des photos** (NT, 18/11/2026) : voir le § 0, à relire à chaque message.
+    Juger dans le film Unreal, jamais sur les seules images fixes de Blender.
+
+24. **Quand NT pose un problème, proposer le MEILLEUR MOYEN** (NT, 18/11/2026 : « je n'ai pas forcément la meilleure solution. À
+    toi de réfléchir pour me donner les meilleurs moyens ») : le moyen le plus court et le plus GÉNÉRAL, qui vaut pour tous les
+    logements (« à grande échelle »), pas une recette par motif, par pièce ou par logement ; le dire même si cela contredit le
+    plan de la veille.
 
 ## 3. Licences (vendre Atelya exige des licences commerciales)
 
