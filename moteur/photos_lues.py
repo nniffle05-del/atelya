@@ -199,12 +199,16 @@ def face_la_plus_proche(point, logement: dict, vers) -> dict | None:
     return meilleur
 
 
-def contre_le_mur(position, sorte: str, boite, cam, logement: dict, largeur: int, distance: float) -> dict | None:
+def contre_le_mur(position, sorte: str, boite, cam, logement: dict, largeur: int, distance: float, bouts: dict | None = None) -> dict | None:
     """Le meuble adossé que ce rectangle montre, mesuré SUR LE MUR : {"position" (son milieu), "largeur_mur", "coupe_mur"
     (un de ses bords est coupé par le cadre de la photo : la largeur est un minimum), "normale"}. None s'il n'est pas contre
-    un mur (plus loin que ce dont la vue peut se tromper), ou si le regard rase le mur."""
+    un mur (plus loin que ce dont la vue peut se tromper), ou si le regard rase le mur.
+    `bouts` : où le meuble finit vraiment de chaque côté de l'image, d'après la lecture de la photo (moteur.lecture_photos :
+    {"gauche" / "droite": "coin" (le bout de son mur), "cadre" (il sort de la photo) ou une abscisse en pixels}) ; le
+    résultat porte alors "mur_lu"."""
     from moteur import meubles_photos as mp
 
+    bouts = bouts or {}
     profondeur = mp.taille_courante(sorte)[1]
     origine = np.array([float(cam[0]), float(cam[1])])
     f = face_la_plus_proche(position, logement, origine)
@@ -214,33 +218,53 @@ def contre_le_mur(position, sorte: str, boite, cam, logement: dict, largeur: int
     t = np.array([-n[1], n[0]])
     base = f["pied"] + n * (profondeur / 2 + JEU_AU_MUR_M)  # la ligne à mi-profondeur du meuble
     x0, y0, x1, y1 = (float(v) for v in boite)
+    sa, sb = sorted((float((f["a"] - base) @ t), float((f["b"] - base) @ t)))
     bords, biais = [], []
-    for u in (x0, x1):
-        angle = math.radians(rayon(cam, u, (y0 + y1) / 2)[0])
+    for cote, u in (("gauche", x0), ("droite", x1)):
+        lu = bouts.get(cote)
+        if lu == "cadre":
+            u = 0.0 if cote == "gauche" else float(largeur)
+        angle = math.radians(rayon(cam, float(lu) if isinstance(lu, (int, float)) else u, (y0 + y1) / 2)[0])
         d = np.array([math.cos(angle), math.sin(angle)])
-        if abs(float(d @ n)) < RASANT:
-            return None
-        k = float((base - origine) @ n) / float(d @ n)
+        k = float((base - origine) @ n) / float(d @ n) if abs(float(d @ n)) >= RASANT else -1.0
         if k <= 0:
-            return None
+            if lu != "coin":
+                return None
+            bords.append(None)  # le regard rase le mur de ce côté, mais la lecture dit que le meuble va jusqu'au coin
+            biais.append(0.0)
+            continue
         bords.append(float((origine + k * d - base) @ t))
         biais.append(float(d @ t) / float(d @ n))
     # vu de côté, un meuble profond paraît plus large : d'un bord on voit son coin de devant, de l'autre son coin du fond
     # (une demi-profondeur × la tangente de l'angle de vue, de chaque côté) ; son milieu, lui, ne bouge pas
     trop = profondeur / 2 * (abs(biais[0]) + abs(biais[1])) / 2
-    bords = [min(bords) + trop, max(bords) - trop] if max(bords) - min(bords) > 2 * trop + 0.2 else bords
+    if None not in bords and abs(bords[1] - bords[0]) > 2 * trop + 0.2:
+        vers = 1.0 if bords[1] >= bords[0] else -1.0
+        bords = [bords[0] + vers * trop, bords[1] - vers * trop]
+    # un bout « au coin » : le bout du mur, du côté de l'image que la lecture a dit (le sens de l'image le long du mur)
+    a0, a1 = (math.radians(rayon(cam, u, (y0 + y1) / 2)[0]) for u in (x0, x1))
+    sens = 1.0 if float(np.array([math.cos(a1) - math.cos(a0), math.sin(a1) - math.sin(a0)]) @ t) > 0 else -1.0
+    if bouts.get("gauche") == "coin":
+        bords[0] = sa if sens > 0 else sb
+    if bouts.get("droite") == "coin":
+        bords[1] = sb if sens > 0 else sa
     # le meuble ne dépasse pas des bouts de son mur
-    sa, sb = sorted((float((f["a"] - base) @ t), float((f["b"] - base) @ t)))
     s0, s1 = max(min(bords), sa), min(max(bords), sb)
     mini, maxi = mp.TAILLES.get(sorte, mp.TAILLES["rangement"])[1]
+    if bouts:  # la lecture a dit où il finit : sa largeur n'est plus bornée par celle des meubles courants de sa sorte
+        maxi = sb - sa
     if s1 - s0 < 0.5 * mini:
         return None
-    coupe = x0 <= mp.BORD_PX or x1 >= largeur - mp.BORD_PX
+    coupe = ((x0 <= mp.BORD_PX and "gauche" not in bouts) or (x1 >= largeur - mp.BORD_PX and "droite" not in bouts)
+             or "cadre" in bouts.values())
     large = min(max(s1 - s0, mini), maxi, sb - sa)
     milieu = min(max((s0 + s1) / 2, sa + large / 2), sb - large / 2)
     centre = base + milieu * t
-    return {"position": [float(centre[0]), float(centre[1])], "largeur_mur": float(large), "coupe_mur": bool(coupe),
-            "normale": [float(n[0]), float(n[1])]}
+    sortie = {"position": [float(centre[0]), float(centre[1])], "largeur_mur": float(large), "coupe_mur": bool(coupe),
+              "normale": [float(n[0]), float(n[1])]}
+    if bouts:
+        sortie["mur_lu"] = True
+    return sortie
 
 
 # ---------------------------------------------------------------- 1. les meubles posés au sol
@@ -293,20 +317,23 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
                 centre = point + direction * meubles_photos.taille_courante(o["sorte"])[1] / 2
                 vu = {"groupe": g, "position": [float(centre[0]), float(centre[1])], "largeur_vue": float(mesure["largeur"]),
                       "confiance": float(o["note"]), "poids": float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100) * POIDS_PROFONDEUR}
-            def par_le_regard() -> dict | None:
+            def par_le_regard(lu: bool = False) -> dict | None:
                 """Un meuble HAUT adossé dont le pied est caché (une bibliothèque derrière un canapé) : le bas de son rectangle
-                n'est pas son pied, il « tombe » derrière le mur. Sa place : contre le mur plein que son regard touche."""
-                if o["sorte"] not in ADOSSES_HAUTS or o.get("approche"):
+                n'est pas son pied, il « tombe » derrière le mur. Sa place : contre le mur plein que son regard touche.
+                `lu` : la lecture de la photo a dit « pied caché » — pour tout meuble adossé, même bas, même sous une fenêtre."""
+                if not lu and (o["sorte"] not in ADOSSES_HAUTS or o.get("approche")):
                     return None
                 angle = rayon(cam, (x0 + x1) / 2, (y0 + y1) / 2)[0]
                 mur, plein = premier_mur(plan, origine, angle, pieces=logement["pieces"])
-                if not math.isfinite(mur) or plein != 0:
+                if not math.isfinite(mur) or (plein != 0 and not lu):
                     return None
                 recul = mur - meubles_photos.taille_courante(o["sorte"])[1] / 2 - JEU_AU_MUR_M
                 place = origine + recul * np.array([math.cos(math.radians(angle)), math.sin(math.radians(angle))])
                 return {"groupe": g, "position": [float(place[0]), float(place[1])], "largeur_vue": float((x1 - x0) / float(cam[5]) * mur),
                         "confiance": float(o["note"]), "poids": float((x1 - x0) * (y1 - y0) / (largeur * hauteur) * 100) * POIDS_PROFONDEUR}
 
+            if o.get("pied_cache") and o["sorte"] in ADOSSES:
+                vu = par_le_regard(lu=True) or vu
             if vu is None:
                 vu = par_le_regard()
             if vu is None:
@@ -344,9 +371,10 @@ def au_sol_d_une_photo(objets: list[dict], cam, largeur: int, hauteur: int, piec
         if vu is None:
             continue
         if logement is not None:
-            if adosser and o["sorte"] in ADOSSES and not o.get("approche"):
+            # un rectangle approché (tracé à l'œil) ne mesure rien sur le mur, sauf si la lecture a dit où le meuble finit
+            if adosser and o["sorte"] in ADOSSES and (not o.get("approche") or o.get("bouts")):
                 sur = contre_le_mur(vu["position"], o["sorte"], o["boite"], cam, logement, largeur,
-                                    float(np.linalg.norm(np.asarray(vu["position"], float) - origine)))
+                                    float(np.linalg.norm(np.asarray(vu["position"], float) - origine)), bouts=o.get("bouts"))
                 if sur is not None and piece_de(sur["position"], logement["pieces"]) is not None:
                     vu.update(sur)
             vu["piece"] = (piece_de(vu["position"], logement["pieces"]) or {}).get("id")

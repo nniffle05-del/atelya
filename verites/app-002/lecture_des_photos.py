@@ -6,7 +6,7 @@ c'est lui qui juge cette lecture. Format des notes : moteur/lecture_photos.fiche
 Fiche écrite par : outils/lecture_photos/ecrire_lecture.py app-002
 """
 NOTES = {
-    "photo-01": {"objets": "1 table rectangulaire, plateau bois, pieds métal ; 2 chaise brun ; 3 rangement buffet, bois clair ; 4 chaise brun ; "
+    "photo-01": {"objets": "1 table rectangulaire, plateau bois, pieds métal ; 2 chaise brun ; 3 rangement buffet, bois clair {entier} ; 4 chaise brun ; "
                            "5 chaise brun ; 6 canape blanc cassé ; 7 chaise brun ; 8 chaise brun ; 9 radiateur ; 10 bureau blanc ; 11 porte ; "
                            "12 suspension plafonnier à vasque, pendu court ; 13 chaise brun ; 14 bibliotheque pin, étroite ; 15 tableau ; "
                            "16 autre écran d'ordinateur ; 17 applique",
@@ -38,11 +38,11 @@ NOTES = {
                            "10 autre tabouret pliant en bois",
                  "sol": "lames", "manquants": "applique 918,195,975,250 ; applique 290,288,328,308 ; porte 380,285,415,400"},
     "photo-08": {"objets": "1 electromenager réfrigérateur inox ; 2 porte blanche ; 3 colonne_cuisine bois ; 4 hotte blanche ; "
-                           "5 electromenager four encastré ; 6 = 3 ; 7 meuble_cuisine_bas tiroirs, bois ; "
-                           "8 electromenager micro-ondes encastré ; 9 meuble_cuisine_bas sous l'évier, bois ; 10 meuble_cuisine_bas bois ; "
+                           "5 electromenager four encastré ; 6 = 3 ; 7 meuble_cuisine_bas tiroirs, bois {d=g3} ; "
+                           "8 electromenager micro-ondes encastré ; 9 meuble_cuisine_bas sous l'évier, bois {g=d10 d=g15} ; 10 meuble_cuisine_bas bois ; "
                            "11 faux ; 12 plafonnier rampe de spots ; 13 = 3 ; 14 electromenager plaque de cuisson ; 15 = 7 ; 16 = 3 ; 17 evier",
                  "sol": "carreaux", "manquants": "fenetre 205,235,465,420"},
-    "photo-09": {"objets": "1 meuble_cuisine_bas linéaire avec évier, bois ; 2 meuble_cuisine_bas tiroirs sous la plaque, bois ; 3 evier ; "
+    "photo-09": {"objets": "1 meuble_cuisine_bas linéaire avec évier, bois {g=cadre d=g2} ; 2 meuble_cuisine_bas tiroirs sous la plaque, bois ; 3 evier ; "
                            "4 electromenager réfrigérateur inox ; 5 = 1 ; 6 colonne_cuisine bois ; "
                            "7 porte porte d'entrée, dans le couloir ; 8 meuble_cuisine_bas petit meuble à droite, bois ; "
                            "9 electromenager fours encastrés ; 10 plafonnier rampe de spots ; 11 = 6 ; "

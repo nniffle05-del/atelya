@@ -4,6 +4,9 @@ Lues dans la conversation, une par une, sur les photos numérotées de ..\atelya
 (outils/lecture_photos/preparer_photos.py). RÉSERVE : avant cette lecture, la liste des SORTES du relevé à la main
 (verites/app-001/meubles.json : « 4 tabourets hauts, 2 îlots, 1 étagère à cases, 1 horloge, 1 lit superposé… ») était passée
 à l'écran ; les places, elles, n'ont pas été regardées. La lecture d'app-001 est donc un peu flattée ; celle d'app-002 ne l'est pas.
+LES BOUTS DES GRANDS MEUBLES (17/11/2026, « vas-y » de NT ; lecture-photos/0.3) : les repères entre accolades ({g=… d=… pied}) disent
+où un meuble adossé finit vraiment de chaque côté de l'image (coin du mur, bord d'un autre rectangle, abscisse, cadre de la photo)
+et si son pied est caché. Relus sur les mêmes photos numérotées, SANS regarder le relevé des meubles ni le plan.
 Format des notes : moteur/lecture_photos.fiche_depuis_notes. Fiche écrite par : outils/lecture_photos/ecrire_lecture.py app-001
 """
 NOTES = {
@@ -35,10 +38,10 @@ NOTES = {
                            "5 tabouret_haut jaune ; 6 tabouret_haut jaune ; 7 tabouret_haut jaune ; 8 = 3 ; 9 etagere_cubes blanc ; 10 = 1 ; "
                            "11 = 3 ; 12 meuble_cuisine_haut gris ; 13 fenetre ; 14 = 12 ; 15 electromenager four encastré ; "
                            "16 suspension cage noire ; 17 suspension cage noire ; 18 suspension cage noire ; 19 = 12 ; 20 = 12 ; 21 = 12 ; "
-                           "22 = 12 ; 23 electromenager plaque de cuisson ; 24 meuble_cuisine_bas gris, linéaire du fond",
+                           "22 = 12 ; 23 electromenager plaque de cuisson ; 24 meuble_cuisine_bas gris, linéaire du fond {g=d4 d=coin pied}",
                  "sol": "lames + carreaux", "manquants": "fenetre 735,95,860,345"},
     "photo-06": {"objets": "1 colonne_cuisine grise ; 2 ilot bar gris, plan blanc ; 3 tabouret_haut jaune ; 4 tabouret_haut jaune ; 5 = 1 ; "
-                           "6 etagere_cubes blanc ; 7 tabouret_haut jaune ; 8 meuble_cuisine_bas gris ; 9 meuble_cuisine_haut gris ; 10 = 9 ; "
+                           "6 etagere_cubes blanc ; 7 tabouret_haut jaune ; 8 meuble_cuisine_bas gris {d=coin} ; 9 meuble_cuisine_haut gris ; 10 = 9 ; "
                            "11 = 9 ; 12 = 8 ; 13 = 2 ; 14 = 9 ; 15 = 9 ; 16 suspension cage noire ; 17 suspension cage noire ; 18 = 9 ; "
                            "19 fenetre ; 20 = 19 ; 21 = 9 ; 22 = 8 ; 23 = 9 ; 24 autre petit électroménager posé ; 25 = 9 ; 26 = 2 ; "
                            "27 electromenager plaque de cuisson",
@@ -47,7 +50,7 @@ NOTES = {
                            "5 colonne_cuisine grise, vue par l'ouverture ; 6 fenetre ; 7 fenetre",
                  "sol": "lames",
                  "manquants": "horloge 838,110,1075,308 grande, noire et dorée ; applique 588,170,618,210 ; applique 765,238,783,262"},
-    "photo-08": {"objets": "1 lit double, beige ; 2 rideaux beige ; 3 placard dressing toute hauteur ; 4 table_de_chevet noire ; "
+    "photo-08": {"objets": "1 lit double, beige ; 2 rideaux beige ; 3 placard dressing toute hauteur {g=bord d=cadre} ; 4 table_de_chevet noire ; "
                            "5 rideaux beige ; 6 = 3 ; 7 lampadaire ; 8 fauteuil noir ; 9 radiateur",
                  "sol": "lames", "manquants": "applique 243,312,300,395 ; applique 490,338,530,385"},
     "photo-10": {"objets": "1 chaise_de_bureau blanche ; 2 tapis gris, étoiles ; 3 bureau bois clair ; 4 rideaux mauve ; "

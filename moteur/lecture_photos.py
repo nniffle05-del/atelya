@@ -11,7 +11,10 @@ Ce que Claude rend, par photo :
   « autre ») ; `meme_que` si le rectangle montre le même objet qu'un autre numéro ; `forme` et `couleur` en clair, facultatifs ;
 - `sol` : la famille du sol de la pièce où se tient le photographe (lames, point_de_hongrie, batons_rompus, carreaux), s'il est
   le même partout (`uniforme`) et, sinon, l'autre famille que la pièce montre (`autre_famille`) ;
-- `manquants` : ce que la photo montre et qu'aucun rectangle n'encadre (sorte + rectangle approché).
+- `manquants` : ce que la photo montre et qu'aucun rectangle n'encadre (sorte + rectangle approché) ;
+- depuis la 0.3 (17/11/2026), pour un grand meuble adossé dont le rectangle ne montre qu'un morceau : `gauche`, `droite`
+  (où il finit vraiment : des repères, voir BOUT plus bas) et `pied_cache`. Règle apprise à l'essai : « coin » seulement si on
+  VOIT le meuble toucher le coin ; ne rien dire quand on ne sait pas (4 repères trop affirmatifs sur 15 ont fait reculer).
 Claude ne donne AUCUNE place en mètres. Une fenêtre qui descend jusqu'au sol se dit « porte_fenetre ».
 
 Ce module contrôle la fiche (sortes connues, numéros existants) et la traduit pour le reste d'Atelya (moteur/photos_lues.py).
@@ -23,7 +26,19 @@ import re
 
 from moteur.meubles import NOMS_MEUBLES
 
-SCHEMA = "lecture-photos/0.2"  # 0.2 (16/11/2026) : sortes précises des appareils de cuisine ; les fiches 0.1 se lisent pareil
+SCHEMA = "lecture-photos/0.3"  # 0.2 (16/11/2026) : sortes précises des appareils de cuisine ; 0.3 (17/11/2026) : les BOUTS d'un
+# grand meuble adossé (« gauche », « droite », « pied_cache ») ; les fiches 0.1 et 0.2 se lisent pareil
+# Les bouts d'un meuble adossé (essai du 17/11/2026, « vas-y » de NT) : le détecteur n'encadre que ce qu'il VOIT d'un meuble ;
+# un linéaire de cuisine derrière un îlot, un buffet derrière une table, un dressing qui file jusqu'au fond sortent en petit
+# morceau. Claude dit où le meuble finit vraiment, de chaque côté de l'image, avec des REPÈRES et non des mètres :
+#   « coin »  : il va jusqu'au bout de son mur de ce côté ;
+#   « d<n> »  : il s'arrête au bord DROIT du rectangle n (il touche l'objet n, qui est à sa gauche) ; « g<n> » : à son bord gauche ;
+#   « u<px> » : il s'arrête à peu près à cette abscisse de l'image (bout caché, deviné d'après ce qui dépasse) ;
+#   « bord »  : le bord du rectangle est bien le vrai bout (la lecture le confirme : cette vue montre le meuble jusque-là) ;
+#   « cadre » : il sort du cadre de la photo de ce côté (on n'en voit pas le bout) ;
+#   rien      : la lecture ne dit rien, le bord du rectangle est pris tel quel.
+# « pied_cache » : le bas du rectangle n'est pas le pied du meuble (caché par ce qui est devant) : sa place vient de son mur.
+BOUT = re.compile(r"^(coin|bord|cadre|[gd]\d+|u\d+)$")
 # ce que la maquette ne sait pas encore porter, mais que Claude doit pouvoir nommer (compté « vu, pas représenté »)
 # les équipements du logement, que Claude nomme et qu'Atelya pose et dessine depuis le 16/11/2026 (moteur/equipements.py).
 # « electromenager » seul reste accepté (fiches 0.1 : la note dit lequel, « electromenager four encastré ») ; depuis la 0.2 la
@@ -45,7 +60,8 @@ def consigne() -> str:
     return f"""Tu regardes une photo d'un logement. Des rectangles numérotés y encadrent ce qu'un détecteur automatique a repéré ;
 il se trompe souvent sur ce que c'est. Tu remplis une fiche JSON au format {SCHEMA} :
 
-{{"objets": {{"<numéro>": {{"sorte": "…", "meme_que": <numéro>, "forme": "…", "couleur": "…", "note": "…"}}, …}},
+{{"objets": {{"<numéro>": {{"sorte": "…", "meme_que": <numéro>, "forme": "…", "couleur": "…", "note": "…",
+                          "gauche": "…", "droite": "…", "pied_cache": true}}, …}},
  "sol": {{"famille": "…", "uniforme": true, "autre_famille": "…"}},
  "manquants": [{{"sorte": "…", "boite": [x0, y0, x1, y1]}}]}}
 
@@ -64,6 +80,12 @@ il se trompe souvent sur ce que c'est. Tu remplis une fiche JSON au format {SCHE
 - « sol » : la famille du sol de la pièce où se tient le photographe, parmi {", ".join(FAMILLES_DE_SOL)} ; « uniforme » : faux si
   cette pièce montre deux sols différents (un tapis n'est pas un sol), et alors « autre_famille » dit le second.
 - « manquants » : ce que la photo montre d'important et qu'aucun rectangle n'encadre (rectangle approché, en pixels).
+- Pour un GRAND MEUBLE ADOSSÉ à un mur (buffet, armoire, placard, bibliothèque, meuble télé, meubles et colonnes de cuisine) dont
+  le rectangle ne montre qu'un morceau : « gauche » et « droite » disent où le meuble finit VRAIMENT de chaque côté de l'image :
+  « coin » (il va jusqu'au bout de son mur), « d<n> » (il s'arrête au bord droit du rectangle n, qu'il touche), « g<n> » (au bord
+  gauche du rectangle n), « u<abscisse en pixels> » (bout caché, à peu près là), « bord » (le bord du rectangle est bien le
+  vrai bout : on voit le meuble finir là), « cadre » (le meuble sort de la photo de ce côté). Ne mets rien si tu ne sais pas.
+  « pied_cache » : vrai si un autre objet cache le bas du meuble (un linéaire de cuisine derrière un îlot).
 - Ne donne aucune mesure en mètres. Ne recopie aucun nom ni aucune adresse.
 
 Réponds uniquement par la fiche JSON."""
@@ -84,6 +106,7 @@ def controler(fiche: dict, numeros: set[int]) -> list[str]:
                 defauts.append(f"numéro {n} : « meme_que » {o['meme_que']} renvoie lui-même à un autre numéro")
         elif o.get("sorte") not in SORTES:
             defauts.append(f"numéro {n} : sorte {o.get('sorte')!r} inconnue")
+        defauts += [f"numéro {n} : {d}" for d in _defauts_des_bouts(o, numeros)]
     for n in sorted(numeros - {int(n) for n in lus if str(n).isdigit()}):
         defauts.append(f"numéro {n} oublié")
     sol = fiche.get("sol") or {}
@@ -95,7 +118,40 @@ def controler(fiche: dict, numeros: set[int]) -> list[str]:
             defauts.append(f"manquant : sorte {m.get('sorte')!r} inconnue")
         if len(m.get("boite") or []) != 4:
             defauts.append(f"manquant {m.get('sorte')} : rectangle absent")
+        defauts += [f"manquant {m.get('sorte')} : {d}" for d in _defauts_des_bouts(m, numeros)]
     return defauts
+
+
+def _defauts_des_bouts(o: dict, numeros: set[int]) -> list[str]:
+    defauts = []
+    for cote in ("gauche", "droite"):
+        b = o.get(cote)
+        if b is None:
+            continue
+        if not BOUT.match(str(b)):
+            defauts.append(f"« {cote} » {b!r} illisible (coin, bord, cadre, g<n>, d<n> ou u<pixels>)")
+        elif b[0] in "gd" and b[1:].isdigit() and int(b[1:]) not in numeros:
+            defauts.append(f"« {cote} » renvoie au numéro {b[1:]}, inconnu")
+    return defauts
+
+
+def _bouts(o: dict, boites: dict[int, list[float]], propre: list[float]) -> dict | None:
+    """Les bouts lus d'un meuble, prêts pour la géométrie : {"gauche": "coin" | "cadre" | abscisse en pixels, "droite": idem}.
+    `propre` : le rectangle du meuble lui-même (« bord »)."""
+    sortie = {}
+    for cote in ("gauche", "droite"):
+        b = o.get(cote)
+        if b is None or not BOUT.match(str(b)):
+            continue
+        if b in ("coin", "cadre"):
+            sortie[cote] = b
+        elif b == "bord":
+            sortie[cote] = float(propre[0 if cote == "gauche" else 2])
+        elif b[0] == "u":
+            sortie[cote] = float(b[1:])
+        elif int(b[1:]) in boites:
+            sortie[cote] = float(boites[int(b[1:])][0 if b[0] == "g" else 2])
+    return sortie or None
 
 
 def objets_lus(fiche: dict, liste: list[dict], manquants: bool = True, reunir: bool = True) -> list[dict]:
@@ -104,15 +160,11 @@ def objets_lus(fiche: dict, liste: list[dict], manquants: bool = True, reunir: b
     approché : `approche` vrai, note 0,5). Un numéro que Claude n'a pas rempli garde ce que le détecteur croyait."""
     sortie = []
     lus = fiche.get("objets") or {}
+    entieres: dict[int, list[float]] = {}
     for o in liste:
-        l = lus.get(str(o["numero"]))
-        if l is None:
-            sortie.append(objet_du_detecteur(o))
-            continue
-        if l.get("sorte") == "faux" or l.get("meme_que") is not None:
-            continue
+        l = lus.get(str(o["numero"])) or {}
         boite = list(o["boite"])
-        if reunir:
+        if reunir and l.get("meme_que") is None:
             # les autres rectangles du MÊME objet (« meme_que ») en sont des morceaux : l'objet entier est leur réunion (un linéaire
             # de cuisine encadré en trois fois, un canapé en deux) — avant le 17/11/2026 ils étaient jetés et l'objet restait un bout
             for autre in liste:
@@ -120,12 +172,30 @@ def objets_lus(fiche: dict, liste: list[dict], manquants: bool = True, reunir: b
                 if la.get("meme_que") is not None and int(la["meme_que"]) == int(o["numero"]):
                     b = autre["boite"]
                     boite = [min(boite[0], b[0]), min(boite[1], b[1]), max(boite[2], b[2]), max(boite[3], b[3])]
-        sortie.append({"numero": o["numero"], "boite": boite, "note": o["note"], "sorte": l["sorte"], "forme": l.get("forme"),
-                       "couleur_dite": l.get("couleur"), "dit": l.get("note")})
+        entieres[int(o["numero"])] = boite
+    for o in liste:
+        l = lus.get(str(o["numero"]))
+        if l is None:
+            sortie.append(objet_du_detecteur(o))
+            continue
+        if l.get("sorte") == "faux" or l.get("meme_que") is not None:
+            continue
+        lu = {"numero": o["numero"], "boite": entieres[int(o["numero"])], "note": o["note"], "sorte": l["sorte"], "forme": l.get("forme"),
+              "couleur_dite": l.get("couleur"), "dit": l.get("note")}
+        if (b := _bouts(l, entieres, lu["boite"])):
+            lu["bouts"] = b
+        if l.get("pied_cache"):
+            lu["pied_cache"] = True
+        sortie.append(lu)
     if manquants:
         for k, m in enumerate(fiche.get("manquants") or [], start=1):
-            sortie.append({"numero": -k, "boite": [float(v) for v in m["boite"]], "note": 0.5, "sorte": m["sorte"], "forme": m.get("forme"),
-                           "couleur_dite": m.get("couleur"), "dit": m.get("note"), "approche": True})
+            lu = {"numero": -k, "boite": [float(v) for v in m["boite"]], "note": 0.5, "sorte": m["sorte"], "forme": m.get("forme"),
+                  "couleur_dite": m.get("couleur"), "dit": m.get("note"), "approche": True}
+            if (b := _bouts(m, entieres, lu["boite"])):
+                lu["bouts"] = b
+            if m.get("pied_cache"):
+                lu["pied_cache"] = True
+            sortie.append(lu)
     return sortie
 
 
@@ -157,6 +227,24 @@ def _mots(texte: str, liste: tuple[str, ...]) -> str | None:
     return next((m for m in liste if re.search(rf"(?<![\w']){re.escape(m)}(?![\w])", bas)), None)
 
 
+def _reperes(dit: str) -> tuple[str, dict]:
+    """« gris, linéaire du fond {g=d4 d=coin pied} » → (« gris, linéaire du fond », {"gauche": "d4", "droite": "coin", "pied_cache": True})."""
+    m = re.search(r"\{([^}]*)\}", dit)
+    if not m:
+        return dit.strip(), {}
+    champs: dict = {}
+    for mot in m.group(1).split():
+        if mot == "pied":
+            champs["pied_cache"] = True
+        elif mot == "entier":  # le rectangle montre le meuble d'un bout à l'autre
+            champs["gauche"] = champs["droite"] = "bord"
+        elif mot[:2] in ("g=", "d="):
+            champs["gauche" if mot[0] == "g" else "droite"] = mot[2:]
+        else:
+            raise ValueError(f"repère illisible : {mot!r} dans {dit!r}")
+    return (dit[:m.start()] + dit[m.end():]).strip(), champs
+
+
 def fiche_depuis_notes(objets: str, sol: str | None = None, manquants: str = "") -> dict:
     """Une fiche lecture-photos/0.1 depuis des notes courtes (verites/<logement>/lecture_des_photos.py) :
     - objets : « 1 canape bleu ; 2 table ronde, bois ; 3 = 1 ; 4 faux » (numéro, sorte, puis ce qu'on en dit ; « = n » : même objet) ;
@@ -172,7 +260,8 @@ def fiche_depuis_notes(objets: str, sol: str | None = None, manquants: str = "")
             fiche["objets"][numero] = {"meme_que": int(reste[1:].strip())}
             continue
         sorte, _, dit = reste.partition(" ")
-        o = {"sorte": sorte}
+        dit, champs = _reperes(dit)
+        o = {"sorte": sorte, **champs}
         if dit.strip():
             o["note"] = dit.strip()
             if (c := _mots(dit, COULEURS_DITES)):
@@ -189,7 +278,10 @@ def fiche_depuis_notes(objets: str, sol: str | None = None, manquants: str = "")
         if not morceau:
             continue
         sorte, boite, *dit = morceau.split(" ", 2)
-        m = {"sorte": sorte, "boite": [int(v) for v in boite.split(",")]}
+        champs: dict = {}
+        if dit:
+            dit[0], champs = _reperes(dit[0])
+        m = {"sorte": sorte, "boite": [int(v) for v in boite.split(",")], **champs}
         if dit and dit[0].strip():
             m["note"] = dit[0].strip()
             if (c := _mots(dit[0], COULEURS_DITES)):

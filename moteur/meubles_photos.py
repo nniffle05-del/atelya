@@ -244,7 +244,14 @@ def _resume(paquet: list[dict]) -> dict:
     # proche ; si toutes ses vues sont coupées par le cadre, la plus grande (chacune est un minimum) ; sa place est alors celle
     # de cette vue (le milieu de ce qu'elle voit), et non la moyenne de vues qui en voient des morceaux différents
     sur_mur = [m for m in paquet if m.get("largeur_mur")]
-    if sur_mur and len(sur_mur) * 2 >= len(paquet):
+    # une vue dont la lecture de la photo a dit les bouts (« jusqu'au coin », « touche tel meuble » : moteur.lecture_photos) fait
+    # foi sur les vues qui n'en montrent qu'un morceau (essai du 17/11/2026)
+    lues = [m for m in sur_mur if m.get("mur_lu") and not m.get("coupe_mur")]
+    if lues:
+        choisie = min(lues, key=eloignement)
+        r.update(largeur_mur=round(float(choisie["largeur_mur"]), 2), normale=choisie["normale"], mur_entier=True, mur_lu=True,
+                 position=[round(float(choisie["position"][0]), 3), round(float(choisie["position"][1]), 3)])
+    elif sur_mur and len(sur_mur) * 2 >= len(paquet):
         entieres = [m for m in sur_mur if not m.get("coupe_mur") and not m.get("coupe")]
         # la vue ENTIÈRE la plus proche ; à défaut la vue la plus proche, coupée par le cadre : ce qu'elle voit est un minimum,
         # le meuble a au moins la largeur courante de sa sorte. (Essayés et retirés, mesurés : « caché par un meuble de devant =
