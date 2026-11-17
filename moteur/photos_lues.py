@@ -784,8 +784,22 @@ def sols_lus(lecture: dict, releve: dict, logement: dict) -> dict[str, dict]:
     return sortie
 
 
+def sols_des_photos(lecture: dict) -> dict[str, tuple]:
+    """Les sols que la lecture dit pour CHAQUE photo : {nom : (famille principale, autre famille)} (photos sans sol lu : absentes).
+    Sert à moteur.reconnaitre_sols.reconnaitre : une photo ne vote que parmi ses sols."""
+    sortie = {}
+    for nom, fiche in lecture["photos"].items():
+        sol = (fiche or {}).get("sol") or {}
+        if sol.get("famille"):
+            sortie[nom] = tuple(f for f in (sol["famille"], sol.get("autre_famille")) if f)
+    return sortie
+
+
 def appliquer_les_sols(pieces: dict, lus: dict[str, dict]) -> dict:
-    """Le résultat de la brique photos (moteur.reconnaitre_sols.reconnaitre → « pieces ») corrigé par la lecture : la famille de
+    """REMPLACÉ le 17/11/2026 (gardé pour la mesure « avant », pc/verification/mesurer_sols_lus.py) : la lecture est maintenant
+    donnée À la décision (reconnaitre_sols.reconnaitre(lus=…, sols_des_photos=…)) ; appliquée après, elle effaçait le sol que la
+    brique avait pris pour principal quand la lecture le dit second (les lames de l'entrée d'app-001 : sol juste 79 % → 92 %).
+    Le résultat de la brique photos (moteur.reconnaitre_sols.reconnaitre → « pieces ») corrigé par la lecture : la famille de
     la pièce est celle qui est LUE ; ses zones d'un autre sol ne sont gardées que si la lecture dit que la pièce a aussi CE sol
     (une zone de la famille lue rejoint le sol de la pièce ; une zone d'un sol que personne n'a lu est une erreur de la brique)."""
     sortie = {}

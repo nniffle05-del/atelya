@@ -121,7 +121,10 @@ def calculer_briques(logement: Logement) -> list[Brique]:
         for k, zone in enumerate(p.zones_sol, start=1):
             morceau = _couper_par_convexe(contour, _sens_direct([_arrondi(pt) for pt in zone.contour]))
             if len(morceau) >= 3 and abs(_aire_signee(morceau)) > 1e-4:
-                briques.append(Brique(f"zone_sol__{p.id}__{k}", "sol", p.id, _sens_direct(morceau), ZONE_SOL_Z, ZONE_SOL_Z))
+                # chaque zone un demi-millimètre au-dessus de la précédente (17/11/2026) : deux zones qui se recouvrent un peu
+                # (enveloppes de deux sols voisins) se disputaient chaque point au rendu (tache noire au pied de l'îlot
+                # d'app-001) ; la dernière de la liste l'emporte, comme dans le format (les petites sont rangées après les grandes)
+                briques.append(Brique(f"zone_sol__{p.id}__{k}", "sol", p.id, _sens_direct(morceau), ZONE_SOL_Z * k, ZONE_SOL_Z * k))
 
     murs = {m.id: m for m in murs_lus}
     for o in ouvertures:

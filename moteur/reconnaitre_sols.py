@@ -225,56 +225,131 @@ ZONE_PROPRE_MIN = 0.5
 ZONE_MEUBLE_MAX = 1.0  # DÉSACTIVÉ (09/11/2026) : à 0,35-0,5, +5 points sur le contrôle fabriqué MAIS app-001 81,5 → 52 % (sur vraies photos l'œil dit « meuble » bien plus souvent : la vraie zone de cubes et le point de Hongrie étaient retirés)
 
 
-def _familles(carte: CarteDesSols, votes: np.ndarray):
+def _lisses(carte: CarteDesSols, votes: np.ndarray):
+    """Les cases où un sol a été vu, et les avis par famille de sol lissés sur 3 × 3 cases."""
     sol = votes[..., carte.indices_sol]
     lisses = np.stack([cv2.blur(sol[..., k].astype(np.float32), (3, 3)) for k in range(sol.shape[-1])], -1)
-    vue = sol.sum(-1) > 1e-6
-    return vue, np.where(vue, np.array(carte.indices_sol)[lisses.argmax(-1)], -1)
+    return sol.sum(-1) > 1e-6, lisses
 
 
-def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZONE_MIN_M2) -> dict:
+def _famille_par_case(carte: CarteDesSols, vue: np.ndarray, lisses: np.ndarray, permises: tuple | None = None) -> np.ndarray:
+    """Indice (dans carte.classes) de la famille la plus votée de chaque case vue (-1 : jamais vue). `permises` : seules ces
+    familles peuvent être choisies (les sols que la LECTURE des photos dit pour la pièce, le premier étant son sol principal) ;
+    une case sans aucun avis pour elles prend la première."""
+    indices = np.array(carte.indices_sol)
+    if permises is None:
+        return np.where(vue, indices[lisses.argmax(-1)], -1)
+    principale = carte.classes.index(permises[0])
+    colonnes = [k for k, i in enumerate(indices) if carte.classes[i] in permises]
+    choisie = indices[np.array(colonnes)][lisses[..., colonnes].argmax(-1)]
+    choisie = np.where(lisses[..., colonnes].sum(-1) > 1e-9, choisie, principale)
+    return np.where(vue, choisie, -1)
+
+
+def _plein(tache: np.ndarray) -> float:
+    """Part de son enveloppe convexe qu'une tache de cases remplit (1 : convexe ; un L : ~0,6)."""
+    lignes, colonnes = np.nonzero(tache)
+    coins = np.concatenate([np.stack([colonnes + dc, lignes + dl], 1) for dc in (0, 1) for dl in (0, 1)]).astype(np.float32)
+    return float(tache.sum()) / max(float(cv2.contourArea(cv2.convexHull(coins))), 1e-9)
+
+
+def morceaux_convexes(tache: np.ndarray, plein_min: float = 0.8, au_plus: int = 4) -> list[np.ndarray]:
+    """Une tache de cases découpée en morceaux à peu près CONVEXES (le format veut des zones convexes ; une zone en L rendue
+    par son enveloppe recouvrirait le sol voisin) : tant qu'un morceau remplit moins de `plein_min` de son enveloppe, il est
+    coupé en deux par la ligne ou la colonne de la carte qui laisse les deux parts les plus pleines."""
+    faits, a_voir = [], [tache]
+    while a_voir:
+        m = a_voir.pop()
+        if len(faits) + len(a_voir) + 1 >= au_plus or _plein(m) >= plein_min:
+            faits.append(m)
+            continue
+        lignes, colonnes = np.nonzero(m)
+        meilleur = None
+        for axe, valeurs in ((0, lignes), (1, colonnes)):
+            for coupe in range(int(valeurs.min()) + 1, int(valeurs.max()) + 1):
+                d_un_cote = np.zeros_like(m)
+                if axe == 0:
+                    d_un_cote[:coupe] = True
+                else:
+                    d_un_cote[:, :coupe] = True
+                a, b = m & d_un_cote, m & ~d_un_cote
+                if a.sum() < 4 or b.sum() < 4:
+                    continue
+                note = (_plein(a) * a.sum() + _plein(b) * b.sum()) / m.sum()
+                if meilleur is None or note > meilleur[0]:
+                    meilleur = (note, a, b)
+        if meilleur is None or meilleur[0] <= _plein(m) + 0.05:
+            faits.append(m)
+            continue
+        a_voir += [meilleur[1], meilleur[2]]
+    return faits
+
+
+def sols_des_pieces(carte: CarteDesSols, logement: dict, zone_min_m2: float = ZONE_MIN_M2, lus: dict | None = None) -> dict:
     """Pour chaque pièce assez vue : la famille de son sol (la plus votée) et ses zones d'une autre famille (contours
     convexes en mètres). Les votes sont d'abord lissés sur 3 × 3 cases (75 cm) : une case isolée suit ses voisines.
     Si la pièce est assez vue PROPREMENT (pas derrière un meuble possible), seules les cases propres décident ; sinon
-    toutes (une pièce vue seulement derrière un lit reste jugée)."""
+    toutes (une pièce vue seulement derrière un lit reste jugée).
+    `lus` (17/11/2026) : ce que la LECTURE des photos dit du sol de chaque pièce (moteur.photos_lues.sols_lus : {id de pièce :
+    {"famille", "autres"}}). Le sol principal de la pièce est alors celui qui est LU, et chaque case choisit seulement entre les
+    sols lus pour la pièce : la lecture donne le SENS (quels sols), les avis des cases la GÉOMÉTRIE (où). Avant, la lecture
+    était appliquée APRÈS cette décision : quand la brique avait pris pour sol principal celui que la lecture dit second
+    (app-001 : « lames » pour un séjour en point de Hongrie dont l'entrée est en lames), l'ancien sol principal était effacé
+    au lieu de devenir une zone, et la couleur du sol principal était mesurée sur l'autre sol."""
     from moteur.sol_a_plat import dans_polygone
-    vue_tout, fam_tout = _familles(carte, carte.votes)
-    vue_propre, fam_propre = _familles(carte, carte.votes_propres) if carte.votes_propres is not None else (vue_tout, fam_tout)
+    vue_tout, lisses_tout = _lisses(carte, carte.votes)
+    vue_propre, lisses_propre = _lisses(carte, carte.votes_propres) if carte.votes_propres is not None else (vue_tout, lisses_tout)
     meuble = carte.part_meuble()
     X, Y = carte.centres()
     case2 = carte.case ** 2
     sorties = {}
     for p in logement["pieces"]:
+        lu = (lus or {}).get(p["id"])
+        permises = (lu["famille"], *lu.get("autres", ())) if lu else None
         dans = dans_polygone(X, Y, p["contour"])
         if (dans & vue_propre).sum() * case2 >= SURFACE_VUE_MIN_M2:
-            dedans, fam = dans & vue_propre, fam_propre
+            dedans, fam = dans & vue_propre, _famille_par_case(carte, vue_propre, lisses_propre, permises)
         else:
-            dedans, fam = dans & vue_tout, fam_tout
+            dedans, fam = dans & vue_tout, _famille_par_case(carte, vue_tout, lisses_tout, permises)
         if dedans.sum() * case2 < SURFACE_VUE_MIN_M2:
             continue
         compte = np.bincount(fam[dedans], minlength=len(carte.classes))
-        principale = int(compte.argmax())
+        votee = int(compte.argmax())
+        principale = carte.classes.index(lu["famille"]) if lu else votee
         zones = []
-        autre = (dedans & (fam != principale)).astype(np.uint8)
-        n, etiquettes, stats, _ = cv2.connectedComponentsWithStats(autre, connectivity=8)
-        for k in range(1, n):
-            morceau = etiquettes == k
-            if morceau.sum() * case2 < zone_min_m2:
+        # sans lecture : une tache = des cases voisines d'un AUTRE sol que le principal (comme toujours) ; avec la lecture : une
+        # tache par famille (un carrelage et des lames qui se touchent, tous deux « autres », ne font pas une seule zone)
+        if lu:
+            taches = []
+            for i in carte.indices_sol:
+                if i != principale:
+                    n, etiquettes = cv2.connectedComponents((dedans & (fam == i)).astype(np.uint8), connectivity=8)
+                    taches += [etiquettes == k for k in range(1, n)]
+        else:
+            n, etiquettes = cv2.connectedComponents((dedans & (fam != principale)).astype(np.uint8), connectivity=8)
+            taches = [etiquettes == k for k in range(1, n)]
+        for tache in taches:
+            if tache.sum() * case2 < zone_min_m2:
                 continue
-            if float(meuble[morceau].mean()) > ZONE_MEUBLE_MAX:
+            if float(meuble[tache].mean()) > ZONE_MEUBLE_MAX:
                 continue  # l'œil y voit surtout des meubles (un lit, un tapis) : pas une zone de sol
-            if carte.vues is not None and carte.vues[morceau].sum() > 0 \
-                    and carte.vues_propres[morceau].sum() / carte.vues[morceau].sum() < ZONE_PROPRE_MIN:
+            if carte.vues is not None and carte.vues[tache].sum() > 0 \
+                    and carte.vues_propres[tache].sum() / carte.vues[tache].sum() < ZONE_PROPRE_MIN:
                 continue  # la plupart des photos y voient un lit, un canapé, un tapis : pas un autre sol
-            f = int(np.bincount(fam[morceau], minlength=len(carte.classes)).argmax())
-            lignes, colonnes = np.nonzero(morceau)
-            coins = np.concatenate([np.stack([colonnes + dc, lignes + dl], 1) for dc in (0, 1) for dl in (0, 1)]).astype(np.float32)
-            enveloppe = cv2.convexHull(coins)[:, 0]
-            contour = [[round(float(carte.origine[0] + c * carte.case), 3), round(float(carte.origine[1] - l * carte.case), 3)]
-                       for c, l in enveloppe]
-            zones.append({"famille": carte.classes[f], "contour": contour[::-1], "surface_m2": round(float(morceau.sum() * case2), 2)})
+            f = int(np.bincount(fam[tache], minlength=len(carte.classes)).argmax())
+            for morceau in (morceaux_convexes(tache) if lu else [tache]):
+                lignes, colonnes = np.nonzero(morceau)
+                coins = np.concatenate([np.stack([colonnes + dc, lignes + dl], 1) for dc in (0, 1) for dl in (0, 1)]).astype(np.float32)
+                enveloppe = cv2.convexHull(coins)[:, 0]
+                contour = [[round(float(carte.origine[0] + c * carte.case), 3), round(float(carte.origine[1] - l * carte.case), 3)]
+                           for c, l in enveloppe]
+                zones.append({"famille": carte.classes[f], "contour": contour[::-1], "surface_m2": round(float(morceau.sum() * case2), 2)})
         sorties[p["id"]] = {"famille": carte.classes[principale], "surface_vue_m2": round(float(dedans.sum() * case2), 2),
                             "part": round(float(compte[principale] / max(compte.sum(), 1)), 3), "zones": zones}
+        if lu:
+            # les grandes zones d'abord : là où deux enveloppes se recouvrent un peu, la plus petite l'emporte (dernière posée)
+            zones.sort(key=lambda z: -z["surface_m2"])
+            sorties[p["id"]]["famille_brique"] = carte.classes[votee]
     return sorties
 
 
@@ -308,10 +383,39 @@ def ecart_lab(c1: dict, c2: dict) -> float:
 
 
 # ---------------------------------------------------------------- tout l'enchaînement, et sa note
-def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, journal=lambda *_: None, pas_du_sol=None) -> dict:
+def avis_parmi(probabilites: np.ndarray, classes, permises) -> np.ndarray:
+    """Les avis des vignettes d'UNE photo, ramenés aux seuls sols que la lecture dit pour CETTE photo (`permises`, la première
+    famille étant son sol principal ; None ou vide : avis inchangés). La part de « sol » de chaque vignette est gardée (ce que
+    l'œil dit « meuble » le reste) et répartie entre les sols permis, au prorata de leurs avis ; sans aucun avis pour eux,
+    tout va au premier. Une photo lue « point de Hongrie » ne peut donc plus voter « carrelage » pour son tapis."""
+    if not permises:
+        return probabilites
+    sols = [i for i, c in enumerate(classes) if c in FAMILLES]
+    gardes = [i for i in sols if classes[i] in permises]
+    if not gardes:
+        return probabilites
+    sortie = probabilites.copy()
+    masse = probabilites[:, sols].sum(1)
+    part = probabilites[:, gardes]
+    total = part.sum(1)
+    sortie[:, sols] = 0.0
+    sortie[:, gardes] = part / np.maximum(total, 1e-12)[:, None] * masse[:, None]
+    vides = total <= 1e-12
+    if vides.any():
+        premier = classes.index(permises[0]) if permises[0] in classes else gardes[0]
+        sortie[np.ix_(vides, gardes)] = 0.0
+        sortie[vides, premier] = masse[vides]
+    return sortie
+
+
+def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, journal=lambda *_: None, pas_du_sol=None,
+                lus: dict | None = None, sols_des_photos: dict | None = None) -> dict:
     """Photos calées du client → sol de chaque pièce (famille, zones, couleur). Rend aussi la carte et le sol assemblé.
     pas_du_sol : fonction (nom, photo RGB) → masque de ce qui n'est pas du sol (lits, canapés…), écarté avant la mise à plat
-    (moteur/pas_du_sol.py) ; None = rien d'écarté (comme avant le 10/11/2026)."""
+    (moteur/pas_du_sol.py) ; None = rien d'écarté (comme avant le 10/11/2026).
+    LA LECTURE DES PHOTOS (17/11/2026 ; None = Atelya décide seul, comme en service) :
+    - sols_des_photos : {nom de la photo : (familles lues sur cette photo)} : chaque photo ne vote que parmi SES sols (avis_parmi) ;
+    - lus : le sol de chaque pièce d'après la lecture (voir sols_des_pieces)."""
     from moteur.sol_a_plat import assembler, dans_polygone, photos_a_plat
     from moteur.oeil_dinov2 import empreintes
     vues = photos_a_plat(releve, logement, racine, journal=journal, pas_du_sol=pas_du_sol)
@@ -330,7 +434,7 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
             (v, centres, finesses), facteurs = vignettes(vue.image, vue.finesse, vue.resolution), None
         if len(v):
             e = empreintes(oeil, v)
-            pr = clf.probabilites(e)
+            pr = avis_parmi(clf.probabilites(e), clf.classes, (sols_des_photos or {}).get(nom))
             voter(votes, centres, pr, finesses, vue.resolution, facteurs=facteurs)
             ok = np.ones(len(v), bool) if facteurs is None else facteurs >= 1.0 - DOUTEUX_REMPLI_MAX
             if propres is not None:
@@ -347,7 +451,7 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
         journal(f"  {nom} : {len(v)} vignettes")
     carte = CarteDesSols(votes, v0.origine, CASE_M, tuple(clf.classes), votes_propres=propres, vues=nb_vues,
                          vues_propres=nb_propres)
-    pieces = sols_des_pieces(carte, logement)
+    pieces = sols_des_pieces(carte, logement, lus=lus)
     image, finesse, choisie = assembler([v for _, _, v in vues])
     douteux = np.zeros(finesse.shape, bool)  # le point retenu est vu derrière un meuble possible
     for k, (_, _, v) in enumerate(vues):
@@ -382,8 +486,39 @@ def reconnaitre(releve: dict, logement: dict, racine, oeil, clf: Classifieur, jo
                 hors_zones &= ~dz
                 z["empreinte"] = te[dz].mean(0) if dz.any() else None
             s["empreinte"] = te[hors_zones].mean(0) if hors_zones.any() else None
+    zones_d_un_meme_sol(pieces)
     return {"pieces": pieces, "carte": carte, "image": image, "finesse": finesse, "origine": v0.origine,
             "resolution": v0.resolution}
+
+
+def zones_d_un_meme_sol(pieces: dict) -> None:
+    """Dans une pièce, les zones d'une MÊME famille sont un seul et même sol (les lames de l'entrée, rendues en plusieurs
+    morceaux convexes) : elles prennent toutes la couleur et l'aspect du morceau le mieux mesuré (le plus de photos, puis le
+    plus grand), sinon la maquette montrerait une couture entre deux morceaux du même parquet."""
+    for s in pieces.values():
+        par_famille: dict[str, list] = {}
+        for z in s.get("zones", []):
+            par_famille.setdefault(z["famille"], []).append(z)
+        for zones in par_famille.values():
+            mesurees = [z for z in zones if z.get("couleur_photo")]
+            if len(zones) < 2 or not mesurees:
+                continue
+            reference = max(mesurees, key=lambda z: (z.get("photos_couleur", 0), z.get("surface_m2", 0.0)))
+            for z in zones:
+                if z is not reference:
+                    for cle in ("couleur_photo", "photos_couleur", "empreinte", "couleur"):
+                        if reference.get(cle) is not None:
+                            z[cle] = reference[cle]
+
+
+def mediane_ponderee(valeurs, poids) -> float:
+    """La valeur qui partage le poids total en deux (une photo qui voit beaucoup de sol compte plus)."""
+    valeurs, poids = np.asarray(valeurs, float), np.asarray(poids, float)
+    ordre = np.argsort(valeurs)
+    return float(valeurs[ordre][min(int(np.searchsorted(np.cumsum(poids[ordre]), poids.sum() / 2)), len(valeurs) - 1)])
+
+
+JOURNAL_COULEURS: list | None = None  # une liste : chaque mesure de couleur (photo, région) y est notée (diagnostic)
 
 
 def albedos_par_region(pieces: dict, vues, logement: dict, pas_meuble: np.ndarray, contours: dict) -> None:
@@ -394,7 +529,7 @@ def albedos_par_region(pieces: dict, vues, logement: dict, pas_meuble: np.ndarra
     from moteur.sol_a_plat import dans_polygone
     from moteur.teinte_photo import BLANC_PEINTURE, lineaire
     mesures: dict[tuple, list] = {}
-    for _, _, vue in vues:
+    for nom_photo, _, vue in vues:
         if vue.photo is None:
             continue
         blanc = blanc_des_murs(vue.photo, vue.camera, logement, vue.piece, vue.point_de_vue)
@@ -427,17 +562,35 @@ def albedos_par_region(pieces: dict, vues, logement: dict, pas_meuble: np.ndarra
                 # pixels proches de la couleur dominante seulement (restes de lit, de tapis, de pied de meuble écartés)
                 ecart = np.linalg.norm(L - np.median(L, 0), axis=1)
                 proches = ecart <= 2.0 * max(float(np.median(ecart)), 1.0)
-                sol = np.median(lineaire(pixels[proches]), axis=0)
+                lumiere = lineaire(pixels[proches])
+                sol = np.median(lumiere, axis=0)
+                if fam != "carreaux":
+                    # La TEINTE d'un parquet se lit sur sa moitié la plus VIVE (17/11/2026) : le reflet d'une fenêtre ou d'un
+                    # voilage sur le sol y ajoute du blanc, qui délave la couleur (séjour d'app-001 : sur les photos 03 et 04,
+                    # la moitié du point de Hongrie est sous ce reflet ; le parquet sortait beige pâle). La clarté reste celle
+                    # de tous les points (médiane du rouge).
+                    rouge = np.maximum(lumiere[:, 0], 1e-6)
+                    bleu_sur_rouge = lumiere[:, 2] / rouge
+                    vifs = bleu_sur_rouge <= np.median(bleu_sur_rouge)
+                    sol = np.array([sol[0], sol[0] * np.median(lumiere[vifs, 1] / rouge[vifs]), sol[0] * np.median(bleu_sur_rouge[vifs])])
                 mesures.setdefault(cle, []).append((sol / max(float(blanc["blanc"].max()), 1e-6) * BLANC_PEINTURE, int(m.sum())))
+                if JOURNAL_COULEURS is not None:  # pc/verification/diag_couleur_sols.py : d'où vient la couleur de chaque sol
+                    JOURNAL_COULEURS.append({"photo": nom_photo, "region": cle, "albedo": mesures[cle][-1][0], "pixels": int(proches.sum()),
+                                             "blanc": blanc["blanc"]})
     for cle, liste in mesures.items():
         valeurs = np.array([a for a, _ in liste])
         poids = np.array([n for _, n in liste], float)
-        ordre = np.argsort(valeurs, axis=0)
-        albedo = []
-        for c in range(3):  # médiane pondérée par canal
-            v, p = valeurs[ordre[:, c], c], poids[ordre[:, c]]
-            albedo.append(float(v[np.searchsorted(np.cumsum(p), p.sum() / 2)]))
         cible = pieces[cle[1]] if cle[0] == "piece" else pieces[cle[0]]["zones"][cle[1]]
+        if cible["famille"] in BOIS:
+            # Un PARQUET (17/11/2026) : la clarté (le rouge, sa couleur la plus forte) et la TEINTE (vert / rouge, bleu / rouge)
+            # sont réunies séparément. Le reflet d'une fenêtre sur le sol ajoute du blanc : il délave la couleur sans beaucoup
+            # changer la clarté. Canal par canal, la photo « du milieu » pouvait être justement celle du reflet, et le parquet
+            # sortait gris (séjour d'app-001 : [0,56 ; 0,37 ; 0,26], la photo 03, pour un bois miel [0,56 ; 0,31 ; 0,15]).
+            rouge = np.maximum(valeurs[:, 0], 1e-6)
+            r = mediane_ponderee(valeurs[:, 0], poids)
+            albedo = [r, r * mediane_ponderee(valeurs[:, 1] / rouge, poids), r * mediane_ponderee(valeurs[:, 2] / rouge, poids)]
+        else:
+            albedo = [mediane_ponderee(valeurs[:, c], poids) for c in range(3)]  # médiane pondérée par canal
         cible["couleur_photo"] = [round(min(max(a, 0.0), 1.0), 4) for a in albedo]
         cible["photos_couleur"] = len(liste)
 

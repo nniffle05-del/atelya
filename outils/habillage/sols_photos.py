@@ -132,15 +132,20 @@ def commande_logement(args) -> int:
     oeil = charger(clf.oeil)
     bibliotheque = trouver_matieres()
     prototypes = prototypes_bibliotheque(oeil, bibliotheque) if bibliotheque else None
-    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args))
+    lus = des_photos = None
     if getattr(args, "lecture", None):
-        # essai du 16/11/2026 : la famille du sol LUE sur les photos (moteur/lecture_photos.py) prime sur celle du petit classificateur
+        # La lecture des photos (moteur/lecture_photos.py) dit QUELS sols, Atelya dit OÙ (17/11/2026) : chaque photo ne vote que
+        # parmi les sols lus sur elle, le sol principal de la pièce est celui qui est lu, et les zones sont découpées ENSUITE.
+        # (Essai du 16/11/2026 : la lecture était appliquée après la décision — photos_lues.appliquer_les_sols — et le sol que la
+        # brique avait pris pour principal était effacé au lieu de devenir une zone : les lames de l'entrée d'app-001.)
         from moteur import photos_lues
-        lus = photos_lues.sols_lus(json.loads(args.lecture.read_text(encoding="utf-8")), releve, logement)
-        resultat["pieces"] = photos_lues.appliquer_les_sols(resultat["pieces"], lus)
-        for pid, s in resultat["pieces"].items():
-            if s.get("famille_brique") and s["famille_brique"] != s["famille"]:
-                print(f"{pid} : sol lu sur les photos « {s['famille']} » (la brique photos disait « {s['famille_brique']} »)")
+        lecture = json.loads(args.lecture.read_text(encoding="utf-8"))
+        lus, des_photos = photos_lues.sols_lus(lecture, releve, logement), photos_lues.sols_des_photos(lecture)
+    resultat = reconnaitre(releve, logement, RACINE, oeil, clf, journal=print, pas_du_sol=fonction_pas_du_sol(args), lus=lus,
+                           sols_des_photos=des_photos)
+    for pid, s in resultat["pieces"].items():
+        if s.get("famille_brique") and s["famille_brique"] != s["famille"]:
+            print(f"{pid} : sol lu sur les photos « {s['famille']} » (sans la lecture, Atelya disait « {s['famille_brique']} »)")
     for p in logement["pieces"]:  # remis avant la règle des espaces ouverts : un sol choisi n'est remplacé par rien
         if p["id"] in choisis:
             p["sol"], p["zones_sol"] = choisis[p["id"]]

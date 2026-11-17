@@ -6,7 +6,8 @@ from moteur.eclairages import AMBIANCE_DE_REFERENCE, AMBIANCES, ambiances
 
 def test_cinq_ambiances_dans_l_ordre():
     assert [a["id"] for a in AMBIANCES] == ["jour_soleil", "jour_voile", "fin_de_journee", "soiree", "nuit"]
-    assert AMBIANCES[0]["id"] == AMBIANCE_DE_REFERENCE  # la scène d'origine, où la teinte des sols est réglée
+    # la teinte des sols se règle sous la lumière douce du jour voilé (17/11/2026 ; avant : au soleil, parquets trop foncés)
+    assert AMBIANCE_DE_REFERENCE == "jour_voile" and AMBIANCE_DE_REFERENCE in [a["id"] for a in AMBIANCES]
     assert len({a["nom"] for a in AMBIANCES}) == 5
 
 

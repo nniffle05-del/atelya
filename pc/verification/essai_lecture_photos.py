@@ -218,7 +218,27 @@ def noter_sols(logement: dict, verite: dict) -> dict:
         details[p["id"]] = {"trouve": trouve, "attendu": attendu}
         zones[0] += len(p.get("zones_sol", []))
         zones[1] += len(v.get("zones_sol", []))
-    return {"pieces_jugees": len(details), "pieces_justes": justes, "zones_posees": zones[0], "zones_vraies": zones[1], "pieces": details}
+    # LA SURFACE JUSTE (17/11/2026) : part du sol des pièces jugées dont la famille est la bonne, zones comprises, sur une grille
+    # de 10 cm. Le compte des zones ne juge rien : une vraie zone relevée en trois morceaux convexes en vaut trois, et une
+    # fausse zone compte comme une vraie (« zones 4 pour 5 » en service sur app-001 : deux des quatre étaient fausses).
+    import numpy as np
+
+    from moteur.reconnaitre_sols import familles_verite
+    from moteur.sol_a_plat import dans_polygone
+
+    surface = [0, 0]
+    for p in logement["pieces"]:
+        if p["id"] not in details:
+            continue
+        c = np.asarray(p["contour"], float)
+        X, Y = np.meshgrid(np.arange(c[:, 0].min() + 0.05, c[:, 0].max(), 0.1), np.arange(c[:, 1].min() + 0.05, c[:, 1].max(), 0.1))
+        dedans = dans_polygone(X, Y, p["contour"])
+        trouve = familles_verite({"pieces": [p]}, X[dedans], Y[dedans])
+        attendu = familles_verite({"pieces": [vraies[p["id"]]]}, X[dedans], Y[dedans])
+        surface[0] += int((trouve == attendu).sum())
+        surface[1] += int(dedans.sum())
+    return {"pieces_jugees": len(details), "pieces_justes": justes, "zones_posees": zones[0], "zones_vraies": zones[1], "pieces": details,
+            "surface_juste": round(surface[0] / surface[1], 3) if surface[1] else None, "surface_jugee_m2": round(surface[1] * 0.01, 1)}
 
 
 def noter_baies(depart: dict, refait: dict) -> dict:
@@ -288,8 +308,9 @@ def main() -> int:
             m, s, b = n["meubles"], n["sols"], n["baies"]
             lignes.append(f"  {v} {VERSIONS[v][0]:38s} au sol : retrouvés {m['retrouves']}/{m['a_trouver']}, bonne sorte {m['bonne_sorte']}/{m['a_trouver']}, "
                           f"en trop {m['en_trop']}, morceaux {m.get('morceaux', 0)}, écart {m['ecart_moyen_m']} m | accrochés : {m['accroches_retrouves']}/{m['accroches_a_trouver']}, "
-                          f"en trop {m['accroches_en_trop']} | sols : {s['pieces_justes']}/{s['pieces_jugees']} pièces, zones {s['zones_posees']} pour "
-                          f"{s['zones_vraies']} | baies changées à tort : {len(b['changees_a_tort'])}/{b['baies']}"
+                          f"en trop {m['accroches_en_trop']} | sols : {s['pieces_justes']}/{s['pieces_jugees']} pièces, "
+                          + (f"surface juste {100 * s['surface_juste']:.0f} % de {s['surface_jugee_m2']} m²" if s.get("surface_juste") is not None else "surface non jugée")
+                          + f" | baies changées à tort : {len(b['changees_a_tort'])}/{b['baies']}"
                           + _equipements(n))
         lignes.append("")
     texte = "\n".join(lignes)
