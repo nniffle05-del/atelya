@@ -111,3 +111,13 @@ def test_une_table_deplacee_par_la_reparation_emmene_ses_chaises():
     assert set("abcd") <= set(par_id) and math.dist(par_id["table"]["position"], (3.0, 2.5)) > 0.05
     assert tablees.sieges_ranges(repare["meubles"]).keys() >= {id(par_id[i]) for i in "abcd"}
     assert collisions.mesurer(repare) == []
+
+
+def test_les_chaises_d_une_meme_table_sont_assorties():
+    table = meuble("table", "table", (3.0, 2.5), (1.8, 0.96, 0.75), 90.0)
+    vues = [{**chaise("a", 2.5, 1.7), "couleur": [90, 60, 40]}, {**chaise("b", 3.5, 1.7), "couleur": [100, 70, 50]},
+            {**chaise("c", 2.5, 3.3), "couleur": [80, 50, 30]}, {**chaise("t", 3.5, 3.3, categorie="tabouret_haut"), "couleur": [200, 200, 200]}]
+    ranges, _ = tablees.ranger([table, *vues], LOGEMENT)
+    par_id = {m["id"]: m for m in ranges}
+    assert par_id["a"]["couleur"] == par_id["b"]["couleur"] == par_id["c"]["couleur"] == [90, 60, 40]  # la médiane des trois chaises
+    assert par_id["t"]["couleur"] == [200, 200, 200]  # une autre sorte de siège garde la sienne

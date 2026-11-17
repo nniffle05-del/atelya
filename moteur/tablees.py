@@ -21,6 +21,7 @@ dit COMBIEN de chaises et à peu près OÙ ; le reste est de la géométrie :
    une largeur de chaise.
 Un siège qui ne tiendrait pas dans la pièce à sa place rangée (côté de table contre un mur) reste où les photos l'ont mis. Ce
 qu'une personne a placé (relevé, écran de vérification) n'est jamais déplacé — ni les tables, ni les sièges.
+7. Les sièges d'une même tablée sont assortis : même taille et même couleur, donc le même modèle dans la maquette.
 6. La table se cale sur ses chaises (au plus 50 cm) : mesuré sur les relevés, les chaises posées une à une étaient plus près de
    leur vraie place (9 à 54 cm) que leur table (39 cm), et rangées autour d'une table mal placée elles reculaient.
 """
@@ -232,11 +233,30 @@ def ranger(meubles: list[dict], logement: dict, journal=None) -> tuple[list[dict
                 ranges.append(i)
             else:
                 restes.append(i)
+        _assortir([sortie[i] for i in ranges])
         actions.append({"table": table["id"], "sieges": [sortie[i]["id"] for i in ranges], "restes": [sortie[i]["id"] for i in restes]})
         if journal:
             journal(f"  tablée : {len(ranges)} siège(s) rangé(s) autour de {table['categorie']} {table['id']}"
                     + (f", {len(restes)} laissé(s) où les photos les montrent" if restes else ""))
     return sortie, actions
+
+
+def _assortir(sieges: list[dict]) -> None:
+    """Les sièges d'une même tablée sont les MÊMES : même taille, même couleur (la médiane de ce que les photos montrent), donc
+    le même modèle dans la maquette (moteur.construire choisit un modèle par sorte, taille et couleur ; avant, quatre tabourets
+    vus de quatre couleurs un peu différentes étaient quatre modèles différents)."""
+    par_sorte: dict[str, list[dict]] = {}
+    for s in sieges:
+        par_sorte.setdefault(s["categorie"], []).append(s)
+    for groupe in par_sorte.values():
+        if len(groupe) < 2:
+            continue
+        couleurs = [g["couleur"] for g in groupe if g.get("couleur")]
+        couleur = [int(v) for v in np.median(np.array(couleurs), axis=0)] if couleurs else None
+        for g in groupe:
+            g["dimensions"] = list(groupe[0]["dimensions"])
+            if couleur is not None:
+                g["couleur"] = list(couleur)
 
 
 def _places(table: dict, sieges: dict[int, dict], vus: dict[int, np.ndarray], piece: dict | None = None) -> tuple[dict[int, dict], list[int]]:
