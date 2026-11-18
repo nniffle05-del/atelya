@@ -39,10 +39,13 @@ def _photos(cameras: dict, base: Path) -> dict[str, Path]:
     dossier = Path(cameras.get("photos", "."))
     if not dossier.is_absolute():
         dossier = (RACINE / dossier) if (RACINE / dossier).is_dir() else (base / dossier)
-    modele = cameras.get("fichier", "{nom}.jpg")
+    # sans « fichier » dans la fiche : .png (la règle des autres outils, ex. verites/app-001) puis .jpg ; avant le 18/11/2026
+    # seul .jpg était essayé, et la vraie vue d'app-001 plantait dès qu'on la demandait
+    modeles = [cameras["fichier"]] if cameras.get("fichier") else ["{nom}.png", "{nom}.jpg"]
     res = {}
     for nom in cameras["cameras"]:
-        chemin = dossier / modele.format(nom=nom)
+        chemin = next((dossier / m.format(nom=nom) for m in modeles if (dossier / m.format(nom=nom)).is_file()),
+                      dossier / modeles[0].format(nom=nom))
         if not chemin.is_file():
             sys.exit(f"PLANTÉ : photo introuvable {chemin}")
         res[nom] = chemin

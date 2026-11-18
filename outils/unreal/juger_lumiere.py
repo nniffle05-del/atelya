@@ -10,6 +10,9 @@ Pourquoi : juger la lumière du film là où le client la verra (CLAUDE.md § 0)
 des chiffres qui valent pour tous les logements (moteur/juge_lumiere.py : murs, sol, sol contre mur, image entière, lumière
 dans la scène). Écrit <sortie>/lumiere.json, lumiere.txt et une planche par logement (la photo | l'image du film remise
 exactement dans le cadre de la photo, avec les couleurs mesurées).
+LA VUE PAR LES FENÊTRES est jugée aussi (moteur/juge_lumiere.mesurer_dehors : couleur, dessin, décalage, netteté, photo contre
+film sur les mêmes pixels) : planche dehors-<logement>.jpg (la fenêtre de la photo | celle du film). Si le dossier des vues
+contient contexte.json (écrit par vues_photos_unreal.py --logement), son logement et ses meubles devant les fenêtres servent.
 --rejouer : PRÉVISION sans relancer Unreal : les images du film sont rejouées avec d'autres réglages d'image avant d'être
 jugées (crans d'exposition en plus ; « usine » = la courbe des tons d'origine d'Unreal ; « sat=1.3 » = vivacité des couleurs).
 À confirmer par un vrai rendu.
@@ -40,7 +43,12 @@ lire = lambda p: json.loads(Path(p).read_text(encoding="utf-8"))
 MESURES = (("murs L", "murs", "L"), ("murs rouge", "murs", "a"), ("murs jaune", "murs", "b"), ("relief des murs", "murs", "relief"),
            ("sol L", "sol", "L"), ("sol rouge", "sol", "a"), ("sol jaune", "sol", "b"), ("sol vivacité", "sol", "C"),
            ("sol contre mur", "sol_contre_mur", "clarte"), ("image sombres", "image", "L5"), ("image milieu", "image", "L50"),
-           ("image clairs", "image", "L95"), ("image vivacité", "image", "C"), ("image brûlée %", "image", "brule"))
+           ("image clairs", "image", "L95"), ("image vivacité", "image", "C"), ("image brûlée %", "image", "brule"),
+           ("dehors L", "dehors", "L"), ("dehors vivacité", "dehors", "C"), ("dehors sombres", "dehors", "sombres"),
+           ("dehors contraste", "dehors", "contraste"))
+DEHORS = (("dehors : écart de couleur", "ecart_couleur"), ("dehors : écart point par point", "ecart_point"),
+          ("dehors : dessin (1 = le même)", "ressemblance"), ("dehors : dessin, film recalé", "ressemblance_recalee"),
+          ("dehors : netteté (1 = photo)", "nettete"), ("dehors : vide %", "vide"))
 
 
 def decrire(image: np.ndarray, vue, logement: dict, pixels_sol, valide=None) -> dict:
@@ -87,6 +95,9 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
     if not fiche["cameras"]:
         print(f"PLANTÉ : aucune image vue-<photo>.png dans {dossier}", flush=True)
         sys.exit(1)
+    contexte = lire(dossier / "contexte.json") if (dossier / "contexte.json").is_file() else {}
+    logement_dehors = lire(contexte["logement"]) if contexte.get("logement") else logement
+    logement_dehors = logement_dehors.get("logement", logement_dehors)
     cadres = sortie / "cadres" / cas
     cadres.mkdir(parents=True, exist_ok=True)
     valides = {}
@@ -103,7 +114,7 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
     films = photos_a_plat({**fiche, "photos": str(cadres), "fichier": "vue-{nom}.png"}, logement, RACINE, journal=muet,
                           pas_du_sol=lambda n, rgb: ~valides[n])
     films = {n: v for n, _, v in films}
-    bilan, lignes = {}, []
+    bilan, lignes, fenetres = {}, [], []
     for nom, piece, vue in vues:
         f = films.get(nom)
         if f is None:
@@ -115,8 +126,32 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
         photo = decrire(vue.photo, vue, logement, jl.dominante(vue.image[propre]))
         film = decrire(f.photo, f, logement, jl.dominante(f.image[propre]), valides[nom])
         film["scene"] = scene(film)
-        bilan[nom] = {"piece": piece, "photo": photo, "film": film,
+        # la vue par les fenêtres : les mêmes pixels de la photo et du film
+        image_film = f.photo if f.photo.shape == vue.photo.shape else cv2.resize(f.photo, vue.photo.shape[1::-1])
+        echelle = vue.photo.shape[1] / 1206.0
+        masque = jl.masque_du_dehors(jl.camera_depuis_dict(fiche["cameras"][nom]["camera"]), vue.photo.shape[1::-1], logement_dehors,
+                                     (contexte.get("caches") or {}).get(nom, []), marge_px=max(1, int(round(4 * echelle))))
+        dehors = jl.mesurer_dehors(vue.photo, image_film, masque, valides[nom])
+        photo["dehors"], film["dehors"] = (dehors["photo"], dehors["film"]) if dehors else (None, None)
+        bilan[nom] = {"piece": piece, "photo": photo, "film": film, "dehors": dehors,
                       "ecart_murs": jl.ecart(photo["murs"], film["murs"]), "ecart_sol": jl.ecart(photo["sol"], film["sol"])}
+        if dehors:
+            ys, xs = np.nonzero(masque)
+            m = int(30 * echelle)
+            x0, x1 = max(0, xs.min() - m), min(masque.shape[1], xs.max() + m)
+            y0, y1 = max(0, ys.min() - m), min(masque.shape[0], ys.max() + m)
+            hauteur = 300
+            zoom = lambda im: cv2.resize(cv2.cvtColor(np.ascontiguousarray(im[y0:y1, x0:x1]), cv2.COLOR_RGB2BGR),
+                                         (max(2, int(round((x1 - x0) * hauteur / (y1 - y0)))), hauteur), interpolation=cv2.INTER_CUBIC)
+            contour = vue.photo.copy()
+            contour[cv2.dilate(masque.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & ~masque] = (255, 0, 255)
+            paire = np.concatenate([zoom(vue.photo), np.full((hauteur, 8, 3), 255, np.uint8), zoom(image_film),
+                                    np.full((hauteur, 8, 3), 255, np.uint8), zoom(contour)], 1)
+            texte = (f"{cas} {nom} ({piece}) : photo | film | zone jugee ; ecart point par point {dehors['ecart_point']}, dessin "
+                     f"{dehors['ressemblance']} (recale {dehors['ressemblance_recalee']}, glisse de {dehors['decalage_px']} px), "
+                     f"nettete {dehors['nettete']}, sombres {dehors['photo']['sombres']:.0f} -> {dehors['film']['sombres']:.0f}, "
+                     f"vivacite {dehors['photo']['C']:.0f} -> {dehors['film']['C']:.0f}")
+            fenetres.append((texte, paire))
         largeur = 760
         h = int(round(vue.photo.shape[0] * largeur / vue.photo.shape[1]))
         reduire = lambda im: cv2.resize(cv2.cvtColor(im, cv2.COLOR_RGB2BGR), (largeur, h), interpolation=cv2.INTER_AREA)
@@ -124,6 +159,16 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
         lignes.append(np.concatenate([reduire(vue.photo), blanc, reduire(f.photo)], 1))
         lignes.append(np.concatenate([pastilles(photo, largeur, f"{cas} {nom} ({piece}) : la photo"), blanc[:64],
                                       pastilles(film, largeur, "l'image du film")], 1))
+    if fenetres:  # la planche des fenêtres : une ligne par vue
+        largeur = max(p.shape[1] for _, p in fenetres)
+        blocs = []
+        for texte, paire in fenetres:
+            bandeau = np.full((26, max(largeur, 1500), 3), 255, np.uint8)
+            cv2.putText(bandeau, texte, (4, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+            ligne = np.full((paire.shape[0], bandeau.shape[1], 3), 255, np.uint8)
+            ligne[:, :paire.shape[1]] = paire[:, :bandeau.shape[1]]
+            blocs += [bandeau, ligne]
+        ecrire_image(sortie / f"dehors-{cas}.jpg", np.concatenate(blocs, 0))
     return bilan, lignes
 
 
@@ -151,6 +196,10 @@ def resume(bilans: dict) -> list[str]:
             e = [v[cle] for v in vues if v[cle] is not None]
             if e:
                 lignes.append(f"   {titre:<28} {np.mean(e):5.1f}   [{len(e)} vues]")
+        for titre, cle in DEHORS:
+            e = [v["dehors"][cle] for v in vues if v.get("dehors")]
+            if e:
+                lignes.append(f"   {titre:<32} {np.mean(e):6.2f}   [{len(e)} vues]")
         s = [v["film"]["scene"] for v in vues if v["film"].get("scene")]
         if s:
             lignes.append(f"   dans la scène du film (avant pellicule) : murs {np.mean([x['murs'] for x in s], 0).round(3).tolist()} "

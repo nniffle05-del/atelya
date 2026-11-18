@@ -150,6 +150,7 @@ def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict, moteur: s
                                       **({"intensite_max": intensite_max} if intensite_max is not None else {}),
                                       **({"force_ciel": force_ciel} if force_ciel is not None else {}),
                                       "debruiteur_temporel": temporel,
+                                      "pellicule": photographe.PELLICULE, "pellicule_couleurs": photographe.PELLICULE_COULEURS,
                                       **({"lampes_pieces": lampes_pieces} if lampes_pieces else {}),
                                       **(essais_de_reglage or {})}, indent=1), encoding="utf-8")
         _python_unreal(SCRIPTS_UE / "preparer_cinematique.py", paquet.as_posix(), nom, trajet.as_posix(), reglage.as_posix())
@@ -231,6 +232,9 @@ def main() -> None:
     p.add_argument("--reglage", action="append", default=[], metavar="CLE=VALEUR",
                    help="essais : un réglage de plus pour la préparation Unreal (ex. ciel_couvert=uni : l'ancien ciel couvert ; valeur lue comme du JSON "
                         "si possible)")
+    p.add_argument("--reglage-fichier", type=Path, metavar="JSON",
+                   help="des réglages de plus pour la préparation Unreal, lus dans un fichier (le DÉCOR du film : vraie vue par "
+                        "les fenêtres, balcons, ciel ; voir outils/unreal/decor_film.py) ; --reglage passe par-dessus")
     a = p.parse_args()
     paquet = STUDIO / "Paquets" / a.nom
     if Path(a.paquet).resolve() != paquet.resolve():
@@ -252,7 +256,7 @@ def main() -> None:
     if not a.sans_import:
         print("1. Import de la maquette dans Unreal")
         _python_unreal(SCRIPTS_UE / "importer_maquette.py", paquet.as_posix(), a.nom)
-    essais_de_reglage = {}
+    essais_de_reglage = json.loads(a.reglage_fichier.read_text(encoding="utf-8")) if a.reglage_fichier else {}
     for r in a.reglage:
         cle, valeur = r.split("=", 1)
         try:

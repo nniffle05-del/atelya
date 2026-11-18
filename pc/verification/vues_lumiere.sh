@@ -6,6 +6,8 @@
 #     ex. bash pc/verification/vues_lumiere.sh ancien-ciel --reglage ciel_couvert=uni
 #         VUES_001="photo-04" VUES_002="photo-01" VUES_004="photo-08" bash pc/verification/vues_lumiere.sh exact --moteur path_tracer
 #
+# Les vues sont tournées avec le DÉCOR du film entier (vraie vue par les fenêtres, balcons, vitre claire, ciel) ;
+# SANS_DECOR=1 : comme avant le 18/11/2026 (pour comparer aux anciens essais).
 # Sorties : ..\atelya\b2\lumiere-film\<essai>\app-00x\ (vues) et ..\atelya\b2\lumiere-film\<essai>\juge\ (chiffres, planches).
 # Éditeur Unreal FERMÉ. S'arrête au premier plantage.
 set -u
@@ -15,15 +17,18 @@ ESSAI="$1"; shift
 SORTIE=../atelya/b2/lumiere-film/$ESSAI
 B=../atelya/b2/film-contre-photos
 J3=../atelya/lectures-photos/parquet-sur-mesure/juges-3/images
+C3=../atelya/lectures-photos/parquet-sur-mesure/chaine-3
 VUES_001="${VUES_001-photo-01 photo-04 photo-07 photo-08 photo-10}"
-VUES_002="${VUES_002-photo-01 photo-05 photo-07 photo-09 photo-14}"
+VUES_002="${VUES_002-photo-01 photo-05 photo-07 photo-14}"  # photo-09 (cuisine) : appareil du film dans un meuble, écartée
 VUES_004="${VUES_004-photo-02 photo-08 photo-09 photo-10}"
 
 filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet> <photos> [options]
   local cas="$1" d3="$2" nom="$3" fiche="$4" paquet="$5" photos="$6"; shift 6
   [ -z "$photos" ] && return 0
+  local decor="--logement $C3/$cas/c/logement-meuble.json"
+  [ -n "${SANS_DECOR-}" ] && decor=""
   # shellcheck disable=SC2086
-  $PY outils/unreal/vues_photos_unreal.py "$d3" "$nom" "$fiche" "$SORTIE/$cas" --photos $photos --paquet "$paquet" --sans-import "$@" \
+  $PY outils/unreal/vues_photos_unreal.py "$d3" "$nom" "$fiche" "$SORTIE/$cas" --photos $photos --paquet "$paquet" --sans-import $decor "$@" \
     || { echo "PLANTÉ : vues de $cas (essai $ESSAI)"; exit 1; }
 }
 
@@ -36,4 +41,4 @@ for cas in app-001 app-002 app-004; do
   ls "$SORTIE/$cas"/vue-*.png >/dev/null 2>&1 && VUES="$VUES $cas=$SORTIE/$cas"
 done
 # shellcheck disable=SC2086
-$PY outils/unreal/juger_lumiere.py "$SORTIE/juge" $VUES --titre "ESSAI $ESSAI : $*" || { echo "PLANTÉ : juge de la lumière (essai $ESSAI)"; exit 1; }
+$PY outils/unreal/juger_lumiere.py "$SORTIE/juge" $VUES --sans app-002:photo-09 --titre "ESSAI $ESSAI : $*" || { echo "PLANTÉ : juge de la lumière (essai $ESSAI)"; exit 1; }

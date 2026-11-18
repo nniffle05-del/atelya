@@ -73,6 +73,9 @@ def main() -> int:
     ap.add_argument("--sans-export", action="store_true")
     ap.add_argument("--sans-import", action="store_true")
     ap.add_argument("--paquet", type=Path, help="un paquet pour Unreal déjà fait (essais de lumière sur la même maquette)")
+    ap.add_argument("--logement", type=Path,
+                    help="le logement.json de la maquette : les vues sont tournées avec le DÉCOR du film entier (vraie vue par "
+                         "les fenêtres d'après les photos de la fiche, balcons, vitre claire, ciel ; outils/unreal/decor_film.py)")
     a, pour_le_film = ap.parse_known_args()
     a.sortie.mkdir(parents=True, exist_ok=True)
     journal = a.sortie / "journal.txt"
@@ -86,6 +89,22 @@ def main() -> int:
     cameras = {n: d for n, d in fiche["cameras"].items() if not a.photos or n in a.photos}
     importee = a.sans_import
     faites = []
+    if a.logement:
+        import decor_film
+
+        # hors du dossier du paquet dans le studio : il est refait à chaque vue
+        decor = decor_film.decor_du_film(a.logement, a.fiche, a.eclairage, STUDIO / "Paquets" / "vues" / a.nom)
+        (a.sortie / "decor.json").write_text(json.dumps(decor, ensure_ascii=False, indent=1), encoding="utf-8")
+        # pour le juge (outils/unreal/juger_lumiere.py, la vue par les fenêtres) : le logement de la maquette et les meubles
+        # que les photos montrent devant les fenêtres
+        boites = STUDIO / "Paquets" / "vues" / a.nom / "meubles-devant-fenetres.json"
+        (a.sortie / "contexte.json").write_text(json.dumps({
+            "logement": str(a.logement.resolve()),
+            "caches": json.loads(boites.read_text(encoding="utf-8"))["boites"] if boites.is_file() else {}}, ensure_ascii=False),
+            encoding="utf-8")
+        pour_le_film = ["--reglage-fichier", str((a.sortie / "decor.json").resolve())] + pour_le_film
+        print(f"décor du film : {len(decor['vues_dehors'])} toile(s) de vraie vue, {len(decor['balcons'])} balcon(s), "
+              f"ciel photographié {'oui' if decor['ciel_photo'] else 'non'}", flush=True)
     for nom, d in cameras.items():
         debut = time.time()
         trajet = a.sortie / f"trajet-{nom}.json"

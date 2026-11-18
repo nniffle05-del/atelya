@@ -20,7 +20,9 @@ réglage par logement : c'est le même « film » pour tous.
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 from pathlib import Path
 
 import numpy as np
@@ -39,7 +41,16 @@ FORCE_BALANCE = 0.7
 # visée (médiane, 185 images). Masque corrigé, le film perdait cet éclat que NT avait validé (« tu as retiré la lumière ?! ») :
 # la visée est remontée pour le retrouver (film corrigé : -0,16 cran à 0,90 ; 0,90 x 2^(0,32 - 0,16) = 1,0). Les autres
 # éclairages, non mesurés, restent tels quels.
-CLARTE_UNREAL = {"jour_soleil": 1.0, "jour_voile": 0.55, "fin_de_journee": 1.30, "soiree": 0.45, "nuit": 0.35}
+# RÉGLAGES D'IMAGE DU 18/11/2026 (point 2 « la lumière du film », étape 3) : le film était gris et terne face aux photos des
+# clients (murs L 73 pour 81, vivacité du sol 19 pour 26 ; 13 vues de trois logements, outils/unreal/juger_lumiere.py). Un seul
+# réglage pour tous les logements, cherché par pc/verification/prevoir_reglages_image.py puis confirmé par de vraies images du
+# film : murs du jour voilé visés à 0,55 × 2^0,254 = 0,656 (affichés 191 sur 255 au lieu de 172), courbe des tons aux
+# clairs moins écrasés (PELLICULE : mêmes sombres et même gris moyen) et couleurs plus vives (PELLICULE_COULEURS). Mesuré : murs 73,0 -> 80,4 (photos 81,0), sol 48,4 ->
+# 52,1 (57,2), vivacité du sol 18,6 -> 25,8 (25,8), écart de couleur des murs 9,9 -> 4,8. Les AUTRES éclairages (non jugés
+# contre des photos) gardent des murs AFFICHÉS au même niveau qu'avant : leur visée est recalculée pour la nouvelle courbe
+# (pc/verification/reglage_d_essai.py) ; anciennes visées, sous la courbe « comme AgX » : soleil 1,0, voilé 0,55, fin de
+# journée 1,30, soirée 0,45, nuit 0,35.
+CLARTE_UNREAL = {"jour_soleil": 0.71, "jour_voile": 0.656, "fin_de_journee": 0.845, "soiree": 0.405, "nuit": 0.33}
 
 
 # EXPOSITION LOCALE d'Unreal (cinématique, étape 4, 12/11/2026) : comme l'œil (ou un vidéaste immobilier qui « garde » ses
@@ -69,12 +80,34 @@ def clarte_visee(ambiance: dict) -> float:
 POIDS = np.array([0.2126, 0.7152, 0.0722])  # clarté d'une couleur linéaire (Rec. 709)
 MINIMUM_PIXELS = 20
 
-# Réglages de la courbe filmique d'Unreal qui imitent AgX (Blender 5.2) sur les gris : pente, pied, épaule, coupure des noirs,
-# coupure des blancs (noms d'Unreal : film_slope, film_toe, film_shoulder, film_black_clip, film_white_clip).
-PELLICULE = {"film_slope": 0.514, "film_toe": 0.650, "film_shoulder": 0.545, "film_black_clip": 0.0, "film_white_clip": 0.0642}
-# Réglages des couleurs (nuancier de 163 couleurs passé dans AgX, moteur/pellicule_unreal.py) : pas d'« expansion de gamme »,
-# correction des bleus entière, saturation +4 % (noms d'Unreal : expand_gamut, blue_correction, color_saturation).
-PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.04}
+# La courbe filmique d'Unreal : pente, pied, épaule, coupure des noirs, coupure des blancs (noms d'Unreal : film_slope,
+# film_toe, film_shoulder, film_black_clip, film_white_clip). Jusqu'au 18/11/2026 elle imitait AgX de Blender sur les gris
+# (PELLICULE_AGX, gardée pour comparer) : très douce, elle écrasait les clairs (murs gris) ; depuis, elle est
+# réglée sur les PHOTOS DES CLIENTS (voir CLARTE_UNREAL).
+PELLICULE = {"film_slope": 0.772, "film_toe": 0.416, "film_shoulder": 0.586, "film_black_clip": 0.0, "film_white_clip": 0.0642}
+PELLICULE_AGX = {"film_slope": 0.514, "film_toe": 0.650, "film_shoulder": 0.545, "film_black_clip": 0.0, "film_white_clip": 0.0642}
+# Réglages des couleurs : pas d'« expansion de gamme », correction des bleus entière (nuancier de 163 couleurs passé dans AgX,
+# moteur/pellicule_unreal.py) ; saturation 1,04 (comme AgX) -> 1,28 le 18/11/2026 (les photos des clients ; noms d'Unreal :
+# expand_gamut, blue_correction, color_saturation).
+PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.28}
+PELLICULE_COULEURS_AGX = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.04}
+
+
+def _reglage_d_essai() -> None:
+    """ESSAIS de réglages d'image (point 2 « la lumière du film », étape 3, 18/11/2026) : la variable d'environnement
+    ATELYA_REGLAGE_IMAGE nomme un fichier JSON {"clarte": {"jour_voile": 0.7}, "pellicule": {"film_slope": …}, "couleurs":
+    {"saturation": …}} qui remplace ces réglages le temps d'un essai, dans TOUS les outils lancés ensuite (le photographe qui
+    mesure, la préparation Unreal qui les pose, le juge de la lumière qui les défait) : un seul endroit, pas de mélange."""
+    chemin = os.environ.get("ATELYA_REGLAGE_IMAGE")
+    if not chemin:
+        return
+    r = json.loads(Path(chemin).read_text(encoding="utf-8"))
+    CLARTE_UNREAL.update(r.get("clarte", {}))
+    PELLICULE.update(r.get("pellicule", {}))
+    PELLICULE_COULEURS.update(r.get("couleurs", {}))
+
+
+_reglage_d_essai()
 PELLICULE_USINE = {"film_slope": 0.88, "film_toe": 0.55, "film_shoulder": 0.26, "film_black_clip": 0.0, "film_white_clip": 0.04}
 # AgX de Blender 5.2 mesuré le 11/11/2026 (rampe de gris, image.save_render) : clarté linéaire -> valeur affichée (sur 255).
 AGX_MESURES = {0.003: 4.6, 0.01: 18.3, 0.03: 42.0, 0.1: 86.1, 0.18: 117.3, 0.3: 145.2, 0.55: 174.3, 1.0: 196.9, 2.0: 217.0,
@@ -176,7 +209,10 @@ def exposition_de_reprise(essais: list[tuple[float, float]], film: tuple[float, 
 
 # Exposition d'Unreal raisonnable pour un intérieur (app-002, 5 éclairages : de -6 à -12,6). Au-delà, la pièce n'a pas de lumière
 # (vu le 11/11/2026 : entrée sans fenêtre, portes fermées, de jour : le photographe partait à +22) : on s'arrête aux bornes.
-EXPOSITION_UNREAL_BORNES = (-16.0, -3.0)
+# Borne haute -3 -> -2 le 18/11/2026 (point 2, étape 3) : avec le vrai ciel couvert et des murs visés plus clairs, le séjour
+# d'app-001 (rideaux tirés devant ses fenêtres) demandait -2,7 et butait à -3 : murs 0,3 cran trop sombres. Les pièces sans
+# fenêtre du film ont leur plafonnier allumé : elles n'arrivent pas à cette borne.
+EXPOSITION_UNREAL_BORNES = (-16.0, -2.0)
 
 
 def _borner(biais: float) -> float:

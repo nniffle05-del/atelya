@@ -76,7 +76,9 @@ def test_la_scene_du_film_remonte_la_pellicule():
 
 def test_rejouer_sans_rien_changer_rend_la_meme_image():
     # une vraie image du film : des couleurs de scène passées par la pellicule (toute couleur d'écran n'en sort pas)
-    scene = np.random.default_rng(1).uniform(0.02, 1.2, (40 * 60, 3))
+    # … ni toute couleur de scène : une couleur très vive sort de ce que l'écran sait montrer (une couleur à 0 ne se remonte pas)
+    rng = np.random.default_rng(1)
+    scene = rng.uniform(0.02, 1.2, (40 * 60, 1)) * rng.uniform(0.75, 1.25, (40 * 60, 3))
     c = photographe.PELLICULE_COULEURS
     ecran = pellicule_unreal.affiche(scene, photographe.PELLICULE, c["saturation"], c["expand_gamut"], c["blue_correction"])
     image = np.round(255.0 * ecran).astype(np.uint8).reshape(40, 60, 3)
@@ -112,3 +114,41 @@ def test_l_image_entiere_et_l_ecart():
     assert jl.ecart(jl.couleur([0.5, 0.5, 0.5]), jl.couleur([0.2, 0.2, 0.2])) > 20
     assert jl.ecart(None, jl.couleur([0.5, 0.5, 0.5])) is None
     assert axes(0.0)[0][0] == 1.0
+
+
+def _vue_fabriquee(decalage=(0, 0), pale=False):
+    """Une « photo » de 200 × 300 avec une fenêtre qui montre des immeubles (rayures et carrés), et le « film » de la même vue."""
+    rng = np.random.default_rng(5)
+    dehors = np.full((260, 360, 3), 150, np.uint8)
+    for k in range(0, 360, 24):
+        dehors[:, k:k + 9] = (90, 100, 120)
+    for _ in range(40):
+        y, x = int(rng.integers(0, 240)), int(rng.integers(0, 340))
+        dehors[y:y + 12, x:x + 12] = rng.integers(40, 220, 3)
+    dx, dy = decalage
+    image = np.full((200, 300, 3), 235, np.uint8)
+    image[40:160, 60:240] = dehors[70 - dy:190 - dy, 90 - dx:270 - dx]
+    if pale:
+        image[40:160, 60:240] = (0.35 * image[40:160, 60:240] + 0.65 * 255).astype(np.uint8)
+    masque = np.zeros((200, 300), bool)
+    masque[44:156, 64:236] = True
+    return image, masque
+
+
+def test_la_vue_par_les_fenetres_identique_decalee_ou_pale():
+    photo, masque = _vue_fabriquee()
+    pareil = jl.mesurer_dehors(photo, photo.copy(), masque)
+    assert pareil["ecart_point"] < 0.5 and pareil["ressemblance"] > 0.99 and pareil["decalage_px"] == [0, 0]
+    assert abs(pareil["nettete"] - 1.0) < 0.01 and pareil["vide"] == 0.0
+    glisse, _ = _vue_fabriquee(decalage=(7, -4))
+    d = jl.mesurer_dehors(photo, glisse, masque)
+    assert d["decalage_px"] == [7, -4] and d["ressemblance_recalee"] > 0.8 and d["ressemblance"] < d["ressemblance_recalee"] - 0.3
+    assert d["ecart_point"] > 5 * max(pareil["ecart_point"], 0.5)
+    pale, _ = _vue_fabriquee(pale=True)
+    p = jl.mesurer_dehors(photo, pale, masque)
+    assert p["film"]["L"] > p["photo"]["L"] + 10 and p["ecart_couleur"] > 10 and p["nettete"] < 0.6
+    assert p["decalage_px"] == [0, 0] and p["ressemblance"] > 0.9  # le même dessin, seulement délavé
+    assert jl.mesurer_dehors(photo, photo, np.zeros_like(masque)) is None
+    blanc = photo.copy()
+    blanc[40:160, 60:240] = 255
+    assert jl.mesurer_dehors(photo, blanc, masque)["vide"] > 90

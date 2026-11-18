@@ -225,3 +225,94 @@ def refaire_l_image(rgb: np.ndarray, crans: float = 0.0, pellicule=None, couleur
     sortie = np.clip(np.round(255.0 * y), 0, 255).astype(np.uint8).reshape(rgb.shape)
     sortie[rgb.min(axis=-1) >= 254] = 255
     return sortie
+
+
+# ------------------------------------------------------------------------------------------------------------------------------
+# La VUE PAR LES FENÊTRES : la photo contre le film, sur les mêmes pixels (18/11/2026, NT : « pas fidèle aux photos à 100 % »)
+# ------------------------------------------------------------------------------------------------------------------------------
+DEHORS_PIXELS_MIN = 1500  # en dessous, la photo ne voit presque pas dehors : rien à juger
+DEHORS_CHERCHE_PX = 40  # décalage cherché entre la vue de la photo et celle du film, en pixels de la photo, de chaque côté
+
+
+def _lab_image(rgb: np.ndarray) -> np.ndarray:
+    return cv2.cvtColor(rgb.astype(np.float32) / 255.0, cv2.COLOR_RGB2LAB)
+
+
+def masque_du_dehors(cam, taille: tuple[int, int], logement: dict, caches=(), marge_px: int = 4) -> np.ndarray:
+    """Les pixels (H, L, bool) par où l'appareil de la photo voit DEHORS d'après le plan (moteur/vue_dehors.masque_fenetres :
+    sans les montants, les balcons, les meubles `caches`, la marque de l'annonce), rétrécis de `marge_px` (calage approché)."""
+    from moteur import vue_dehors
+
+    vue, _ = vue_dehors.masque_fenetres(cam, taille, vue_dehors.ouvertures_vitrees(logement), vue_dehors.murs_et_trous(logement),
+                                        caches, balcons=logement.get("balcons"))
+    if marge_px > 0:
+        vue = cv2.erode(vue, np.ones((2 * marge_px + 1, 2 * marge_px + 1), np.uint8))
+    # les MEUBLES DE LA MAQUETTE qui passent devant la fenêtre dans le film (les meubles de la photo sont dans `caches`) : la
+    # boîte de chacun, vue par l'appareil, est retirée ; sans cela une chaise sombre du film comptait comme du « dehors »
+    from moteur.camera_photo import projeter
+    from moteur.collisions import hauteurs, rect_du_meuble
+
+    for meuble in logement.get("meubles") or []:
+        try:
+            r, (z0, z1) = rect_du_meuble(meuble, 0.05), hauteurs(meuble)
+        except (KeyError, TypeError, ValueError, IndexError):
+            continue
+        coins = [projeter([*(r.c + i * r.h1 * r.e1 + j * r.h2 * r.e2), z], cam) for i in (-1, 1) for j in (-1, 1) for z in (z0, z1)]
+        if any(prof <= 0.05 for _, _, prof in coins):
+            continue  # boîte en partie derrière l'appareil : pas devant une fenêtre vue de face
+        pts = np.array([[u, v] for u, v, _ in coins], np.float32)
+        if np.abs(pts).max() > 20000:
+            continue
+        cv2.fillConvexPoly(vue, cv2.convexHull(pts).astype(np.int32), 0)
+    return vue > 0
+
+
+def mesurer_dehors(photo: np.ndarray, film: np.ndarray, masque: np.ndarray, valide=None, cherche_px: int = DEHORS_CHERCHE_PX) -> dict | None:
+    """Ce qu'on voit PAR LES FENÊTRES, photo contre film (deux images RGB de même taille, même cadre), sur `masque` :
+    - « photo », « film » : la couleur du dehors (médiane ; L clarté, C vivacité), ses « sombres » et ses « clairs » (10e et 90e
+      centièmes de clarté) et leur écart, le « contraste » (un voile blanc sur la vue relève les sombres : contraste perdu) ;
+      « ecart_couleur » entre les deux médianes ;
+    - « ecart_point » : l'écart de couleur moyen POINT PAR POINT (images adoucies de 3 pixels) : 0 = la même vue au même
+      endroit ; il compte à la fois la couleur, le dessin et sa place ;
+    - « ressemblance » : le DESSIN de la vue (immeubles, fenêtres d'en face ; les grandes plages de clarté sont retirées),
+      de 0 (rien de commun) à 1 (le même), sans bouger le film ; « ressemblance_recalee » et « decalage_px » : la même après
+      avoir fait glisser le film jusqu'à la meilleure place (le glissement trouvé, en pixels de la photo : → droite, ↓ bas) ;
+    - « nettete » : finesse du dessin du film rapportée à celle de la photo (1 = aussi net) ;
+    - « vide » : part du dehors où la photo montre quelque chose et où le film est blanc (%).
+    None si la photo ne voit presque pas dehors."""
+    m = masque.astype(bool)
+    if valide is not None:
+        m &= valide
+    if int(m.sum()) < DEHORS_PIXELS_MIN:
+        return None
+    lp, lf = _lab_image(photo), _lab_image(film)
+
+    def mediane(lab_px):
+        L, a, b = (float(x) for x in np.median(lab_px, axis=0))
+        sombres, clairs = (float(x) for x in np.percentile(lab_px[:, 0], [10, 90]))
+        return {"L": round(L, 1), "a": round(a, 1), "b": round(b, 1), "C": round(math.hypot(a, b), 1),
+                "sombres": round(sombres, 1), "clairs": round(clairs, 1), "contraste": round(clairs - sombres, 1)}
+
+    p, f = mediane(lp[m]), mediane(lf[m])
+    doux = lambda im: cv2.GaussianBlur(im, (0, 0), 3.0)
+    point = float(np.linalg.norm(doux(lp)[m] - doux(lf)[m], axis=1).mean())
+    # le dessin : la clarté sans ses grandes plages
+    detail = lambda L: (L - cv2.GaussianBlur(L, (0, 0), 10.0)).astype(np.float32)
+    dp, df = detail(lp[..., 0]), detail(lf[..., 0])
+    ys, xs = np.nonzero(m)
+    x0, x1, y0, y1 = int(xs.min()), int(xs.max()) + 1, int(ys.min()), int(ys.max()) + 1
+    c = int(cherche_px)
+    gabarit, poids = dp[y0:y1, x0:x1].copy(), m[y0:y1, x0:x1].astype(np.float32)
+    gabarit *= poids
+    champ = cv2.copyMakeBorder(df, c, c, c, c, cv2.BORDER_REFLECT)[y0:y1 + 2 * c, x0:x1 + 2 * c]
+    carte = cv2.matchTemplate(champ, gabarit, cv2.TM_CCORR_NORMED, mask=poids)
+    carte = np.nan_to_num(carte, nan=0.0, posinf=0.0, neginf=0.0)
+    iy, ix = np.unravel_index(int(np.argmax(carte)), carte.shape)
+    force = lambda L: float(np.abs(cv2.Laplacian(cv2.GaussianBlur(L, (0, 0), 1.0), cv2.CV_32F))[m].mean())
+    vide = (lf[..., 0] > 96.0) & (np.hypot(lf[..., 1], lf[..., 2]) < 4.0) & (lp[..., 0] < 90.0)
+    return {"pixels": int(m.sum()), "photo": p, "film": f,
+            "ecart_couleur": round(float(np.linalg.norm([p[k] - f[k] for k in "Lab"])), 1), "ecart_point": round(point, 1),
+            "ressemblance": round(float(carte[c, c]), 3), "ressemblance_recalee": round(float(carte[iy, ix]), 3),
+            "decalage_px": [int(ix - c), int(iy - c)],
+            "nettete": round(force(lf[..., 0]) / max(force(lp[..., 0]), 1e-6), 2),
+            "vide": round(100.0 * float(vide[m].mean()), 1)}

@@ -2,13 +2,15 @@ r"""POINT 2 (18/11/2026) : un petit plan EN MOUVEMENT tourné depuis la place d'
 lumière quand la caméra bouge (CLAUDE.md § 0 : le produit est le film, pas une image à l'arrêt).
 
     ..\atelya\.venv\Scripts\python.exe pc\verification\panoramique_lumiere.py <paquet> <nom Unreal> <fiche des caméras> <photo>
-        <sortie> [--tour 60] [--avance 0.4] [--secondes 6] [options du film, ex. --reglage ciel_couvert=uni]
+        <sortie> [--logement <logement.json>] [--tour 60] [--avance 0.4] [--secondes 6]
+        [options du film, ex. --reglage ciel_couvert=uni]
 
 La caméra part de la place de l'appareil de la photo, avance de <avance> mètres dans le sens du regard et tourne de <tour>
 degrés en tout (moitié à gauche, moitié à droite du regard de la photo), à hauteur d'appareil, à l'horizontale. Pourquoi ce
 plan et pas le vol du film entier : il reste dans une pièce que la photo montre (on sait à quoi comparer) et il fait défiler
 les reflets du sol et les murs sous plusieurs angles en peu d'images. La maquette doit être DÉJÀ importée dans Unreal (éditeur
-fermé). Les images sont copiées dans <sortie> (image-0001.png…), prêtes pour pc/verification/film_cote_a_cote.py.
+fermé). Avec --logement : le DÉCOR du film entier (vraie vue par les fenêtres d'après les photos de la fiche, balcons, vitre
+claire, ciel ; outils/unreal/decor_film.py). Les images sont copiées dans <sortie> (image-0001.png…), prêtes pour pc/verification/film_cote_a_cote.py.
 """
 from __future__ import annotations
 
@@ -51,6 +53,7 @@ def main() -> int:
     ap.add_argument("photo")
     ap.add_argument("sortie", type=Path)
     ap.add_argument("--eclairage", default="jour_voile")
+    ap.add_argument("--logement", type=Path)
     ap.add_argument("--tour", type=float, default=60.0)
     ap.add_argument("--avance", type=float, default=0.4)
     ap.add_argument("--secondes", type=float, default=6.0)
@@ -63,6 +66,12 @@ def main() -> int:
     trajet = a.sortie / "trajet.json"
     trajet.write_text(json.dumps(trajet_du_panoramique(fiche["cameras"][a.photo], a.eclairage, a.tour, a.avance, a.secondes),
                                  ensure_ascii=False, indent=1), encoding="utf-8")
+    if a.logement:
+        import decor_film
+
+        decor = decor_film.decor_du_film(a.logement, a.fiche, a.eclairage, STUDIO / "Paquets" / "vues" / a.nom)
+        (a.sortie / "decor.json").write_text(json.dumps(decor, ensure_ascii=False, indent=1), encoding="utf-8")
+        pour_le_film = ["--reglage-fichier", str((a.sortie / "decor.json").resolve())] + pour_le_film
     suffixe = f"-pano-{a.photo}"
     debut = time.time()
     with open(a.sortie / "journal.txt", "w", encoding="utf-8") as journal:

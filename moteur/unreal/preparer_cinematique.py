@@ -69,8 +69,8 @@ FORCE_CIEL_PHYSIQUE = 3.3
 FORCE_CIEL = 1.0
 DEHORS_ALBEDO = 0.2  # un trottoir, un bitume clair
 DEHORS_COTE_M = 20000.0  # 20 km : avec 2 km, le bord du sol faisait un trait sombre à l'horizon dans les fenêtres
-PELLICULE = {"film_slope": 0.514, "film_toe": 0.650, "film_shoulder": 0.545, "film_black_clip": 0.0, "film_white_clip": 0.0642}
-PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.04}
+PELLICULE = {"film_slope": 0.772, "film_toe": 0.416, "film_shoulder": 0.586, "film_black_clip": 0.0, "film_white_clip": 0.0642}
+PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.28}
 
 
 def _args():
@@ -827,10 +827,15 @@ def marquer_blancs(fiche):
     return n
 
 
-def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None, halo=0.2):
+def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None, halo=0.2, pellicule=None,
+                        couleurs=None):
     """Le réglage d'image (Post Process). `locale` : exposition LOCALE {"hautes_lumieres": 0..1, "pivot_crans": crans,
     "flou": 0..1} : les grandes zones plus claires que le pivot (les fenêtres) voient leur contraste réduit (1 = rien) ; le pivot
-    est placé au-dessus du gris moyen d'Unreal (0,18) ; None = pas d'exposition locale."""
+    est placé au-dessus du gris moyen d'Unreal (0,18) ; None = pas d'exposition locale. `pellicule`, `couleurs` : la courbe des
+    tons et les couleurs envoyées par l'outil qui tourne (moteur/photographe.PELLICULE, PELLICULE_COULEURS : la seule source,
+    aussi pour les essais) ; à défaut, les copies de ce fichier."""
+    pellicule = {**PELLICULE, **(pellicule or {})}
+    couleurs = {**PELLICULE_COULEURS, **(couleurs or {})}
     v = _poser(unreal.PostProcessVolume, etiquette="Atelya_ReglageImage")
     v.set_editor_property("unbound", True)
     r = v.get_editor_property("settings")
@@ -852,10 +857,10 @@ def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, lo
         "motion_blur_amount": 0.5,
         "vignette_intensity": 0.0,
         "bloom_intensity": float(halo),
-        **PELLICULE,
-        "expand_gamut": PELLICULE_COULEURS["expand_gamut"],
-        "blue_correction": PELLICULE_COULEURS["blue_correction"],
-        "color_saturation": unreal.Vector4(1.0, 1.0, 1.0, PELLICULE_COULEURS["saturation"]),
+        **{cle: float(valeur) for cle, valeur in pellicule.items()},
+        "expand_gamut": float(couleurs["expand_gamut"]),
+        "blue_correction": float(couleurs["blue_correction"]),
+        "color_saturation": unreal.Vector4(1.0, 1.0, 1.0, float(couleurs["saturation"])),
     }
     if moteur == "path_tracer":
         reglages.update({"path_tracing_max_bounces": REBONDS_PT, "path_tracing_enable_denoiser": True,
@@ -1075,7 +1080,7 @@ def main():
     exposition = float(reglage.get("exposition", 0.0))
     gain = reglage.get("gain") or [1.0, 1.0, 1.0]
     volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"), reglage.get("exposition_locale"),
-                                 reglage.get("halo", 0.2))
+                                 reglage.get("halo", 0.2), reglage.get("pellicule"), reglage.get("pellicule_couleurs"))
     if materiau_ciel is not None:  # le ciel photographié, posé sur l'image (réglage d'image)
         r = volume.get_editor_property("settings")
         r.set_editor_property("weighted_blendables", unreal.WeightedBlendables(

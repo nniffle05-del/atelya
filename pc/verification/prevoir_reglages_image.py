@@ -32,6 +32,8 @@ from moteur.images import lire_image  # noqa: E402
 from moteur.reconnaitre_sols import lab  # noqa: E402
 
 # ce que l'œil voit d'abord pèse plus : murs et sol ; puis l'image entière
+GROS_ECART = 8.0
+BORNES = {"crans": (-0.5, 2.5), "pente": (0.45, 1.0), "pied": (0.3, 0.8), "epaule": (0.2, 0.7), "vivacite": (1.0, 1.9)}
 POIDS = {"murs_L": 2.0, "sol_L": 2.0, "sol_C": 1.5, "L5": 1.0, "L50": 1.0, "L95": 1.0, "C": 1.0}
 
 
@@ -80,8 +82,31 @@ def ecarts(vues: list[dict], r: dict) -> tuple[float, dict]:
         m = mesures(vue, r)
         for k in POIDS:
             par_mesure[k].append(m[k] - vue["cible"][k])
-    note = sum(POIDS[k] * float(np.mean(np.square(v))) for k, v in par_mesure.items()) / sum(POIDS.values())
+    # écarts « bornés » : au-delà de GROS_ECART points, un écart ne compte plus au carré (un sol dont la MATIÈRE est fausse,
+    # ex. la chambre d'app-004 à -40, ne doit pas tirer le réglage d'image de tous les logements)
+    def borne(v):
+        v = np.abs(np.asarray(v, float))
+        return np.where(v <= GROS_ECART, v ** 2, GROS_ECART * (2 * v - GROS_ECART))
+
+    note = sum(POIDS[k] * float(np.mean(borne(v))) for k, v in par_mesure.items()) / sum(POIDS.values())
     return float(np.sqrt(note)), {k: round(float(np.mean(v)), 1) for k, v in par_mesure.items()}
+
+
+def chercher(vues: list[dict], depart: dict, tirages: int) -> dict:
+    """Le meilleur réglage commun pour ces vues : exposition seule, puis vivacité, puis tout ensemble (tirages au hasard)."""
+    seule = min(({**depart, "crans": c} for c in np.arange(0.0, 2.55, 0.05)), key=lambda r: ecarts(vues, r)[0])
+    deux = min(({**seule, "vivacite": s} for s in np.arange(1.0, 1.85, 0.05)), key=lambda r: ecarts(vues, r)[0])
+    rng = np.random.default_rng(0)
+    meilleur, note = dict(deux), ecarts(vues, deux)[0]
+    for k in range(tirages):
+        largeur = 1.0 if k < tirages // 2 else 0.15
+        essai = {c: float(np.clip(meilleur[c] + largeur * rng.normal(0, 0.25) * (b - a_), a_, b)) for c, (a_, b) in BORNES.items()}
+        if essai["pied"] + 0.18 >= 1.0:
+            continue
+        n = ecarts(vues, essai)[0]
+        if n < note:
+            meilleur, note = essai, n
+    return {"seule": seule, "deux": deux, "tout": {k: round(v, 3) for k, v in meilleur.items()}}
 
 
 def main() -> int:
@@ -106,25 +131,22 @@ def main() -> int:
         return note
 
     dire("le film d'aujourd'hui", depart)
-    # 1. l'exposition seule
-    seule = min(({**depart, "crans": c} for c in np.arange(0.0, 2.55, 0.05)), key=lambda r: ecarts(vues, r)[0])
-    dire("exposition seule", seule)
-    # 2. exposition + vivacité
-    deux = min(({**seule, "vivacite": s} for s in np.arange(1.0, 1.85, 0.05)), key=lambda r: ecarts(vues, r)[0])
-    dire("exposition + vivacité", deux)
-    # 3. tout ensemble : tirages au hasard autour, puis affinage
-    rng = np.random.default_rng(0)
-    bornes = {"crans": (-0.5, 2.5), "pente": (0.45, 1.0), "pied": (0.3, 0.8), "epaule": (0.2, 0.7), "vivacite": (1.0, 1.9)}
-    meilleur, note = dict(deux), ecarts(vues, deux)[0]
-    for k in range(a.tirages):
-        largeur = 1.0 if k < a.tirages // 2 else 0.15
-        essai = {c: float(np.clip(meilleur[c] + largeur * rng.normal(0, 0.25) * (b - a_), a_, b)) for c, (a_, b) in bornes.items()}
-        if essai["pied"] + 0.18 >= 1.0:
-            continue
-        n = ecarts(vues, essai)[0]
-        if n < note:
-            meilleur, note = essai, n
-    dire("exposition + courbe + vivacité", {k: round(v, 3) for k, v in meilleur.items()})
+    r = chercher(vues, depart, a.tirages)
+    dire("exposition seule", r["seule"])
+    dire("exposition + vivacité", r["deux"])
+    dire("exposition + courbe + vivacité", r["tout"])
+    meilleur = r["tout"]
+    # le réglage tient-il sur un logement qu'il n'a PAS vu ? cherché sur deux logements, noté sur le troisième
+    logements = sorted({v["nom"].split()[0] for v in vues})
+    if len(logements) >= 3:
+        lignes.append("")
+        lignes.append("réglage cherché sans un logement, puis noté sur ce logement (avant -> avec ce réglage | avec le réglage de tous) :")
+        for cas in logements:
+            dehors = [v for v in vues if v["nom"].split()[0] == cas]
+            autres = [v for v in vues if v["nom"].split()[0] != cas]
+            sans = chercher(autres, depart, a.tirages // 2)["tout"]
+            lignes.append(f"  sans {cas} : note sur {cas} {ecarts(dehors, depart)[0]:.1f} -> {ecarts(dehors, sans)[0]:.1f} | "
+                          f"{ecarts(dehors, meilleur)[0]:.1f} ; " + " ".join(f"{k} {v:.3g}" for k, v in sans.items()))
     lignes.append("")
     lignes.append("par vue, avec ce dernier réglage (film − photo) :")
     for vue in vues:
