@@ -124,8 +124,17 @@ def _nouveau(racine, nom, classe, fabrique):
     return unreal.AssetToolsHelpers.get_asset_tools().create_asset(court, dossier, classe, fabrique)
 
 
-def _materiau_ciel(racine, couleur, force):
-    """Un matériau « ciel » uni et lumineux (vu par la lumière de ciel), à poser à l'intérieur d'un grand dôme."""
+# Le ciel couvert de la CIE : clarté (1 + 2 sin h) / 3, h = hauteur au-dessus de l'horizon (1 au zénith, 1/3 à l'horizon).
+CIEL_COUVERT_HORIZON = 1.0 / 3.0
+
+
+def _materiau_ciel(racine, couleur, force, forme="uni"):
+    """Un matériau « ciel » lumineux (vu par la lumière de ciel), à poser à l'intérieur d'un grand dôme.
+    forme « uni » : la même clarté dans toutes les directions, AUSSI PAR EN DESSOUS (le dôme d'origine, 11/11/2026) ;
+    forme « cie » (essai du 18/11/2026) : le ciel couvert de la CIE, comme dans Blender (1 au zénith, 1/3 à l'horizon), et SOUS
+    l'horizon la clarté d'un sol de rue éclairé par ce ciel (albédo DEHORS_ALBEDO × 7/9 de la clarté du zénith) : avec le dôme
+    uni, il arrivait par le bas des fenêtres autant de lumière que du zénith (6 fois trop), qui éclairait les plafonds et le
+    haut des murs comme jamais en vrai et aplatissait la lumière des pièces."""
     m = _nouveau(racine, "Studio/M_Ciel", unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
     m.set_editor_property("two_sided", True)
@@ -133,7 +142,40 @@ def _materiau_ciel(racine, couleur, force):
     lib = unreal.MaterialEditingLibrary
     c = lib.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -400, 0)
     c.set_editor_property("constant", unreal.LinearColor(couleur[0] * force, couleur[1] * force, couleur[2] * force, 1.0))
-    lib.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    if forme != "cie":
+        lib.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    else:
+        # la direction regardée = l'opposé du « vecteur caméra » (du point vers l'œil) : vaut pour la caméra du film comme
+        # pour la capture de la lumière de ciel, où que soit le dôme
+        vers_oeil = lib.create_material_expression(m, unreal.MaterialExpressionCameraVectorWS, -1100, 300)
+        z = lib.create_material_expression(m, unreal.MaterialExpressionComponentMask, -900, 300)
+        for canal, garde in (("r", False), ("g", False), ("b", True), ("a", False)):
+            z.set_editor_property(canal, garde)
+        lib.connect_material_expressions(vers_oeil, "", z, "")
+        haut = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -750, 300)  # sin h (+ vers le zénith)
+        lib.connect_material_expressions(z, "", haut, "A")
+        haut.set_editor_property("const_b", -1.0)
+        pente = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -600, 200)
+        lib.connect_material_expressions(haut, "", pente, "A")
+        pente.set_editor_property("const_b", 1.0 - CIEL_COUVERT_HORIZON)
+        dessus = lib.create_material_expression(m, unreal.MaterialExpressionAdd, -450, 200)
+        lib.connect_material_expressions(pente, "", dessus, "A")
+        dessus.set_editor_property("const_b", CIEL_COUVERT_HORIZON)
+        dessous = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -450, 420)
+        dessous.set_editor_property("r", DEHORS_ALBEDO * 7.0 / 9.0)
+        horizon = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -450, 520)
+        horizon.set_editor_property("r", CIEL_COUVERT_HORIZON)
+        clarte = lib.create_material_expression(m, unreal.MaterialExpressionIf, -250, 300)
+        lib.connect_material_expressions(haut, "", clarte, "A")
+        clarte.set_editor_property("const_b", 0.0)
+        clarte.set_editor_property("equals_threshold", 0.0)
+        lib.connect_material_expressions(dessus, "", clarte, "A > B")
+        lib.connect_material_expressions(horizon, "", clarte, "A == B")
+        lib.connect_material_expressions(dessous, "", clarte, "A < B")
+        produit = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -100, 100)
+        lib.connect_material_expressions(c, "", produit, "A")
+        lib.connect_material_expressions(clarte, "", produit, "B")
+        lib.connect_material_property(produit, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     lib.recompile_material(m)
     unreal.EditorAssetLibrary.save_loaded_asset(m)
     return m
@@ -240,7 +282,7 @@ def direction_soleil(ambiance, fiche):
     return soleil["direction"] if soleil else [0.6, 0.2, -0.77]
 
 
-def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None):
+def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None, ciel_couvert="uni"):
     ciel = ambiance.get("ciel", "couvert")
     lumiere_ciel = _poser(unreal.SkyLight, centre, etiquette="Atelya_LumiereCiel")
     composant = lumiere_ciel.get_component_by_class(unreal.SkyLightComponent)
@@ -271,7 +313,7 @@ def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None):
         mesh.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Sphere"))
         mesh.set_editor_property("cast_shadow", False)
         mesh.set_world_scale3d(unreal.Vector(CIEL_RAYON_CM / 50.0, CIEL_RAYON_CM / 50.0, CIEL_RAYON_CM / 50.0))
-        mesh.set_material(0, _materiau_ciel(racine, couleur, force))
+        mesh.set_material(0, _materiau_ciel(racine, couleur, force, ciel_couvert if ciel == "couvert" else "uni"))
     return ciel
 
 
@@ -997,7 +1039,7 @@ def main():
     moteur = reglage.get("moteur", "lumen")
     if moteur not in MOTEURS:
         raise RuntimeError(f"PLANTÉ : moteur « {moteur} » inconnu ({MOTEURS})")
-    ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"))
+    ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"), reglage.get("ciel_couvert", "uni"))
     if ciel == "physique" and reglage.get("dehors", True):
         poser_dehors(racine, centre, invisible=bool(reglage.get("vues_dehors")) and not reglage.get("dehors_visible", False))
     ciel_photo, materiau_ciel = None, None
@@ -1037,6 +1079,7 @@ def main():
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
+                                                 "ciel_couvert": reglage.get("ciel_couvert", "uni"),
                                                  "ciel_photo_decalage": ciel_photo, "vues_dehors": vues, "objets_balcons": nb_balcons,
                                                  "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
                                                  "verre_importe": verre_importe,

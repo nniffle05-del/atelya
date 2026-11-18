@@ -1,12 +1,15 @@
 r"""LE JUGE DANS LE FILM : la photo du client à côté d'une image du FILM Unreal prise du même endroit (18/11/2026).
 
     python outils/unreal/vues_photos_unreal.py <dossier 3d> <nom> <fiche des caméras> <sortie> [--photos photo-01 photo-07]
-        [--eclairage jour_voile] [--sans-export] [--sans-import]
+        [--eclairage jour_voile] [--sans-export] [--sans-import] [--paquet <paquet déjà fait>] [options du film…]
 
 Pourquoi : le produit d'Atelya est la cinématique et la visite dans Unreal, pas des images fixes de Blender (CLAUDE.md § 0).
 On juge donc là où le client regardera : pour chaque photo du client, la caméra du film est posée à la place de l'appareil
-(même endroit, même direction, même angle de champ) et le film y tourne trois images, avec les réglages du film (lumière,
-exposition du « photographe »). Les photos ne sont qu'un modèle pour comparer.
+(même endroit, même direction, même angle de champ, MÊME CADRE : moteur/juge_lumiere.cadre_du_film) et le film y tourne trois
+images, avec les réglages du film (lumière, exposition du « photographe »). Les photos ne sont qu'un modèle pour comparer.
+--paquet : reprendre un paquet pour Unreal déjà fait (essais de lumière sur la même maquette : rien n'est refait ni réimporté
+si --sans-import). Les options inconnues ici sont passées telles quelles au film (outils/unreal/cinematique_unreal.py :
+--moteur path_tracer, --force-ciel 2, --exposition-fixe -5…).
 <dossier 3d> : la maquette faite par Atelya (maquette.blend, construction.json…) ; <nom> : nom court sans accent du niveau Unreal.
 1. le paquet pour Unreal est refait (outils/unreal/exporter_pour_unreal.py), sauf --sans-export ;
 2. pour chaque photo : un trajet immobile à la place de l'appareil, rendu par outils/unreal/cinematique_unreal.py (la maquette
@@ -30,6 +33,8 @@ sys.path.insert(0, str(RACINE))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from moteur.juge_lumiere import cadre_du_film  # noqa: E402
+
 STUDIO = Path("D:/Atelya-Unreal")
 SCENES = {"jour_voile": "2 Jour voilé", "jour_soleil": "1 Jour ensoleillé"}
 
@@ -44,16 +49,17 @@ def lancer(commande: list, journal: Path, quoi: str) -> None:
 
 
 def trajet_de_la_photo(d: dict, eclairage: str) -> dict:
-    """Le trajet immobile qui met la caméra du film à la place de l'appareil de la photo. L'appareil de la photo regarde à
-    l'horizontale avec un horizon décalé dans l'image ; la caméra du film, elle, est penchée d'autant (même centre d'image)."""
+    """Le trajet immobile qui met la caméra du film à la place de l'appareil de la photo, AU CADRE EXACT de la photo : l'appareil
+    regarde à l'horizontale avec un horizon décalé dans l'image ; le film est tourné sur une image plus grande, centrée sur
+    l'horizon, puis rogné au cadre de la photo (« rognage »). Jusqu'au 18/11/2026 la caméra était penchée vers le centre de la
+    photo : cadrage plus plongeant, verticales qui fuyaient."""
     c = d["camera"]
-    largeur, hauteur = int(d.get("largeur", 1206)), int(d.get("hauteur", 804))
-    tangage = float(c.get("tangage", 0.0)) - math.degrees(math.atan((hauteur / 2 - float(c["v0"])) / float(c["f"])))
+    cadre = cadre_du_film(d)
     a = math.radians(float(c["cap"]))
-    p0 = [float(c["x"]), float(c["y"]), float(c["z"]), float(c["cap"]), round(tangage, 3)]
+    p0 = [float(c["x"]), float(c["y"]), float(c["z"]), float(c["cap"]), cadre["tangage"]]
     p1 = [p0[0] + 0.01 * math.cos(a), p0[1] + 0.01 * math.sin(a), *p0[2:]]  # un centimètre : immobile à l'œil
-    return {"points": [p0, p1], "images": 3, "focale_mm": round(float(c["f"]) * 36.0 / largeur, 3),
-            "format": [largeur - largeur % 2, hauteur - hauteur % 2], "scene": SCENES.get(eclairage, eclairage)}
+    return {"points": [p0, p1], "images": 3, "focale_mm": cadre["focale_mm"], "format": cadre["format"],
+            "cadre": "photo", "rognage": cadre["rognage"], "scene": SCENES.get(eclairage, eclairage)}
 
 
 def main() -> int:
@@ -66,12 +72,13 @@ def main() -> int:
     ap.add_argument("--eclairage", default="jour_voile")
     ap.add_argument("--sans-export", action="store_true")
     ap.add_argument("--sans-import", action="store_true")
-    a = ap.parse_args()
+    ap.add_argument("--paquet", type=Path, help="un paquet pour Unreal déjà fait (essais de lumière sur la même maquette)")
+    a, pour_le_film = ap.parse_known_args()
     a.sortie.mkdir(parents=True, exist_ok=True)
     journal = a.sortie / "journal.txt"
     py = sys.executable
-    paquet = a.sortie / "paquet"
-    if not a.sans_export:
+    paquet = a.paquet or a.sortie / "paquet"
+    if not a.sans_export and a.paquet is None:
         debut = time.time()
         lancer([py, "outils/unreal/exporter_pour_unreal.py", a.dossier_3d, paquet], journal, "paquet pour Unreal")
         print(f"paquet pour Unreal fait en {time.time() - debut:.0f} s", flush=True)
@@ -85,13 +92,22 @@ def main() -> int:
         trajet.write_text(json.dumps(trajet_de_la_photo(d, a.eclairage), ensure_ascii=False, indent=1), encoding="utf-8")
         suffixe = f"-{nom}"
         lancer([py, "outils/unreal/cinematique_unreal.py", paquet, a.nom, trajet, "--eclairages", a.eclairage, f"--suffixe={suffixe}"]
-               + (["--sans-import"] if importee else []), journal, f"film depuis la place de {nom}")
+               + (["--sans-import"] if importee else []) + pour_le_film, journal, f"film depuis la place de {nom}")
         importee = True
-        images = sorted((STUDIO / "Paquets" / "rendus" / a.nom).glob(f"*{suffixe}/image-*.png"))
-        if not images:
+        dossiers = [p for p in (STUDIO / "Paquets" / "rendus" / a.nom).glob(f"*{suffixe}") if p.stat().st_mtime >= debut - 1
+                    and list(p.glob("image-*.png"))]
+        if not dossiers:
             print(f"PLANTÉ : aucune image du film pour {nom} : voir {journal}", flush=True)
             return 1
-        shutil.copy2(images[len(images) // 2], a.sortie / f"vue-{nom}.png")
+        images = sorted(max(dossiers, key=lambda p: p.stat().st_mtime).glob("image-*.png"))
+        from moteur.images import ecrire_image, lire_image
+
+        x, y, w, h = json.loads(trajet.read_text(encoding="utf-8"))["rognage"]
+        grande = lire_image(images[len(images) // 2])
+        if grande is None or grande.shape[0] < y + h or grande.shape[1] < x + w:
+            print(f"PLANTÉ : image du film de {nom} illisible ou trop petite pour le cadre de la photo : voir {journal}", flush=True)
+            return 1
+        ecrire_image(a.sortie / f"vue-{nom}.png", grande[y:y + h, x:x + w])
         faites.append(nom)
         print(f"{nom} : image du film prise en {time.time() - debut:.0f} s", flush=True)
     # la planche : la photo | l'image du film
