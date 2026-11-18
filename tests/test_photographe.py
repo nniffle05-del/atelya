@@ -128,3 +128,14 @@ def test_exposition_bornee():
     assert ph.prochaine_exposition([(-15.5, -3.0)]) == ph.EXPOSITION_UNREAL_BORNES[0]
     texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
     assert 'reglage.get("lampes_pieces")' in texte  # plafonnier allumé dans une pièce sans fenêtre filmée de jour
+
+
+def test_la_reprise_du_film_corrige_l_ecart_du_film_et_pas_trois_fois_trop():
+    """Vu le 18/11/2026 sur app-004 : essais (-8,00 ; +2,70) puis (-5,30 ; +0,05), film à -5,435 mesuré à -0,17 cran. La
+    reprise partait à -5,99 (pente « essai contre film » absurde, bornée à 0,3) et rendait des murs gris ; elle doit corriger
+    de l'écart du film, à la pente des essais (ici ~1)."""
+    essais = [(-8.0, 2.70), (-5.30, 0.05)]
+    b = ph.exposition_de_reprise(essais, (-5.435, -0.17))
+    assert b == pytest.approx(-5.435 - 0.17 / (2.65 / 2.70), abs=1e-6)
+    assert ph.exposition_de_reprise(essais[:1], (-5.0, 0.3)) == pytest.approx(-4.7)  # un seul essai : 1 cran pour 1 cran
+    assert ph.exposition_de_reprise(essais, (-3.1, 2.0)) == ph.EXPOSITION_UNREAL_BORNES[1]  # toujours borné

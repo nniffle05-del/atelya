@@ -7,7 +7,7 @@ Dans le niveau /Game/Logements/<nom>/Carte (fait par importer_maquette.py), d'ap
 et le réglage (reglage.json : {"eclairage": id ou nom, "exposition": crans, "gain": [r, v, b]} ; sans lui : l'éclairage du trajet,
 exposition 0, gain neutre) :
 - l'ÉCLAIRAGE (les 5 de Blender, moteur/eclairages.py) : « physique » = atmosphère + soleil à la hauteur et la direction de
-  l'ambiance (jour, fin de journée, soirée : soleil sous l'horizon) ; « couvert » = dôme uni blanc à peine bleuté ; « nuit » =
+  l'ambiance (jour, fin de journée, soirée : soleil sous l'horizon) ; « couvert » = le ciel couvert de la CIE, blanc à peine bleuté (plus clair au zénith, sol de rue sous l'horizon) ; « nuit » =
   dôme bleu nuit très sombre ; les plafonniers (Rect Light) allumés si l'ambiance le dit (soirée, nuit) ; une lumière de ciel
   (Sky Light) qui éclaire par les fenêtres ; la lumière qui rebondit est calculée par Lumen. Mêmes forces que Blender, converties
   en unités d'Unreal (1 W de Blender = 683 lumens ; 1 unité de ciel de Blender = 683 nits) : seuls les RAPPORTS comptent (ciel du
@@ -63,7 +63,8 @@ DEHORS_Z_M = -6.0
 # Force de la lumière du CIEL (Sky Light) avec l'atmosphère et le soleil. Mesuré le 11/11/2026 (séjour d'app-002, soleil à 50°,
 # path tracer, rendus avec et sans la lumière du ciel, même chose dans Cycles sans le disque du soleil) : le ciel apporte 59 % de
 # la lumière d'un mur dans Blender (cohérent avec un vrai ciel bleu), 26 % dans Unreal ; il faut ×3,3 (médiane de 7 zones, de 1,9
-# à 6,7) pour retrouver la part du ciel de Blender. Le ciel couvert (dôme) était déjà juste : inchangé.
+# à 6,7) pour retrouver la part du ciel de Blender. Le ciel couvert (dôme) n'a pas été touché ce jour-là ; sa FORME, elle,
+# était fausse (boule uniforme) : corrigée le 18/11/2026, voir CIEL_COUVERT.
 FORCE_CIEL_PHYSIQUE = 3.3
 FORCE_CIEL = 1.0
 DEHORS_ALBEDO = 0.2  # un trottoir, un bitume clair
@@ -126,12 +127,25 @@ def _nouveau(racine, nom, classe, fabrique):
 
 # Le ciel couvert de la CIE : clarté (1 + 2 sin h) / 3, h = hauteur au-dessus de l'horizon (1 au zénith, 1/3 à l'horizon).
 CIEL_COUVERT_HORIZON = 1.0 / 3.0
+# La FORME du ciel couvert du film. « cie » PAR DÉFAUT depuis le 18/11/2026 (point 2, la lumière du film, accord de NT) : mesuré
+# sur les images du film de trois logements contre les photos des clients (outils/unreal/juger_lumiere.py) : ce que le sol
+# renvoie face aux murs 0,29 → 0,37 pour 0,36 sur les photos, relief des murs 16,7 → 18,4 pour 18,6. « uni » = l'ancienne boule
+# uniforme (réglage « ciel_couvert » : pour comparer).
+CIEL_COUVERT = "cie"
+# Le NIVEAU du ciel couvert « cie » : remonté pour qu'une fenêtre reçoive AUTANT de lumière qu'avec l'ancienne boule uniforme.
+# Une façade reçoit pi fois la clarté de la boule uniforme ; du ciel couvert de la CIE elle reçoit 0,396 x 7 pi / 9 de la
+# clarté du zénith (rapport connu des éclairements vertical / horizontal), plus pi / 2 fois la clarté du sol de rue. Sans cela
+# les pièces recevaient 2,6 fois moins de lumière (1,4 cran) : l'exposition du film butait sur sa borne dans les pièces sombres
+# (app-001, 18/11/2026 : murs encore à +0,35 et +0,84 cran de la visée) et le rapport avec les plafonniers allumés dans les
+# pièces sans fenêtre changeait. Seule la FORME du ciel change ; la clarté d'ensemble reste l'affaire du photographe.
+CIEL_COUVERT_NIVEAU = math.pi / (0.396 * 7.0 * math.pi / 9.0 + (math.pi / 2.0) * DEHORS_ALBEDO * 7.0 / 9.0)
 
 
-def _materiau_ciel(racine, couleur, force, forme="uni"):
+def _materiau_ciel(racine, couleur, force, forme=CIEL_COUVERT):
     """Un matériau « ciel » lumineux (vu par la lumière de ciel), à poser à l'intérieur d'un grand dôme.
-    forme « uni » : la même clarté dans toutes les directions, AUSSI PAR EN DESSOUS (le dôme d'origine, 11/11/2026) ;
-    forme « cie » (essai du 18/11/2026) : le ciel couvert de la CIE, comme dans Blender (1 au zénith, 1/3 à l'horizon), et SOUS
+    forme « uni » : la même clarté dans toutes les directions, AUSSI PAR EN DESSOUS (le dôme d'origine, 11/11/2026 ; reste
+    celui de la nuit) ;
+    forme « cie » (18/11/2026, le défaut du ciel couvert) : le ciel couvert de la CIE, comme dans Blender (1 au zénith, 1/3 à l'horizon), et SOUS
     l'horizon la clarté d'un sol de rue éclairé par ce ciel (albédo DEHORS_ALBEDO × 7/9 de la clarté du zénith) : avec le dôme
     uni, il arrivait par le bas des fenêtres autant de lumière que du zénith (6 fois trop), qui éclairait les plafonds et le
     haut des murs comme jamais en vrai et aplatissait la lumière des pièces."""
@@ -282,7 +296,7 @@ def direction_soleil(ambiance, fiche):
     return soleil["direction"] if soleil else [0.6, 0.2, -0.77]
 
 
-def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None, ciel_couvert="uni"):
+def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None, ciel_couvert=CIEL_COUVERT):
     ciel = ambiance.get("ciel", "couvert")
     lumiere_ciel = _poser(unreal.SkyLight, centre, etiquette="Atelya_LumiereCiel")
     composant = lumiere_ciel.get_component_by_class(unreal.SkyLightComponent)
@@ -308,6 +322,8 @@ def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None, ciel_couvert="u
     else:
         couleur = ambiance.get("couleur_nuit") if ciel == "nuit" else ambiance.get("couleur_couvert", [0.92, 0.95, 1.0])
         force = (1.0 if ciel == "nuit" else float(ambiance.get("force_couvert", 1.2))) * NITS_PAR_UNITE
+        if ciel == "couvert" and ciel_couvert == "cie":
+            force *= CIEL_COUVERT_NIVEAU
         dome = _poser(unreal.StaticMeshActor, centre, etiquette="Atelya_Ciel")
         mesh = dome.static_mesh_component
         mesh.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Sphere"))
@@ -1039,7 +1055,7 @@ def main():
     moteur = reglage.get("moteur", "lumen")
     if moteur not in MOTEURS:
         raise RuntimeError(f"PLANTÉ : moteur « {moteur} » inconnu ({MOTEURS})")
-    ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"), reglage.get("ciel_couvert", "uni"))
+    ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"), reglage.get("ciel_couvert", CIEL_COUVERT))
     if ciel == "physique" and reglage.get("dehors", True):
         poser_dehors(racine, centre, invisible=bool(reglage.get("vues_dehors")) and not reglage.get("dehors_visible", False))
     ciel_photo, materiau_ciel = None, None
@@ -1079,7 +1095,7 @@ def main():
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
-                                                 "ciel_couvert": reglage.get("ciel_couvert", "uni"),
+                                                 "ciel_couvert": reglage.get("ciel_couvert", CIEL_COUVERT),
                                                  "ciel_photo_decalage": ciel_photo, "vues_dehors": vues, "objets_balcons": nb_balcons,
                                                  "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
                                                  "verre_importe": verre_importe,

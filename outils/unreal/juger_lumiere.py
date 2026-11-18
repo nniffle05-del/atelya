@@ -1,7 +1,7 @@
 r"""LE JUGE DE LA LUMIÈRE DU FILM (point 2, 18/11/2026) : photo du client contre image du FILM Unreal, en chiffres.
 
     ..\atelya\.venv\Scripts\python.exe outils\unreal\juger_lumiere.py <sortie> app-001=<dossier des vues> [app-002=… …]
-        [--titre "…"] [--rejouer crans[,usine][,sat=1.3]]
+        [--titre "…"] [--rejouer crans[,usine][,sat=1.3]] [--sans app-002:photo-09 …]
 
 <dossier des vues> : une sortie de outils/unreal/vues_photos_unreal.py (vue-<photo>.png = l'image du film prise de la place de
 la photo, trajet-<photo>.json = comment elle a été tournée).
@@ -79,11 +79,11 @@ def pastilles(d: dict, largeur: int, titre: str) -> np.ndarray:
     return bande
 
 
-def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None) -> tuple[dict, list[np.ndarray]]:
-    """Les mesures de toutes les vues d'un logement, et les lignes de sa planche."""
+def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> tuple[dict, list[np.ndarray]]:
+    """Les mesures de toutes les vues d'un logement (sauf celles de `sans`), et les lignes de sa planche."""
     fiche, logement = lire(CAS[cas]["fiche"]), lire(CAS[cas]["logement"])
     logement = logement.get("logement", logement)
-    fiche["cameras"] = {n: c for n, c in fiche["cameras"].items() if (dossier / f"vue-{n}.png").is_file()}
+    fiche["cameras"] = {n: c for n, c in fiche["cameras"].items() if (dossier / f"vue-{n}.png").is_file() and f"{cas}:{n}" not in sans}
     if not fiche["cameras"]:
         print(f"PLANTÉ : aucune image vue-<photo>.png dans {dossier}", flush=True)
         sys.exit(1)
@@ -164,6 +164,8 @@ def main() -> int:
     ap.add_argument("vues", nargs="+", help="app-001=<dossier des vues du film>")
     ap.add_argument("--titre", default="")
     ap.add_argument("--rejouer", default="", help="prévision : crans d'exposition en plus[,usine] (ex. 1.5 ou 0.8,usine)")
+    ap.add_argument("--sans", nargs="*", default=[], metavar="LOGEMENT:PHOTO",
+                    help="vues à ne pas juger (ex. une vue de cuisine où la caméra du film est dans un meuble)")
     a = ap.parse_args()
     a.sortie.mkdir(parents=True, exist_ok=True)
     rejouer = None
@@ -185,7 +187,7 @@ def main() -> int:
     bilans, textes = {}, [a.titre] if a.titre else []
     for demande in a.vues:
         cas, dossier = demande.split("=", 1)
-        bilans[cas], lignes = juger(cas, Path(dossier), a.sortie, pds, rejouer)
+        bilans[cas], lignes = juger(cas, Path(dossier), a.sortie, pds, rejouer, set(a.sans))
         for nom, v in bilans[cas].items():
             p, f = v["photo"], v["film"]
             c = lambda d, k: "—" if not d else f"{d['rgb']} L {d['L']:.0f} C {d['C']:.0f}"

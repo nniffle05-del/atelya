@@ -3,7 +3,7 @@
 # sur les maquettes DÉJÀ importées dans Unreal (rien n'est reconstruit ni réimporté), puis jugées (outils/unreal/juger_lumiere.py).
 #
 #     bash pc/verification/vues_lumiere.sh <nom de l'essai> [options du film…]
-#     ex. bash pc/verification/vues_lumiere.sh ciel-cie --reglage ciel_couvert=cie
+#     ex. bash pc/verification/vues_lumiere.sh ancien-ciel --reglage ciel_couvert=uni
 #         VUES_001="photo-04" VUES_002="photo-01" VUES_004="photo-08" bash pc/verification/vues_lumiere.sh exact --moteur path_tracer
 #
 # Sorties : ..\atelya\b2\lumiere-film\<essai>\app-00x\ (vues) et ..\atelya\b2\lumiere-film\<essai>\juge\ (chiffres, planches).
@@ -15,9 +15,9 @@ ESSAI="$1"; shift
 SORTIE=../atelya/b2/lumiere-film/$ESSAI
 B=../atelya/b2/film-contre-photos
 J3=../atelya/lectures-photos/parquet-sur-mesure/juges-3/images
-VUES_001="${VUES_001-photo-04 photo-07 photo-08}"
-VUES_002="${VUES_002-photo-01 photo-07}"
-VUES_004="${VUES_004-photo-02 photo-08}"
+VUES_001="${VUES_001-photo-01 photo-04 photo-07 photo-08 photo-10}"
+VUES_002="${VUES_002-photo-01 photo-05 photo-07 photo-09 photo-14}"
+VUES_004="${VUES_004-photo-02 photo-08 photo-09 photo-10}"
 
 filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet> <photos> [options]
   local cas="$1" d3="$2" nom="$3" fiche="$4" paquet="$5" photos="$6"; shift 6

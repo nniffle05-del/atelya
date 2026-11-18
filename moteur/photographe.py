@@ -159,6 +159,21 @@ def prochaine_exposition(historique: list[tuple[float, float]]) -> float:
     return _borner(b + e / pente)
 
 
+def exposition_de_reprise(essais: list[tuple[float, float]], film: tuple[float, float]) -> float:
+    """L'exposition de la REPRISE du film, quand son contrôle s'écarte encore : l'écart du FILM, corrigé avec la pente mesurée
+    entre les deux derniers ESSAIS (1 cran pour 1 cran s'il n'y a eu qu'un essai). Pourquoi pas prochaine_exposition : elle
+    tirait sa pente du dernier essai et du film, deux mesures qui ne sont pas de même nature (le film sort plus clair que les
+    essais, d'un écart qui change d'un logement à l'autre) ; la pente sortait absurde, bornée à 0,3, et la reprise corrigeait
+    plus de trois fois trop (vu le 18/11/2026 sur app-004 : film à -0,17 cran, reprise à +0,34 : murs gris)."""
+    pente = 1.0
+    if len(essais) >= 2:
+        (b0, e0), (b1, e1) = essais[-2:]
+        if b1 != b0:
+            pente = min(max((e0 - e1) / (b1 - b0), 0.3), 1.5)
+    b, e = film
+    return _borner(b + e / pente)
+
+
 # Exposition d'Unreal raisonnable pour un intérieur (app-002, 5 éclairages : de -6 à -12,6). Au-delà, la pièce n'a pas de lumière
 # (vu le 11/11/2026 : entrée sans fenêtre, portes fermées, de jour : le photographe partait à +22) : on s'arrête aux bornes.
 EXPOSITION_UNREAL_BORNES = (-16.0, -3.0)

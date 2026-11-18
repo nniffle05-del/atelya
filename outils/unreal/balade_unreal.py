@@ -77,6 +77,8 @@ def main() -> None:
     p.add_argument("--photos", default=None,
                    help="caméras des photos du client (cameras-photos.json) : la VRAIE VUE par les fenêtres, tirée des photos "
                         "(outils/unreal/vue_dehors_photos.py), posée aux moments de jour")
+    p.add_argument("--reglage", action="append", default=[], metavar="CLE=VALEUR",
+                   help="essais : un réglage de plus pour la préparation Unreal (ex. ciel_couvert=uni : l'ancien ciel couvert)")
     a = p.parse_args()
     debut = time.time()
     paquet = Path(a.paquet)
@@ -126,6 +128,12 @@ def main() -> None:
             # le ciel photographié est posé SUR L'IMAGE à la place de tout ce qui est « ciel » : il passait par-dessus la vraie vue
             # (translucide) et lui retirait ses couleurs (arbres gris, 13/11/2026) ; avec la vraie vue, pas de ciel photographié
             "ciel_photo": None if vues else ciel_photo(ambiance["id"])}
+    for r in a.reglage:
+        cle, valeur = r.split("=", 1)
+        try:
+            base[cle] = json.loads(valeur)
+        except json.JSONDecodeError:
+            base[cle] = valeur
 
     def preparer(exposition, gain, cles=None):
         contenu = {**base, "exposition": exposition, "gain": list(gain)}

@@ -198,8 +198,8 @@ def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict, moteur: s
         print(f"  film{' (reprise)' if tour else ''} : murs à {controle['correction']:+.2f} cran de la clarté visée")
         if abs(controle["correction"]) <= photographe.TOLERANCE:
             break
-        historique = [(e["exposition_unreal"], e["correction"]) for e in essais + controles]
-        biais = photographe.prochaine_exposition(historique)
+        biais = photographe.exposition_de_reprise([(e["exposition_unreal"], e["correction"]) for e in essais],
+                                                  (controles[-1]["exposition_unreal"], controles[-1]["correction"]))
     else:
         print(f"  ATTENTION : film encore à {controles[-1]['correction']:+.2f} cran de la clarté visée (gardé, à regarder)")
     n = len(list(sortie.glob("image-*.png")))
@@ -229,7 +229,7 @@ def main() -> None:
     p.add_argument("--suffixe", default="", help="ajouté au nom du dossier de sortie")
     p.add_argument("--temporel", action="store_true", help="path tracer : débruiteur temporel (NFOR) en plus")
     p.add_argument("--reglage", action="append", default=[], metavar="CLE=VALEUR",
-                   help="essais : un réglage de plus pour la préparation Unreal (ex. ciel_couvert=cie ; valeur lue comme du JSON "
+                   help="essais : un réglage de plus pour la préparation Unreal (ex. ciel_couvert=uni : l'ancien ciel couvert ; valeur lue comme du JSON "
                         "si possible)")
     a = p.parse_args()
     paquet = STUDIO / "Paquets" / a.nom
