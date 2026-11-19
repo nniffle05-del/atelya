@@ -1024,7 +1024,13 @@ def rideaux_des_fenetres(vues: list[dict], logement: dict, refuse=lambda *_: Non
             refuse(v, "aucune fenêtre du plan à moins de 1,2 m")
             continue
         r = voix.setdefault(min(proches)[1], {"voilage": [], "rideaux": [], "photos": set()})
-        r[v["sorte"]].append(v.get("couleur") or (VOILAGE if v["sorte"] == "voilage" else v.get("couleur_vue") or (200, 195, 185)))
+        # la couleur d'un rideau épais est celle VUE sur la photo (« le même que sur la photo ») ; le mot de la lecture (« beige »,
+        # « mauve » : une couleur de nuancier, bien plus pâle que les rideaux d'app-001) ne sert que sans mesure. Un voilage,
+        # éclairé par derrière, garde sa couleur dite, sinon blanc.
+        if v["sorte"] == "voilage":
+            r["voilage"].append(v.get("couleur") or VOILAGE)
+        else:
+            r["rideaux"].append(v.get("couleur_vue") or v.get("couleur") or (200, 195, 185))
         if v["sorte"] == "rideaux" and "avec voil" in _sans_accents(v.get("dit") or ""):
             r["voilage"].append(VOILAGE)  # des rideaux épais devant un voilage : la fenêtre a les deux
         r["photos"].add(v["photo"])

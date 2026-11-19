@@ -857,9 +857,36 @@ VOILAGE_COULEUR = (0.80, 0.80, 0.78)
 VOILAGE_OPACITE = 0.45
 
 
-def voilages(racine):
-    """Pose le tissu translucide sur tous les voilages de la maquette (matières importées « Voilage… »). Renvoie leur nombre."""
-    m = _materiau_simple(racine, "M_Voilage", VOILAGE_COULEUR, 0.9, VOILAGE_OPACITE)
+VELOUTE_MAX = 0.04  # part de « velouté » (reflet rasant blanc des tissus) gardée dans le film
+
+
+def adoucir_le_veloute(racine):
+    """Les tissus de la maquette (rideaux) portent un « velouté » : dans le paquet il arrive BLANC et À FOND, et Unreal en
+    recouvre toute la couleur du tissu (rideaux bruns et mauves d'app-001 affichés beige pâle et rose pâle, alors que leur
+    couleur de base était la bonne ; vu le 19/11/2026 en lisant les matières importées). On n'en garde qu'un reflet léger.
+    Renvoie le nombre de matières corrigées."""
+    n = 0
+    for chemin in unreal.EditorAssetLibrary.list_assets(racine, recursive=True, include_folder=False):
+        a = unreal.load_asset(chemin)
+        if not isinstance(a, unreal.MaterialInstanceConstant):
+            continue
+        for v in a.get_editor_property("vector_parameter_values"):
+            if str(v.get_editor_property("parameter_info").get_editor_property("name")) != "SheenColorFactor":
+                continue
+            c = v.get_editor_property("parameter_value")
+            if max(c.r, c.g, c.b) > VELOUTE_MAX + 1e-6:
+                unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(
+                    a, "SheenColorFactor", unreal.LinearColor(VELOUTE_MAX, VELOUTE_MAX, VELOUTE_MAX, 1.0))
+                unreal.MaterialEditingLibrary.update_material_instance(a)
+                unreal.EditorAssetLibrary.save_loaded_asset(a)
+                n += 1
+    return n
+
+
+def voilages(racine, opacite=None):
+    """Pose le tissu translucide sur tous les voilages de la maquette (matières importées « Voilage… »). Renvoie leur nombre.
+    `opacite` : pour un essai (réglage « voilage_opacite ») ; None = VOILAGE_OPACITE."""
+    m = _materiau_simple(racine, "M_Voilage", VOILAGE_COULEUR, 0.9, VOILAGE_OPACITE if opacite is None else float(opacite))
     # le voilage s'inscrit dans le marquage (il est translucide : sans cela le mur derrière lui, vu à travers le tissu clair,
     # comptait comme un mur et le photographe assombrissait tout le film ; essai du 19/11/2026 : murs −0,3 cran)
     # (nom de la propriété dans Unreal 5.8 : « allow_translucent_custom_depth_writes » ; « allow_custom_depth_writes »
@@ -1150,7 +1177,8 @@ def main():
     refermer_portes()
     portes = ouvrir_portes(reglage.get("portes_ouvertes") or [])
     blancs = marquer_blancs(fiche)
-    nb_voilages = voilages(racine)  # APRÈS le marquage des murs (qui remet à zéro celui de tous les autres objets)
+    nb_veloutes = adoucir_le_veloute(racine)
+    nb_voilages = voilages(racine, reglage.get("voilage_opacite"))  # APRÈS le marquage des murs (qui remet à zéro celui de tous les autres objets)
     if not blancs:
         raise RuntimeError("PLANTÉ : aucun mur ni plafond reconnu (fiche : surfaces_blanches)")
     exposition = float(reglage.get("exposition", 0.0))
@@ -1179,7 +1207,7 @@ def main():
                                                  "ciel_couvert": reglage.get("ciel_couvert", CIEL_COUVERT),
                                                  "ciel_photo_decalage": ciel_photo, "vues_dehors": vues, "objets_balcons": nb_balcons,
                                                  "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
-                                                 "voilages": nb_voilages,
+                                                 "voilages": nb_voilages, "veloutes_adoucis": nb_veloutes,
                                                  "verre_importe": verre_importe,
                                                  "sortie": str(dossier)},
                                                 ensure_ascii=False))
