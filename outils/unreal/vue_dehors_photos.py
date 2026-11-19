@@ -100,7 +100,8 @@ def mesurer_distances(logement: dict, photos: list[dict], sortie: Path) -> dict:
     return mesure
 
 
-def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: float | None = None) -> list[dict]:
+def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: float | None = None,
+             par_les_fenetres: bool | None = None) -> list[dict]:
     """Fabrique les toiles et renvoie la liste des vues à poser dans Unreal ([] si aucune photo ne voit dehors)."""
     logement = json.loads(logement_json.read_text(encoding="utf-8"))
     cameras = json.loads(cameras_json.read_text(encoding="utf-8"))
@@ -146,11 +147,15 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
         apercus.append((res["rvba"][..., :3] * a + np.array([60, 60, 60]) * (1 - a)).astype(np.uint8))
 
     couleurs, faits = {}, {}
+    communes, par_fenetre = [], []
+    # ce qu'une photo voit à travers un VOILAGE n'est pas le dehors : cela ne peint pas la toile commune
+    claires = vue_dehors.sans_fenetres_voilees(photos, ouvertures)
     for f in immeubles:
         # une photo ne peint pas sur une toile ce qui est caché derrière une autre toile du même côté (décor qui suit la rue)
         ecrans = [g for g in immeubles if g["cote"] == f["cote"] and g is not f]
-        r = vue_dehors.composer(f, photos, ecrans=ecrans)
+        r = vue_dehors.composer(f, claires, ecrans=ecrans)
         faits[f["id"]] = r
+        communes.append((f, {"rvba": r["rvba"], "_gagnant": r["_gagnant"], "_noms": r["_noms"]}))
         if r["couverte"] > 0:
             couleurs[f["id"]] = np.median(r["_couleur"][r["_vu"]], axis=0)
     # la RUE au pied des immeubles d'en face : sol au niveau de la rue, UNIE (les photos ne voient pas la chaussée ; ce qu'elles
@@ -185,14 +190,47 @@ def preparer(logement_json: Path, cameras_json: Path, sortie: Path, distance: fl
             r = vue_dehors.fondre_le_bas(r, f, rue_cote[f["cote"]])
         rue = rues[f["id"].replace("facade-", "rue-")]
         ecrire(f, r, f)
-        ecrire(rue, vue_dehors.composer(rue, [], defaut=rue_cote[f["cote"]]), f)
+        if rue["longueur_u"] > 0.1 and rue["longueur_v"] > 0.1:  # deux côtés qui se coupent peuvent ne laisser aucune rue
+            ecrire(rue, vue_dehors.composer(rue, [], defaut=rue_cote[f["cote"]]), f)
+    # UNE VUE PAR FENÊTRE : chaque fenêtre a ses toiles, peintes par les seules photos qui regardent à travers elle, posées
+    # devant la toile commune et visibles seulement à travers elle (vue_dehors, « une vue par fenêtre », 18/11/2026)
+    if par_les_fenetres is None:
+        par_les_fenetres = vue_dehors.VUE_PAR_FENETRE
+    if par_les_fenetres:
+        for o in ouvertures:
+            siennes = vue_dehors.photos_de_la_fenetre(photos, o["id"])
+            for f in immeubles if siennes else []:
+                if o["id"] not in f["fenetres"]:
+                    continue
+                ecrans = [g for g in immeubles if g["cote"] == f["cote"] and g is not f]
+                image = vue_dehors.composer(f, siennes, remplir=False, ecrans=ecrans,
+                                            prolonge=vue_dehors.PROLONGE_FENETRE * f["distance"])
+                if o.get("voilee"):  # derrière un voilage : seulement la lueur, floutée
+                    image = vue_dehors.voiler(image, f["distance"])
+                rogne = vue_dehors.rogner(f, image)
+                if rogne is None:
+                    continue
+                toile, res = rogne
+                ident = f"{f['id']}-par-{vue_dehors.nom_de_fichier(o['id'])}"
+                png = sortie / f"toile-{ident}.png"
+                cv2.imencode(".png", cv2.cvtColor(res["rvba"], cv2.COLOR_RGBA2BGRA))[1].tofile(str(png))
+                vues.append({**vue_dehors.vers_unreal(toile), "id": ident, "image": png.as_posix(),
+                             "force": vue_dehors.FORCE_TOILE, "fenetre": vue_dehors.fenetre_vers_unreal(o), "priorite": 1})
+                bilan.append({"cote": ident, "distance_m": f["distance"], "fenetre": o["id"], "voilee": bool(o.get("voilee")),
+                              "taille_m": [round(toile["longueur_u"], 2), round(toile["longueur_v"], 2)],
+                              "photos": res["parts"]})
+                par_fenetre.append((toile, res, o["id"]))
+    # le juge : depuis la place de chaque photo, quelle photo a peint ce que le film montre (avant = la toile commune seule)
+    qui = {ph["nom"]: {"avant": vue_dehors.qui_peint(ph, communes),
+                       "apres": vue_dehors.qui_peint(ph, communes, par_fenetre)} for ph in photos}
     (sortie / "vues-dehors.json").write_text(json.dumps({"vues": vues, "bilan": bilan, "couverture": couverture,
                                                           "niveau_rue_m": vue_dehors.Z_BAS_M,
-                                                          "photos_utilisees": [p["nom"] for p in photos]},
+                                                          "photos_utilisees": [p["nom"] for p in photos],
+                                                          "une_vue_par_fenetre": bool(par_les_fenetres), "qui_peint": qui},
                                                          indent=1, ensure_ascii=False), encoding="utf-8")
     if apercus:
         h = 600
-        planche = np.hstack([cv2.resize(x, (int(x.shape[1] * h / x.shape[0]), h)) for x in apercus])
+        planche = np.hstack([cv2.resize(x, (max(1, int(x.shape[1] * h / x.shape[0])), h)) for x in apercus])
         cv2.imencode(".jpg", cv2.cvtColor(planche, cv2.COLOR_RGB2BGR))[1].tofile(str(sortie / "toiles.jpg"))
     return vues
 

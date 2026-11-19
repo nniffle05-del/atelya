@@ -117,7 +117,8 @@ def preciser(sorte: str, dit: str | None) -> str | None:
     if sorte == "etagere_murale":
         return "niche" if "niche" in mots else "etagere_murale"
     if sorte == "rideaux":
-        return "voilage" if "voil" in mots else "rideaux"
+        # « rideaux beiges, avec voilages » : des rideaux épais DEVANT un voilage (les deux : voir rideaux_des_fenetres)
+        return "voilage" if ("voil" in mots and "avec voil" not in mots) else "rideaux"
     if sorte in ("lave_linge", "lave_vaisselle"):
         return "electromenager"
     if sorte in SANS_DESSIN:
@@ -1024,6 +1025,8 @@ def rideaux_des_fenetres(vues: list[dict], logement: dict, refuse=lambda *_: Non
             continue
         r = voix.setdefault(min(proches)[1], {"voilage": [], "rideaux": [], "photos": set()})
         r[v["sorte"]].append(v.get("couleur") or (VOILAGE if v["sorte"] == "voilage" else v.get("couleur_vue") or (200, 195, 185)))
+        if v["sorte"] == "rideaux" and "avec voil" in _sans_accents(v.get("dit") or ""):
+            r["voilage"].append(VOILAGE)  # des rideaux épais devant un voilage : la fenêtre a les deux
         r["photos"].add(v["photo"])
     sortie = {}
     for ident, r in voix.items():

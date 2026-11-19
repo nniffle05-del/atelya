@@ -56,11 +56,11 @@ NOTES = {
                            "5 colonne_cuisine grise, vue par l'ouverture ; 6 fenetre ; 7 fenetre",
                  "sol": "lames",
                  "manquants": "horloge 838,110,1075,308 grande, noire et dorée ; applique 588,170,618,210 ; applique 765,238,783,262"},
-    "photo-08": {"objets": "1 lit double, beige ; 2 rideaux beige ; 3 placard dressing toute hauteur {g=bord d=cadre} ; 4 table_de_chevet noire ; "
-                           "5 rideaux beige ; 6 = 3 ; 7 lampadaire ; 8 fauteuil noir ; 9 radiateur",
+    "photo-08": {"objets": "1 lit double, beige ; 2 rideaux beige, avec voilages ; 3 placard dressing toute hauteur {g=bord d=cadre} ; 4 table_de_chevet noire ; "
+                           "5 rideaux beige, avec voilages ; 6 = 3 ; 7 lampadaire ; 8 fauteuil noir ; 9 radiateur",
                  "sol": "lames", "manquants": "applique 243,312,300,395 ; applique 490,338,530,385"},
-    "photo-10": {"objets": "1 chaise_de_bureau blanche ; 2 tapis gris, étoiles ; 3 bureau bois clair ; 4 rideaux mauve ; "
-                           "5 chaise_de_bureau blanche ; 6 = 11 ; 7 rideaux mauve ; 8 commode colonne à tiroirs, blanche ; "
+    "photo-10": {"objets": "1 chaise_de_bureau blanche ; 2 tapis gris, étoiles ; 3 bureau bois clair ; 4 rideaux mauve, avec voilages ; "
+                           "5 chaise_de_bureau blanche ; 6 = 11 ; 7 rideaux mauve, avec voilages ; 8 commode colonne à tiroirs, blanche ; "
                            "9 etagere_cubes blanc, bacs en tissu ; 10 bureau bois ; 11 placard armoire blanche à deux portes ; "
                            "12 autre panneau de liège ; 13 suspension boule en papier ; 14 radiateur ; 15 autre tablette sur pied ; "
                            "16 lampe fine, blanche",

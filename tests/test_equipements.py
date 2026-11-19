@@ -253,3 +253,12 @@ def test_le_meuble_mesure_dans_la_cheminee_glisse_le_long_du_regard_de_l_apparei
     sans = {k: v for k, v in chaise.items() if k != "_appareils"}
     (apres,) = eq.poser(vues, lg, [sans])["meubles_ranges"]
     assert math.dist(apres["position"], sans["position"]) > 0.2  # sans appareil connu : écartée au plus court
+
+
+def test_des_rideaux_epais_devant_un_voilage_donnent_les_deux():
+    """La lecture dit « rideaux mauve, avec voilages » : la fenêtre a des rideaux épais ET un voilage (chambres d'app-001,
+    19/11/2026 : seuls les rideaux étaient posés, et la vue recopiait l'image du voilage)."""
+    assert eq.preciser("rideaux", "mauve, avec voilages") == "rideaux"
+    lg = logement()
+    r = eq.poser([vue("rideaux", [7.9, 1.5], "cuisine", photo=1, couleur=(170, 140, 190), dit="mauve, avec voilages")], lg, [])
+    assert r["rideaux"]["baie"]["rideaux"] == [170, 140, 190] and r["rideaux"]["baie"]["voilage"] == list(eq.VOILAGE)

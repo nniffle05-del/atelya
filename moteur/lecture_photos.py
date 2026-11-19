@@ -81,7 +81,8 @@ il se trompe souvent sur ce que c'est. Tu remplis une fiche JSON au format {SCHE
   « suspension », collé au plafond un « plafonnier », fixé au mur une « applique ». Un écran d'ordinateur n'est pas une « television ».
   Un appareil de cuisine se nomme précisément : « refrigerateur », « four », « micro_ondes », « plaque », « lave_vaisselle »,
   « lave_linge » ; un radiateur porte-serviettes : « radiateur » avec la note « sèche-serviettes » ; des voilages (rideaux fins
-  qui laissent passer le jour) : « rideaux » avec la note « voilages » ; une ouverture à mi-hauteur entre deux pièces, sans
+  qui laissent passer le jour) : « rideaux » avec la note « voilages » (des rideaux épais DEVANT un voilage : « rideaux » avec
+  leur couleur et la note « avec voilages ») ; une ouverture à mi-hauteur entre deux pièces, sans
   vitre : « passe_plat ».
 - « meme_que » : seulement si ce rectangle montre le MÊME objet qu'un autre numéro (un morceau, ou deux rectangles pour un meuble).
 - « forme » (ronde, rectangulaire…) et « couleur » (bleu, blanc, bois clair…) : en un ou deux mots, si c'est net.

@@ -44,6 +44,7 @@ NITS_PAR_UNITE = 683.0  # une clarté de ciel de Blender (W/m²/sr) en nits (cd/
 SOLEIL_LUX = 110000.0
 STENCIL_BLANCS = 1
 STENCIL_DEHORS = 2  # le sol du dehors, pour le masque « dehors vu par une fenêtre »
+STENCIL_VOILAGE = 3  # un voilage : ni mur ni dehors (le mur vu À TRAVERS lui ne compte pas pour le photographe)
 PROFONDEUR_CIEL_CM = 1.0e6  # au-delà de 10 km, c'est le ciel (le sol du dehors est marqué à part)
 NIVEAU_FLOU_CIEL = 6.0  # niveau de détail de la photo de ciel qui donne sa clarté moyenne locale (~32 pixels par face)
 # Le photographe : images d'essai au quart de la taille, une image sur PAS_ESSAI (au moins ESSAI_MIN images par plan).
@@ -494,7 +495,7 @@ def _materiau_vue(racine, nom, texture, vue):
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     m.set_editor_property("two_sided", True)
-    _proprietes(m, {"use_translucency_vertex_fog": False, "apply_cloud_fogging": False, "allow_custom_depth_writes": False,
+    _proprietes(m, {"use_translucency_vertex_fog": False, "apply_cloud_fogging": False, "allow_translucent_custom_depth_writes": False,
                     "translucency_pass": unreal.MaterialTranslucencyPass.MTP_BEFORE_DOF})
     lib = unreal.MaterialEditingLibrary
     position = lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -1100, 0)
@@ -521,10 +522,44 @@ def _materiau_vue(racine, nom, texture, vue):
     lib.connect_material_expressions(f1, "", f2, "A")
     lib.connect_material_expressions(inverse, "", f2, "B")
     lib.connect_material_property(f2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    lib.connect_material_property(image, "A", unreal.MaterialProperty.MP_OPACITY)
+    fen = vue.get("fenetre")
+    if not fen:
+        lib.connect_material_property(image, "A", unreal.MaterialProperty.MP_OPACITY)
+    else:
+        # UNE VUE PAR FENÊTRE (18/11/2026) : cette toile ne s'affiche que pour un regard qui passe par SA fenêtre, de l'intérieur
+        # vers le dehors. MÊME FORMULE que moteur/vue_dehors.py, passe_par_la_fenetre : les changer ensemble.
+        camera = lib.create_material_expression(m, unreal.MaterialExpressionCameraPositionWS, -1100, 500)
+        passe = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -800, 500)
+        passe.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+        entrees = []
+        for nom_entree in ("P", "C"):
+            e = unreal.CustomInput()
+            e.set_editor_property("input_name", nom_entree)
+            entrees.append(e)
+        passe.set_editor_property("inputs", entrees)
+        n, t, a = fen["normale"], fen["axe"], fen["centre"]
+        passe.set_editor_property("code",
+                                  f"float3 n = float3({n[0]:.6f}, {n[1]:.6f}, {n[2]:.6f});\n"
+                                  f"float3 a = float3({a[0]:.3f}, {a[1]:.3f}, {a[2]:.3f});\n"
+                                  "float3 d = P - C;\n"
+                                  "float den = dot(d, n);\n"
+                                  "float s = (dot(a, n) - dot(C, n)) / (abs(den) > 1e-4 ? den : 1e-4);\n"
+                                  "float3 q = C + s * d;\n"
+                                  f"float le_long = dot(q - a, float3({t[0]:.6f}, {t[1]:.6f}, {t[2]:.6f}));\n"
+                                  f"return (den > 1e-4 && s > 0.0 && s < 1.0 && abs(le_long) < {fen['demi_largeur_cm']:.3f}"
+                                  f" && q.z > {fen['bas_cm']:.3f} && q.z < {fen['haut_cm']:.3f}) ? 1.0 : 0.0;")
+        lib.connect_material_expressions(position, "", passe, "P")
+        lib.connect_material_expressions(camera, "", passe, "C")
+        opacite = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 400)
+        lib.connect_material_expressions(image, "A", opacite, "A")
+        lib.connect_material_expressions(passe, "", opacite, "B")
+        lib.connect_material_property(opacite, "", unreal.MaterialProperty.MP_OPACITY)
     lib.recompile_material(m)
     unreal.EditorAssetLibrary.save_loaded_asset(m)
     return m
+
+
+RETRAIT_TOILE_FENETRE_CM = 5.0  # une toile de fenêtre est posée devant la toile commune (vers le logement) de cette distance
 
 
 def poser_vues_dehors(racine, vues):
@@ -538,7 +573,8 @@ def poser_vues_dehors(racine, vues):
         texture = _texture_vue(racine, vue["image"])
         m = _materiau_vue(racine, vue.get("id", str(i)).replace("-", "_"), texture, vue)
         c, au, av, n = (unreal.Vector(*vue[k]) for k in ("coin", "axe_u", "axe_v", "normale_vers_logement"))
-        centre = c + au * (vue["largeur_cm"] / 2) + av * (vue["hauteur_cm"] / 2)
+        priorite = int(vue.get("priorite", 0))
+        centre = c + au * (vue["largeur_cm"] / 2) + av * (vue["hauteur_cm"] / 2) + n * (RETRAIT_TOILE_FENETRE_CM * priorite)
         rotation = unreal.MathLibrary.make_rot_from_zx(n, au)
         a = _poser(unreal.StaticMeshActor, centre, rotation, etiquette=f"Atelya_Vue_{vue.get('id', i)}")
         comp = a.static_mesh_component
@@ -546,6 +582,8 @@ def poser_vues_dehors(racine, vues):
         comp.set_static_mesh(plan)
         comp.set_world_scale3d(unreal.Vector(vue["largeur_cm"] / 100.0, vue["hauteur_cm"] / 100.0, 1.0))
         comp.set_material(0, m)
+        # les toiles de fenêtre sont dessinées APRÈS la toile commune (par-dessus), quel que soit l'ordre des distances
+        comp.set_editor_property("translucency_sort_priority", priorite)
         _proprietes(comp, {"cast_shadow": False, "cast_dynamic_shadow": False, "cast_static_shadow": False,
                            "cast_hidden_shadow": False, "affect_dynamic_indirect_lighting": False,
                            "affect_indirect_lighting_while_hidden": False, "affect_distance_field_lighting": False,
@@ -812,6 +850,43 @@ def verre_clair(racine, actif=True):
     return n, (origine.get_path_name() if origine else None)
 
 
+# VOILAGES (19/11/2026). Dans Blender le voilage laisse passer la lumière (moteur/blender/rideaux.py) ; ce mélange n'existe pas
+# dans glTF : dans Unreal il arrivait GRIS et OPAQUE, comme un mur devant la fenêtre (NT, séjour d'app-001 : « tu as carrément
+# enlevé la fenêtre »). Ici : un tissu clair TRANSLUCIDE (on devine le dehors à travers) qui ne fait pas d'ombre (le jour entre).
+VOILAGE_COULEUR = (0.80, 0.80, 0.78)
+VOILAGE_OPACITE = 0.45
+
+
+def voilages(racine):
+    """Pose le tissu translucide sur tous les voilages de la maquette (matières importées « Voilage… »). Renvoie leur nombre."""
+    m = _materiau_simple(racine, "M_Voilage", VOILAGE_COULEUR, 0.9, VOILAGE_OPACITE)
+    # le voilage s'inscrit dans le marquage (il est translucide : sans cela le mur derrière lui, vu à travers le tissu clair,
+    # comptait comme un mur et le photographe assombrissait tout le film ; essai du 19/11/2026 : murs −0,3 cran)
+    # (nom de la propriété dans Unreal 5.8 : « allow_translucent_custom_depth_writes » ; « allow_custom_depth_writes »
+    # n'existe pas, vu dans le journal d'Unreal le 19/11/2026)
+    _proprietes(m, {"allow_translucent_custom_depth_writes": True})
+    unreal.MaterialEditingLibrary.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    n = 0
+    for a in _acteurs().get_all_level_actors():
+        if not isinstance(a, unreal.StaticMeshActor):
+            continue
+        comp = a.static_mesh_component
+        pose = False
+        for i in range(comp.get_num_materials()):
+            mi = comp.get_material(i)
+            if mi and mi.get_name().lower().startswith(("voilage", "mi_voilage", "m_voilage")):
+                comp.set_material(i, m)
+                pose = True
+        if pose:
+            _proprietes(comp, {"cast_shadow": False, "affect_dynamic_indirect_lighting": False,
+                               "affect_distance_field_lighting": False, "visible_in_ray_tracing": False})
+            comp.set_render_custom_depth(True)
+            comp.set_custom_depth_stencil_value(STENCIL_VOILAGE)
+            n += 1
+    return n
+
+
 def marquer_blancs(fiche):
     """Murs et plafonds (fiche : surfaces_blanches) marqués pour le masque du photographe."""
     noms = set(fiche.get("surfaces_blanches") or [])
@@ -1075,6 +1150,7 @@ def main():
     refermer_portes()
     portes = ouvrir_portes(reglage.get("portes_ouvertes") or [])
     blancs = marquer_blancs(fiche)
+    nb_voilages = voilages(racine)  # APRÈS le marquage des murs (qui remet à zéro celui de tous les autres objets)
     if not blancs:
         raise RuntimeError("PLANTÉ : aucun mur ni plafond reconnu (fiche : surfaces_blanches)")
     exposition = float(reglage.get("exposition", 0.0))
@@ -1103,6 +1179,7 @@ def main():
                                                  "ciel_couvert": reglage.get("ciel_couvert", CIEL_COUVERT),
                                                  "ciel_photo_decalage": ciel_photo, "vues_dehors": vues, "objets_balcons": nb_balcons,
                                                  "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
+                                                 "voilages": nb_voilages,
                                                  "verre_importe": verre_importe,
                                                  "sortie": str(dossier)},
                                                 ensure_ascii=False))

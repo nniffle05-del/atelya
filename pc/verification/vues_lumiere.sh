@@ -25,14 +25,17 @@ VUES_004="${VUES_004-photo-02 photo-08 photo-09 photo-10}"
 filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet> <photos> [options]
   local cas="$1" d3="$2" nom="$3" fiche="$4" paquet="$5" photos="$6"; shift 6
   [ -z "$photos" ] && return 0
-  local decor="--logement $C3/$cas/c/logement-meuble.json"
+  local log="$C3/$cas/c/logement-meuble.json"
+  # app-001 : logement refait le 19/11/2026 avec les voilages des deux chambres (lecture des photos corrigée)
+  [ "$cas" = app-001 ] && log=../atelya/lectures-photos/voilages/chaine/app-001/c/logement-meuble.json
+  local decor="--logement $log"
   [ -n "${SANS_DECOR-}" ] && decor=""
   # shellcheck disable=SC2086
   $PY outils/unreal/vues_photos_unreal.py "$d3" "$nom" "$fiche" "$SORTIE/$cas" --photos $photos --paquet "$paquet" --sans-import $decor "$@" \
     || { echo "PLANTÉ : vues de $cas (essai $ESSAI)"; exit 1; }
 }
 
-filmer app-001 $B/app-001-v2-3d parquet001c verites/app-001/cameras-photos.json $B/app-001-v2/paquet "$VUES_001" "$@"
+filmer app-001 $B/app-001-v3-3d parquet001d verites/app-001/cameras-photos.json $B/app-001-v3/paquet "$VUES_001" "$@"
 filmer app-002 $J3/app-002-apres-3d parquet002c verites/app-002/cameras-photos.json $B/app-002-v2/paquet "$VUES_002" "$@"
 filmer app-004 $J3/app-004-apres-3d parquet004c ../atelya/b2/app-004/chaine-v2/cameras-photos-seul.json $B/app-004-v2/paquet "$VUES_004" "$@"
 

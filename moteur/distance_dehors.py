@@ -122,7 +122,8 @@ def preparer_vue(image_rvb: np.ndarray, cam, toile: dict, ouvertures: list[dict]
     None si la photo ne voit pas assez ce côté."""
     h, w = image_rvb.shape[:2]
     k = w / LARGEUR_REF_PX
-    ouv = [o for o in ouvertures if o["id"] in toile["fenetres"]]
+    # une fenêtre VOILÉE ne montre pas les immeubles d'en face : les plis du voilage y étaient pris pour des étages (app-001)
+    ouv = [o for o in ouvertures if o["id"] in toile["fenetres"] and not o.get("voilee")]
     if not ouv:
         return None
     vue, _ = vue_dehors.masque_fenetres(cam, (w, h), ouv, murs, caches, balcons=balcons)
@@ -213,6 +214,10 @@ def mesurer_photo(image_rvb: np.ndarray, cam, toile: dict, ouvertures: list[dict
         if valides.sum() < 10:
             continue
         i = int(np.nanargmax(accords))
+        if i == 0 or i == len(Ds) - 1:
+            # le meilleur accord est au BOUT des distances essayées : ce n'est pas un sommet, rien n'est mesuré (app-001,
+            # 18/11/2026 : les plis des voilages donnaient « 120 m », la borne, sur deux chambres)
+            continue
         detache = float(accords[i] - np.median(accords[valides]))
         if accords[i] < ACCORD_MIN or detache < DETACHE_MIN:
             continue

@@ -245,3 +245,111 @@ def test_bas_fondu_sans_rectangle_dans_un_trou_etroit():
     r = vd.fondre_le_bas(r, sud, np.full(3, 0.2, np.float32))
     assert np.allclose(r["_couleur"][70, 202], 0.8)  # le trou garde la couleur vue autour
     assert np.allclose(r["_couleur"][99, 202], 0.2, atol=1e-3)  # tout en bas : la rue
+
+
+def _photo_au_dehors_uni(log, cam, nom, gris):
+    """Une photo aux murs gris clair dont tout le dehors (vu par ses fenêtres) est d'un gris uni `gris`."""
+    ouv, murs = vd.ouvertures_vitrees(log), vd.murs_et_trous(log)
+    image = np.full((700, 1000, 3), 200, np.uint8)
+    image[vd.masque_fenetres(cam, (1000, 700), ouv, murs)[1] > 0] = gris
+    ph = vd.preparer_photo(image, cam, ouv, "bonne", murs, ecart_px=1.0)
+    ph["nom"] = nom
+    return ph
+
+
+def test_une_vue_par_fenetre_chaque_piece_garde_sa_photo():
+    """Deux pièces, une fenêtre au sud chacune, une photo par pièce : les deux photos voient le même endroit de la toile commune,
+    qui n'en garde qu'une. Avec une toile par fenêtre, depuis la place de chaque photo, la vue est peinte par ELLE."""
+    log = _logement()
+    pa = _photo_au_dehors_uni(log, _camera_piece_a(), "a", 60)
+    pb = _photo_au_dehors_uni(log, [5.5, 2.2, 1.5, -90.0, 0.0, 500.0, 500.0, 350.0], "b", 150)
+    assert set(pa["fenetres"]) == {"F1"} and set(pb["fenetres"]) == {"F3"}
+    sud = next(f for f in vd.facades(log, 15.0) if f["id"] == "facade-sud")
+    commune = [(sud, vd.composer(sud, [pa, pb], pas=0.05))]
+    avant = {p["nom"]: vd.qui_peint(p, commune) for p in (pa, pb)}
+    assert max(sum(q["autres"].values()) for q in avant.values()) > 0.2  # l'une des deux pièces montre la vue de l'autre
+    par_fenetre = []
+    for o in vd.ouvertures_vitrees(log):
+        siennes = vd.photos_de_la_fenetre([pa, pb], o["id"])
+        if not siennes or o["id"] not in sud["fenetres"]:
+            continue
+        assert [p["nom"] for p in siennes] == [{"F1": "a", "F3": "b"}[o["id"]]]
+        toile, image = vd.rogner(sud, vd.composer(sud, siennes, pas=0.05, remplir=False), pas=0.05)
+        assert toile["longueur_u"] < sud["longueur_u"] / 2 and toile["decalage"] == sud["decalage"]
+        assert abs(vd.vers_unreal(toile)["largeur_cm"] - 100 * toile["longueur_u"]) < 1e-6
+        par_fenetre.append((toile, image, o["id"]))
+    assert len(par_fenetre) == 2
+    for p in (pa, pb):
+        q = vd.qui_peint(p, commune, par_fenetre)
+        assert q["elle_meme"] > 0.97 and not q["autres"], (p["nom"], q)
+    # la toile de la fenêtre garde la couleur de SA photo là où la toile commune montrait l'autre
+    t_a, i_a, _ = par_fenetre[0]
+    pleins = i_a["rvba"][i_a["rvba"][..., 3] == 255][:, :3].astype(float)
+    assert np.ptp(pleins[:, 0]) < 3.0
+
+
+def test_le_regard_passe_par_la_fenetre():
+    log = _logement()
+    f1 = vd.fenetre_vers_unreal(next(o for o in vd.ouvertures_vitrees(log) if o["id"] == "F1"))
+    assert f1["normale"] == [0.0, 1.0, 0.0]  # dehors au sud : −y d'Atelya = +Y d'Unreal
+    assert abs(f1["demi_largeur_cm"] - (80 + 100 * vd.MARGE_FENETRE_M)) < 1e-6 and abs(f1["centre"][0] - 180) < 1e-6
+    dans_a, dans_b = [200.0, -220.0, 150.0], [550.0, -220.0, 150.0]
+    en_face = [[180.0, 1510.0, 150.0]]
+    assert vd.passe_par_la_fenetre(f1, dans_a, en_face).all()
+    assert not vd.passe_par_la_fenetre(f1, dans_a, [[-2000.0, 1510.0, 150.0]]).any()  # ce regard bute sur le mur
+    assert not vd.passe_par_la_fenetre(f1, dans_a, [[180.0, 1510.0, 2000.0]]).any()  # et celui-ci passe au-dessus du linteau
+    assert not vd.passe_par_la_fenetre(f1, dans_b, en_face).any()  # depuis la pièce b : par une autre fenêtre
+    assert not vd.passe_par_la_fenetre(f1, en_face[0], [dans_a]).any()  # du dehors vers le dedans : non
+
+
+def test_deux_cotes_vers_le_meme_point_cardinal_ont_deux_noms():
+    """Un pan coupé (30° du sud) : avant le 18/11/2026 il s'appelait « facade-sud » comme la façade sud, et l'image de l'un
+    écrasait celle de l'autre."""
+    log = _logement()
+    log["murs"].append({"id": "P", "debut": [7, 0], "fin": [9, 1.1547], "epaisseur": 0.2})
+    log["murs"].append({"id": "P2", "debut": [9, 1.1547], "fin": [7, 3], "epaisseur": 0.2})
+    log["pieces"].append({"id": "c", "contour": [[7, 0], [9, 1.1547], [7, 3]]})
+    log["ouvertures"].append({"id": "F4", "type": "fenetre", "mur": "P", "position": 0.6, "largeur": 1.0, "hauteur": 1.3,
+                              "allege": 0.9})
+    fs = vd.facades(log, 20.0)
+    ids = [f["id"] for f in fs]
+    assert len(ids) == len(set(ids)) and "facade-sud" in ids and "facade-sud-b" in ids
+    assert next(f for f in fs if f["id"] == "facade-sud-b")["fenetres"] == ["F4"]
+    assert {r["id"] for r in vd.rues(fs)} >= {"rue-sud", "rue-sud-b"}
+
+
+def test_un_rideau_de_couleur_autour_de_la_fenetre_n_est_pas_le_blanc_du_mur():
+    masque = np.zeros((300, 400), np.uint8)
+    masque[100:200, 150:250] = 1
+    mur = vd._lineaire(np.full((300, 400, 3), (205, 203, 200), np.uint8))
+    blanc = vd._srgb(vd.blanc_des_murs(mur, masque)).astype(float)
+    assert np.abs(blanc - [205, 203, 200]).max() <= 1  # un mur à peine teinté : sa teinte est gardée (elle sera neutralisée)
+    rideau = vd._lineaire(np.full((300, 400, 3), (161, 134, 138), np.uint8))  # le mauve des rideaux de la chambre d'app-001
+    blanc = vd._srgb(vd.blanc_des_murs(rideau, masque)).astype(float)
+    assert np.ptp(blanc) <= 1 and abs(blanc.mean() - (161 + 134 + 138) / 3) <= 1.5  # gris neutre de même clarté
+
+
+def test_fenetre_voilee_la_photo_ne_peint_que_sa_lueur():
+    """Un voilage devant la fenêtre F1 : ce que la photo y voit ne peint pas la toile commune, et la toile de la fenêtre n'en
+    garde que la lueur (floue, sans le pan sombre d'un rideau)."""
+    log = _logement()
+    log["ouvertures"][0]["rideaux"] = {"voilage": [244, 243, 238], "rideaux": None}
+    ouv, murs = vd.ouvertures_vitrees(log), vd.murs_et_trous(log)
+    assert [o["voilee"] for o in ouv] == [True, False, False]
+    cam = _camera_piece_a()
+    image = np.full((700, 1000, 3), 200, np.uint8)
+    dehors = vd.masque_fenetres(cam, (1000, 700), ouv, murs)[1] > 0
+    image[dehors] = 235  # le voilage, clair
+    raies = dehors & ((np.arange(1000)[None, :] // 8) % 2 == 0)
+    image[raies] = 215  # ses plis
+    image[dehors & (np.arange(1000)[None, :] < 440)] = 60  # un pan de rideau épais, sombre, à gauche
+    ph = vd.preparer_photo(image, cam, ouv, "bonne", murs, ecart_px=1.0)
+    ph["nom"] = "a"
+    assert vd.sans_fenetres_voilees([ph], ouv) == []  # rien pour la toile commune
+    sud = next(f for f in vd.facades(log, 15.0) if f["id"] == "facade-sud")
+    net = vd.composer(sud, vd.photos_de_la_fenetre([ph], "F1"), pas=0.05, remplir=False)
+    vu = net["_vu"].copy()
+    avant = net["rvba"][vu][:, 0].astype(float)
+    flou = vd.voiler(net, 15.0, pas=0.05)["rvba"][vu][:, 0].astype(float)
+    assert np.ptp(avant) > 100 and np.ptp(flou) < 25  # plus de pan sombre ni de plis nets
+    assert flou.min() > np.percentile(avant, 60) - 25  # il reste le clair du voilage
