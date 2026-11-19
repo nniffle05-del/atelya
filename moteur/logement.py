@@ -76,14 +76,27 @@ class Mur(Element):
 Couleur = tuple[Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)]]
 
 
+class PanDeRideau(BaseModel):
+    """Un pan de rideau épais (19/11/2026) : de quel côté de la fenêtre il pend. « debut » = le bord de la fenêtre le plus
+    proche du début de son mur, « fin » = l'autre (comme les gonds d'une porte, SensPorte)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cote: Literal["debut", "fin"]
+
+
 class Rideaux(BaseModel):
     """Ce qui habille une fenêtre côté intérieur (B4, 09/11/2026) : un voilage (tissu fin qui laisse passer la lumière, tiré
-    devant la vitre) et/ou des rideaux épais (deux pans ouverts sur les côtés). Couleur sRGB vue sur photo ; None = absent."""
+    devant la vitre) et/ou des rideaux épais (deux pans ouverts sur les côtés, ou les pans de `pans`). Couleur sRGB vue sur
+    photo ; None = absent."""
 
     model_config = ConfigDict(extra="forbid")
 
     voilage: Couleur | None = None
     rideaux: Couleur | None = None
+    pans: Annotated[list[PanDeRideau], Field(min_length=1, max_length=2)] | None = Field(
+        default=None, description="Les pans de rideaux épais vus sur les photos : un seul (et de quel côté) ou deux. Sans ce "
+                                  "champ : deux pans, un de chaque côté (la supposition d'avant le 19/11/2026).")
     ecart: Annotated[float, Field(gt=0, le=0.5)] | None = Field(
         default=None, description="Distance au mur de la nappe du voilage (m) ; les rideaux pendent 6 cm plus loin. Par défaut 10 cm. "
                                   "Réglée par moteur/collisions.py pour passer DEVANT un radiateur.")

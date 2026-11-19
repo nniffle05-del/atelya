@@ -15,7 +15,7 @@ NOTES = {
     "photo-01": {"objets": "1 rideaux voilages blancs ; 2 canape gris clair ; 3 table_basse ovale, bois ; 4 suspension grande, noire, filaire ; "
                            "5 porte blanche ; 6 fauteuil jaune ; 7 television ; 8 meuble_tv blanc ; 9 bibliotheque bois, haute ; "
                            "10 miroir verrière, cadre noir ; 11 rangement buffet bois et blanc, dans la salle à manger ; "
-                           "12 table blanche, dans la salle à manger ; 13 etagere_cubes blanc ; 14 rideaux ceux de la salle à manger ; "
+                           "12 table blanche, dans la salle à manger ; 13 etagere_cubes blanc ; 14 rideaux voilages blancs, ceux de la salle à manger ;"
                            "15 chaise grise ; 16 chaise grise ; 17 suspension petite, noire ; 18 rangement petit meuble, bois",
                  "sol": "point_de_hongrie", "manquants": "fauteuil 0,520,350,804 jaune ; caisson 228,10,605,575 volume bleu"},
     "photo-02": {"objets": "1 rideaux voilages blancs ; 2 tapis rond, crème ; 3 canape gris clair ; 4 fauteuil jaune ; 5 ilot bar blanc ; "

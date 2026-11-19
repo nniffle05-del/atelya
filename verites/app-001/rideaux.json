@@ -1,0 +1,14 @@
+{
+ "schema": "verite-rideaux/0.1",
+ "releve": "à la main, d'après les photos du client, le 19/11/2026 (Claude ; à faire confirmer par NT). « gauche » et « droite » : vu de la pièce, face à la fenêtre. Seules les fenêtres dont une photo montre l'habillage sont relevées.",
+ "fenetres": {
+  "O8": {"piece": "chambre 1", "voilage": true, "rideaux": true, "pans": ["gauche", "droite"], "photos": ["photo-08"],
+         "note": "deux pans brun-beige, un de chaque côté, devant un voilage blanc"},
+  "O9": {"piece": "chambre 2", "voilage": true, "rideaux": true, "pans": ["gauche", "droite"], "photos": ["photo-10"],
+         "note": "deux pans mauves, un de chaque côté, devant un voilage blanc"},
+  "O10": {"piece": "séjour", "voilage": true, "rideaux": false, "pans": [], "photos": ["photo-01"],
+          "note": "voilages blancs seuls, sur toute la baie"},
+  "O11": {"piece": "séjour, pan coupé du coin repas", "voilage": true, "rideaux": false, "pans": [], "photos": ["photo-04"],
+          "note": "voilages blancs seuls"}
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "schema": "verite-rideaux/0.1",
+ "releve": "à la main, d'après les photos du client, le 19/11/2026 (Claude ; à faire confirmer par NT). « gauche » et « droite » : vu de la pièce, face à la fenêtre.",
+ "fenetres": {
+  "O6": {"piece": "séjour", "voilage": false, "rideaux": true, "pans": ["gauche"],
+         "photos": ["photo-01", "photo-04", "photo-07"],
+         "note": "un seul pan beige, à gauche ; la tringle traverse toute la fenêtre, rien à droite"},
+  "O7": {"piece": "chambre", "voilage": false, "rideaux": true, "pans": ["droite"],
+         "photos": ["photo-04", "photo-09", "photo-10", "photo-12", "photo-13"],
+         "note": "un seul pan gris, à droite ; rien à gauche (photos 09 et 10)"}
+ }
+}

@@ -6,7 +6,8 @@ un tissu froncé à sa tringle que Blender laisse tomber) donne une longue bande
 largeur ; le pas des plis reste le vrai. Sans la collection : l'ancienne surface ondulée. Une TRINGLE porte le tout.
 - Voilage : un seul pan sur toute la largeur de la fenêtre (+ 15 cm de chaque côté), tissu fin et clair qui LAISSE PASSER la
   lumière en la diffusant (mélange « translucide » + « transparent ») : c'est ce qui donne la lumière douce des photos d'annonce.
-- Rideaux : deux pans épais, ouverts sur les côtés (chacun couvre 45 cm, à cheval sur le bord de la fenêtre), tissu mat.
+- Rideaux : deux pans épais, ouverts sur les côtés (chacun couvre 45 cm, à cheval sur le bord de la fenêtre), tissu mat ;
+  depuis le 19/11/2026, UN seul pan (et de quel côté) quand les photos n'en montrent qu'un (« pans »).
 Repère : milieu de la fenêtre sur la face intérieure du mur ; x le long du mur, y vers l'intérieur de la pièce.
 """
 import math
@@ -219,7 +220,8 @@ def poser_rideaux(scene, rideaux: list[dict]) -> int:
                 materiau_voilage(r["voilage"]), racine, collection)
         if r.get("rideaux"):
             mat = materiau_rideaux(r["rideaux"])
-            for cote in (-1, 1):
+            # un pan de chaque côté, ou les seuls pans vus sur les photos (« pans » : −1 et/ou +1, moteur.habillage.rideaux_du_plan)
+            for cote in r.get("pans") or (-1, 1):
                 bord = cote * (demi + 0.15)
                 x0, x1 = sorted((bord, bord - cote * 0.45))
                 pan(f"Rideau_{r['id']}_{'g' if cote < 0 else 'd'}", x0, x1, ecart_rideaux, bas, haut, "rideaux", mat, racine,

@@ -225,7 +225,8 @@ def fenetres_habillees(logement: dict) -> list[dict]:
 
 
 def nappes(fenetre: dict) -> list[dict]:
-    """Les nappes de tissu d'une fenêtre habillée, comme des boîtes : le voilage (toute la largeur) et les deux pans de rideaux."""
+    """Les nappes de tissu d'une fenêtre habillée, comme des boîtes : le voilage (toute la largeur) et les pans de rideaux
+    (deux, ou ceux que les photos montrent)."""
     r = fenetre["ouverture"]["rideaux"]
     ecart = r.get("ecart")
     bas = float(r.get("bas") or 0.01)
@@ -237,7 +238,8 @@ def nappes(fenetre: dict) -> list[dict]:
         sortie.append({"id": f"voilage de {ident}", "rect": Rect(c + n * e, t, n, demi + DEBORD_RIDEAUX, PLIS_VOILAGE), "z": (bas, fenetre["z_tringle"])})
     if r.get("rideaux"):
         e = float(ecart) + (ECART_RIDEAUX - ECART_VOILAGE) if ecart else ECART_RIDEAUX
-        for cote in (-1, 1):
+        # un pan de chaque côté, ou les seuls pans vus sur les photos (`pans` ; t va du début vers la fin du mur)
+        for cote in sorted({1 if p["cote"] == "fin" else -1 for p in r["pans"]}) if r.get("pans") else (-1, 1):
             milieu = cote * (demi + DEBORD_RIDEAUX - PAN_RIDEAUX / 2)
             sortie.append({"id": f"rideau de {ident}", "rect": Rect(c + t * milieu + n * e, t, n, PAN_RIDEAUX / 2, PLIS_RIDEAUX),
                            "z": (bas, fenetre["z_tringle"])})

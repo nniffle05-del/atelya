@@ -182,7 +182,11 @@ def rideaux_du_plan(logement: Logement) -> list[dict]:
         if not any(_dans((cx + nx * (m.epaisseur / 2 + 0.3), cy + ny * (m.epaisseur / 2 + 0.3)), p.contour) for p in logement.pieces):
             nx, ny = -nx, -ny
         hsp = m.hauteur or logement.hauteur_sous_plafond
-        sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2],
+        # les pans de rideaux épais, dans le repère que Blender donne à la fenêtre (y vers la pièce, x = (ny, −nx) le long du
+        # mur) : −1 = du côté des x négatifs, +1 = de l'autre. Sans mesure sur les photos : un pan de chaque côté.
+        vers_la_fin = 1 if ny * ux - nx * uy > 0 else -1
+        pans = sorted({vers_la_fin if p.cote == "fin" else -vers_la_fin for p in o.rideaux.pans}) if o.rideaux.pans else [-1, 1]
+        sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2], "pans": pans,
                        "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
                        "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),
                        "voilage": list(o.rideaux.voilage) if o.rideaux.voilage else None,
