@@ -155,6 +155,7 @@ def _fabriques_simples():
         "porte_interieure": lambda m, _: _uni(m, (0.88, 0.87, 0.84), rugosite=0.45),
         "porte_entree": lambda m, _: _uni(m, (0.12, 0.13, 0.14), rugosite=0.4),
         "metal": lambda m, _: _uni(m, (0.75, 0.75, 0.76), rugosite=0.25, metal=1.0),
+        "fer_forge": lambda m, _: _uni(m, (0.035, 0.035, 0.04), rugosite=0.5),  # ferronnerie peinte en noir (garde-corps de fenêtre)
         "seuil": lambda m, _: _uni(m, (0.55, 0.53, 0.5), rugosite=0.6),
         "parquet": lambda m, _: _parquet(m),
         "carrelage": lambda m, _: _carrelage(m),

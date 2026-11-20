@@ -194,6 +194,15 @@ def main() -> int:
                 logement, lus, votes, journal=lambda s: dire("   lu : " + s))
             bilan["baies_lues"] = {"votes": lus, "changements": changes_lus, "desaccords": desaccords}
             changes = changes + changes_lus
+        if a.lecture_photos and not a.sortes_du_detecteur and (a.lecture_photos / "vitrages.json").is_file():
+            # F2 pièce 3 (20/11/2026) : le DESSIN de chaque fenêtre lu sur les photos (vantaux, petits bois, largeur du cadre,
+            # partie pleine sous les vitres, garde-corps) est posé sur l'ouverture ; la maquette la construit ainsi
+            # (moteur/dessin_fenetres.py). Après la sorte de baie : une baie qui descend au sol garde sa partie pleine.
+            from moteur import dessin_fenetres
+            lecture_des_fenetres = json.loads((a.lecture_photos / "vitrages.json").read_text(encoding="utf-8"))
+            logement, dessinees = dessin_fenetres.appliquer(logement, lecture_des_fenetres, journal=lambda s: dire("   dessin : " + s))
+            bilan["dessin_des_fenetres"] = dessinees
+            dire(f"   {len(dessinees)} fenêtre(s) dessinée(s) d'après les photos")
         depart.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
         bilan["baies"] = {"votes": votes, "changements": changes}
         dire(f"   {len(changes)} baie(s) corrigée(s) d'après les photos, sur {len(votes)} vue(s)")

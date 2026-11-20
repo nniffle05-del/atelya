@@ -28,17 +28,28 @@ Le même dessin dit aussi combien de vantaux et de petits bois a la vraie fenêt
 
 Chaque lecture est gardée : ce sont les leçons du futur lecteur d'Atelya (décision de NT du 16/11/2026).
 
-Format « vitrages-photos/0.1 » :
-    {"format": "vitrages-photos/0.1", "photos": {"photo-10": [{"baie": "O7", "coins": [[x, y] × 4], "montants": [[…] …],
+Format « vitrages-photos/0.2 » (le 0.1 est lu de même) :
+    {"format": "vitrages-photos/0.2", "photos": {"photo-10": [{"baie": "O7", "coins": [[x, y] × 4], "montants": [[…] …],
                                                               "traverses": [[…] …], "caches": [[…] …], "vue": "oui"}, …]}}
+
+Depuis le 0.2 (F2 pièce 3, 20/11/2026 : la fenêtre est CONSTRUITE dans la maquette d'après ce dessin, moteur/dessin_fenetres.py),
+la lecture peut dire en plus, sur UN des vitrages de la baie :
+  - `cadre` : les quatre coins du TOUR de la menuiserie (le bord extérieur de son cadre, là où elle touche le mur), même ordre
+    que `coins` : il donne la largeur vraie des montants du tour, de la traverse du haut et de celle du bas ;
+  - `sol` : un ou deux points [x, y] de la ligne où le mur sous la fenêtre touche le SOL (quand on la voit) : il dit si la
+    menuiserie descend jusqu'au sol ou s'arrête au-dessus d'une partie pleine (allège basse, panneau) ;
+  - `garde_corps` (déjà là : y de son bord haut à gauche et à droite du vitrage) et `genre_garde_corps` : « fer_forge »,
+    « barreaudage », « verre » ou « lisses ».
 """
 from __future__ import annotations
 
 import cv2
 import numpy as np
 
-VERSION = "0.1.0"
-FORMAT = "vitrages-photos/0.1"
+VERSION = "0.2.0"
+FORMAT = "vitrages-photos/0.2"
+FORMATS = ("vitrages-photos/0.1", FORMAT)
+GENRES_GARDE_CORPS = ("fer_forge", "barreaudage", "verre", "lisses")
 MARGE_PX = 4.0  # les vitres sont rétrécies d'autant, et les barres élargies (lecture à 2-3 pixels près ; photo de 1206 px de large)
 AUTOUR_DES_BARRES = 3.0  # pixels comblés en plus de chaque côté d'une barre (son bord flou sur la photo)
 ENTRE_VANTAUX_MAX = 45.0  # pixels : le battement entre deux vantaux est comblé s'il est plus mince (au-delà : un trumeau, un mur)
@@ -62,14 +73,22 @@ def consigne() -> str:
         "- vue : « oui » si l'on voit le dehors à travers les vitres ; « lueur » si le vitrage est dépoli ; « non » si la "
         "fenêtre est trop coupée ou trop cachée pour montrer le dehors.\n"
         "Ne rien inventer : une barre que l'on ne voit pas n'est pas dite. Le garde-corps (dehors, devant la fenêtre) n'est pas "
-        "une barre de la fenêtre : le signaler par « garde_corps » : y de son bord haut à gauche et à droite du vitrage."
+        "une barre de la fenêtre : le signaler par « garde_corps » : y de son bord haut à gauche et à droite du vitrage, et "
+        "« genre_garde_corps » : fer_forge, barreaudage, verre ou lisses.\n"
+        "Sur UN des vitrages de chaque fenêtre, dire aussi :\n"
+        "- cadre : les quatre coins du TOUR de la menuiserie entière (le bord extérieur de son cadre, là où elle touche le mur "
+        "ou son encadrement), même ordre que les coins ; un côté caché (rideau) est estimé d'après l'autre côté. Ne pas le dire "
+        "si la fenêtre sort de la photo.\n"
+        "- sol : si on la voit, un ou deux points [x, y] de la ligne où le mur SOUS la fenêtre touche le sol.\n"
+        "Un vantail que l'on voit mais qui ne montre pas le dehors (toile, bout de balcon) est dit quand même, avec un cache "
+        "qui le couvre : il compte dans le dessin de la fenêtre."
     )
 
 
 def controler(lecture: dict, tailles: dict[str, tuple[int, int]] | None = None, baies: set[str] | None = None) -> list[str]:
     """Les défauts d'une lecture des vitrages (liste vide = bonne) : format, coins dans l'ordre, barres dans le vitrage."""
     defauts = []
-    if lecture.get("format") != FORMAT:
+    if lecture.get("format") not in FORMATS:
         defauts.append(f"format {lecture.get('format')!r} au lieu de {FORMAT!r}")
     for photo, fenetres in (lecture.get("photos") or {}).items():
         dit: dict[str, set[str]] = {}
@@ -114,7 +133,40 @@ def controler(lecture: dict, tailles: dict[str, tuple[int, int]] | None = None, 
             for c in f.get("caches") or []:
                 if _polygone(c) is None:
                     defauts.append(f"{ou} : cache {c} : attendu [x0, y0, x1, y1] ou [[x, y], …]")
+            cadre = f.get("cadre")
+            if cadre is not None:
+                if not (isinstance(cadre, list) and len(cadre) == 4 and all(len(c) == 2 for c in cadre)):
+                    defauts.append(f"{ou} : « cadre » : il faut 4 coins [x, y]")
+                else:
+                    (chg, chd, cbd, cbg) = [np.array(c, float) for c in cadre]
+                    if not (chg[0] < chd[0] and cbg[0] < cbd[0] and chg[1] < cbg[1] and chd[1] < cbd[1]):
+                        defauts.append(f"{ou} : « cadre » : coins dans le désordre")
+                    elif (min(hg[0], bg[0]) < min(chg[0], cbg[0]) - 3 or max(hd[0], bd[0]) > max(chd[0], cbd[0]) + 3
+                          or min(hg[1], hd[1]) < min(chg[1], chd[1]) - 3 or max(bg[1], bd[1]) > max(cbg[1], cbd[1]) + 3):
+                        defauts.append(f"{ou} : le vitrage sort de son « cadre »")
+            sol = f.get("sol")
+            if sol is not None and not points_du_sol(sol):
+                defauts.append(f"{ou} : « sol » : attendu [x, y] ou [[x, y], [x, y]]")
+            if sol is not None and cadre is None:
+                defauts.append(f"{ou} : « sol » sans « cadre »")
+            gc = f.get("garde_corps")
+            if gc is not None and not (isinstance(gc, list) and len(gc) == 2 and all(isinstance(v, (int, float)) for v in gc)
+                                       and min(hg[1], hd[1]) - 5 <= min(gc) and max(gc) <= max(bg[1], bd[1]) + 5):
+                defauts.append(f"{ou} : « garde_corps » {gc} : attendu [y à gauche, y à droite], dans le vitrage")
+            if f.get("genre_garde_corps") is not None and f["genre_garde_corps"] not in GENRES_GARDE_CORPS:
+                defauts.append(f"{ou} : genre de garde-corps {f['genre_garde_corps']!r} (attendu : {', '.join(GENRES_GARDE_CORPS)})")
     return defauts
+
+
+def points_du_sol(sol) -> list[tuple[float, float]]:
+    """Les points [x, y] d'un « sol » lu (un point, ou une liste de points) ; liste vide s'il est mal écrit."""
+    try:
+        if len(sol) == 2 and all(isinstance(v, (int, float)) for v in sol):
+            return [(float(sol[0]), float(sol[1]))]
+        pts = [(float(x), float(y)) for x, y in sol]
+        return pts if 1 <= len(pts) <= 4 else []
+    except (TypeError, ValueError):
+        return []
 
 
 def _polygone(cache) -> np.ndarray | None:
@@ -183,13 +235,53 @@ def vitres_nues(fenetre: dict, taille: tuple[int, int], marge: float | None = No
     if k and plein.any():
         plein = cv2.dilate(plein, noyau)
     m[plein > 0] = 0
-    # le garde-corps (« garde_corps ») est DEHORS, devant la fenêtre : il reste dans la vue tant que la maquette n'en construit pas
+    # le garde-corps (« garde_corps ») est DEHORS, devant la fenêtre : ces vitres restent dans la vue, mais sa ferronnerie en
+    # est effacée (zone_du_garde_corps, effacer_la_ferronnerie) : la maquette le construit (F2 pièce 3, 20/11/2026)
     return m
+
+
+AU_DESSUS_DU_GARDE_CORPS = 6.0  # pixels : la ferronnerie est effacée à partir d'un peu au-dessus de sa main courante
+FER_PX = 11.0  # pixels : un fer (barreau, volute) est plus mince ; ce qui est plus large derrière lui (fenêtre d'en face) reste
+
+
+def zone_du_garde_corps(fenetre: dict, taille: tuple[int, int]) -> np.ndarray:
+    """(H, L) uint8 : 1 dans les vitres nues de la fenêtre SOUS le dessus de son garde-corps (lu « garde_corps ») : là, la
+    photo montre le dehors À TRAVERS la ferronnerie. Vide sans garde-corps lu."""
+    largeur, hauteur = taille
+    zone = np.zeros((hauteur, largeur), np.uint8)
+    if not fenetre.get("garde_corps") or fenetre.get("vue", "oui") != "oui":
+        return zone
+    hg, hd, bd, bg = [np.array(c, float) for c in fenetre["coins"]]
+    haut = AU_DESSUS_DU_GARDE_CORPS * largeur / 1206.0
+    y_g, y_d = fenetre["garde_corps"]
+    _remplir(zone, np.array([_sur_le_bord(hg, bg, y_g - haut, 1), _sur_le_bord(hd, bd, y_d - haut, 1), bd, bg]), 1)
+    return zone & vitres_nues(fenetre, taille)
+
+
+def effacer_la_ferronnerie(image: np.ndarray, zone: np.ndarray) -> np.ndarray:
+    """La photo sans la FERRONNERIE du garde-corps de ses fenêtres (F2 pièce 3, 20/11/2026). Le garde-corps est maintenant
+    construit dans la maquette (moteur/habillage.py) : peint en plus sur la toile lointaine, il serait vu deux fois, et le
+    second glisserait quand la caméra bouge. Dans `zone` (zone_du_garde_corps), les traits sombres plus minces que FER_PX
+    (barreaux, volutes) sont remplacés par ce qui les entoure (fermeture) : il reste ce que la photo montre DERRIÈRE le
+    garde-corps (la façade d'en face, ses fenêtres, un peu arrondies). Rien n'est inventé ; rien n'est touché hors de la zone."""
+    if not zone.any():
+        return image
+    cote = max(3, int(round(FER_PX * image.shape[1] / 1206.0)) | 1)
+    noyau = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (cote, cote))
+    source = np.ascontiguousarray(image).copy()
+    source[zone == 0] = 0  # hors de la zone : noir avant d'étaler le clair (le cadre blanc de la fenêtre ne déborde pas dedans)
+    clair = cv2.dilate(source, noyau)
+    clair[zone == 0] = 255  # … et blanc avant de le resserrer (le bord de la zone ne noircit pas)
+    ferme = cv2.erode(clair, noyau)
+    sortie = np.ascontiguousarray(image).copy()
+    sortie[zone > 0] = ferme[zone > 0]
+    return sortie
 
 
 def d_une_photo(lecture: dict | None, photo: str, taille: tuple[int, int]) -> dict[str, dict]:
     """Pour chaque fenêtre lue sur cette photo : {id de la baie: {"vue": « oui » / « non » / « lueur », "vitres": masque des
-    vitres nues, "vitrage": masque du vitrage entier, "debout" et "couchees" : ses barres minces à combler (barres_a_combler)}}.
+    vitres nues, "vitrage": masque du vitrage entier, "debout" et "couchees" : ses barres minces à combler (barres_a_combler),
+    "garde_corps" : les vitres vues à travers la ferronnerie de son garde-corps (zone_du_garde_corps)}}.
     Une fenêtre absente de la lecture n'y est pas (ancien comportement)."""
     res: dict[str, dict] = {}
     vantaux: dict[str, list[dict]] = {}
@@ -198,8 +290,10 @@ def d_une_photo(lecture: dict | None, photo: str, taille: tuple[int, int]) -> di
         if f["baie"] in res:  # un autre vantail de la même fenêtre
             res[f["baie"]]["vitres"] |= nues
             res[f["baie"]]["vitrage"] |= entier
+            res[f["baie"]]["garde_corps"] |= zone_du_garde_corps(f, taille)
         else:
-            res[f["baie"]] = {"vue": f.get("vue", "oui"), "vitres": nues, "vitrage": entier}
+            res[f["baie"]] = {"vue": f.get("vue", "oui"), "vitres": nues, "vitrage": entier,
+                              "garde_corps": zone_du_garde_corps(f, taille)}
         if f.get("vue", "oui") == "oui":
             vantaux.setdefault(f["baie"], []).append(f)
     for baie, fs in vantaux.items():

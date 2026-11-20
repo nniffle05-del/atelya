@@ -47,6 +47,7 @@ UNIES = {  # nom : (couleur, rugosité, métal)
     "porte_interieure": ((0.88, 0.87, 0.84), 0.45, 0.0),
     "porte_entree": ((0.12, 0.13, 0.14), 0.4, 0.0),
     "metal": ((0.75, 0.75, 0.76), 0.25, 1.0),
+    "fer_forge": ((0.035, 0.035, 0.04), 0.5, 0.0),  # ferronnerie peinte en noir (garde-corps de fenêtre)
     "seuil": ((0.55, 0.53, 0.5), 0.6, 0.0),
 }
 PEINTURES = {"mur_blanc": COULEUR_PEINTURE, "plafond_blanc": (0.9, 0.9, 0.9)}

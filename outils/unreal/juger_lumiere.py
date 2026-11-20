@@ -88,6 +88,9 @@ def pastilles(d: dict, largeur: int, titre: str) -> np.ndarray:
     return bande
 
 
+VITRAGES: dict[str, str] = {}  # logement -> vitrages.json donné par --vitrages (sinon : celui rangé à côté du logement des vues)
+
+
 def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> tuple[dict, list[np.ndarray]]:
     """Les mesures de toutes les vues d'un logement (sauf celles de `sans`), et les lignes de sa planche."""
     fiche, logement = lire(CAS[cas]["fiche"]), lire(CAS[cas]["logement"])
@@ -101,6 +104,8 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
     logement_dehors = logement_dehors.get("logement", logement_dehors)
     a_cote = Path(contexte["logement"]).with_name("vitrages.json") if contexte.get("logement") else None
     vitrages_lus = lire(a_cote) if a_cote is not None and a_cote.is_file() else None
+    if cas in VITRAGES:  # une lecture donnée à la main (--vitrages) : juger d'anciennes vues avec la lecture du jour
+        vitrages_lus = lire(VITRAGES[cas])
     cadres = sortie / "cadres" / cas
     cadres.mkdir(parents=True, exist_ok=True)
     valides = {}
@@ -143,6 +148,10 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
             masque = np.zeros(masque.shape, bool)
             for v in lues.values():
                 masque |= v["vitres"] > 0
+                # F2 pièce 3 (20/11/2026) : sous le dessus d'un GARDE-CORPS la photo montre sa ferronnerie, que la maquette
+                # CONSTRUIT (ce n'est plus la vue : elle est jugée par pc/verification/juger_dessin_fenetres.py)
+                if v.get("garde_corps") is not None:
+                    masque &= ~(v["garde_corps"] > 0)
             for x0, y0, x1, y1 in (contexte.get("caches") or {}).get(nom, []):
                 masque[max(0, int(y0)):int(np.ceil(y1)), max(0, int(x0)):int(np.ceil(x1))] = False
             masque = masque.astype(genre)
@@ -232,8 +241,11 @@ def main() -> int:
     ap.add_argument("--rejouer", default="", help="prévision : crans d'exposition en plus[,usine] (ex. 1.5 ou 0.8,usine)")
     ap.add_argument("--sans", nargs="*", default=[], metavar="LOGEMENT:PHOTO",
                     help="vues à ne pas juger (ex. une vue de cuisine où la caméra du film est dans un meuble)")
+    ap.add_argument("--vitrages", nargs="*", default=[], metavar="LOGEMENT=FICHIER",
+                    help="la lecture des fenêtres à prendre (défaut : vitrages.json rangé à côté du logement des vues)")
     a = ap.parse_args()
     a.sortie.mkdir(parents=True, exist_ok=True)
+    VITRAGES.update(dict(v.split("=", 1) for v in a.vitrages))
     rejouer = None
     if a.rejouer.endswith(".json"):  # un réglage complet (pc/verification/prevoir_reglages_image.py)
         voulu = lire(a.rejouer)

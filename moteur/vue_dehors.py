@@ -58,6 +58,9 @@ POIDS_QUALITE = {"bonne": 1.0, "moyenne": 0.6, "approchée": 0.35, "approchee": 
 GENRES_VITRES = ("fenetre", "porte_fenetre", "baie")
 # UNE VUE PAR FENÊTRE (défaut depuis le 18/11/2026) ; ATELYA_VUE_PAR_FENETRE=0 : seulement la toile commune (pour comparer)
 VUE_PAR_FENETRE = os.environ.get("ATELYA_VUE_PAR_FENETRE", "1") != "0"
+# F2 pièce 3 (20/11/2026) : le garde-corps d'une fenêtre est construit dans la maquette ; sa ferronnerie est effacée des photos
+# avant de peindre la vue (moteur.vitrages.effacer_la_ferronnerie). « 0 » : comme avant (pour une maquette sans garde-corps).
+EFFACER_LES_GARDE_CORPS = os.environ.get("ATELYA_EFFACER_LES_GARDE_CORPS", "1") != "0"
 MARGE_FENETRE_M = 0.10  # le rectangle « à travers cette fenêtre » dépasse l'ouverture d'autant (les murs cachent le surplus)
 TEINTE_MUR_MAX = 0.08  # écart de teinte (affichage, par canal, contre la moyenne) au-delà duquel le tour d'une fenêtre n'est pas un mur
 SOMBRE_VOILAGE = 0.5  # derrière un voilage : ce qui est plus sombre que 0,5 × le clair du voilage n'en fait pas partie (rideaux, cadres)
@@ -545,10 +548,12 @@ def preparer_photo(image_rvb: np.ndarray, cam, ouvertures: list[dict], qualite: 
         vue = cv2.erode(vue, np.ones((2 * marge + 1, 2 * marge + 1), np.uint8))
     fenetres = masques_par_fenetre(cam, (w, h), autres, murs)
     connues = {o["id"] for o in ouvertures}
-    debout, couchees, vitres = (np.zeros((h, w), np.uint8) for _ in range(3))
+    debout, couchees, vitres, ferronnerie = (np.zeros((h, w), np.uint8) for _ in range(4))
     for ident, lu in lues.items():
         if ident not in connues:
             continue
+        if lu.get("garde_corps") is not None:
+            ferronnerie |= lu["garde_corps"]
         # les vitres lues sont déjà rétrécies de la précision de la lecture : pas de marge de calage en plus
         vitres |= _sans_ce_qui_n_est_pas_dehors(lu["vitres"].copy(), cam, caches, balcons)
         for masque, nom in ((debout, "debout"), (couchees, "couchees")):
@@ -557,6 +562,11 @@ def preparer_photo(image_rvb: np.ndarray, cam, ouvertures: list[dict], qualite: 
         ouv |= lu["vitrage"]
         fenetres[ident] = lu["vitrage"]
     vue |= vitres
+    if EFFACER_LES_GARDE_CORPS and ferronnerie.any():
+        # le garde-corps de la fenêtre est CONSTRUIT dans la maquette : sa ferronnerie est effacée de la photo avant de peindre
+        # la vue (sinon on le verrait deux fois, dont une au loin) ; il reste ce que la photo montre derrière lui
+        from moteur import vitrages as dessin_des_fenetres
+        image_rvb = dessin_des_fenetres.effacer_la_ferronnerie(image_rvb, ferronnerie)
     if debout.any() or couchees.any():
         # derrière une barre mince (petit bois, battement), le dehors CONTINUE : la photo y est comblée d'après les vitres qui
         # la bordent, au lieu de laisser une bande floue en travers de la vue (moteur.vitrages.combler)

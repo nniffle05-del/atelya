@@ -119,6 +119,65 @@ class SensPorte(BaseModel):
     ouvre_vers: Literal["gauche", "droite"] = "gauche"
 
 
+Part = Annotated[float, Field(ge=0, le=1)]
+
+
+class Vantail(BaseModel):
+    """Un vantail d'une fenêtre (20/11/2026) : où est sa VITRE dans la largeur de la baie, et ses petits bois. Tout est en
+    PARTS de la baie (0 à 1) : en largeur depuis le bord de la baie le plus proche du début du mur, en hauteur depuis son bas."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    debut: Part = Field(description="Où commence sa vitre (part de la largeur de la baie)")
+    fin: Part = Field(description="Où finit sa vitre")
+    montants: list[tuple[Part, Part]] = Field(default_factory=list, description="Petits bois debout : (début, fin) en parts de la largeur")
+    traverses: list[tuple[Part, Part]] = Field(default_factory=list, description="Petits bois couchés : (bas, haut) en parts de la hauteur")
+
+    @model_validator(mode="after")
+    def _dans_l_ordre(self) -> "Vantail":
+        if not self.debut < self.fin:
+            raise ValueError("un vantail finit après son début")
+        return self
+
+
+class GardeCorpsFenetre(BaseModel):
+    """Le garde-corps posé DEHORS devant une fenêtre dont le bas est à moins d'un mètre du sol (20/11/2026)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bas: Part = Field(default=0.0, description="Son pied (part de la hauteur de la baie)")
+    haut: Part = Field(description="Le dessus de sa main courante (part de la hauteur de la baie)")
+    genre: Literal["fer_forge", "barreaudage", "verre", "lisses"] = "barreaudage"
+
+
+class DessinFenetre(BaseModel):
+    """Le DESSIN d'une fenêtre lu sur les photos du client (F2 pièce 3, 20/11/2026 ; moteur/dessin_fenetres.py) : ses vantaux,
+    ses petits bois, la largeur vraie de son cadre, la partie pleine sous ses vitres, son garde-corps. En PARTS de la baie, pas
+    en mètres : la fenêtre de la maquette peut être décalée ou d'une autre taille que la vraie, son dessin reste juste.
+    Sans ce champ : le cadre par défaut (moteur.habillage._fenetre). Même provenance que Plinthes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vantaux: Annotated[list[Vantail], Field(min_length=1, max_length=8)] = Field(description="Du début vers la fin du mur")
+    vitrage_bas: Part = Field(description="Où commencent les vitres (part de la hauteur de la baie, depuis son bas)")
+    vitrage_haut: Part = Field(description="Où finissent les vitres")
+    soubassement: Part = Field(default=0.0, description="Partie PLEINE au bas de la baie, sous la menuiserie (allège basse, "
+                               "marche) : part de la hauteur de la baie")
+    garde_corps: GardeCorpsFenetre | None = None
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _coherent(self) -> "DessinFenetre":
+        if not self.soubassement <= self.vitrage_bas < self.vitrage_haut:
+            raise ValueError("dessin de fenêtre : il faut soubassement ≤ vitrage_bas < vitrage_haut")
+        for a, b in zip(self.vantaux, self.vantaux[1:]):
+            if b.debut < a.fin:
+                raise ValueError("dessin de fenêtre : deux vantaux se recouvrent")
+        return self
+
+
 class Ouverture(Element):
     """Une porte, une porte-fenêtre ou une fenêtre percée dans un mur."""
 
@@ -134,6 +193,8 @@ class Ouverture(Element):
     )
     rideaux: Rideaux | None = Field(default=None, description="Voilage et rideaux côté intérieur (fenêtres seulement)")
     sens: SensPorte | None = Field(default=None, description="Gonds et côté d'ouverture (portes) ; sinon, réglage par défaut")
+    dessin: DessinFenetre | None = Field(default=None, description="Vantaux, petits bois, cadre et garde-corps lus sur les "
+                                         "photos (fenêtres seulement) ; sinon, le cadre par défaut")
 
 
 class PassePlat(Element):

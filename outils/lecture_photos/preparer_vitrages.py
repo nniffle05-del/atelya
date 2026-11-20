@@ -159,6 +159,16 @@ def controle(logement_json: Path, cameras_json: Path, vitrages_json: Path, sorti
             for f in dits:
                 pts = np.round((np.array(f["coins"], float) - [x0, y0]) * k).astype(np.int32)
                 cv2.polylines(v, [pts], True, (0, 255, 255), 1, cv2.LINE_AA)
+                if f.get("cadre"):  # le tour de la menuiserie (BLEU) et la ligne du sol lue sous la fenêtre (croix MAGENTA)
+                    tour = np.round((np.array(f["cadre"], float) - [x0, y0]) * k).astype(np.int32)
+                    cv2.polylines(v, [tour], True, (255, 80, 0), 2, cv2.LINE_AA)
+                for x, y in vitrages.points_du_sol(f["sol"]) if f.get("sol") is not None else []:
+                    cv2.drawMarker(v, (int(round((x - x0) * k)), int(round((y - y0) * k))), (255, 0, 255), cv2.MARKER_CROSS, 24, 2)
+                if f.get("garde_corps"):  # le dessus du garde-corps (trait ORANGE)
+                    (hg, hd, bd, bg), (yg, yd) = [np.array(c, float) for c in f["coins"]], f["garde_corps"]
+                    a, b = vitrages._sur_le_bord(hg, bg, yg, 1), vitrages._sur_le_bord(hd, bd, yd, 1)
+                    cv2.line(v, tuple(np.round((a - [x0, y0]) * k).astype(int)), tuple(np.round((b - [x0, y0]) * k).astype(int)),
+                             (0, 140, 255), 2, cv2.LINE_AA)
             return v
 
         ecrire_image(sortie / f"{c['photo']}-{vue_dehors.nom_de_fichier(c['baie'])}.jpg", agrandir(image, c["cadre"], dessus))
