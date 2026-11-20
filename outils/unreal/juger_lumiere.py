@@ -36,6 +36,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from banc_ressemblance import CAS  # noqa: E402
 from moteur import juge_lumiere as jl  # noqa: E402
 from moteur import pas_du_sol, photographe  # noqa: E402
+from moteur import vitrages as dessin_des_fenetres  # noqa: E402
 from moteur.images import ecrire_image, lire_image  # noqa: E402
 from moteur.sol_a_plat import photos_a_plat  # noqa: E402
 
@@ -98,6 +99,8 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
     contexte = lire(dossier / "contexte.json") if (dossier / "contexte.json").is_file() else {}
     logement_dehors = lire(contexte["logement"]) if contexte.get("logement") else logement
     logement_dehors = logement_dehors.get("logement", logement_dehors)
+    a_cote = Path(contexte["logement"]).with_name("vitrages.json") if contexte.get("logement") else None
+    vitrages_lus = lire(a_cote) if a_cote is not None and a_cote.is_file() else None
     cadres = sortie / "cadres" / cas
     cadres.mkdir(parents=True, exist_ok=True)
     valides = {}
@@ -131,7 +134,21 @@ def juger(cas: str, dossier: Path, sortie: Path, pds, rejouer=None, sans=()) -> 
         echelle = vue.photo.shape[1] / 1206.0
         masque = jl.masque_du_dehors(jl.camera_depuis_dict(fiche["cameras"][nom]["camera"]), vue.photo.shape[1::-1], logement_dehors,
                                      (contexte.get("caches") or {}).get(nom, []), marge_px=max(1, int(round(4 * echelle))))
+        # LE DESSIN DES FENÊTRES lu sur cette photo (moteur/vitrages.py, F2, 20/11/2026) : la vue se juge sur les VITRES NUES de la
+        # photo, pas sur le trou du plan (qui tombe à côté de la vraie fenêtre et couvre ses montants et son rideau : le juge
+        # récompensait alors un film qui recopiait les montants de la photo dans la vue)
+        lues = {i: v for i, v in dessin_des_fenetres.d_une_photo(vitrages_lus, nom, vue.photo.shape[1::-1]).items() if v["vue"] == "oui"}
+        if lues:
+            genre = masque.dtype
+            masque = np.zeros(masque.shape, bool)
+            for v in lues.values():
+                masque |= v["vitres"] > 0
+            for x0, y0, x1, y1 in (contexte.get("caches") or {}).get(nom, []):
+                masque[max(0, int(y0)):int(np.ceil(y1)), max(0, int(x0)):int(np.ceil(x1))] = False
+            masque = masque.astype(genre)
         dehors = jl.mesurer_dehors(vue.photo, image_film, masque, valides[nom])
+        if dehors:
+            dehors["zone"] = "vitres lues" if lues else "trou du plan"
         photo["dehors"], film["dehors"] = (dehors["photo"], dehors["film"]) if dehors else (None, None)
         bilan[nom] = {"piece": piece, "photo": photo, "film": film, "dehors": dehors,
                       "ecart_murs": jl.ecart(photo["murs"], film["murs"]), "ecart_sol": jl.ecart(photo["sol"], film["sol"])}

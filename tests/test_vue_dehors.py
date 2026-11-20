@@ -331,7 +331,7 @@ def test_un_rideau_de_couleur_autour_de_la_fenetre_n_est_pas_le_blanc_du_mur():
 
 def test_fenetre_voilee_la_photo_ne_peint_que_sa_lueur():
     """Un voilage devant la fenêtre F1 : ce que la photo y voit ne peint pas la toile commune, et la toile de la fenêtre n'en
-    garde que la lueur (floue, sans le pan sombre d'un rideau)."""
+    garde que la lueur : UNE couleur, celle du clair du voilage (sans le pan sombre d'un rideau), sur toute la toile."""
     log = _logement()
     log["ouvertures"][0]["rideaux"] = {"voilage": [244, 243, 238], "rideaux": None}
     ouv, murs = vd.ouvertures_vitrees(log), vd.murs_et_trous(log)
@@ -347,9 +347,39 @@ def test_fenetre_voilee_la_photo_ne_peint_que_sa_lueur():
     ph["nom"] = "a"
     assert vd.sans_fenetres_voilees([ph], ouv) == []  # rien pour la toile commune
     sud = next(f for f in vd.facades(log, 15.0) if f["id"] == "facade-sud")
-    net = vd.composer(sud, vd.photos_de_la_fenetre([ph], "F1"), pas=0.05, remplir=False)
-    vu = net["_vu"].copy()
-    avant = net["rvba"][vu][:, 0].astype(float)
-    flou = vd.voiler(net, 15.0, pas=0.05)["rvba"][vu][:, 0].astype(float)
-    assert np.ptp(avant) > 100 and np.ptp(flou) < 25  # plus de pan sombre ni de plis nets
-    assert flou.min() > np.percentile(avant, 60) - 25  # il reste le clair du voilage
+    siennes = vd.photos_de_la_fenetre([ph], "F1")
+    net = vd.composer(sud, siennes, pas=0.05, remplir=False)
+    avant = net["rvba"][net["_vu"]][:, 0].astype(float)
+    lueur = vd.lueur_des_photos(siennes)
+    unie = lueur["rvba"].reshape(-1, 4).astype(float)
+    assert np.ptp(avant) > 100 and np.ptp(unie[:, 0]) == 0 and (unie[:, 3] == 255).all()  # une seule couleur, pleine partout
+    assert unie[0, 0] > np.percentile(avant, 60) - 25  # le clair du voilage, pas le pan sombre
+    assert lueur["_noms"][int(lueur["_gagnant"][0, 0])] == "a" and lueur["parts"] == {"a": 1.0}
+    assert vd.lueur_des_photos([]) is None  # aucune photo : pas de lueur inventée
+
+
+def test_la_toile_de_lueur_est_posee_juste_dehors_et_remplit_la_vitre_meme_de_biais():
+    """Vue de biais, une toile lointaine et pas assez large laissait la vitre à moitié éclairée (coin repas
+    d'app-001) : la toile de lueur est tout près du mur et déborde largement la fenêtre."""
+    f1 = next(o for o in vd.ouvertures_vitrees(_logement()) if o["id"] == "F1")  # au sud, de x = 1,0 à 2,6, de z = 0,9 à 2,2
+    t = vd.toile_de_lueur(f1)
+    assert abs(t["decalage"] - float(f1["n"] @ f1["a"]) - 0.1 - vd.LUEUR_PRES_M) < 1e-6  # à LUEUR_PRES_M de la face de dehors
+    unreal = vd.vers_unreal(t)
+    assert unreal["largeur_cm"] == 100 * (1.6 + 2 * vd.LUEUR_DEBORD_M) and unreal["hauteur_cm"] == 100 * (1.3 + 2 * vd.LUEUR_DEBORD_M)
+    # un regard très en biais par le bord de la fenêtre touche encore la toile
+    camera = np.array([3.9, 0.75, 1.5])
+    vers = np.array([1.05, 0.0, 1.5]) - camera  # vers le bord ouest de la fenêtre, à ~75° de la normale
+    s = (t["decalage"] - float(camera[:2] @ t["n"])) / float(vers[:2] @ t["n"])
+    touche = camera + s * vers
+    le_long = float((touche - t["origine"]) @ t["axe_u"])
+    assert s > 0 and 0 < le_long < t["longueur_u"]
+
+
+def test_sans_distance_mesuree_une_seule_photo_peint_la_vue_d_une_fenetre():
+    """Deux photos prises de deux endroits ne se recollent pas sur une toile posée à une distance supposée : celle qui voit le
+    plus de la fenêtre peint seule (sinon le même immeuble est peint deux fois, côte à côte)."""
+    petite = {"nom": "a", "poids": np.full((10, 10), 0.2, np.float32)}
+    grande = {"nom": "b", "poids": np.full((10, 10), 0.6, np.float32)}
+    assert [p["nom"] for p in vd.photo_principale([petite, grande])] == ["b"]
+    assert vd.photo_principale([petite]) == [petite] and vd.photo_principale([]) == []
+

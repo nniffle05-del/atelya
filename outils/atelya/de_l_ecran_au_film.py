@@ -214,6 +214,11 @@ def main() -> int:
             note("meubles", lancer("meubles", commande + (["--detecteur"] if a.sortes_du_detecteur else []), journaux))
         else:
             note("meubles", lancer("meubles", [py, "outils/habillage/reperer_meubles_photos.py", fiche, sols, meuble], journaux))
+        # LE DESSIN DES FENÊTRES lu sur les photos (moteur/vitrages.py, F2, 20/11/2026) : rangé à côté du logement meublé, où le
+        # décor du film le prend (outils/unreal/vue_dehors_photos.lire_vitrages) : la vue n'est peinte que par les vitres nues
+        if a.lecture_photos and (a.lecture_photos / "vitrages.json").is_file():
+            shutil.copy2(a.lecture_photos / "vitrages.json", meuble.with_name("vitrages.json"))
+            dire("   dessin des fenêtres lu sur les photos : pris pour la vue par les fenêtres")
         # LE CONTRÔLE « ZÉRO COLLISION » (NT, 16/11/2026) : mesuré sur le logement meublé, écrit dans le bilan. Les deux outils
         # ci-dessus réparent eux-mêmes ; il ne peut rester que des objets placés par quelqu'un (jamais déplacés par Atelya).
         from moteur import collisions

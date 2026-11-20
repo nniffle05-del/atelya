@@ -60,9 +60,10 @@ GENRES_VITRES = ("fenetre", "porte_fenetre", "baie")
 VUE_PAR_FENETRE = os.environ.get("ATELYA_VUE_PAR_FENETRE", "1") != "0"
 MARGE_FENETRE_M = 0.10  # le rectangle « à travers cette fenêtre » dépasse l'ouverture d'autant (les murs cachent le surplus)
 TEINTE_MUR_MAX = 0.08  # écart de teinte (affichage, par canal, contre la moyenne) au-delà duquel le tour d'une fenêtre n'est pas un mur
-FLOU_VOILAGE = 0.025  # derrière un voilage, la vue est floutée de 0,025 × la distance de la toile (~1,4°)
-SOMBRE_VOILAGE = 0.5  # et ce qui est plus sombre que 0,5 × le clair du voilage n'en fait pas partie (rideaux épais, cadres)
+SOMBRE_VOILAGE = 0.5  # derrière un voilage : ce qui est plus sombre que 0,5 × le clair du voilage n'en fait pas partie (rideaux, cadres)
 ALPHA_PLEIN = 128  # une toile de fenêtre cache la toile commune là où son image est au moins à demi opaque
+LUEUR_PRES_M = 0.6  # la toile de lueur d'une fenêtre voilée est posée à 0,6 m dehors
+LUEUR_DEBORD_M = 6.0  # et déborde la fenêtre de 6 m de chaque côté (vue de biais jusqu'à ~85°)
 PROLONGE_FENETRE = 0.06  # une toile de fenêtre est prolongée EN FLOU de 0,06 × sa distance (~3,5°) autour de ce que ses photos
 # montrent, avant de laisser la place à la toile commune : sans cela, le bord de la fenêtre (retiré des photos, calage incertain)
 # montrait une bande de la vue d'une AUTRE pièce (bande d'arbre dans la chambre d'app-002, essai du 18/11/2026)
@@ -437,7 +438,13 @@ def masque_fenetres(cam, taille: tuple[int, int], ouvertures: list[dict], murs=N
             bo = {**o, "a": o["a"] + t * g, "b": o["a"] + t * h}
             for face in (-o["epaisseur"] / 2, o["epaisseur"] / 2):
                 montants |= _remplir_quad(_quad(bo, face, 0.0), cam, taille)
-    vue = total & (1 - montants)
+    return _sans_ce_qui_n_est_pas_dehors(total & (1 - montants), cam, caches, balcons), total
+
+
+def _sans_ce_qui_n_est_pas_dehors(vue: np.ndarray, cam, caches=(), balcons=None) -> np.ndarray:
+    """Le masque `vue` (modifié et rendu) sans ce qui est un BALCON (construit dans la maquette), sans les rectangles `caches`
+    (meubles devant la fenêtre) ni les coins de la photo (marque de l'annonce)."""
+    hauteur, largeur = vue.shape
     if balcons and vue.any():
         vs, us = np.nonzero(vue)
         d = _rayons(cam, us.astype(float), vs.astype(float))
@@ -448,7 +455,7 @@ def masque_fenetres(cam, taille: tuple[int, int], ouvertures: list[dict], murs=N
     lx, ly = int(LOGO[0] * largeur), int(LOGO[1] * hauteur)
     for x0, y0 in ((0, 0), (largeur - lx, 0), (0, hauteur - ly), (largeur - lx, hauteur - ly)):
         vue[y0:y0 + ly, x0:x0 + lx] = 0
-    return vue, total
+    return vue
 
 
 def blanc_des_murs(image_lin: np.ndarray, masque: np.ndarray, caches=()) -> np.ndarray | None:
@@ -517,16 +524,45 @@ def clarte_avant_pellicule(image_rvb: np.ndarray, blanc_lin: np.ndarray, clarte:
 
 
 def preparer_photo(image_rvb: np.ndarray, cam, ouvertures: list[dict], qualite: str = "bonne", murs=None,
-                   caches=(), clarte: float = 1.0, ecart_px: float = 3.0, balcons=None) -> dict | None:
+                   caches=(), clarte: float = 1.0, ecart_px: float = 3.0, balcons=None, vitrages: dict | None = None) -> dict | None:
     """Ce qu'une photo apporte : clarté avant pellicule de chaque pixel (clarte_avant_pellicule, murs du film à `clarte`), poids
-    par pixel (fondu au bord de ce qu'elle voit dehors × qualité du calage). None si la photo ne voit aucune fenêtre."""
+    par pixel (fondu au bord de ce qu'elle voit dehors × qualité du calage). None si la photo ne voit aucune fenêtre.
+
+    `vitrages` (F2, 20/11/2026) : le DESSIN des fenêtres lu sur cette photo (moteur.vitrages.d_une_photo : {id de la baie:
+    {"vue", "vitres", "vitrage"}}). Pour une fenêtre lue « oui », la photo ne voit dehors que par ses VITRES NUES (ni montants,
+    ni petits bois, ni rideau, ni battant ouvert), là où elles sont VRAIMENT sur la photo, et non plus par le trou placé d'après
+    le plan et la place de l'appareil (connue à 30-50 cm). Lue « non » : cette photo ne montre rien par cette fenêtre. Lue
+    « lueur », ou pas lue : le trou du plan, comme avant."""
     h, w = image_rvb.shape[:2]
-    vue, ouv = masque_fenetres(cam, (w, h), ouvertures, murs, caches, balcons=balcons)
+    lues = {i: v for i, v in (vitrages or {}).items() if v["vue"] == "oui"}
+    tues = {i for i, v in (vitrages or {}).items() if v["vue"] == "non"}
+    autres = [o for o in ouvertures if o["id"] not in lues and o["id"] not in tues]
+    vue, ouv = masque_fenetres(cam, (w, h), autres, murs, caches, balcons=balcons)
     # plus le calage de la photo est incertain (écart moyen de ses repères), plus on ne garde que le CŒUR de ses fenêtres : un
     # calage à 10 px près peignait sur la vue des bouts de cadre, de mur et d'interrupteur (essai du 12/11/2026)
     marge = int(round((MARGE_PX + MARGE_PAR_ECART * float(ecart_px)) * w / 1206.0))
     if marge > 0:
         vue = cv2.erode(vue, np.ones((2 * marge + 1, 2 * marge + 1), np.uint8))
+    fenetres = masques_par_fenetre(cam, (w, h), autres, murs)
+    connues = {o["id"] for o in ouvertures}
+    debout, couchees, vitres = (np.zeros((h, w), np.uint8) for _ in range(3))
+    for ident, lu in lues.items():
+        if ident not in connues:
+            continue
+        # les vitres lues sont déjà rétrécies de la précision de la lecture : pas de marge de calage en plus
+        vitres |= _sans_ce_qui_n_est_pas_dehors(lu["vitres"].copy(), cam, caches, balcons)
+        for masque, nom in ((debout, "debout"), (couchees, "couchees")):
+            if lu.get(nom) is not None:
+                masque |= _sans_ce_qui_n_est_pas_dehors(lu[nom].copy(), cam, caches, balcons)
+        ouv |= lu["vitrage"]
+        fenetres[ident] = lu["vitrage"]
+    vue |= vitres
+    if debout.any() or couchees.any():
+        # derrière une barre mince (petit bois, battement), le dehors CONTINUE : la photo y est comblée d'après les vitres qui
+        # la bordent, au lieu de laisser une bande floue en travers de la vue (moteur.vitrages.combler)
+        from moteur import vitrages as dessin_des_fenetres
+        image_rvb, comble = dessin_des_fenetres.combler(image_rvb, debout, couchees, vitres)
+        vue |= comble
     if vue.sum() < 500:
         return None
     blanc = blanc_des_murs(_lineaire(image_rvb), ouv, caches)
@@ -537,8 +573,7 @@ def preparer_photo(image_rvb: np.ndarray, cam, ouvertures: list[dict], qualite: 
     poids = np.clip(dist / fondu, 0.0, 1.0) * POIDS_QUALITE.get(qualite, 0.5)
     garde = cv2.dilate(vue, np.ones((5, 5), np.uint8))
     return {"cam": cam, "image": clarte_avant_pellicule(image_rvb, blanc, clarte, garde), "poids": poids.astype(np.float32),
-            "masque": vue, "blanc": [round(float(x), 4) for x in blanc],
-            "fenetres": masques_par_fenetre(cam, (w, h), ouvertures, murs)}
+            "masque": vue, "blanc": [round(float(x), 4) for x in blanc], "fenetres": fenetres, "lues": sorted(lues)}
 
 
 def echantillonner(photo: dict, P: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -756,6 +791,19 @@ def photos_de_la_fenetre(photos: list[dict], ident: str) -> list[dict]:
     return res
 
 
+def photo_principale(siennes: list[dict]) -> list[dict]:
+    """Des photos qui voient dehors par une même fenêtre (photos_de_la_fenetre), celle qui en voit LE PLUS (la somme de ses
+    poids : surface de vitre vue × qualité du calage), seule dans sa liste.
+
+    Pourquoi (F2, 20/11/2026) : deux photos prises de deux endroits ne se recollent sur une même toile que si la toile est à la
+    vraie distance des immeubles d'en face. Quand cette distance n'est pas MESURÉE (35 m par défaut, pour une rue de 12 m), le
+    même immeuble était peint deux fois, côte à côte (chambre d'app-004 : trois photos, deux façades). Une seule photo donne
+    une vue cohérente ; ce qu'elle ne voit pas reste prolongé en flou."""
+    if len(siennes) <= 1:
+        return siennes
+    return [max(siennes, key=lambda ph: float(ph["poids"].sum()))]
+
+
 def rogner(f: dict, r: dict, pas: float = PAS_M) -> tuple[dict, dict] | None:
     """La toile `f` et son image `r` (composer, remplir=False) réduites au rectangle où l'image n'est pas vide : (toile, image),
     ou None si elle est vide partout. La toile rognée reste dans le plan de `f` (mêmes `n` et `decalage`)."""
@@ -864,8 +912,9 @@ def qui_peint(photo: dict, communes: list[tuple[dict, dict]], par_fenetre: list[
 # des plis et des rideaux flotter loin dans la vitre.
 # Méthode : (1) le voilage est un objet de la maquette, translucide dans le film (moteur/unreal/preparer_cinematique.voilages) ;
 # (2) ce qu'une photo voit à travers une fenêtre voilée ne peint JAMAIS la toile commune ni la mesure des distances ;
-# (3) la toile de cette fenêtre garde seulement la LUEUR de ce que la photo montre : couleurs très floutées (voiler), sans les
-# zones sombres (pans de rideaux épais, cadres).
+# (3) la toile de cette fenêtre garde seulement la LUEUR de ce que la photo montre : UNE couleur, sur un rectangle posé
+# juste dehors (lueur_des_photos, toile_de_lueur ; depuis le 20/11/2026, avant : la photo très floutée sur la toile lointaine),
+# sans les zones sombres (pans de rideaux épais, cadres).
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
@@ -886,24 +935,52 @@ def sans_fenetres_voilees(photos: list[dict], ouvertures: list[dict]) -> list[di
     return res
 
 
-def voiler(r: dict, distance: float, pas: float = PAS_M) -> dict:
-    """L'image `r` d'une toile de fenêtre (composer) vue à travers un VOILAGE : il n'en reste que la lueur. Les couleurs sont
-    floutées de FLOU_VOILAGE × `distance` (moyenne des seuls points vus et clairs : ce qui est plus sombre que SOMBRE_VOILAGE ×
-    le clair du voilage est un rideau épais ou un cadre, pas le voilage). L'opacité ne change pas. Modifie et renvoie `r`."""
-    c, vu = r.get("_couleur"), r.get("_vu")
-    if c is None or vu is None or not vu.any():
-        return r
+def lueur_des_photos(siennes: list[dict], cote: int = 8) -> dict | None:
+    """Ce que des photos montrent par une fenêtre VOILÉE (photos_de_la_fenetre) : il n'en reste que la LUEUR, d'UNE SEULE
+    COULEUR (F2, 20/11/2026) : la moyenne des seuls pixels vus et clairs (ce qui est plus sombre que SOMBRE_VOILAGE × le clair
+    du voilage est un rideau épais ou un cadre, pas le voilage). Rend une petite image pleine, à poser sur la toile de lueur de
+    la fenêtre (toile_de_lueur), ou None si aucune photo ne voit rien.
+
+    Avant (19/11/2026) la lueur était la photo très floutée, sur une toile lointaine, seulement là où la photo voyait : dans le
+    film, des taches arrondies (« arches » blanches autour) et, vue de biais, une vitre lumineuse à moitié (le regard passait à
+    côté de la toile : coin repas d'app-001, étape F1)."""
+    couleurs, poids, noms = [], [], []
+    for ph in siennes:
+        vu = ph["poids"] > 0
+        if vu.any():
+            couleurs.append(ph["image"][vu])
+            poids.append(float(ph["poids"][vu].sum()))
+            noms.append(ph.get("nom"))
+    if not couleurs:
+        return None
+    c = np.concatenate(couleurs).astype(np.float32)
     lum = c @ np.array([0.2126, 0.7152, 0.0722], np.float32)
-    clair = vu & (lum >= SOMBRE_VOILAGE * float(np.percentile(lum[vu], 75)))
-    if not clair.any():
-        clair = vu
-    w = clair.astype(np.float32)
-    sigma = max(1.0, FLOU_VOILAGE * float(distance) / pas)
-    somme = cv2.GaussianBlur(c * w[..., None], (0, 0), sigma)
-    poids = cv2.GaussianBlur(w, (0, 0), sigma)
-    moyenne = (c[clair].mean(0)).astype(np.float32)
-    a = np.clip(poids / 0.05, 0.0, 1.0)[..., None]
-    flou = (somme / np.maximum(poids, 1e-6)[..., None]) * a + moyenne[None, None, :] * (1 - a)
-    r["_couleur"] = flou.astype(np.float32)
-    r["rvba"] = np.dstack([_srgb(flou / FORCE_TOILE), r["rvba"][..., 3]])
-    return r
+    clair = lum >= SOMBRE_VOILAGE * float(np.percentile(lum, 75))
+    couleur = c[clair].mean(0) if clair.any() else c.mean(0)
+    ordre = np.argsort(poids)[::-1]
+    rvba = np.empty((cote, cote, 4), np.uint8)
+    rvba[..., :3] = _srgb(couleur / FORCE_TOILE)[None, None, :]
+    rvba[..., 3] = 255
+    return {"rvba": rvba, "largeur": cote, "hauteur": cote, "couverte": 1.0,
+            "parts": {noms[i]: round(poids[i] / sum(poids), 3) for i in ordre}, "_couleur": None,
+            "_vu": np.ones((cote, cote), bool), "_gagnant": np.zeros((cote, cote), np.int16), "_noms": [noms[i] for i in ordre],
+            "couleur": [round(float(x), 4) for x in couleur]}
+
+
+def toile_de_lueur(o: dict, pres: float | None = None, debord: float | None = None) -> dict:
+    """La toile de LUEUR d'une fenêtre voilée (ou au vitrage dépoli) `o` (ouvertures_vitrees) : un rectangle posé juste DEHORS,
+    à `pres` du mur, qui déborde la fenêtre de `debord` de chaque côté, au-dessus et en dessous. Une couleur unie n'a pas besoin
+    d'être loin ; tout près, elle remplit la vitre de quelque endroit de la pièce qu'on la regarde, même de biais (jusqu'à ~85°).
+    Dans Unreal elle n'est vue qu'à travers SA fenêtre et ne compte dans aucun calcul de lumière, comme les autres toiles."""
+    pres = LUEUR_PRES_M if pres is None else pres
+    debord = LUEUR_DEBORD_M if debord is None else debord
+    n = np.asarray(o["n"], float)
+    u = np.array([n[1], -n[0]])  # la droite de qui regarde dehors
+    milieu = (o["a"] + o["b"]) / 2 + n * (o["epaisseur"] / 2 + pres)
+    demi = float(np.linalg.norm(o["b"] - o["a"])) / 2 + debord
+    z0, z1 = float(o["z0"]) - debord, float(o["z1"]) + debord
+    base = milieu - u * demi
+    return {"id": f"lueur-{o['id']}", "cote": f"lueur-{o['id']}", "genre": "immeubles", "n": n, "u": u, "distance": pres,
+            "decalage": float(n @ milieu), "u0": float(base @ u), "u1": float(base @ u) + 2 * demi, "z0": z0, "z1": z1,
+            "fenetres": [o["id"]], "origine": np.array([base[0], base[1], z1]), "axe_u": np.array([u[0], u[1], 0.0]),
+            "axe_v": np.array([0.0, 0.0, -1.0]), "longueur_u": 2 * demi, "longueur_v": z1 - z0}
