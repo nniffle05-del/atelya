@@ -84,6 +84,10 @@ il se trompe souvent sur ce que c'est. Tu remplis une fiche JSON au format {SCHE
   qui laissent passer le jour) : « rideaux » avec la note « voilages » (des rideaux épais DEVANT un voilage : « rideaux » avec
   leur couleur et la note « avec voilages ») ; une ouverture à mi-hauteur entre deux pièces, sans
   vitre : « passe_plat ».
+  Un voilage derrière lequel tu VOIS, à travers le tissu, les menuiseries de la fenêtre d'un bord à l'autre du voilage : ajoute à
+  sa note « baie sur toute la largeur » (Atelya en tire la largeur de la fenêtre ; ne le dis pas si le voilage est blanc de
+  lumière ou si la fenêtre ne tient qu'une partie du voilage). Et si tu vois que cette fenêtre est sur allège ou descend
+  jusqu'au sol, ajoute-la aux « manquants » (« fenetre » ou « porte_fenetre », le rectangle de ses vitres).
 - « meme_que » : seulement si ce rectangle montre le MÊME objet qu'un autre numéro (un morceau, ou deux rectangles pour un meuble).
 - « forme » (ronde, rectangulaire…) et « couleur » (bleu, blanc, bois clair…) : en un ou deux mots, si c'est net.
 - « sol » : la famille du sol de la pièce où se tient le photographe, parmi {", ".join(FAMILLES_DE_SOL)} ; « uniforme » : faux si

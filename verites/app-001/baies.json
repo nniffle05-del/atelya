@@ -1,0 +1,54 @@
+{
+ "schema": "baies-vues/0.1",
+ "fait_par": "Claude, à l'œil, sur les photos du client et les planches photo | film (20/11/2026, étape F1) ; à confirmer par NT",
+ "lire": "pour chaque baie du plan VUE sur les photos : « plus_large » si les photos la montrent nettement plus large que le plan (au moins 50 cm), « comme_le_plan » sinon ; les baies qu'aucune photo ne montre assez sont absentes",
+ "baies": {
+  "O11": {
+   "verdict": "plus_large",
+   "photos": [
+    "photo-03",
+    "photo-04"
+   ],
+   "note": "coin repas : derrière le voilage, les menuiseries tiennent tout le pan de mur (le plan : 1,21 m dans un pan de 2,10 m) ; fenêtre sur allège"
+  },
+  "O10": {
+   "verdict": "comme_le_plan",
+   "photos": [
+    "photo-01",
+    "photo-03"
+   ],
+   "note": "séjour : baie d'environ 1,5 à 1,8 m derrière son voilage, porte-fenêtre à garde-corps ; un peu plus large que le plan (1,47 m), pas nettement"
+  },
+  "O5": {
+   "verdict": "comme_le_plan",
+   "photos": [
+    "photo-05",
+    "photo-06"
+   ],
+   "note": "cuisine : fenêtre à deux vantaux, mur blanc de chaque côté"
+  },
+  "O6": {
+   "verdict": "comme_le_plan",
+   "photos": [
+    "photo-02",
+    "photo-05",
+    "photo-06"
+   ],
+   "note": "fenêtre étroite du coin, à droite de la cuisine"
+  },
+  "O8": {
+   "verdict": "comme_le_plan",
+   "photos": [
+    "photo-08"
+   ],
+   "note": "chambre 1 : baie entre ses deux pans de rideaux"
+  },
+  "O9": {
+   "verdict": "comme_le_plan",
+   "photos": [
+    "photo-10"
+   ],
+   "note": "chambre 2 : baie entre ses deux pans de rideaux"
+  }
+ }
+}

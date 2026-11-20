@@ -172,6 +172,17 @@ def main() -> int:
         debut = time.time()
         dire("\n=== baies : que montrent les photos ?")
         logement = json.loads(depart.read_text(encoding="utf-8"))
+        if a.lecture_photos and not a.sortes_du_detecteur:
+            # F1 (20/11/2026, accord de NT) : une fenêtre que les photos montrent NETTEMENT plus large que le plan est élargie
+            # (moteur/largeur_baies.py) ; d'abord, pour que la sorte de baie (ci-dessous) se lise sur la baie entière
+            sys.path.insert(0, str(RACINE / "outils" / "lecture_photos"))
+            import poser_photos_lues
+            from moteur import largeur_baies
+            fiche_lue = json.loads(fiche.read_text(encoding="utf-8"))
+            mesures = largeur_baies.lire(logement, fiche_lue, poser_photos_lues.objets_des_photos(fiche_lue, a.lecture_photos))
+            logement, elargies, doutes_largeur = largeur_baies.elargir(logement, mesures, journal=lambda s: dire("   " + s))
+            bilan["largeur_des_baies"] = {"mesures": mesures, "changements": elargies, "doutes": doutes_largeur}
+            dire(f"   {len(elargies)} baie(s) élargie(s) d'après les photos, {len(doutes_largeur)} doute(s)")
         votes = ouvertures_photos.lire(logement, json.loads(fiche.read_text(encoding="utf-8")), RACINE, journal=lambda s: dire("   " + s))
         logement, changes = ouvertures_photos.corriger(logement, votes, journal=lambda s: dire("   " + s))
         if a.lecture_photos and not a.sortes_du_detecteur:

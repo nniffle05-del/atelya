@@ -134,7 +134,10 @@ def corriger(logement: dict, votes: dict[str, list[int]], journal=None) -> tuple
         else:
             continue
         changes.append({"id": o["id"], "avant": o["type"], "apres": apres["type"], "votes": [sol, allege]})
-        o.update(apres, statut="estime", source="photos (bas de la baie vu sur les photos du client)")
+        source = "photos (bas de la baie vu sur les photos du client)"
+        if str(o.get("source", "")).startswith("photos (largeur"):  # déjà élargie d'après les photos (moteur/largeur_baies.py) : on garde les deux
+            source = f"{o['source']} ; {source}"
+        o.update(apres, statut="estime", source=source)
         if journal:
             journal(f"  baie {o['id']} : {changes[-1]['avant']} → {apres['type']} (jusqu'au sol {sol}, sur allège {allege})")
     return lg, changes

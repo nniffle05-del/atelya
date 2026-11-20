@@ -9,10 +9,15 @@ où un meuble adossé finit vraiment de chaque côté de l'image (coin du mur, b
 et si son pied est caché. Relus sur les mêmes photos numérotées, SANS regarder le relevé des meubles ni le plan.
 LES RANGÉES DE CUISINE (17/11/2026, « travaille tous ces points-là » de NT) : la clé "rangees" dit la suite des éléments le long de
 chaque mur garni, de la gauche vers la droite de l'image (moteur/rangees.py). Écrites d'après les seules photos.
+LA BAIE DERRIÈRE UN VOILAGE (20/11/2026, étape F1 : la largeur des fenêtres d'après les photos) : « baie sur toute la largeur » est
+ajouté à un voilage quand on VOIT, à travers le tissu, les menuiseries de la fenêtre d'un bord à l'autre du voilage (vérifié sur des
+agrandissements contrastés : photos 01, 03, 04 ; rien sur la photo 02, où le voilage est blanc de lumière) ; la fenêtre du coin repas,
+sur allège derrière son voilage (photo 04 : l'appui et le muret se voient sous les vitres), est ajoutée aux manquants. RÉSERVE : relu en
+sachant que le plan dessine cette fenêtre trop étroite (1,21 m).
 Format des notes : moteur/lecture_photos.fiche_depuis_notes. Fiche écrite par : outils/lecture_photos/ecrire_lecture.py app-001
 """
 NOTES = {
-    "photo-01": {"objets": "1 rideaux voilages blancs ; 2 canape gris clair ; 3 table_basse ovale, bois ; 4 suspension grande, noire, filaire ; "
+    "photo-01": {"objets": "1 rideaux voilages blancs, baie sur toute la largeur ; 2 canape gris clair ; 3 table_basse ovale, bois ; 4 suspension grande, noire, filaire ; "
                            "5 porte blanche ; 6 fauteuil jaune ; 7 television ; 8 meuble_tv blanc ; 9 bibliotheque bois, haute ; "
                            "10 miroir verrière, cadre noir ; 11 rangement buffet bois et blanc, dans la salle à manger ; "
                            "12 table blanche, dans la salle à manger ; 13 etagere_cubes blanc ; 14 rideaux voilages blancs, ceux de la salle à manger ;"
@@ -27,15 +32,15 @@ NOTES = {
                  "sol": "point_de_hongrie + lames",
                  "manquants": "horloge 435,312,475,378 ; fenetre 250,215,310,390 ; caisson 495,193,725,500 volume bleu ; "
                               "table 728,405,800,470 blanche"},
-    "photo-03": {"objets": "1 canape gris clair ; 2 suspension grande, noire, filaire ; 3 table_basse ovale, bois ; 4 rideaux voilages blancs ; "
-                           "5 tableau grand, bleu ; 6 rideaux voilages blancs ; 7 meuble_tv blanc ; 8 television ; "
+    "photo-03": {"objets": "1 canape gris clair ; 2 suspension grande, noire, filaire ; 3 table_basse ovale, bois ; 4 rideaux voilages blancs, baie sur toute la largeur ; "
+                           "5 tableau grand, bleu ; 6 rideaux voilages blancs, baie sur toute la largeur ; 7 meuble_tv blanc ; 8 television ; "
                            "9 table_d_appoint ronde, blanche ; 10 bibliotheque bois, haute ; 11 fauteuil jaune ; "
                            "12 lampadaire trépied doré ; 13 chaise grise, dans la salle à manger ; 14 rangement petit meuble, bois",
                  "sol": "point_de_hongrie", "manquants": "fauteuil 705,570,1206,804 jaune ; caisson 0,0,190,570 volume bleu"},
-    "photo-04": {"objets": "1 rideaux voilages blancs ; 2 bibliotheque grand meuble mural à cases, bois et blanc ; 3 table blanche, pied central ; "
+    "photo-04": {"objets": "1 rideaux voilages blancs, baie sur toute la largeur ; 2 bibliotheque grand meuble mural à cases, bois et blanc ; 3 table blanche, pied central ; "
                            "4 chaise grise ; 5 rangement buffet blanc et bois ; 6 chaise grise ; 7 chaise grise ; "
                            "8 rangement buffet bois et blanc ; 9 chaise grise ; 10 suspension noire, filaire ; 11 = 3",
-                 "sol": "point_de_hongrie"},
+                 "sol": "point_de_hongrie", "manquants": "fenetre 755,45,1206,432 sur allège, derrière le voilage"},
     "photo-05": {"objets": "1 ilot bar gris, plan blanc ; 2 tabouret_haut jaune ; 3 colonne_cuisine grise ; 4 colonne_cuisine grise ; "
                            "5 tabouret_haut jaune ; 6 tabouret_haut jaune ; 7 tabouret_haut jaune ; 8 = 3 ; 9 etagere_cubes blanc ; 10 = 1 ; "
                            "11 = 3 ; 12 meuble_cuisine_haut gris ; 13 fenetre ; 14 = 12 ; 15 electromenager four encastré ; "

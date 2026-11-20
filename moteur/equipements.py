@@ -1080,14 +1080,15 @@ def repere_de_la_baie(ouverture: dict, logement: dict) -> dict | None:
             "z": float(ouverture.get("allege", 0.0) or 0.0) + float(ouverture.get("hauteur", 2.1)) / 2}
 
 
-def _sur_le_mur(appareil, u: float, v: float, baie: dict) -> float | None:
-    """Où le rayon du pixel (u, v) coupe la nappe des rideaux de la fenêtre : abscisse le long du mur (m), comptée depuis le
-    milieu de la fenêtre, positive vers la fin du mur. None si le rayon ne va pas vers ce mur."""
+def _sur_le_mur(appareil, u: float, v: float, baie: dict, ecart: float = ECART_RIDEAUX_M) -> float | None:
+    """Où le rayon du pixel (u, v) coupe la nappe des rideaux de la fenêtre (à `ecart` du mur ; 0 : la face du mur elle-même) :
+    abscisse le long du mur (m), comptée depuis le milieu de la fenêtre, positive vers la fin du mur. None si le rayon ne va
+    pas vers ce mur."""
     from moteur.photos_lues import rayon
 
     angle = math.radians(rayon(appareil, u, v)[0])
     d = np.array([math.cos(angle), math.sin(angle)])
-    o = np.array([float(appareil[0]), float(appareil[1])]) - (baie["centre"] + baie["n"] * ECART_RIDEAUX_M)
+    o = np.array([float(appareil[0]), float(appareil[1])]) - (baie["centre"] + baie["n"] * ecart)
     den = float(d @ baie["n"])
     if den > -RASANT:  # le rayon s'éloigne du mur, ou le longe de trop près : le point où il le coupe ne veut rien dire
         return None
