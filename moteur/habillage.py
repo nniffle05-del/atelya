@@ -161,6 +161,8 @@ def plan_habille(logement: Logement) -> dict:
         # les parquets faits sur mesure d'après les photos : {nom de la matière : sa fiche} ; moteur.construire les dessine
         "parquets_sur_mesure": parquets_sur_mesure(logement),
         "rideaux": rideaux_du_plan(logement),
+        # les ferronneries des garde-corps recopiées des photos (moteur/ferronnerie.py) : du métal découpé, pas des briques
+        "ferronneries": ferronneries_du_plan(logement),
     }
 
 
@@ -614,6 +616,9 @@ def _garde_corps_de_fenetre(o: Ouverture, mur: Mur, s: int) -> list[Brique]:
         briques.append(_boite(o, mur, "garde_corps_verre", (0.02, l - 0.02), n(EPAISSEUR_VITRE), (z_lisse, z_sous), "verre"))
         return briques
     briques.append(_boite(o, mur, "garde_corps_lisse_basse", (0, l), n(LISSE), (z_lisse, z_lisse + LISSE), fer))
+    if gc.motif is not None and gc.genre in ("fer_forge", "barreaudage"):
+        # la ferronnerie RECOPIÉE des photos remplit l'entre-deux : du métal découpé, posé à part (ferronneries_du_plan)
+        return briques
     if gc.genre == "lisses":
         nombre = max(1, math.ceil((z_sous - z_lisse - LISSE) / ECART_BARREAUX) - 1)
         pas = (z_sous - z_lisse - LISSE) / (nombre + 1)
@@ -629,6 +634,47 @@ def _garde_corps_de_fenetre(o: Ouverture, mur: Mur, s: int) -> list[Brique]:
         t = i * pas
         briques.append(_boite(o, mur, f"garde_corps_barreau_{i}", (t - BARREAU / 2, t + BARREAU / 2), n(BARREAU), (z_lisse + LISSE, z_sous), fer))
     return briques
+
+
+EPAISSEUR_FERRONNERIE = 0.014  # m : la fonte d'un garde-corps, vue par la tranche
+
+
+def ferronneries_du_plan(logement: Logement) -> list[dict]:
+    """Les FERRONNERIES des garde-corps de fenêtre dont le motif a été recopié des photos (moteur/ferronnerie.py,
+    20/11/2026), prêtes pour Blender : le module répété sur la largeur de la baie, entre la lisse basse et la main courante.
+    Chacune : {"id", "element", "origine": [x, y] (le bord de la baie du côté du début du mur, sur l'axe du garde-corps),
+    "direction": [ux, uy] (le long du mur), "z_bas", "epaisseur", "materiau", "morceaux": [{"contour": [(t, z) …], "trous":
+    […]}] en mètres (t le long du mur depuis l'origine, z au-dessus de z_bas)}."""
+    from moteur import ferronnerie
+
+    murs = {m.id: m for m in logement.murs}
+    sortie = []
+    for o in logement.ouvertures:
+        gc = o.dessin.garde_corps if o.dessin is not None else None
+        if o.type == "porte" or gc is None or gc.motif is None or gc.genre not in ("fer_forge", "barreaudage"):
+            continue
+        mur = murs[o.mur]
+        gauche, droite = _cotes_dans_une_piece(o, mur, logement)
+        if gauche == droite:
+            continue  # on ne sait pas où est le dehors : pas de garde-corps (comme _fenetre_dessinee)
+        s = 1 if gauche else -1
+        z0, z1 = o.allege + gc.bas * o.hauteur, o.allege + gc.haut * o.hauteur
+        z_bas = z0 + PIED_GARDE_CORPS
+        if z1 - z0 < 0.25:
+            continue
+        motif = gc.motif.model_dump()
+        morceaux = ferronnerie.panneau(motif, o.largeur, z1 - z_bas)
+        if s > 0:  # le motif est vu de la pièce ; pièce à gauche du mur : sa gauche est du côté de la FIN du mur
+            morceaux = [{"contour": [(round(o.largeur - t, 5), z) for t, z in m["contour"]][::-1],
+                         "trous": [[(round(o.largeur - t, 5), z) for t, z in trou][::-1] for trou in m["trous"]]} for m in morceaux]
+        (x0, y0), (x1, y1) = mur.debut, mur.fin
+        ux, uy = (x1 - x0) / mur.longueur, (y1 - y0) / mur.longueur
+        axe = -s * max(0.0, mur.epaisseur / 2 - RETRAIT_GARDE_CORPS)  # vers la gauche du mur
+        sortie.append({"id": f"{o.id}__garde_corps_ferronnerie", "element": o.id,
+                       "origine": [x0 + ux * o.position - uy * axe, y0 + uy * o.position + ux * axe],
+                       "direction": [ux, uy], "z_bas": round(z_bas, 4), "epaisseur": EPAISSEUR_FERRONNERIE,
+                       "materiau": "fer_forge", "morceaux": morceaux})
+    return sortie
 
 
 def _place_de_chaque_cote(o: Ouverture, mur: Mur, logement: Logement) -> tuple[float, float]:

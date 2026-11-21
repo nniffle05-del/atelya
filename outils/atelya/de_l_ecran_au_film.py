@@ -203,6 +203,16 @@ def main() -> int:
             logement, dessinees = dessin_fenetres.appliquer(logement, lecture_des_fenetres, journal=lambda s: dire("   dessin : " + s))
             bilan["dessin_des_fenetres"] = dessinees
             dire(f"   {len(dessinees)} fenêtre(s) dessinée(s) d'après les photos")
+            # … et la FERRONNERIE de leurs garde-corps, recopiée des photos (moteur/ferronnerie.py, 20/11/2026) : un garde-corps
+            # en fonte est un dessin plat, que la photo montre en sombre sur le dehors ; sans motif lisible : barreaux droits
+            from moteur import ferronnerie
+            # les photos : celles de la fiche des photos placées (le banc ne donne pas le dossier du client), sinon le dossier donné
+            dossier_de_la_fiche = RACINE / str(json.loads(fiche.read_text(encoding="utf-8")).get("photos") or "")
+            photos_des_fenetres = dossier_de_la_fiche if dossier_de_la_fiche.is_dir() and dossier_de_la_fiche != RACINE else a.photos
+            logement, ferronneries = ferronnerie.appliquer(logement, lecture_des_fenetres, photos_des_fenetres,
+                                                           journal=lambda s: dire("   ferronnerie : " + s))
+            bilan["ferronneries"] = ferronneries
+            dire(f"   {len(ferronneries)} garde-corps à la ferronnerie recopiée des photos")
         depart.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")
         bilan["baies"] = {"votes": votes, "changements": changes}
         dire(f"   {len(changes)} baie(s) corrigée(s) d'après les photos, sur {len(votes)} vue(s)")

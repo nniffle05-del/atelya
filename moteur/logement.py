@@ -140,6 +140,22 @@ class Vantail(BaseModel):
         return self
 
 
+class MotifFerronnerie(BaseModel):
+    """Le MOTIF d'une ferronnerie RECOPIÉ des photos du client (moteur/ferronnerie.py, 20/11/2026) : un module (un barreau et
+    ses volutes) qui se répète le long du garde-corps. En parts : il vaut pour une fenêtre de n'importe quelle taille.
+    Vu de la PIÈCE (comme sur la photo) : x de gauche à droite, y de bas en haut."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pas: float = Field(gt=0.03, le=3.0, description="Largeur du module, en parts de la hauteur du motif")
+    contours: Annotated[list[Annotated[list[tuple[Part, Part]], Field(min_length=3)]], Field(min_length=1, max_length=400)] = Field(
+        description="Contours fermés du fer, pleins et trous mêlés (un point est dans le fer s'il est dans un nombre impair de "
+                    "contours) : (x en parts de la largeur du module, y en parts de sa hauteur)")
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
 class GardeCorpsFenetre(BaseModel):
     """Le garde-corps posé DEHORS devant une fenêtre dont le bas est à moins d'un mètre du sol (20/11/2026)."""
 
@@ -148,6 +164,8 @@ class GardeCorpsFenetre(BaseModel):
     bas: Part = Field(default=0.0, description="Son pied (part de la hauteur de la baie)")
     haut: Part = Field(description="Le dessus de sa main courante (part de la hauteur de la baie)")
     genre: Literal["fer_forge", "barreaudage", "verre", "lisses"] = "barreaudage"
+    motif: MotifFerronnerie | None = Field(default=None, description="Sa ferronnerie recopiée des photos ; sans elle : des "
+                                           "barreaux droits")
 
 
 class DessinFenetre(BaseModel):
