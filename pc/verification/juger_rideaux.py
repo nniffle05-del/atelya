@@ -10,6 +10,10 @@ le film se regarde à côté de la photo (pc/verification/vues_rideaux.sh). Code
 2e pièce (22/11/2026, étape b) : pour chaque pan relevé (« mesures » du relevé), sa LARGEUR (juste à 30 % ou 8 cm près), ce
 qui pend DEVANT la fenêtre (à 10 cm près, quand le relevé le dit) et son ÉTAT (ouvert / tiré). Le relevé donne la largeur en
 part de la largeur de la fenêtre (quand la fenêtre se voit) ou en mètres ; tout est comparé en mètres dans la maquette.
+
+3e pièce (23/11/2026, étape c) : la TRINGLE de chaque fenêtre relevée (« tringle » du relevé) : sa HAUTEUR (le relevé la donne
+en part de la hauteur du sol au plafond ; juste à 8 cm près) et sa TEINTE (claire ou foncée : clarté au-dessus ou au-dessous
+de 130 sur 255 ; une tringle jamais mesurée est en métal sombre).
 """
 from __future__ import annotations
 
@@ -97,6 +101,43 @@ def juger_les_mesures(verite: dict, logement: dict) -> dict:
     return bilan
 
 
+TOLERANCE_TRINGLE = 0.08  # m
+TEINTE_CLAIRE = 130  # clarté (sur 255) de la couleur gardée au-dessus de laquelle une tringle est « claire » (seuil remis de
+# 150 à 130 le 23/11 quand l'étalon de la couleur a été réglé dans le film : la teinte se juge d'abord dans le film,
+# pc/verification/juger_tringle_film.py ; ici ce n'est qu'un garde-fou)
+TRINGLE_SOMBRE = (89, 85, 80)  # la tringle jamais mesurée (moteur/blender/rideaux.materiau_tringle : 0,10 en linéaire)
+
+
+def juger_les_tringles(verite: dict, logement: dict) -> dict:
+    """Hauteur et teinte de la tringle de chaque fenêtre relevée, telles que la maquette les construit."""
+    from moteur import pans_rideaux as pr
+
+    ouvertures = {o["id"]: o for o in logement.get("ouvertures", [])}
+    murs = {m["id"]: m for m in logement.get("murs", [])}
+    hsp = float(logement.get("hauteur_sous_plafond", 2.5))
+    bilan = {"tringles": 0, "hauteur": 0, "teinte": 0, "ecarts_cm": [], "lignes": []}
+    for ident, v in verite["fenetres"].items():
+        o, vraie = ouvertures.get(ident), v.get("tringle")
+        if o is None or not vraie or not o.get("rideaux"):
+            continue
+        plafond = float((murs.get(o.get("mur")) or {}).get("hauteur") or hsp)
+        r = o["rideaux"]
+        atelya = pr.haut_du_tissu(r, plafond, float(o.get("allege", 0.0) or 0.0), float(o.get("hauteur", 2.1))) + pr.RAYON_TRINGLE
+        attendue = vraie["hauteur_part"] * plafond
+        couleur = (r.get("tringle") or {}).get("couleur") or TRINGLE_SOMBRE
+        teinte = "claire" if 0.299 * couleur[0] + 0.587 * couleur[1] + 0.114 * couleur[2] >= TEINTE_CLAIRE else "foncee"
+        juste = abs(atelya - attendue) <= TOLERANCE_TRINGLE
+        bilan["tringles"] += 1
+        bilan["hauteur"] += juste
+        bilan["teinte"] += teinte == vraie["teinte"]
+        bilan["ecarts_cm"].append(abs(atelya - attendue) * 100)
+        mesuree = "" if (r.get("tringle") or {}).get("hauteur") else " ; jamais mesurée"
+        bilan["lignes"].append(f"  {'juste' if juste else 'FAUX '}  {ident:4s} tringle     photos : {attendue:.2f} m, {vraie['teinte']:6s} "
+                               f"Atelya : {atelya:.2f} m ({(atelya - attendue) * 100:+.0f} cm), {teinte:6s}"
+                               f"{'' if teinte == vraie['teinte'] else ' (FAUX)'}{mesuree}")
+    return bilan
+
+
 def juger(cas: str, logement: dict) -> dict:
     verite = json.loads((RACINE / "verites" / cas / "rideaux.json").read_text(encoding="utf-8"))
     ouvertures = {o["id"]: o for o in logement.get("ouvertures", [])}
@@ -116,21 +157,25 @@ def juger(cas: str, logement: dict) -> dict:
         bilan["lignes"].append(f"  {'juste' if cote else 'FAUX '}  {ident:4s} {v['piece']:32s} photos : {dire(v['voilage'], v['rideaux'], sorted(v['pans'])):38s} "
                                f"Atelya : {dire(r.get('voilage'), r.get('rideaux'), pans)}")
     bilan["mesures"] = juger_les_mesures(verite, logement)
+    bilan["tringle"] = juger_les_tringles(verite, logement)
     return bilan
 
 
 def main() -> int:
     total = {"fenetres": 0, "sorte": 0, "nombre": 0, "cote": 0}
     pans = {"pans": 0, "largeur": 0, "devant": 0, "devant_juges": 0, "etat": 0, "ecarts": []}
+    tringles = {"tringles": 0, "hauteur": 0, "teinte": 0, "ecarts_cm": []}
     for arg in sys.argv[1:]:
         cas, _, chemin = arg.partition("=")
         bilan = juger(cas, json.loads(Path(chemin).read_text(encoding="utf-8")))
         print(f"{cas} ({chemin})")
-        print("\n".join(bilan["lignes"] + bilan["mesures"]["lignes"]))
+        print("\n".join(bilan["lignes"] + bilan["mesures"]["lignes"] + bilan["tringle"]["lignes"]))
         for k in total:
             total[k] += bilan[k]
         for k in pans:
             pans[k] += bilan["mesures"][k]
+        for k in tringles:
+            tringles[k] += bilan["tringle"][k]
     n = total["fenetres"]
     print(f"\nRIDEAUX, {n} fenêtres relevées : bonne sorte {total['sorte']}/{n} ; bon nombre de pans {total['nombre']}/{n} ; "
           f"pans du bon côté {total['cote']}/{n}")
@@ -138,6 +183,10 @@ def main() -> int:
         moyen = sum(pans["ecarts"]) / max(len(pans["ecarts"]), 1)
         print(f"PANS, {pans['pans']} pans relevés : bonne largeur {pans['largeur']}/{pans['pans']} (écart moyen {moyen:.0%}) ; "
               f"bonne part devant la fenêtre {pans['devant']}/{pans['devant_juges']} ; bon état {pans['etat']}/{pans['pans']}")
+    if tringles["tringles"]:
+        n = tringles["tringles"]
+        print(f"TRINGLES, {n} relevées : bonne hauteur {tringles['hauteur']}/{n} (écart moyen "
+              f"{sum(tringles['ecarts_cm']) / n:.0f} cm) ; bonne teinte {tringles['teinte']}/{n}")
     return 0
 
 

@@ -22,6 +22,10 @@ PAN_MIN = 0.12  # m : un pan plus étroit n'est plus un rideau (un trait) : la m
 DEBORD_MIN = 0.05  # m : un pan pend toujours jusqu'au bord de sa baie, et un peu au-delà (sinon la vitre se voit à côté de lui)
 PAN_TIRE_M = 0.55  # m : un pan aussi large n'est plus « ramassé sur le côté » (un rideau ouvert tient dans 20 à 45 cm)
 PART_TIREE = 1 / 3  # un pan qui pend devant plus du tiers de la baie est tiré
+SOUS_PLAFOND = 0.12  # m : une tringle jamais mesurée est 12 cm sous le plafond (comme dans un ancien)…
+AU_DESSUS = 0.30  # … et au moins 30 cm au-dessus de la fenêtre
+AU_DESSUS_MIN = 0.05  # m : une tringle mesurée reste au moins 5 cm au-dessus du haut de sa baie
+RAYON_TRINGLE = 0.012  # m : le tissu pend juste sous l'axe de la tringle
 
 
 def etendue(demi: float, pan: dict | None) -> tuple[float, float]:
@@ -54,3 +58,15 @@ def cotes(pans: list[dict] | None) -> list[tuple[int, dict | None]]:
         return [(-1, None), (1, None)]
     par_cote = {(1 if p["cote"] == "fin" else -1): p for p in pans}
     return sorted(par_cote.items(), key=lambda c: c[0])
+
+
+def haut_du_tissu(rideaux: dict | None, plafond: float, allege: float, hauteur: float) -> float:
+    """La hauteur (m) du haut du tissu, juste sous la tringle (23/11/2026, étape c). `rideaux` : le champ `rideaux` de la
+    fenêtre ; `plafond` : la hauteur du mur ; `allege`, `hauteur` : ceux de la baie. Une tringle MESURÉE sur les photos
+    (`tringle.hauteur`) est à sa hauteur, au moins 5 cm au-dessus de la baie et sous le plafond ; jamais mesurée : 12 cm sous
+    le plafond, au moins 30 cm au-dessus de la fenêtre (la règle d'avant)."""
+    sous = plafond - 0.02
+    mesuree = ((rideaux or {}).get("tringle") or {}).get("hauteur")
+    if mesuree:
+        return min(max(float(mesuree) - RAYON_TRINGLE, allege + hauteur + AU_DESSUS_MIN), sous)
+    return max(min(plafond - SOUS_PLAFOND, sous), min(allege + hauteur + AU_DESSUS, sous))

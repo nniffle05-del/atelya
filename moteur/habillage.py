@@ -199,7 +199,9 @@ def rideaux_du_plan(logement: Logement) -> list[dict]:
         pans.sort(key=lambda p: p["cote"])
         sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2], "pans": pans,
                        "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
-                       "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),
+                       # le haut du tissu : sous la tringle vue sur les photos, sinon 12 cm sous le plafond (pans_rideaux)
+                       "z_tringle": pans_rideaux.haut_du_tissu(o.rideaux.model_dump(), hsp, o.allege, o.hauteur),
+                       "couleur_tringle": list(o.rideaux.tringle.couleur) if o.rideaux.tringle and o.rideaux.tringle.couleur else None,
                        "voilage": list(o.rideaux.voilage) if o.rideaux.voilage else None,
                        "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None,
                        "ecart": o.rideaux.ecart, "bas": o.rideaux.bas})

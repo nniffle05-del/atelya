@@ -29,15 +29,17 @@ filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet>
   # app-001 : logement refait le 19/11/2026 avec les voilages des deux chambres (lecture des photos corrigée)
   # (puis refait le 20/11/2026, étape F1 : fenêtre du coin repas élargie d'après les photos, maquette app-001-v6-3d / parquet001g)
   # (puis le 23/11/2026, rideaux étape b : chaque pan à la largeur vue sur les photos, tiré ou ouvert, rideau repoussé devant
-  # son voilage : maquettes app-001-v8-3d / parquet001i et app-004-v8-3d / parquet004j, logements « rideaux-largeur »)
-  [ "$cas" = app-001 ] && log=../atelya/lectures-photos/rideaux-largeur/app-001/logement-meuble.json
+  # son voilage : maquettes app-001-v8-3d / parquet001i et app-004-v8-3d / parquet004j, logements « rideaux-largeur » ;
+  # 23/11/2026, étape c : la tringle vue sur les photos, maquettes app-001-v10-3d / parquet001k et app-004-v10-3d /
+  # parquet004l, logements « tringle »)
+  [ "$cas" = app-001 ] && log=../atelya/lectures-photos/tringle/app-001/logement-meuble.json
   # app-004 : refait de même le 19/11/2026 (rideaux de la collection calculée, couleur vue sur la photo ; puis un seul pan par
   # fenêtre, du côté vu sur les photos : maquettes app-001-v5-3d / parquet001f et app-004-v4-3d / parquet004e)
   # (puis le 20/11/2026, F2 pièce 3 : fenêtres construites d'après leur dessin lu sur les photos — partie pleine, vantaux, petits
   # bois, garde-corps : maquettes app-004-v5-3d / parquet004f et app-002-v3-3d / parquet002d, logements « dessin-fenetres »)
   # (puis le 21/11/2026 : ferronnerie des garde-corps recopiée des photos, maquette app-004-v7-3d / parquet004h, logement
   # « ferronnerie »)
-  [ "$cas" = app-004 ] && log=../atelya/lectures-photos/rideaux-largeur/app-004/logement-meuble.json
+  [ "$cas" = app-004 ] && log=../atelya/lectures-photos/tringle/app-004/logement-meuble.json
   [ "$cas" = app-002 ] && log=../atelya/lectures-photos/dessin-fenetres/app-002/logement-meuble.json
   local decor="--logement $log"
   [ -n "${SANS_DECOR-}" ] && decor=""
@@ -46,9 +48,9 @@ filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet>
     || { echo "PLANTÉ : vues de $cas (essai $ESSAI)"; exit 1; }
 }
 
-filmer app-001 $B/app-001-v8-3d parquet001i verites/app-001/cameras-photos.json $B/app-001-v8/paquet "$VUES_001" "$@"
+filmer app-001 $B/app-001-v10-3d parquet001k verites/app-001/cameras-photos.json $B/app-001-v10/paquet "$VUES_001" "$@"
 filmer app-002 $B/app-002-v3-3d parquet002d verites/app-002/cameras-photos.json $B/app-002-v3/paquet "$VUES_002" "$@"
-filmer app-004 $B/app-004-v8-3d parquet004j ../atelya/b2/app-004/chaine-v2/cameras-photos-seul.json $B/app-004-v8/paquet "$VUES_004" "$@"
+filmer app-004 $B/app-004-v10-3d parquet004l ../atelya/b2/app-004/chaine-v2/cameras-photos-seul.json $B/app-004-v10/paquet "$VUES_004" "$@"
 
 VUES=""
 for cas in app-001 app-002 app-004; do

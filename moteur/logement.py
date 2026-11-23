@@ -93,6 +93,16 @@ class PanDeRideau(BaseModel):
         default=None, description="« ouvert » : ramassé sur le côté (plis serrés) ; « tire » : déployé devant la fenêtre (plis larges).")
 
 
+class Tringle(BaseModel):
+    """La tringle d'une fenêtre habillée, vue sur les photos (23/11/2026) : sa hauteur au-dessus du sol et sa couleur. Sans
+    mesure (champ absent) : 12 cm sous le plafond, métal sombre (moteur/pans_rideaux.py, moteur/blender/rideaux.py)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hauteur: Annotated[float, Field(gt=0.5, le=6)] | None = Field(default=None, description="Hauteur de l'axe de la tringle au-dessus du sol (m).")
+    couleur: Couleur | None = Field(default=None, description="Couleur de la tringle (sRGB), à côté d'un mur blanc bien exposé.")
+
+
 class Rideaux(BaseModel):
     """Ce qui habille une fenêtre côté intérieur (B4, 09/11/2026) : un voilage (tissu fin qui laisse passer la lumière, tiré
     devant la vitre) et/ou des rideaux épais (deux pans ouverts sur les côtés, ou les pans de `pans`). Couleur sRGB vue sur
@@ -105,6 +115,8 @@ class Rideaux(BaseModel):
     pans: Annotated[list[PanDeRideau], Field(min_length=1, max_length=2)] | None = Field(
         default=None, description="Les pans de rideaux épais vus sur les photos : un seul (et de quel côté) ou deux. Sans ce "
                                   "champ : deux pans, un de chaque côté (la supposition d'avant le 19/11/2026).")
+    tringle: Tringle | None = Field(default=None, description="La tringle vue sur les photos : hauteur, couleur. Sans ce champ : "
+                                                               "12 cm sous le plafond, métal sombre.")
     ecart: Annotated[float, Field(gt=0, le=0.5)] | None = Field(
         default=None, description="Distance au mur de la nappe du voilage (m) ; les rideaux pendent 6 cm plus loin. Par défaut 10 cm. "
                                   "Réglée par moteur/collisions.py pour passer DEVANT un radiateur.")

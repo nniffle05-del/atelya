@@ -291,6 +291,9 @@ def vues_d_une_photo(objets: list[dict], cam, camera: dict, plan: dict, repere: 
         if o["sorte"] == "rideaux":  # de quoi mesurer ses PANS (pans_d_une_fenetre) : son rectangle, l'appareil, les fenêtres lues
             base.update(boite=[x0, y0, x1, y1], appareil=[float(c) for c in cam], image=(int(largeur), int(hauteur)),
                         baies_vues=[[float(c) for c in f["boite"]] for f in objets if f["sorte"] in ("fenetre", "porte_fenetre")])
+            # … et sa TRINGLE (23/11/2026) : le trait fin qui passe par le haut du tissu, sa hauteur dans le relief, sa couleur
+            base["tringle_vue"] = tringle_d_une_vue(rgb, [x0, y0, x1, y1], repere, precise == "voilage",
+                                                   pente_d_une_horizontale(cam, plan, logement, x0, x1, y0))
         if precise is None:
             sortie.append(base)
             continue
@@ -1027,7 +1030,8 @@ def rideaux_des_fenetres(vues: list[dict], logement: dict, refuse=lambda *_: Non
         if not proches:
             refuse(v, "aucune fenêtre du plan à moins de 1,2 m")
             continue
-        r = voix.setdefault(min(proches)[1], {"voilage": [], "rideaux": [], "photos": set(), "epais": []})
+        r = voix.setdefault(min(proches)[1], {"voilage": [], "rideaux": [], "photos": set(), "epais": [], "toutes": []})
+        r["toutes"].append(v)
         # la couleur d'un rideau épais est celle VUE sur la photo (« le même que sur la photo ») ; le mot de la lecture (« beige »,
         # « mauve » : une couleur de nuancier, bien plus pâle que les rideaux d'app-001) ne sert que sans mesure. Un voilage,
         # éclairé par derrière, garde sa couleur dite, sinon blanc.
@@ -1053,6 +1057,10 @@ def rideaux_des_fenetres(vues: list[dict], logement: dict, refuse=lambda *_: Non
             pans = pans_d_une_fenetre(r["epais"], repere_de_la_baie(ouvertures[ident], logement), portee_libre(ouvertures[ident], logement))
             if pans:
                 sortie[ident]["pans"] = pans
+        # la tringle (23/11/2026) : sa hauteur et sa couleur vues sur les photos ; sans mesure, celle d'avant
+        tringle = tringle_d_une_fenetre(r["toutes"], float(logement.get("hauteur_sous_plafond", 2.5)))
+        if tringle:
+            sortie[ident]["tringle"] = tringle
     return sortie
 
 
@@ -1290,6 +1298,184 @@ def largeurs_des_pans(par_photo: dict, baie: dict, portee: tuple[float, float] |
     for p in sortie.values():
         p["etat"] = "tire" if TIRES.search(dit) else "ouvert" if OUVERTS.search(dit) else pr.etat(p, demi)
     return sortie
+
+
+# ------------------------------------------------------------------ la tringle d'une fenêtre (23/11/2026, rideaux étape c)
+# Avant : la tringle était toujours 12 cm sous le plafond et toujours en métal sombre. Les photos montrent sa vraie hauteur
+# (app-004 : une vingtaine de centimètres sous le plafond ; ailleurs elle peut être juste au-dessus d'une fenêtre basse) et sa
+# vraie couleur (app-004 : acier brossé gris clair). Sur une photo la tringle est un TRAIT FIN, presque horizontal, qui passe
+# par le haut du tissu et continue à côté de lui, au-dessus de la fenêtre.
+TRINGLE_TOL = 0.04  # le trait passe par le haut du rectangle du tissu, à 4 % de sa hauteur près (au moins 8 pixels)
+TRINGLE_PENTES = 0.10  # … avec la pente d'une horizontale du mur vue par l'appareil, à 0,10 près
+TRINGLE_ECART_PX = 5  # le mur se regarde 5 pixels au-dessus et au-dessous du trait (une tringle fait 2 à 5 pixels d'épaisseur)
+TRINGLE_FORCE = 14.0  # écart de clarté (sur 255) entre le trait et le mur, tenu sur 60 % de sa longueur
+TRINGLE_COLONNES = 30  # longueur minimale du trait (pixels)
+TRINGLE_HAUTEUR_MIN = 1.6  # m : plus bas, ce n'est pas une tringle
+# L'étalon de la couleur de la tringle : la couleur gardée = sa clarté contre le mur clair autour d'elle × ETALON_TRINGLE.
+# RÉGLÉ DANS LE FILM le 23/11/2026 (pc/verification/juger_tringle_film.py, 8 vues d'app-001 et d'app-004, un seul réglage pour
+# tous) : avec 0,85 (ce que renvoie un mur blanc) la tringle du film était trop claire contre son mur sur TOUTES les vues
+# (0,73 pour 0,63 sur les photos : la pellicule du film et le reflet du métal l'éclaircissent) ; 0,60 la remet à la clarté vue.
+ETALON_TRINGLE = 0.60
+MUR_CLAIR = 150  # clarté (sur 255) au-dessus de laquelle le mur autour de la tringle sert d'étalon
+TRINGLE_DITE = re.compile(r"\btringles?\b(.*)")
+
+
+def pente_d_une_horizontale(cam, plan: dict, logement: dict, u0: float, u1: float, v: float) -> float:
+    """La pente, dans l'image, d'une ligne HORIZONTALE du mur que l'appareil voit entre les colonnes u0 et u1 à la ligne v
+    (pixels descendus par pixel vers la droite). 0 si le mur n'est pas trouvé."""
+    from moteur.camera_photo import projeter
+    from moteur.photos_lues import premier_mur, rayon
+
+    origine = np.array([float(cam[0]), float(cam[1])])
+    points = []
+    for u in (u0, u1):
+        angle, pente = rayon(cam, u, v)
+        distance = premier_mur(plan, origine, angle, pieces=logement.get("pieces"))[0]
+        if not math.isfinite(distance) or distance < 0.3:
+            return 0.0
+        points.append((origine + distance * np.array([math.cos(math.radians(angle)), math.sin(math.radians(angle))]),
+                       float(cam[2]) + pente * distance))
+    (pa, za), (pb, _) = points
+    ua, va, da = projeter([pa[0], pa[1], za], cam)
+    ub, vb, db = projeter([pb[0], pb[1], za], cam)
+    if da <= 0.1 or db <= 0.1 or abs(ub - ua) < 2:
+        return 0.0
+    return float(np.clip((vb - va) / (ub - ua), -0.8, 0.8))
+
+
+def trait_de_la_tringle(rgb: np.ndarray, boite, pente: float = 0.0, dessus: bool = False) -> dict | None:
+    """La tringle cherchée dans l'image : un trait fin, plus sombre (ou plus clair) que le mur au-dessus ET au-dessous de lui,
+    qui passe par le haut du rectangle du tissu avec la pente d'une horizontale du mur, à gauche ou à droite du tissu (et
+    au-dessus de lui pour un voilage, `dessus`). Rend {"a", "b" : ses deux bouts (pixels), "force" : son écart de clarté avec
+    le mur, "couleur" : sa couleur, "mur" : celle du mur autour, "points" : quelques-uns de ses pixels} ; None sans trait net."""
+    H, W = rgb.shape[:2]
+    gris = rgb[..., :3].astype(np.float32) @ np.array([0.299, 0.587, 0.114], np.float32)
+    x0, y0, x1, y1 = (float(c) for c in boite)
+    xc, d = (x0 + x1) / 2, TRINGLE_ECART_PX
+    tol = max(8, int(round(TRINGLE_TOL * (y1 - y0))))
+    portee = max(60, int(round(1.5 * (x1 - x0))))
+    zones = {"gauche": np.arange(max(0, int(x0) - portee), max(0, int(x0) - 2)),
+             "droite": np.arange(min(W, int(x1) + 3), min(W, int(x1) + portee))}
+    if dessus:
+        zones["dessus"] = np.arange(max(0, int(x0 + 0.1 * (x1 - x0))), min(W, int(x1 - 0.1 * (x1 - x0))))
+    departs = np.arange(int(y0) - tol, int(y0) + tol + 1, dtype=np.float32)[:, None]
+    meilleur = None
+    for nom, xs in zones.items():
+        if len(xs) < TRINGLE_COLONNES:
+            continue
+        for p in pente + np.linspace(-TRINGLE_PENTES, TRINGLE_PENTES, 11):
+            ys = np.rint(departs + p * (xs[None, :] - xc)).astype(int)
+            dedans = (ys >= d + 2).all(axis=1) & (ys < H - d - 2).all(axis=1)
+            if not dedans.any():
+                continue
+            ys = ys[dedans]
+            xx = np.broadcast_to(xs[None, :], ys.shape)
+            trois = np.stack([gris[ys - 1, xx], gris[ys, xx], gris[ys + 1, xx]])
+            dehors = np.stack([gris[ys - d, xx], gris[ys + d, xx]])
+            for signe, ecart in (("sombre", dehors.min(axis=0) - trois.min(axis=0)), ("clair", trois.max(axis=0) - dehors.max(axis=0))):
+                force = np.percentile(ecart, 40, axis=1)  # tenu sur 60 % de la longueur : un trait, pas une tache
+                # … et, entre deux droites qui tiennent aussi bien, celle qui suit le trait d'un bout à l'autre (la moyenne)
+                rang = force + np.clip(ecart, 0.0, None).mean(axis=1)
+                k = int(np.argmax(np.where(force >= TRINGLE_FORCE, rang, -1.0)))
+                if force[k] >= TRINGLE_FORCE and (meilleur is None or rang[k] > meilleur[0]):
+                    meilleur = (float(rang[k]), signe, xs, ys[k], ecart[k], float(force[k]))
+    if meilleur is None:
+        return None
+    _, signe, xs, ys, ecart, force = meilleur
+    net = ecart >= 0.6 * force
+    x, y = xs[net], ys[net]
+    lignes = np.stack([y - 1, y, y + 1])
+    choix = (np.argmin if signe == "sombre" else np.argmax)(gris[lignes, x[None, :]], axis=0)
+    couleur = np.median(rgb[lignes[choix, np.arange(len(x))], x, :3].astype(np.float32), axis=0)
+    # le mur : le plus clair du dessus et du dessous (dessous, ce peut être le cadre de la fenêtre ou le tissu)
+    haut, bas = rgb[y - d - 1, x, :3].astype(np.float32), rgb[y + d + 1, x, :3].astype(np.float32)
+    mur = np.median(np.where((gris[y - d - 1, x] >= gris[y + d + 1, x])[:, None], haut, bas), axis=0)
+    pas = max(1, len(x) // 12)
+    return {"a": [float(xs[0]), float(ys[0])], "b": [float(xs[-1]), float(ys[-1])], "force": force, "signe": signe,
+            "couleur": [int(c) for c in couleur], "mur": [int(c) for c in mur],
+            "points": [[float(a), float(b)] for a, b in zip(x[::pas], y[::pas])]}
+
+
+def _du_relief(repere: dict | None, points, largeur: int, hauteur: int) -> float | None:
+    """La hauteur au-dessus du sol (m) de ces pixels de la photo, dans le relief remis entre le sol et le plafond de la pièce
+    (moteur.caler_photos.repere) : la médiane des points mesurés ; None s'il y en a moins de trois."""
+    if repere is None:
+        return None
+    Hm, Wm = repere["M"].shape
+    valeurs = []
+    for u, v in points:
+        i, j = int(v * Hm / hauteur), int(u * Wm / largeur)
+        if 0 <= i < Hm and 0 <= j < Wm and repere["M"][i, j] and np.isfinite(repere["h"][i, j]):
+            valeurs.append(float(repere["h"][i, j]))
+    return float(np.median(valeurs)) if len(valeurs) >= 3 else None
+
+
+def tringle_d_une_vue(rgb: np.ndarray | None, boite, repere: dict | None, voilage: bool = False, pente: float = 0.0) -> dict | None:
+    """Ce qu'UN rectangle de rideaux ou de voilage dit de sa tringle : {"haut" : la hauteur du haut du tissu dans le relief de
+    la photo (m), "trait" : la tringle trouvée dans l'image (trait_de_la_tringle) ou None, "hauteur" : la hauteur de ce trait
+    dans le relief (m)}. None quand le haut du tissu est coupé par le cadre de la photo (ou sans image)."""
+    if rgb is None:
+        return None
+    H, W = rgb.shape[:2]
+    x0, y0, x1, y1 = (float(c) for c in boite)
+    if y0 < BORD_IMAGE * H:
+        return None
+    ligne = y0 + 0.02 * (y1 - y0)
+    haut = _du_relief(repere, [(x0 + f * (x1 - x0), ligne) for f in np.linspace(0.15, 0.85, 15)], W, H)
+    trait = trait_de_la_tringle(rgb, boite, pente, dessus=voilage)
+    # le relief d'un trait de 3 pixels est celui du MUR qui le porte : il se lit juste au-dessus de lui
+    hauteur = _du_relief(repere, [(u, v - 2) for u, v in trait["points"]], W, H) if trait else None
+    return {"haut": haut, "trait": trait, "hauteur": hauteur}
+
+
+def _a_blanc_de_mur(couleur, mur) -> list[int]:
+    """La couleur de la tringle ramenée à ce qu'elle serait à côté d'un mur blanc bien exposé : le mur clair autour d'elle
+    sert d'étalon (ETALON_TRINGLE, réglé dans le film). Un mur sombre ou coloré n'étalonne rien : couleur telle quelle."""
+    lin = lambda c: ((np.asarray(c, float) / 255 + 0.055) / 1.055) ** 2.4
+    srgb = lambda v: 255 * (1.055 * np.clip(v, 0, 1) ** (1 / 2.4) - 0.055)
+    clarte = float(np.asarray(mur, float) @ [0.299, 0.587, 0.114])
+    if clarte < MUR_CLAIR:
+        return [int(c) for c in couleur]
+    return [int(round(float(c))) for c in np.clip(srgb(lin(couleur) / max(float(lin(mur).mean()), 1e-3) * ETALON_TRINGLE), 0, 255)]
+
+
+def tringle_d_une_fenetre(vues: list[dict], hsp: float) -> dict | None:
+    """La tringle d'une fenêtre d'après toutes les vues de ses rideaux et de son voilage : {"hauteur" (m au-dessus du sol),
+    "couleur" (sRGB)}, chaque champ seulement s'il est mesuré ; None sans aucune mesure (la tringle d'avant : 12 cm sous le
+    plafond, métal sombre).
+    - HAUTEUR : celle du trait de la tringle trouvé sur chaque photo, lue dans le relief de la photo (qui est remis entre le
+      sol et le plafond de la pièce : elle ne dépend pas de la place de l'appareil) ; sans trait : le haut du tissu. Médiane.
+    - COULEUR : celle du trait, étalonnée par le mur blanc autour de lui ; médiane. Le mot de la lecture (« tringle noire »)
+      fait foi quand il existe."""
+    traits, tissus, couleurs, dite = [], [], [], None
+    for v in vues:
+        mots = TRINGLE_DITE.search(_sans_accents(v.get("dit") or ""))
+        if mots and couleur_dite(mots.group(1)):
+            dite = couleur_dite(mots.group(1))
+        t = v.get("tringle_vue")
+        if not t:
+            continue
+        mesure = {"haut": t.get("haut"), "hauteur": t.get("hauteur"), "trait": t.get("trait")}
+        plausible = lambda h: h is not None and TRINGLE_HAUTEUR_MIN <= h <= hsp + 0.15
+        # un trait dont la hauteur n'est pas celle d'une tringle (une corniche, le bord d'une poutre) ne dit pas sa couleur
+        if t.get("trait") and plausible(t.get("hauteur")):
+            mesure["couleur"] = _a_blanc_de_mur(t["trait"]["couleur"], t["trait"]["mur"])
+            mesure["mur"] = t["trait"]["mur"]
+            mesure["clarte"] = float(np.asarray(t["trait"]["couleur"], float) @ [0.299, 0.587, 0.114]) / max(
+                1.0, float(np.asarray(t["trait"]["mur"], float) @ [0.299, 0.587, 0.114]))
+            couleurs.append(mesure["couleur"])
+        v["tringle"] = mesure  # gardé sur la vue : pour contrôler (pc/verification/sonde_tringle.py)
+        if plausible(t.get("hauteur")):
+            traits.append(t["hauteur"])
+        if plausible(t.get("haut")):
+            tissus.append(t["haut"])
+    sortie = {}
+    hauteurs = traits or tissus
+    if hauteurs:
+        sortie["hauteur"] = round(float(np.clip(np.median(hauteurs), TRINGLE_HAUTEUR_MIN, hsp - 0.03)), 2)
+    if dite or couleurs:
+        sortie["couleur"] = [int(c) for c in (dite or np.median(np.array(couleurs), axis=0))]
+    return sortie or None
 
 
 def appliquer(logement: dict, resultat: dict) -> dict:

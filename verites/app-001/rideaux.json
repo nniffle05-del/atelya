@@ -1,5 +1,5 @@
 {
- "schema": "verite-rideaux/0.2",
+ "schema": "verite-rideaux/0.3",
  "releve": "à la main, d'après les photos du client, le 19/11/2026 (Claude ; à faire confirmer par NT). « gauche » et « droite » : vu de la pièce, face à la fenêtre. Seules les fenêtres dont une photo montre l'habillage sont relevées.",
  "fenetres": {
   "O8": {
@@ -25,6 +25,11 @@
      "etat": "tire",
      "note": "photo-08 : 105 px de large pour 446 px de haut ; borné à droite par le dressing"
     }
+   },
+   "tringle": {
+    "hauteur_part": 0.977,
+    "teinte": "foncee",
+    "note": "tringle en fer gris foncé, à anneaux, juste sous la retombée du plafond ; photo-08 : pan de droite sol 513, tringle 79, retombée ~72 ; pan de gauche sol 450, tringle 115, retombée ~107"
    }
   },
   "O9": {
@@ -50,6 +55,11 @@
      "etat": "tire",
      "note": "photo-10 : 117 px de large pour 516 px de haut"
     }
+   },
+   "tringle": {
+    "hauteur_part": 0.975,
+    "teinte": "foncee",
+    "note": "la même tringle en fer gris foncé, à anneaux ; photo-10 : pan de droite sol 583, tringle 92, retombée ~82 ; pan de gauche sol 548, tringle 185, retombée ~178"
    }
   },
   "O10": {
@@ -73,5 +83,6 @@
    "note": "voilages blancs seuls"
   }
  },
- "mesures": "22/11/2026 (Claude ; à faire confirmer par NT) : la fenêtre est derrière un voilage, on ne peut pas mesurer les pans contre elle. Largeur de chaque pan en MÈTRES, estimée par sa hauteur (du sol à la tringle, ~2,75 m sous 3 m de plafond) et par la fuite du mur (le pan le plus haut dans l'image est le plus près) : à ± 20 %. « etat » : les pans sont à demi tirés devant une grande baie, plis larges et réguliers : « tire ». RÉSERVE : cette estimation et la mesure d'Atelya partent des mêmes rectangles."
+ "mesures": "22/11/2026 (Claude ; à faire confirmer par NT) : la fenêtre est derrière un voilage, on ne peut pas mesurer les pans contre elle. Largeur de chaque pan en MÈTRES, estimée par sa hauteur (du sol à la tringle, ~2,75 m sous 3 m de plafond) et par la fuite du mur (le pan le plus haut dans l'image est le plus près) : à ± 20 %. « etat » : les pans sont à demi tirés devant une grande baie, plis larges et réguliers : « tire ». RÉSERVE : cette estimation et la mesure d'Atelya partent des mêmes rectangles.",
+ "tringles": "23/11/2026 (Claude ; à faire confirmer par NT) : « hauteur_part » = hauteur de la tringle en PART de la hauteur du sol au plafond, prise à la règle sur les photos à la colonne d'un pan (du pied du pan à la tringle, sur du pied du pan au plafond) ; juste à ± 0,02 (5 cm) : le plafond se lit mal derrière une corniche ou une retombée. « teinte » : claire (acier, blanc) ou foncee (fer, noir), à l'œil."
 }

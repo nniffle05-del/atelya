@@ -23,6 +23,7 @@ import tissus  # noqa: E402 : le calcul des nappes, sans Blender
 ECART_VOILAGE, ECART_RIDEAUX = 0.10, 0.16  # distance au mur (m)
 PAS_PLIS = {"voilage": 0.10, "rideaux": 0.16, "rideaux_tires": 0.16}
 AMPLITUDE = {"voilage": 0.022, "rideaux": 0.04, "rideaux_tires": 0.04}
+METAL_TRINGLE = 0.2  # part « métal » d'une tringle dont la couleur est vue sur la photo (réglée dans le film, tous logements)
 
 
 def lineaire(rgb255):
@@ -96,19 +97,28 @@ def pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection, der
     return o, n
 
 
-def materiau_tringle():
-    m = bpy.data.materials.get("Tringle")
+def materiau_tringle(couleur=None):
+    """La matière de la tringle. Sans couleur vue sur les photos : le métal sombre d'avant. Avec (23/11/2026) : cette couleur,
+    en métal BROSSÉ peu réfléchissant : un métal poli ne montre que le reflet de la pièce, et la tringle du film n'aurait plus
+    la clarté qu'elle a sur la photo."""
+    nom = "Tringle" if couleur is None else "Tringle_%02x%02x%02x" % tuple(int(c) for c in couleur[:3])
+    m = bpy.data.materials.get(nom)
     if m is None:
-        m = bpy.data.materials.new("Tringle")
+        m = bpy.data.materials.new(nom)
         m.use_nodes = True
         bsdf = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
-        bsdf.inputs["Base Color"].default_value = (0.10, 0.09, 0.08, 1.0)  # métal sombre, le plus courant sur les photos
-        bsdf.inputs["Metallic"].default_value = 0.8
-        bsdf.inputs["Roughness"].default_value = 0.45
+        if couleur is None:
+            bsdf.inputs["Base Color"].default_value = (0.10, 0.09, 0.08, 1.0)  # métal sombre, le plus courant sur les photos
+            bsdf.inputs["Metallic"].default_value = 0.8
+            bsdf.inputs["Roughness"].default_value = 0.45
+        else:
+            bsdf.inputs["Base Color"].default_value = (*lineaire(couleur[:3]), 1.0)
+            bsdf.inputs["Metallic"].default_value = METAL_TRINGLE
+            bsdf.inputs["Roughness"].default_value = 0.5
     return m
 
 
-def tringle(nom, x0, x1, y, z, parent, collection, rayon=0.011, cotes=10):
+def tringle(nom, x0, x1, y, z, parent, collection, rayon=0.011, cotes=10, couleur=None):
     """La tringle : une barre ronde de x0 à x1 (le long du mur), à la distance y du mur et à la hauteur z, avec un embout à
     chaque bout."""
     sommets, faces = [], []
@@ -131,7 +141,7 @@ def tringle(nom, x0, x1, y, z, parent, collection, rayon=0.011, cotes=10):
     me.update()
     for f in me.polygons:
         f.use_smooth = True
-    me.materials.append(materiau_tringle())
+    me.materials.append(materiau_tringle(couleur))
     o = bpy.data.objects.new(nom, me)
     o.parent = parent
     collection.objects.link(o)
@@ -196,7 +206,7 @@ def poser_rideaux(scene, rideaux: list[dict]) -> int:
         # la tringle : au-dessus du tissu, à la distance du pan le plus loin du mur, 8 cm plus large que lui de chaque côté
         bouts = {cote: max([demi + 0.23] + [p["x1"] + 0.08 for p in pans if p["cote"] == cote]) for cote in (-1, 1)}
         tringle(f"Tringle_{r['id']}", -bouts[-1], bouts[1], ecart_rideaux if r.get("rideaux") else ecart_voilage,
-                haut + 0.012, racine, collection)
+                haut + 0.012, racine, collection, couleur=r.get("couleur_tringle"))
         voilage = None
         if r.get("voilage"):
             voilage = pan(f"Voilage_{r['id']}", -demi - 0.15, demi + 0.15, ecart_voilage, bas, haut, "voilage",
