@@ -60,7 +60,12 @@ def cotes(pans: list[dict] | None) -> list[tuple[int, dict | None]]:
     return sorted(par_cote.items(), key=lambda c: c[0])
 
 
-def haut_du_tissu(rideaux: dict | None, plafond: float, allege: float, hauteur: float) -> float:
+def haut_vu_sur_les_photos(source) -> bool:
+    """Le haut de cette baie a-t-il été mesuré sur les photos (moteur/hauteur_baies.py) ?"""
+    return "photos (bas et haut de la baie" in str(source or "") or "photos (haut de la baie" in str(source or "")
+
+
+def haut_du_tissu(rideaux: dict | None, plafond: float, allege: float, hauteur: float, haut_vu: bool = False) -> float:
     """La hauteur (m) du haut du tissu, juste sous la tringle (23/11/2026, étape c). `rideaux` : le champ `rideaux` de la
     fenêtre ; `plafond` : la hauteur du mur ; `allege`, `hauteur` : ceux de la baie. Une tringle MESURÉE sur les photos
     (`tringle.hauteur`) est à sa hauteur, au moins 5 cm au-dessus de la baie et sous le plafond ; jamais mesurée : 12 cm sous
@@ -69,4 +74,6 @@ def haut_du_tissu(rideaux: dict | None, plafond: float, allege: float, hauteur: 
     mesuree = ((rideaux or {}).get("tringle") or {}).get("hauteur")
     if mesuree:
         return min(max(float(mesuree) - RAYON_TRINGLE, allege + hauteur + AU_DESSUS_MIN), sous)
-    return max(min(plafond - SOUS_PLAFOND, sous), min(allege + hauteur + AU_DESSUS, sous))
+    # une baie dont le haut est MESURÉ sur les photos (23/11/2026) : la tringle n'a plus à s'en écarter de 30 cm « au cas où »
+    # (une fenêtre haute sous un voilage poussait la tringle contre le plafond)
+    return max(min(plafond - SOUS_PLAFOND, sous), min(allege + hauteur + (AU_DESSUS_MIN if haut_vu else AU_DESSUS), sous))

@@ -13,8 +13,11 @@ On compare la PLACE dans l'image (part de la hauteur de l'image) du haut et du b
 Un haut dit « au moins » (fenêtre derrière un voilage) est jugé de même : le film doit montrer la fenêtre au moins jusque-là.
 Sorties : le tableau, et <sortie>/fenetre-<logement>-<photo>-<baie>.jpg (photo | hier | aujourd'hui, à REGARDER : trait ROUGE =
 le haut, trait BLEU = le bas).
-Ce juge mêle la hauteur de la fenêtre et la place de l'appareil (calé à 0,3-0,5 m) : il dit si la fenêtre du film TOMBE au même
-endroit de l'image que celle de la photo ; les mètres se jugent sur le papier (sonde_hauteur_baies.py).
+La PLACE dans l'image mêle la hauteur de la fenêtre et la place de l'appareil (calé à 0,3-0,5 m : un appareil trop près grossit
+toute l'image). Seconde mesure, qui s'en affranchit : la fenêtre ENTRE LE SOL ET LE PLAFOND de l'image (où tombent son bas et
+son haut, en parts de la hauteur du mur, à la colonne de la fenêtre) : sur la photo d'après les lignes lues du sol et du
+plafond, dans le film d'après le pied et le haut du mur de la maquette cherchés de même dans l'image. Les mètres se jugent sur
+le papier (sonde_hauteur_baies.py : lignes contre relief).
 """
 from __future__ import annotations
 
@@ -56,6 +59,7 @@ def juger(cas: str, spec: str, sortie: Path) -> list[dict]:
     import cv2
 
     from banc_ressemblance import CAS
+    from moteur import hauteur_baies as hb
     from moteur.camera_photo import camera_depuis_dict, projeter
     from moteur.equipements import repere_de_la_baie
     from moteur.images import ecrire_image, lire_image
@@ -75,6 +79,8 @@ def juger(cas: str, spec: str, sortie: Path) -> list[dict]:
             x_photo = float((hg[0] + hd[0] + bd[0] + bg[0]) / 4)
             ligne = {"cas": cas, "photo": nom, "baie": f["baie"], "au_moins": bool(f.get("haut_au_moins")),
                      "photo_haut": float((hg[1] + hd[1]) / 2) / Hp, "photo_bas": None if f.get("bas_cache") else float((bg[1] + bd[1]) / 2) / Hp}
+            parts = hb.niveaux_d_une_photo([g for g in fenetres if g["baie"] == f["baie"]]) or {}
+            ligne["photo_part_haut"], ligne["photo_part_bas"] = parts.get("haut"), parts.get("bas")
             cam = camera_depuis_dict(fiche["cameras"][nom]["camera"])
             cases = [("la photo du client", photo, 1.0, x_photo, ligne["photo_haut"] * Hp, None if ligne["photo_bas"] is None else ligne["photo_bas"] * Hp)]
             for quand in QUAND:
@@ -93,6 +99,12 @@ def juger(cas: str, spec: str, sortie: Path) -> list[dict]:
                     continue
                 y_haut, y_bas = bord_dans_l_image(film, haut[0] * k, haut[1] * k), bord_dans_l_image(film, bas[0] * k, bas[1] * k)
                 ligne[f"{quand}_haut"], ligne[f"{quand}_bas"] = y_haut / film.shape[0], y_bas / film.shape[0]
+                # la fenêtre entre le sol et le plafond de l'IMAGE du film (à sa colonne) : indépendant de la place de l'appareil
+                sol, plafond = (projeter([*r["centre"], z], cam) for z in (0.0, float(logements[quand].get("hauteur_sous_plafond", 2.5))))
+                y_sol, y_plafond = bord_dans_l_image(film, sol[0] * k, sol[1] * k), bord_dans_l_image(film, plafond[0] * k, plafond[1] * k)
+                if y_sol - y_plafond > 20:
+                    ligne[f"{quand}_part_haut"] = (y_sol - y_haut) / (y_sol - y_plafond)
+                    ligne[f"{quand}_part_bas"] = (y_sol - y_bas) / (y_sol - y_plafond)
                 cases.append((f"le film, {QUAND[quand]}", cv2.cvtColor(film, cv2.COLOR_RGB2BGR), k, haut[0] * k, y_haut, y_bas))
             bandes = []
             for titre, img, k, x, y_haut, y_bas in cases:
@@ -134,6 +146,20 @@ def main() -> int:
         hauts = [max(0.0, l[f"{quand}_haut"] - l["photo_haut"]) if l["au_moins"] else abs(l[f"{quand}_haut"] - l["photo_haut"]) for l in deux]
         bas = [abs(l[f"{quand}_bas"] - l["photo_bas"]) for l in deux if l["photo_bas"] is not None]
         print(f"{QUAND[quand]:12s}: écart moyen du HAUT {100 * np.mean(hauts) if hauts else float('nan'):.1f} % de la hauteur de l'image "
+              f"({len(hauts)} vues), du BAS {100 * np.mean(bas) if bas else float('nan'):.1f} % ({len(bas)} vues)")
+    print()
+    print("LA FENÊTRE ENTRE LE SOL ET LE PLAFOND DE L'IMAGE (parts de la hauteur du mur ; ne dépend pas de la place de l'appareil)")
+    print("vue                 baie  | HAUT : photo, hier, aujourd'hui | BAS : photo, hier, aujourd'hui")
+    part = lambda x: "  —  " if x is None else f"{x:5.2f}"  # noqa: E731
+    for l in lignes:
+        if l.get("photo_part_haut") is not None:
+            print(f"{l['cas']} {l['photo']:9s} {l['baie']:5s} | {part(l['photo_part_haut'])}{'+' if l['au_moins'] else ' '} {part(l.get('hier_part_haut'))} {part(l.get('auj_part_haut'))}"
+                  f" | {part(l.get('photo_part_bas'))} {part(l.get('hier_part_bas'))} {part(l.get('auj_part_bas'))}")
+    for quand in QUAND:
+        deux = [l for l in lignes if l.get("photo_part_haut") is not None and l.get("hier_part_haut") is not None and l.get("auj_part_haut") is not None]
+        hauts = [max(0.0, l["photo_part_haut"] - l[f"{quand}_part_haut"]) if l["au_moins"] else abs(l[f"{quand}_part_haut"] - l["photo_part_haut"]) for l in deux]
+        bas = [abs(l[f"{quand}_part_bas"] - l["photo_part_bas"]) for l in deux if l.get("photo_part_bas") is not None]
+        print(f"{QUAND[quand]:12s}: écart moyen du HAUT {100 * np.mean(hauts) if hauts else float('nan'):.1f} % de la hauteur du mur "
               f"({len(hauts)} vues), du BAS {100 * np.mean(bas) if bas else float('nan'):.1f} % ({len(bas)} vues)")
     (sortie / "hauteur-baies-film.json").write_text(json.dumps(lignes, ensure_ascii=False, indent=1), encoding="utf-8")
     return 0

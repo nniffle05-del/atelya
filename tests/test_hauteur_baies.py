@@ -184,3 +184,15 @@ def test_une_baie_mesuree_est_la_menuiserie_son_dessin_n_a_plus_de_partie_pleine
     assert avant["soubassement"] > 0.1
     lg["ouvertures"][0].update(type="fenetre", allege=0.2, hauteur=2.0, source=f"{hb.MARQUE} lus sur 1 photo(s) du client)")
     assert dessin_fenetres.lire(lg, {"photos": {"p": [vitrage]}})["O1"]["soubassement"] == 0.0
+
+
+def test_la_tringle_jamais_mesuree_ne_se_colle_pas_au_plafond_au_dessus_d_une_fenetre_haute():
+    """Avant, une tringle non mesurée se tenait à 30 cm au moins au-dessus de la baie (« au cas où ») : au-dessus d'une fenêtre
+    mesurée haute elle montait contre le plafond. Le haut de la baie mesuré, 5 cm suffisent."""
+    from moteur import pans_rideaux as pr
+
+    assert pr.haut_du_tissu(None, 3.0, 0.0, 2.15) == pytest.approx(2.88)  # baie par défaut : 12 cm sous le plafond
+    assert pr.haut_du_tissu(None, 3.0, 0.0, 2.77) == pytest.approx(2.98)  # la règle d'avant, baie haute : contre le plafond
+    assert pr.haut_du_tissu(None, 3.0, 0.0, 2.77, haut_vu=True) == pytest.approx(2.88)
+    assert pr.haut_vu_sur_les_photos(f"{hb.MARQUE} lus sur 1 photo(s))") and pr.haut_vu_sur_les_photos("photos (haut de la baie lus…")
+    assert not pr.haut_vu_sur_les_photos("lecture_claude")

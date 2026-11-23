@@ -223,7 +223,7 @@ def fenetres_habillees(logement: dict) -> list[dict]:
         haut = float(m.get("hauteur") or hsp)
         allege, hauteur = float(o.get("allege", 0.0) or 0.0), float(o.get("hauteur", 2.1))
         sortie.append({"ouverture": o, "centre": c + n * ep / 2, "n": n, "t": u, "demi": float(o["largeur"]) / 2,
-                       "z_tringle": pans_rideaux.haut_du_tissu(r, haut, allege, hauteur)})
+                       "z_tringle": pans_rideaux.haut_du_tissu(r, haut, allege, hauteur, pans_rideaux.haut_vu_sur_les_photos(o.get("source")))})
     return sortie
 
 

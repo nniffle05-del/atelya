@@ -4,7 +4,8 @@
 #
 #     bash pc/verification/film_hauteur_baies.sh [hier] [app-004] [app-001] [mouvement]
 #
-# « hier » : les vues qui manquaient sur les maquettes de la veille (déjà importées : parquet001k, parquet004l), pour comparer.
+# « hier » : les vues qui manquaient sur les maquettes de la veille (parquet001k, parquet004l), pour comparer ; tournées le
+# 23/11/2026 AVANT que vues_lumiere.sh ne pointe sur les maquettes v11 : ne plus relancer cette variante telle quelle.
 # Entrée : les logements refaits par la chaîne (..\atelya\lectures-photos\hauteur-baies\chaine\<logement>\c\).
 # Sorties : maquettes ..\atelya\b2\film-contre-photos\app-004-v11-3d (niveau Unreal parquet004m) et app-001-v11-3d
 # (parquet001l) ; vues ..\atelya\b2\lumiere-film\hauteur-baies\<logement>\ et …\hauteur-baies-hier\ ; plans en mouvement
