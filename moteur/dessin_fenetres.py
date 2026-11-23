@@ -30,6 +30,7 @@ import statistics
 import cv2
 import numpy as np
 
+from moteur import hauteur_baies
 from moteur.vitrages import _sur_le_bord, points_du_sol
 
 VERSION = "0.1.0"
@@ -264,7 +265,9 @@ def lire(logement: dict, lecture: dict | None) -> dict[str, dict]:
         if o.get("type") == "porte" or o["id"] not in par_baie:
             continue
         largeur, hauteur = float(o["largeur"]), float(o["hauteur"])
-        au_sol = float(o.get("allege", 0.0) or 0.0) < ALLEGE_AU_SOL
+        # une baie dont le bas a été MESURÉ sur les photos (moteur/hauteur_baies.py, 23/11/2026) commence au bas de sa
+        # menuiserie : plus de partie pleine à compter dedans
+        au_sol = float(o.get("allege", 0.0) or 0.0) < ALLEGE_AU_SOL and not hauteur_baies.mesuree(o)
         vus = [(photo, d) for photo, fs in sorted(par_baie[o["id"]].items())
                if (d := d_une_photo(fs, largeur, hauteur, au_sol)) is not None]
         accord = accorder(vus)

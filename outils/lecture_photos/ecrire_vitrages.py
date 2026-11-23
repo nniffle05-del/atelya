@@ -38,7 +38,9 @@ def ecrire(cas: str) -> Path:
         a_lire = json.loads(liste.read_text(encoding="utf-8"))["a_lire"]
         tailles = {c["photo"]: tuple(c["taille"]) for c in a_lire}
         lues = {(photo, f["baie"]) for photo, fenetres in lecture["photos"].items() for f in fenetres}
-        defauts += [f"{c['photo']} {c['baie']} : fenêtre montrée mais pas lue" for c in a_lire if (c["photo"], c["baie"]) not in lues]
+        for c in a_lire:  # une fenêtre montrée et pas dite : la vue par elle reste comme avant (le trou du plan)
+            if (c["photo"], c["baie"]) not in lues:
+                print(f"  à noter : {c['photo']} {c['baie']} montrée mais pas lue" + (" (derrière un voilage)" if c.get("voilee") else ""), flush=True)
     defauts += vitrages.controler(lecture, tailles)
     if defauts:
         raise SystemExit(f"PLANTÉ : dessin des fenêtres de {cas} à corriger\n  " + "\n  ".join(defauts))

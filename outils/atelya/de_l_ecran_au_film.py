@@ -11,6 +11,8 @@ docs/projet/memoire/produit-livre-client.md, « LA SUITE DE LA CHAÎNE »). Ici 
       0. enveloppe moteur
 accorder_murs.fermer_les_fentes      → logement-depart.json (fentes entre bouts de murs refermées)
          baies     moteur/ouvertures_photos                             → les baies qui descendent jusqu'au sol, lues sur les photos
+                   (avec --lecture-photos : largeur des baies, leur bas et leur haut mesurés sur les photos — moteur/hauteur_baies —,
+                   dessin des fenêtres, ferronnerie)
       1. sols      outils\habillage\sols_photos.py logement         → logement-sols.json
       2. meubles   outils\habillage\reperer_meubles_photos.py       → logement-meuble.json
       3. maquette  python -m moteur.construire … --sans-images      → 3d\maquette.blend           (Blender)
@@ -198,8 +200,24 @@ def main() -> int:
             # F2 pièce 3 (20/11/2026) : le DESSIN de chaque fenêtre lu sur les photos (vantaux, petits bois, largeur du cadre,
             # partie pleine sous les vitres, garde-corps) est posé sur l'ouverture ; la maquette la construit ainsi
             # (moteur/dessin_fenetres.py). Après la sorte de baie : une baie qui descend au sol garde sa partie pleine.
-            from moteur import dessin_fenetres
+            from moteur import dessin_fenetres, hauteur_baies
             lecture_des_fenetres = json.loads((a.lecture_photos / "vitrages.json").read_text(encoding="utf-8"))
+            # LE BAS ET LE HAUT de chaque fenêtre mesurés sur les photos (moteur/hauteur_baies.py, 23/11/2026, accord de NT) : le
+            # plan n'en dit rien (hauteurs par défaut). Par les lignes lues (sol, tour de la menuiserie, plafond), contrôlées
+            # par le relief de la photo. Après la sorte de baie (que la mesure du bas précise), avant le dessin (posé en parts
+            # de la baie : la baie mesurée EST la menuiserie).
+            fiche_des_photos = json.loads(fiche.read_text(encoding="utf-8"))
+            a_mesurer = {p for p, fs in (lecture_des_fenetres.get("photos") or {}).items() if any(f.get("cadre") for f in fs)}
+            reperes, tailles = hauteur_baies.reperes_des_photos(fiche_des_photos, RACINE, float(logement.get("hauteur_sous_plafond", 2.5)),
+                                                                 noms=a_mesurer & set(fiche_des_photos.get("cameras", {})))
+            hauteurs = hauteur_baies.lire(logement, lecture_des_fenetres, reperes, tailles)
+            logement, rehaussees, doutes_hauteur = hauteur_baies.corriger(logement, hauteurs, journal=lambda s: dire("   " + s))
+            bilan["hauteur_des_baies"] = {"mesures": {b: {k: v for k, v in m.items() if k != "mesures"} for b, m in hauteurs.items()},
+                                          "par_photo": {b: [{k: v for k, v in p.items() if k != "points"} for p in m["mesures"]]
+                                                        for b, m in hauteurs.items()},
+                                          "changements": rehaussees, "doutes": doutes_hauteur}
+            dire(f"   {len(rehaussees)} baie(s) au bas ou au haut corrigés d'après les photos, {len(doutes_hauteur)} doute(s)")
+            del reperes
             logement, dessinees = dessin_fenetres.appliquer(logement, lecture_des_fenetres, journal=lambda s: dire("   dessin : " + s))
             bilan["dessin_des_fenetres"] = dessinees
             dire(f"   {len(dessinees)} fenêtre(s) dessinée(s) d'après les photos")

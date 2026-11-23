@@ -7,6 +7,10 @@ r"""LE DESSIN DES FENÊTRES, à faire lire (F2, 20/11/2026) : Atelya montre chaq
 place de l'appareil), écrit <sortie>/<photo>-<baie>.jpg : la photo recadrée autour de la fenêtre, agrandie, avec une RÈGLE
 graduée en pixels de la photo entière et un quadrillage léger tous les 25 pixels ; et <sortie>/liste.json (ce qu'il faut lire).
 La lecture rend le dessin de chaque fenêtre (moteur/vitrages.py : coins, montants, traverses, caches, vue).
+Depuis le 23/11/2026 (le bas et le haut des fenêtres, moteur/hauteur_baies.py), deux images de plus par fenêtre, au contraste
+renforcé (un plafond blanc contre un mur blanc ne se lit pas sans cela) : <photo>-<baie>-haut.jpg (du haut de la photo au haut
+de la fenêtre : la ligne du PLAFOND) et <photo>-<baie>-bas.jpg (du bas de la fenêtre au bas de la photo : la ligne du SOL) ;
+les fenêtres derrière un VOILAGE sont montrées aussi (« voilee » dans la liste : on n'en lit que le tour, le sol, le plafond).
 
 2e forme (« controle ») : dessine la lecture sur les mêmes images (VERT = les vitres nues gardées pour la vue, ROUGE = barres et
 caches écartés, trait JAUNE = le vitrage lu) : à REGARDER avant de s'en servir.
@@ -30,6 +34,8 @@ from moteur.images import ecrire_image, lire_image  # noqa: E402
 
 TROU_MIN = 3000  # pixels (photo de 1206 px de large) : en dessous la fenêtre est trop petite ou trop coupée pour être lue
 MARGE = 70  # pixels de la photo gardés autour du trou (la place de l'appareil est connue à 30-50 cm : le trou tombe à côté)
+MARGE_BANDE = 170  # … et de chaque côté dans les images du plafond et du sol (le pied du mur se voit souvent à côté d'un meuble)
+RECOUVRE_BANDE = 110  # ce que ces images gardent de la fenêtre (son haut, son bas : la fenêtre vraie n'a pas la hauteur du plan)
 QUADRILLAGE = 25
 COTE_VOULU = 1700  # le grand côté de l'image agrandie, en pixels
 
@@ -42,8 +48,9 @@ def photo_de(fiche: dict, base: Path, nom: str) -> Path | None:
     return next((dossier / m.format(nom=nom) for m in modeles if (dossier / m.format(nom=nom)).is_file()), None)
 
 
-def cadres(logement: dict, fiche: dict, base: Path) -> list[dict]:
-    """Chaque (photo, fenêtre claire) à lire : {photo, baie, chemin, cadre [x0, y0, x1, y1], trou (pixels)}."""
+def cadres(logement: dict, fiche: dict, base: Path, voilees: bool = False) -> list[dict]:
+    """Chaque (photo, fenêtre claire) à lire : {photo, baie, chemin, cadre [x0, y0, x1, y1], trou (pixels)} ; avec
+    `voilees`, les fenêtres derrière un voilage aussi (marquées "voilee")."""
     ouvertures = vue_dehors.ouvertures_vitrees(logement)
     murs = vue_dehors.murs_et_trous(logement)
     res = []
@@ -55,14 +62,18 @@ def cadres(logement: dict, fiche: dict, base: Path) -> list[dict]:
         h, w = image.shape[:2]
         cam = camera_photo.camera_depuis_dict(d["camera"])
         for o in ouvertures:
-            if o.get("voilee"):
+            if o.get("voilee") and not voilees:
                 continue
             _, trou = vue_dehors.masque_fenetres(cam, (w, h), [o], murs)
             if trou.sum() < TROU_MIN * (w / 1206.0) ** 2:
                 continue
             vs, us = np.nonzero(trou)
             m = int(round(MARGE * w / 1206.0))
+            mb, rb = int(round(MARGE_BANDE * w / 1206.0)), int(round(RECOUVRE_BANDE * w / 1206.0))
             res.append({"photo": nom, "baie": o["id"], "chemin": str(chemin), "trou": int(trou.sum()),
+                        **({"voilee": True} if o.get("voilee") else {}),
+                        "bandes": {"haut": [int(max(0, us.min() - mb)), 0, int(min(w, us.max() + mb)), int(min(h, vs.min() + rb))],
+                                   "bas": [int(max(0, us.min() - mb)), int(max(0, vs.max() - rb)), int(min(w, us.max() + mb)), h]},
                         "cadre": [int(max(0, us.min() - m)), int(max(0, vs.min() - m)), int(min(w, us.max() + m)), int(min(h, vs.max() + m))]})
     return res
 
@@ -108,17 +119,29 @@ def agrandir(image: np.ndarray, cadre: list[int], dessus=None) -> np.ndarray:
     return toile
 
 
+def contraste(image: np.ndarray) -> np.ndarray:
+    """La même image au contraste local renforcé : la ligne d'un plafond blanc contre un mur blanc devient lisible."""
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    lab[..., 0] = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8, 8)).apply(lab[..., 0])
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+
 def preparer(logement_json: Path, cameras_json: Path, sortie: Path) -> list[dict]:
     logement = json.loads(logement_json.read_text(encoding="utf-8"))
     fiche = json.loads(cameras_json.read_text(encoding="utf-8"))
     sortie.mkdir(parents=True, exist_ok=True)
-    liste = cadres(logement, fiche, cameras_json.parent)
+    liste = cadres(logement, fiche, cameras_json.parent, voilees=True)
     for c in liste:
         image = lire_image(c["chemin"])
         c["image"] = f"{c['photo']}-{vue_dehors.nom_de_fichier(c['baie'])}.jpg"
         c["taille"] = [int(image.shape[1]), int(image.shape[0])]
         ecrire_image(sortie / c["image"], agrandir(image, c["cadre"]))
-        print(f"{c['photo']} {c['baie']} : trou {c['trou']} px, cadre {c['cadre']} → {c['image']}", flush=True)
+        net = contraste(image)
+        for nom, bande in c["bandes"].items():  # le plafond et le sol du mur de la fenêtre, au contraste renforcé
+            if bande[3] - bande[1] >= 30:
+                ecrire_image(sortie / c["image"].replace(".jpg", f"-{nom}.jpg"), agrandir(net, bande))
+        print(f"{c['photo']} {c['baie']} : trou {c['trou']} px, cadre {c['cadre']} → {c['image']}"
+              + (" (derrière un voilage)" if c.get("voilee") else ""), flush=True)
     (sortie / "liste.json").write_text(json.dumps({"format": vitrages.FORMAT, "consigne": vitrages.consigne(),
                                                     "a_lire": [{k: v for k, v in c.items() if k != "chemin"} for c in liste]},
                                                    ensure_ascii=False, indent=1), encoding="utf-8")

@@ -40,20 +40,32 @@ la lecture peut dire en plus, sur UN des vitrages de la baie :
     menuiserie descend jusqu'au sol ou s'arrête au-dessus d'une partie pleine (allège basse, panneau) ;
   - `garde_corps` (déjà là : y de son bord haut à gauche et à droite du vitrage) et `genre_garde_corps` : « fer_forge »,
     « barreaudage », « verre » ou « lisses ».
+
+Depuis le 0.3 (23/11/2026 : le BAS et le HAUT de chaque fenêtre mesurés sur les photos, moteur/hauteur_baies.py) :
+  - `sol` peut être pris N'IMPORTE OÙ le long du pied du MUR de la fenêtre (à côté d'un meuble qui cache le dessous) ;
+  - `plafond` : un ou deux points [x, y] de la ligne où ce même mur touche le PLAFOND (sous une corniche : le milieu de la
+    corniche) ;
+  - `vue` : « voilee » pour une fenêtre derrière un voilage, dont on ne dit que le TOUR vu à travers le tissu (`cadre`, sans
+    `coins`), le `sol` et le `plafond` : elle ne dit rien de la vue (ce sont les rideaux du logement qui en décident) ;
+  - quand un bord du tour n'est pas VU : `haut_au_moins` (vrai : le haut du `cadre` est le plus haut endroit où l'on voit la
+    fenêtre, elle monte au moins jusque-là : son vrai haut est derrière le haut du tissu) et `bas_cache` (vrai : le bas du
+    `cadre` n'est pas le bas de la fenêtre, on ne le voit pas) ;
+  - « tour seul » : une fenêtre claire dont on ne dit que `cadre`, `sol`, `plafond` (ni `coins` ni `vue`) : sa hauteur est
+    mesurée, sa vue et son dessin restent comme avant (lecture à compléter).
 """
 from __future__ import annotations
 
 import cv2
 import numpy as np
 
-VERSION = "0.2.0"
-FORMAT = "vitrages-photos/0.2"
-FORMATS = ("vitrages-photos/0.1", FORMAT)
+VERSION = "0.3.0"
+FORMAT = "vitrages-photos/0.3"
+FORMATS = ("vitrages-photos/0.1", "vitrages-photos/0.2", FORMAT)
 GENRES_GARDE_CORPS = ("fer_forge", "barreaudage", "verre", "lisses")
 MARGE_PX = 4.0  # les vitres sont rétrécies d'autant, et les barres élargies (lecture à 2-3 pixels près ; photo de 1206 px de large)
 AUTOUR_DES_BARRES = 3.0  # pixels comblés en plus de chaque côté d'une barre (son bord flou sur la photo)
 ENTRE_VANTAUX_MAX = 45.0  # pixels : le battement entre deux vantaux est comblé s'il est plus mince (au-delà : un trumeau, un mur)
-VUES = ("oui", "non", "lueur")
+VUES = ("oui", "non", "lueur", "voilee")
 
 
 def consigne() -> str:
@@ -79,7 +91,15 @@ def consigne() -> str:
         "- cadre : les quatre coins du TOUR de la menuiserie entière (le bord extérieur de son cadre, là où elle touche le mur "
         "ou son encadrement), même ordre que les coins ; un côté caché (rideau) est estimé d'après l'autre côté. Ne pas le dire "
         "si la fenêtre sort de la photo.\n"
-        "- sol : si on la voit, un ou deux points [x, y] de la ligne où le mur SOUS la fenêtre touche le sol.\n"
+        "- sol : un ou deux points [x, y] de la ligne où le MUR de la fenêtre touche le sol : sous la fenêtre, ou plus loin "
+        "le long du même mur si un meuble cache le dessous. Ne rien dire si on ne voit nulle part le pied de ce mur.\n"
+        "- plafond : un ou deux points [x, y] de la ligne où ce même mur touche le plafond (s'il y a une corniche : le milieu "
+        "de la corniche). Ne rien dire si le plafond est hors de la photo, ou si la fenêtre est sous une retombée (un "
+        "coffre, une poutre) qui avance devant le mur.\n"
+        "Une fenêtre derrière un VOILAGE : vue « voilee », et seulement « cadre » (le tour de la menuiserie, si on le voit "
+        "à travers le tissu ; sinon dire seulement vue « voilee »), « sol » et « plafond » ; si le haut de la menuiserie est caché "
+        "par le haut du tissu, mettre le haut du cadre au plus haut endroit où l'on voit la fenêtre et dire « haut_au_moins » ; "
+        "si son bas est caché, dire « bas_cache ».\n"
         "Un vantail que l'on voit mais qui ne montre pas le dehors (toile, bout de balcon) est dit quand même, avec un cache "
         "qui le couvre : il compte dans le dessin de la fenêtre."
     )
@@ -104,7 +124,8 @@ def controler(lecture: dict, tailles: dict[str, tuple[int, int]] | None = None, 
                 defauts.append(f"{ou} : baie inconnue du logement")
             if f.get("vue", "oui") not in VUES:
                 defauts.append(f"{ou} : vue {f.get('vue')!r} (attendu : {', '.join(VUES)})")
-            if f.get("vue", "oui") != "oui" and not f.get("coins"):
+            if not f.get("coins") and (f.get("vue", "oui") != "oui" or (f.get("cadre") and "vue" not in f)):
+                defauts += _defauts_du_tour(f, ou)  # pas de vitrage dit : seulement son tour (sa hauteur), ou rien
                 continue
             coins = f.get("coins")
             if not (isinstance(coins, list) and len(coins) == 4 and all(len(c) == 2 for c in coins)):
@@ -144,17 +165,34 @@ def controler(lecture: dict, tailles: dict[str, tuple[int, int]] | None = None, 
                     elif (min(hg[0], bg[0]) < min(chg[0], cbg[0]) - 3 or max(hd[0], bd[0]) > max(chd[0], cbd[0]) + 3
                           or min(hg[1], hd[1]) < min(chg[1], chd[1]) - 3 or max(bg[1], bd[1]) > max(cbg[1], cbd[1]) + 3):
                         defauts.append(f"{ou} : le vitrage sort de son « cadre »")
-            sol = f.get("sol")
-            if sol is not None and not points_du_sol(sol):
-                defauts.append(f"{ou} : « sol » : attendu [x, y] ou [[x, y], [x, y]]")
-            if sol is not None and cadre is None:
-                defauts.append(f"{ou} : « sol » sans « cadre »")
+            defauts += _defauts_du_tour(f, ou, cadre_deja_vu=True)
             gc = f.get("garde_corps")
             if gc is not None and not (isinstance(gc, list) and len(gc) == 2 and all(isinstance(v, (int, float)) for v in gc)
                                        and min(hg[1], hd[1]) - 5 <= min(gc) and max(gc) <= max(bg[1], bd[1]) + 5):
                 defauts.append(f"{ou} : « garde_corps » {gc} : attendu [y à gauche, y à droite], dans le vitrage")
             if f.get("genre_garde_corps") is not None and f["genre_garde_corps"] not in GENRES_GARDE_CORPS:
                 defauts.append(f"{ou} : genre de garde-corps {f['genre_garde_corps']!r} (attendu : {', '.join(GENRES_GARDE_CORPS)})")
+    return defauts
+
+
+def _defauts_du_tour(f: dict, ou: str, cadre_deja_vu: bool = False) -> list[str]:
+    """Les défauts du tour (`cadre`), du `sol` et du `plafond` d'une fenêtre lue : coins dans l'ordre, points bien écrits."""
+    defauts = []
+    cadre = f.get("cadre")
+    if cadre is not None and not cadre_deja_vu:
+        if not (isinstance(cadre, list) and len(cadre) == 4 and all(len(c) == 2 for c in cadre)):
+            defauts.append(f"{ou} : « cadre » : il faut 4 coins [x, y]")
+        else:
+            (chg, chd, cbd, cbg) = [np.array(c, float) for c in cadre]
+            if not (chg[0] < chd[0] and cbg[0] < cbd[0] and chg[1] < cbg[1] and chd[1] < cbd[1]):
+                defauts.append(f"{ou} : « cadre » : coins dans le désordre")
+    for nom in ("sol", "plafond"):
+        if f.get(nom) is None:
+            continue
+        if not points_du_sol(f[nom]):
+            defauts.append(f"{ou} : « {nom} » : attendu [x, y] ou [[x, y], [x, y]]")
+        elif cadre is None:
+            defauts.append(f"{ou} : « {nom} » sans « cadre »")
     return defauts
 
 
@@ -286,6 +324,8 @@ def d_une_photo(lecture: dict | None, photo: str, taille: tuple[int, int]) -> di
     res: dict[str, dict] = {}
     vantaux: dict[str, list[dict]] = {}
     for f in ((lecture or {}).get("photos") or {}).get(photo) or []:
+        if f.get("vue") == "voilee" or (not f.get("coins") and "vue" not in f):
+            continue  # derrière un voilage, ou « tour seul » : la lecture ne dit que sa hauteur, rien sur la vue
         nues, entier = vitres_nues(f, taille), masque_du_vitrage(f, taille)
         if f["baie"] in res:  # un autre vantail de la même fenêtre
             res[f["baie"]]["vitres"] |= nues
