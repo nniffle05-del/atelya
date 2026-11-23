@@ -1188,7 +1188,7 @@ Demande de NT (20/11/2026) : « F2 PIÈCE 3 : montants, petits bois et garde-cor
 - **SUITE (ordre de NT, après sa validation)** : (b) largeur de chaque pan de rideau et tiré / ouvert ; puis (c) tringle, (d) matière, (e) juge chiffré, (f) plans en mouvement. À proposer : le bas et le haut des fenêtres d'après les photos, la couleur des menuiseries, la finesse du fer, un motif de secours.
 - **VALIDÉE PAR NT le 21/11/2026** (« Oui » au compte rendu, qui disait les défauts restants : fer trop épais, petits « X » entre deux modules, motif un peu large, frise simplifiée, un seul logement à ferronnerie). La pièce 3 de F2 est donc close. Prochaine conversation : étape (b), la largeur de chaque pan de rideau et tiré / ouvert (plan détaillé au § 5 de `CLAUDE.md`, paragraphe « PROCHAINE CONVERSATION »).
 
-## Les rideaux, 2e temps, étape (b) : la largeur de chaque pan, et tiré ou ouvert (22-23/11/2026, branche `etape-app-004`, rien dans `main`)
+## Les rideaux, 2e temps, étape (b) : la largeur de chaque pan, et tiré ou ouvert (22-23/11/2026, branche `etape-app-004`, rien dans `main` ; VALIDÉE PAR NT le 23/11/2026 : « Oui, vas-y »)
 
 - **Pourquoi** : dans le film, un pan de rideau épais faisait toujours 45 cm, à cheval sur le bord de la fenêtre (30 cm devant, 15 cm sur le mur). Les photos montrent autre chose : sur app-004 un pan de ~25-40 cm ramassé À CÔTÉ de la fenêtre (le pan de 45 cm cachait un vantail et la ferronnerie construite la veille, et prenait du jour) ; dans les chambres d'app-001 deux grands pans de 60 à 95 cm, à demi tirés devant la baie.
 - **Ce qui est fait, par défaut dans la pose d'après la lecture des photos** (option `--lecture-photos`, toujours éteinte par défaut) :
