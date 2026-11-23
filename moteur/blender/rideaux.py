@@ -7,18 +7,22 @@ largeur ; le pas des plis reste le vrai. Sans la collection : l'ancienne surface
 - Voilage : un seul pan sur toute la largeur de la fenêtre (+ 15 cm de chaque côté), tissu fin et clair qui LAISSE PASSER la
   lumière en la diffusant (mélange « translucide » + « transparent ») : c'est ce qui donne la lumière douce des photos d'annonce.
 - Rideaux : deux pans épais, ouverts sur les côtés (chacun couvre 45 cm, à cheval sur le bord de la fenêtre), tissu mat ;
-  depuis le 19/11/2026, UN seul pan (et de quel côté) quand les photos n'en montrent qu'un (« pans »).
+  depuis le 19/11/2026, UN seul pan (et de quel côté) quand les photos n'en montrent qu'un (« pans ») ; depuis le 22/11/2026,
+  chaque pan à la LARGEUR et à la PLACE vues sur les photos, ramassé sur le côté ou tiré (moteur/pans_rideaux.py).
 Repère : milieu de la fenêtre sur la face intérieure du mur ; x le long du mur, y vers l'intérieur de la pièce.
 """
 import math
-import zlib
+import sys
 from pathlib import Path
 
 import bpy
 
+sys.path.insert(0, str(Path(__file__).parent))
+import tissus  # noqa: E402 : le calcul des nappes, sans Blender
+
 ECART_VOILAGE, ECART_RIDEAUX = 0.10, 0.16  # distance au mur (m)
-PAS_PLIS = {"voilage": 0.10, "rideaux": 0.16}
-AMPLITUDE = {"voilage": 0.022, "rideaux": 0.04}
+PAS_PLIS = {"voilage": 0.10, "rideaux": 0.16, "rideaux_tires": 0.16}
+AMPLITUDE = {"voilage": 0.022, "rideaux": 0.04, "rideaux_tires": 0.04}
 
 
 def lineaire(rgb255):
@@ -58,50 +62,17 @@ def materiau_rideaux(rgb):
     return m
 
 
-COLLECTION = Path(__file__).resolve().parents[1] / "modeles" / "rideaux"
-# la bande de la collection pour chaque nappe, et la demi-profondeur gardée pour ses plis (les mêmes que moteur/collisions.py :
-# PLIS_VOILAGE, PLIS_RIDEAUX ; la bande calculée est plus profonde, on l'aplatit pour que rien ne touche le mur ni un meuble)
-BANDES = {"voilage": ("voilage", 0.03), "rideaux": ("rideau_ouvert", 0.05), "rideaux_tires": ("rideau", 0.05)}
-_bandes = {}
-
-
-def bande(sorte):
-    """La bande calculée d'une sorte : (points lignes × colonnes × 3, abscisses sur le tissu à plat, hauteur) ; None sans collection."""
-    nom = BANDES.get(sorte, (None,))[0]
-    if nom not in _bandes:
-        chemin = COLLECTION / f"{nom}.npz"
-        try:
-            import numpy as np
-            d = np.load(str(chemin))
-            _bandes[nom] = (d["points"].astype("float32"), d["tissu"].astype("float32"), float(d["hauteur"]))
-        except Exception:  # noqa: BLE001 : collection absente ou illisible : l'ancienne surface ondulée
-            _bandes[nom] = None
-    return _bandes[nom]
-
-
-def pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection):
-    """Un pan découpé dans la bande calculée de sa sorte : de x0 à x1 le long du mur, à la distance y du mur, de z0 à z1.
-    L'endroit de la bande dépend du nom du pan (toujours le même pour un même pan, différent d'une fenêtre à l'autre).
-    Renvoie None si la collection manque."""
-    b = bande(sorte)
-    if b is None:
-        return None
+def pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection, derriere=None):
+    """Un pan découpé dans la bande calculée de sa sorte (tissus.nappe) : de x0 à x1 le long du mur, à la distance y du mur,
+    de z0 à z1. `derriere` : la nappe du voilage de la même fenêtre : le rideau ne passe jamais derrière elle
+    (tissus.passer_devant). Renvoie (objet, nappe) ; (None, None) si la collection manque."""
+    n = tissus.nappe(nom, x0, x1, y, z0, z1, sorte)
+    if n is None:
+        return None, None
+    if derriere is not None:
+        tissus.passer_devant(n, derriere)
     import numpy as np
-    points, tissu, hauteur = b
-    tringle = points[0, :, 0]
-    largeur, dispo = x1 - x0, float(tringle.max() - tringle.min())
-    echelle = max(1.0, largeur / (dispo - 0.02))  # un pan plus large que la bande : étiré (jamais vu : bande de 4 m)
-    besoin = largeur / echelle
-    depart = float(tringle.min()) + (zlib.crc32(nom.encode("utf-8")) % 1000) / 1000.0 * max(0.0, dispo - besoin)
-    cols = np.nonzero((tringle >= depart) & (tringle <= depart + besoin))[0]
-    if len(cols) < 4:
-        return None
-    p = points[:, cols[0]:cols[-1] + 1, :]
-    demi = BANDES[sorte][1]
-    profondeur = max(float(np.abs(p[..., 1] - np.median(p[..., 1])).max()), 1e-6)
-    x = x0 + (p[..., 0] - depart) * echelle
-    yy = y + (p[..., 1] - np.median(p[..., 1])) * min(1.0, demi / profondeur)
-    z = z0 + p[..., 2] * ((z1 - z0) / hauteur)
+    x, yy, z = n["x"], n["y"], n["z"]
     lignes, colonnes = x.shape
     sommets = np.stack([x, yy, z], -1).reshape(-1, 3).tolist()
     faces = [(i * colonnes + j, i * colonnes + j + 1, (i + 1) * colonnes + j + 1, (i + 1) * colonnes + j)
@@ -111,7 +82,7 @@ def pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection):
     me.update()
     # placage du tissu À PLAT, en mètres (u le long du tissu, v la hauteur) : un tissage posé dessus n'est pas étiré par les plis
     uv = me.uv_layers.new(name="tissu")
-    u = (tissu[cols[0]:cols[-1] + 1] - tissu[cols[0]]) * echelle
+    u = n["u"]
     v = z - z0
     for boucle in me.loops:
         i, j = divmod(boucle.vertex_index, colonnes)
@@ -122,7 +93,7 @@ def pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection):
     o = bpy.data.objects.new(nom, me)
     o.parent = parent
     collection.objects.link(o)
-    return o
+    return o, n
 
 
 def materiau_tringle():
@@ -167,12 +138,13 @@ def tringle(nom, x0, x1, y, z, parent, collection, rayon=0.011, cotes=10):
     return o
 
 
-def pan(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection):
+def pan(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection, derriere=None):
     """Un pan de tissu de x0 à x1 (le long du mur), à la distance y du mur, de z0 à z1 : découpé dans la collection calculée
-    (pan_calcule) ; sans elle, l'ancienne surface ondulée."""
-    o = pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection)
+    (pan_calcule) ; sans elle, l'ancienne surface ondulée. `derriere` : la nappe du voilage, que le pan ne traverse pas.
+    Renvoie la nappe calculée (None avec l'ancienne surface)."""
+    o, nappe = pan_calcule(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection, derriere)
     if o is not None:
-        return o
+        return nappe
     pas, amp = PAS_PLIS[sorte], AMPLITUDE[sorte]
     n = max(2, int((x1 - x0) / 0.01))
     sommets, faces = [], []
@@ -192,7 +164,7 @@ def pan(nom, x0, x1, y, z0, z1, sorte, materiau, parent, collection):
     o = bpy.data.objects.new(nom, me)
     o.parent = parent
     collection.objects.link(o)
-    return o
+    return None
 
 
 def poser_rideaux(scene, rideaux: list[dict]) -> int:
@@ -212,18 +184,28 @@ def poser_rideaux(scene, rideaux: list[dict]) -> int:
         ecart_voilage = r.get("ecart") or ECART_VOILAGE
         ecart_rideaux = ecart_voilage + (ECART_RIDEAUX - ECART_VOILAGE) if r.get("ecart") else ECART_RIDEAUX
         bas = r.get("bas") or 0.01
+        # les pans de rideaux épais : un de chaque côté, ou les seuls pans vus sur les photos ; depuis le 22/11/2026 chacun a
+        # SA largeur, SA place et SON état (moteur.habillage.rideaux_du_plan : « cote » −1 / +1, « x0 » et « x1 » = ses bords
+        # intérieur et extérieur depuis le milieu de la fenêtre, « etat »). Un simple −1 / +1 : l'ancien pan de 45 cm.
+        pans = []
+        if r.get("rideaux"):
+            for p in r.get("pans") or (-1, 1):
+                if not isinstance(p, dict):
+                    p = {"cote": p, "x0": demi - 0.30, "x1": demi + 0.15, "etat": "ouvert"}
+                pans.append(p)
         # la tringle : au-dessus du tissu, à la distance du pan le plus loin du mur, 8 cm plus large que lui de chaque côté
-        tringle(f"Tringle_{r['id']}", -demi - 0.23, demi + 0.23, ecart_rideaux if r.get("rideaux") else ecart_voilage,
+        bouts = {cote: max([demi + 0.23] + [p["x1"] + 0.08 for p in pans if p["cote"] == cote]) for cote in (-1, 1)}
+        tringle(f"Tringle_{r['id']}", -bouts[-1], bouts[1], ecart_rideaux if r.get("rideaux") else ecart_voilage,
                 haut + 0.012, racine, collection)
+        voilage = None
         if r.get("voilage"):
-            pan(f"Voilage_{r['id']}", -demi - 0.15, demi + 0.15, ecart_voilage, bas, haut, "voilage",
-                materiau_voilage(r["voilage"]), racine, collection)
+            voilage = pan(f"Voilage_{r['id']}", -demi - 0.15, demi + 0.15, ecart_voilage, bas, haut, "voilage",
+                          materiau_voilage(r["voilage"]), racine, collection)
         if r.get("rideaux"):
             mat = materiau_rideaux(r["rideaux"])
-            # un pan de chaque côté, ou les seuls pans vus sur les photos (« pans » : −1 et/ou +1, moteur.habillage.rideaux_du_plan)
-            for cote in r.get("pans") or (-1, 1):
-                bord = cote * (demi + 0.15)
-                x0, x1 = sorted((bord, bord - cote * 0.45))
-                pan(f"Rideau_{r['id']}_{'g' if cote < 0 else 'd'}", x0, x1, ecart_rideaux, bas, haut, "rideaux", mat, racine,
-                    collection)
+            for p in pans:
+                x0, x1 = sorted((p["cote"] * p["x0"], p["cote"] * p["x1"]))
+                # ramassé sur le côté : plis serrés ; tiré devant la fenêtre : plis larges (deux bandes de la collection)
+                pan(f"Rideau_{r['id']}_{'g' if p['cote'] < 0 else 'd'}", x0, x1, ecart_rideaux, bas, haut,
+                    "rideaux_tires" if p.get("etat") == "tire" else "rideaux", mat, racine, collection, derriere=voilage)
     return len(rideaux)

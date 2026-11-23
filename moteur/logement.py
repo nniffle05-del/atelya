@@ -78,11 +78,19 @@ Couleur = tuple[Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, 
 
 class PanDeRideau(BaseModel):
     """Un pan de rideau épais (19/11/2026) : de quel côté de la fenêtre il pend. « debut » = le bord de la fenêtre le plus
-    proche du début de son mur, « fin » = l'autre (comme les gonds d'une porte, SensPorte)."""
+    proche du début de son mur, « fin » = l'autre (comme les gonds d'une porte, SensPorte). Depuis le 22/11/2026, ce que les
+    photos en mesurent : sa largeur, la part qui pend devant la baie, et s'il est ramassé sur le côté ou tiré
+    (moteur/pans_rideaux.py ; sans mesure : 45 cm, dont 30 devant la baie, ouvert)."""
 
     model_config = ConfigDict(extra="forbid")
 
     cote: Literal["debut", "fin"]
+    largeur: Annotated[float, Field(gt=0, le=6)] | None = Field(default=None, description="Largeur du pan le long du mur (m), vue sur les photos.")
+    recouvre: Annotated[float, Field(ge=0, le=6)] | None = Field(
+        default=None, description="Part de la largeur qui pend DEVANT la baie, depuis le bord de la baie du côté du pan (m) ; le "
+                                  "reste pend sur le mur, à côté de la fenêtre.")
+    etat: Literal["ouvert", "tire"] | None = Field(
+        default=None, description="« ouvert » : ramassé sur le côté (plis serrés) ; « tire » : déployé devant la fenêtre (plis larges).")
 
 
 class Rideaux(BaseModel):

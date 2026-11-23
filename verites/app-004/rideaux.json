@@ -1,12 +1,53 @@
 {
- "schema": "verite-rideaux/0.1",
+ "schema": "verite-rideaux/0.2",
  "releve": "à la main, d'après les photos du client, le 19/11/2026 (Claude ; à faire confirmer par NT). « gauche » et « droite » : vu de la pièce, face à la fenêtre.",
  "fenetres": {
-  "O6": {"piece": "séjour", "voilage": false, "rideaux": true, "pans": ["gauche"],
-         "photos": ["photo-01", "photo-04", "photo-07"],
-         "note": "un seul pan beige, à gauche ; la tringle traverse toute la fenêtre, rien à droite"},
-  "O7": {"piece": "chambre", "voilage": false, "rideaux": true, "pans": ["droite"],
-         "photos": ["photo-04", "photo-09", "photo-10", "photo-12", "photo-13"],
-         "note": "un seul pan gris, à droite ; rien à gauche (photos 09 et 10)"}
- }
+  "O6": {
+   "piece": "séjour",
+   "voilage": false,
+   "rideaux": true,
+   "pans": [
+    "gauche"
+   ],
+   "photos": [
+    "photo-01",
+    "photo-04",
+    "photo-07"
+   ],
+   "note": "un seul pan beige, à gauche ; la tringle traverse toute la fenêtre, rien à droite",
+   "mesures": {
+    "gauche": {
+     "largeur_part": 0.23,
+     "devant_part": 0.03,
+     "etat": "ouvert",
+     "note": "photo-01 : 36 px pour une fenêtre de 166 px (pan plus loin) ; photo-07 : 50 px pour 198 px (pan plus près) ; il pend à côté de la fenêtre et ne cache que le bord du cadre"
+    }
+   }
+  },
+  "O7": {
+   "piece": "chambre",
+   "voilage": false,
+   "rideaux": true,
+   "pans": [
+    "droite"
+   ],
+   "photos": [
+    "photo-04",
+    "photo-09",
+    "photo-10",
+    "photo-12",
+    "photo-13"
+   ],
+   "note": "un seul pan gris, à droite ; rien à gauche (photos 09 et 10)",
+   "mesures": {
+    "droite": {
+     "largeur_part": 0.33,
+     "devant_part": 0.06,
+     "etat": "ouvert",
+     "note": "pan froncé en haut, évasé en bas : photo-10, 42 à 56 px pour une fenêtre de 180 px (pan plus loin) ; photo-09, 50 à 71 px pour 155 px (pan plus près) ; il mord un peu sur le cadre"
+    }
+   }
+  }
+ },
+ "mesures": "22/11/2026 (Claude ; à faire confirmer par NT) : largeur de chaque pan en PART de la largeur de sa fenêtre (cadre compris), prise à la règle sur les photos, à mi-hauteur du pan ; deux photos prises de côtés opposés sont moyennées (le pan paraît plus large que nature quand il est plus près de l'appareil que la fenêtre, plus étroit quand il est plus loin). « devant_part » : part de la largeur de la fenêtre que le pan cache. « etat » : ouvert = ramassé sur le côté ; tire = déployé."
 }

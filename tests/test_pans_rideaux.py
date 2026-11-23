@@ -31,6 +31,11 @@ def vue(cam, baie: dict, s0: float, s1: float, photo: int = 0, fenetre: tuple | 
             "baies_vues": [boite(cam, baie, *fenetre, z0=0.0, z1=2.15)] if fenetre else []}
 
 
+def cotes(rideaux: dict) -> list[str]:
+    """Les côtés des pans retenus pour une fenêtre (sans leurs mesures : tests/test_largeur_pans.py)."""
+    return [p["cote"] for p in rideaux.get("pans") or []]
+
+
 def baie_du_logement(lg: dict, ident: str = "baie") -> dict:
     return eq.repere_de_la_baie(next(o for o in lg["ouvertures"] if o["id"] == ident), lg)
 
@@ -43,7 +48,7 @@ def test_un_seul_pan_vu_contre_sa_fenetre_et_de_quel_cote():
     vues = [vue(cam, baie, 0.55, 0.85, photo=0, fenetre=(-0.6, 0.6)), vue(appareil(5.0, 1.0, 10.0), baie, 0.55, 0.85, photo=1, fenetre=(-0.6, 0.6))]
     assert vues[0]["boite"][0] < vues[0]["baies_vues"][0][0]  # vu de la pièce, le côté « fin » de ce mur est à GAUCHE de l'image
     r = eq.rideaux_des_fenetres(vues, lg)
-    assert r["baie"]["pans"] == [{"cote": "fin"}]
+    assert cotes(r["baie"]) == ["fin"]
     assert vues[0]["pan"]["par"] == "image" and vues[0]["pan"]["autre_cote_visible"]
 
 
@@ -52,7 +57,7 @@ def test_deux_rectangles_sur_une_photo_sont_les_deux_pans():
     baie = baie_du_logement(lg)
     cam = appareil(5.0, 1.5, 0.0)
     r = eq.rideaux_des_fenetres([vue(cam, baie, 0.5, 0.95), vue(cam, baie, -0.95, -0.5)], lg)
-    assert r["baie"]["pans"] == [{"cote": "debut"}, {"cote": "fin"}]
+    assert cotes(r["baie"]) == ["debut", "fin"]
 
 
 def test_un_pan_dont_l_autre_cote_est_hors_du_cadre_ne_prouve_rien():
@@ -64,7 +69,8 @@ def test_un_pan_dont_l_autre_cote_est_hors_du_cadre_ne_prouve_rien():
     v = vue(cam, baie, 0.55, 0.85, fenetre=(-0.6, 0.6))
     v["baies_vues"][0][2] = float(LARGEUR)  # la fenêtre est coupée par le bord droit de l'image
     r = eq.rideaux_des_fenetres([v], lg)
-    assert "pans" not in r["baie"] and not v["pan"]["autre_cote_visible"]
+    # (depuis le 22/11/2026 la largeur vue vaut pour les deux pans : le NOMBRE reste deux, comme sans preuve)
+    assert cotes(r["baie"]) == ["debut", "fin"] and not v["pan"]["autre_cote_visible"]
 
 
 def test_sans_fenetre_lue_le_cote_se_mesure_sur_le_mur_du_plan():
@@ -72,7 +78,7 @@ def test_sans_fenetre_lue_le_cote_se_mesure_sur_le_mur_du_plan():
     baie = baie_du_logement(lg)
     v = vue(appareil(5.0, 1.5, 0.0), baie, -0.9, -0.55)
     r = eq.rideaux_des_fenetres([v], lg)
-    assert r["baie"]["pans"] == [{"cote": "debut"}] and v["pan"]["par"] == "mur"
+    assert cotes(r["baie"]) == ["debut"] and v["pan"]["par"] == "mur"
     assert abs(v["pan"]["s"][0] + 0.9) < 0.02 and abs(v["pan"]["s"][1] + 0.55) < 0.02
 
 
@@ -95,7 +101,7 @@ def test_l_image_fait_foi_contre_le_mur_du_plan():
     cam = appareil(5.5, 1.5, 0.0)
     fausse = vue(appareil(5.2, 1.4, 0.0), baie, -0.9, -0.6, photo=2)
     r = eq.rideaux_des_fenetres([vue(cam, baie, 0.55, 0.85, photo=0, fenetre=(-0.6, 0.6)), fausse], lg)
-    assert r["baie"]["pans"] == [{"cote": "fin"}]
+    assert cotes(r["baie"]) == ["fin"]
 
 
 def test_le_pan_est_construit_et_controle_du_bon_cote():
@@ -110,12 +116,12 @@ def test_le_pan_est_construit_et_controle_du_bon_cote():
         baie = baie_du_logement(lg, r["id"])
         n = np.array([np.cos(np.radians(r["normale_deg"])), np.sin(np.radians(r["normale_deg"]))])
         x_local = np.array([n[1], -n[0]])  # l'axe x que Blender donne à la fenêtre (moteur/blender/rideaux.py)
-        assert len(r["pans"]) == 1 and float(x_local @ baie["t"]) * r["pans"][0] > 0
+        assert len(r["pans"]) == 1 and float(x_local @ baie["t"]) * r["pans"][0]["cote"] > 0
     for f in co.fenetres_habillees(lg):
         (nappe,) = co.nappes(f)
         assert float((nappe["rect"].c - f["centre"]) @ f["t"]) > 0.3
     for o in lg["ouvertures"]:
         if o.get("rideaux"):
             del o["rideaux"]["pans"]
-    assert all(r["pans"] == [-1, 1] for r in rideaux_du_plan(Logement.model_validate(lg)))
+    assert all([p["cote"] for p in r["pans"]] == [-1, 1] for r in rideaux_du_plan(Logement.model_validate(lg)))
     assert all(len(co.nappes(f)) == 2 for f in co.fenetres_habillees(lg))

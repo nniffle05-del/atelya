@@ -40,6 +40,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from moteur import pans_rideaux
+
 VERSION = "0.1.0"
 EPS = 0.005  # m : deux boîtes qui se pénètrent de moins de 5 mm ne se touchent pas
 EPS_Z = 0.01  # m : … ni deux objets dont les hauteurs se recouvrent de moins de 1 cm
@@ -65,7 +67,8 @@ GLISSE_LEGER = 1.2  # m : jusqu'où on leur cherche une place quand ils n'en ont
 # largeur minimale (m) à laquelle un objet accroché fait de modules peut être réduit pour tenir sur son mur ; les autres : 75 % de la leur
 MODULE_MIN = {"meuble_cuisine_haut": 0.45, "etagere_murale": 0.4}
 # rideaux (moteur/blender/rideaux.py) : distance au mur de la nappe, demi-épaisseur de ses plis, débord de chaque côté
-ECART_VOILAGE, ECART_RIDEAUX, PLIS_VOILAGE, PLIS_RIDEAUX, DEBORD_RIDEAUX, PAN_RIDEAUX = 0.10, 0.16, 0.03, 0.05, 0.15, 0.45
+ECART_VOILAGE, ECART_RIDEAUX, PLIS_VOILAGE, PLIS_RIDEAUX = 0.10, 0.16, 0.03, 0.05
+DEBORD_RIDEAUX, PAN_RIDEAUX = pans_rideaux.DEBORD_RIDEAUX, pans_rideaux.PAN_RIDEAUX
 ECART_MAX = 0.40  # au-delà, le rideau n'est plus un rideau : il est retiré
 RIDEAU_MIN = 0.6  # m de tissu qu'il doit rester sous la tringle quand le rideau s'arrête au-dessus d'un objet
 
@@ -239,11 +242,46 @@ def nappes(fenetre: dict) -> list[dict]:
     if r.get("rideaux"):
         e = float(ecart) + (ECART_RIDEAUX - ECART_VOILAGE) if ecart else ECART_RIDEAUX
         # un pan de chaque côté, ou les seuls pans vus sur les photos (`pans` ; t va du début vers la fin du mur)
-        for cote in sorted({1 if p["cote"] == "fin" else -1 for p in r["pans"]}) if r.get("pans") else (-1, 1):
-            milieu = cote * (demi + DEBORD_RIDEAUX - PAN_RIDEAUX / 2)
-            sortie.append({"id": f"rideau de {ident}", "rect": Rect(c + t * milieu + n * e, t, n, PAN_RIDEAUX / 2, PLIS_RIDEAUX),
+        # (22/11/2026 : chacun à sa largeur et à sa place, moteur/pans_rideaux.py, la même règle que la maquette)
+        for cote, pan in pans_rideaux.cotes(r.get("pans")):
+            interieur, exterieur = pans_rideaux.etendue(demi, pan)
+            sortie.append({"id": f"rideau de {ident}", "cote": cote, "pan": pan,
+                           "rect": Rect(c + t * (cote * (interieur + exterieur) / 2) + n * e, t, n, (exterieur - interieur) / 2, PLIS_RIDEAUX),
                            "z": (bas, fenetre["z_tringle"])})
     return sortie
+
+
+def resserrer_les_pans(fenetre: dict, rideaux: dict, objets: list[dict], hauteurs) -> bool:
+    """Un pan de rideau épais qu'un objet fixe pénètre se resserre (22/11/2026) : il s'arrête avant l'objet quand celui-ci est
+    à son bout extérieur, il commence après quand l'objet est du côté de la fenêtre, tant qu'il lui reste PAN_MIN de large et
+    qu'il pend encore jusqu'au bord de sa baie. Écrit les pans dans `rideaux` (« pans » : largeur, recouvre) et renvoie True
+    si un pan a changé. Ne touche pas au voilage : s'il est gêné lui aussi, le rideau reste à retirer."""
+    demi, change = fenetre["demi"], False
+    pans = {sens: dict(pan or {"cote": "fin" if sens > 0 else "debut"}) for sens, pan in pans_rideaux.cotes(rideaux.get("pans"))}
+    for nappe in nappes(fenetre):
+        if "cote" not in nappe:
+            continue
+        sens = nappe["cote"]
+        interieur, exterieur = pans_rideaux.etendue(demi, nappe["pan"])
+        avant = (interieur, exterieur)
+        for x in objets:
+            x0, x1 = hauteurs(x)
+            rect = rect_du_meuble(x)
+            if min(x1, nappe["z"][1]) - max(x0, nappe["z"][0]) <= EPS_Z or penetration(rect, nappe["rect"]) is None:
+                continue
+            coins = [rect.c + a * rect.e1 * rect.h1 + b * rect.e2 * rect.h2 for a in (-1, 1) for b in (-1, 1)]
+            le_long = [sens * float((c - fenetre["centre"]) @ fenetre["t"]) for c in coins]  # du côté du pan, depuis le milieu de la baie
+            debut, fin = min(le_long) - JEU, max(le_long) + JEU
+            if debut - interieur >= pans_rideaux.PAN_MIN and debut >= demi + pans_rideaux.DEBORD_MIN:
+                exterieur = min(exterieur, debut)
+            elif exterieur - fin >= pans_rideaux.PAN_MIN and fin <= demi:
+                interieur = max(interieur, fin)
+        if (interieur, exterieur) != avant and exterieur - interieur >= pans_rideaux.PAN_MIN:
+            pans[sens].update(largeur=math.floor((exterieur - interieur) * 1000) / 1000, recouvre=math.floor((demi - interieur) * 1000) / 1000)
+            change = True
+    if change:
+        rideaux["pans"] = [pans[s] for s in sorted(pans)]
+    return change
 
 
 def toutes_les_nappes(logement: dict) -> list[dict]:
@@ -634,7 +672,7 @@ def reparer(logement: dict, journal=None) -> tuple[dict, list[dict]]:
         for f in fenetres_habillees(lg):
             o = f["ouverture"]
             r = o["rideaux"]
-            for _ in range(3):
+            for _ in range(4):
                 genants = []
                 for nappe in nappes(f):
                     for x in poses:
@@ -652,6 +690,11 @@ def reparer(logement: dict, journal=None) -> tuple[dict, list[dict]]:
                     if r["ecart"] > ECART_MAX:
                         break
                     continue
+                # (22/11/2026) un pan de rideau dont un objet fixe occupe un bout se RESSERRE (le tissu se ramasse) : bien moins
+                # visible que de couper tout l'habillage de la fenêtre au-dessus de l'objet
+                if not r.get("pans_regles") and resserrer_les_pans(f, r, genants, hauteurs):
+                    r["pans_regles"] = True
+                    continue
                 dessus = max(hauteurs(x)[1] for x in genants) + 0.02
                 if f["z_tringle"] - dessus >= RIDEAU_MIN and not r.get("bas_regle"):
                     r["bas"] = round(dessus, 2)
@@ -662,6 +705,8 @@ def reparer(logement: dict, journal=None) -> tuple[dict, list[dict]]:
                         if min(hauteurs(x)[1], nappe["z"][1]) - max(hauteurs(x)[0], nappe["z"][0]) > EPS_Z
                         and penetration(rect_du_meuble(x), nappe["rect"]) is not None]
             regle_ecart, regle_bas = r.pop("ecart_regle", False), r.pop("bas_regle", False)
+            if r.pop("pans_regles", False) and not restants:
+                actions.append({"id": o["id"], "categorie": "rideaux", "action": "rideau rétréci", "raison": "un objet fixe occupe le bout d'un pan"})
             if restants or float(r.get("ecart") or 0.0) > ECART_MAX:
                 o["rideaux"] = None
                 actions.append({"id": o["id"], "categorie": "rideaux", "action": "rideau retiré", "raison": "un objet fixe occupe sa place"})

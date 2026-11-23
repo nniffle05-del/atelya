@@ -59,6 +59,7 @@ import math
 import unicodedata
 from dataclasses import asdict, replace
 
+from moteur import pans_rideaux
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
 from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, SUR_MESURE, matiere_et_teinte, nom_materiau, sorte
@@ -186,8 +187,16 @@ def rideaux_du_plan(logement: Logement) -> list[dict]:
         hsp = m.hauteur or logement.hauteur_sous_plafond
         # les pans de rideaux épais, dans le repère que Blender donne à la fenêtre (y vers la pièce, x = (ny, −nx) le long du
         # mur) : −1 = du côté des x négatifs, +1 = de l'autre. Sans mesure sur les photos : un pan de chaque côté.
+        # Depuis le 22/11/2026 chaque pan porte son étendue le long du mur (« x0 », « x1 », du même signe que son côté) et son
+        # état (« ouvert » / « tire ») : la largeur et la place vues sur les photos, ou 45 cm à cheval sur le bord de la baie
+        # (moteur/pans_rideaux.py, la même règle que le contrôle des collisions).
         vers_la_fin = 1 if ny * ux - nx * uy > 0 else -1
-        pans = sorted({vers_la_fin if p.cote == "fin" else -vers_la_fin for p in o.rideaux.pans}) if o.rideaux.pans else [-1, 1]
+        pans = []
+        for sens, p in pans_rideaux.cotes([p.model_dump() for p in o.rideaux.pans] if o.rideaux.pans else None):
+            interieur, exterieur = pans_rideaux.etendue(o.largeur / 2, p)
+            pans.append({"cote": sens * vers_la_fin, "x0": round(interieur, 3), "x1": round(exterieur, 3),
+                         "etat": pans_rideaux.etat(p, o.largeur / 2)})
+        pans.sort(key=lambda p: p["cote"])
         sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2], "pans": pans,
                        "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
                        "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),

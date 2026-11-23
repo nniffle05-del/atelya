@@ -27,6 +27,7 @@ qui ne bougent pas : sans cheminée, les meubles sont exactement ceux qu'Atelya 
 from __future__ import annotations
 
 import math
+import re
 import unicodedata
 
 import numpy as np
@@ -1045,9 +1046,13 @@ def rideaux_des_fenetres(vues: list[dict], logement: dict, refuse=lambda *_: Non
         sortie[ident] = {"voilage": teinte(r["voilage"]), "rideaux": teinte(r["rideaux"]), "statut": "estime",
                          "source": f"lecture des photos ({len(r['photos'])} photo(s))", "confiance": 0.7}
         # combien de pans de rideaux épais, et de quel côté de la fenêtre (19/11/2026) ; sans preuve : deux pans, comme avant
-        pans = pans_d_une_fenetre(r["epais"], repere_de_la_baie(ouvertures[ident], logement)) if r["epais"] else None
-        if pans:
-            sortie[ident]["pans"] = pans
+        # (22/11/2026 : et la largeur de chacun, la part devant la baie, tiré ou ouvert)
+        if r["epais"]:
+            from moteur.largeur_baies import portee_libre
+
+            pans = pans_d_une_fenetre(r["epais"], repere_de_la_baie(ouvertures[ident], logement), portee_libre(ouvertures[ident], logement))
+            if pans:
+                sortie[ident]["pans"] = pans
     return sortie
 
 
@@ -1058,6 +1063,7 @@ BORD_IMAGE = 0.04  # « visible » : à plus de 4 % de la largeur de l'image de 
 RASANT = 0.42  # sinus de 25° : un rayon qui arrive sur le mur sous un angle plus faible ne le mesure pas (photo-03 d'app-004 : pan
 # vu presque le long du mur, placé 1,4 m à côté, du mauvais côté de la fenêtre)
 AU_DELA_M = 0.25  # l'autre côté de la fenêtre se regarde 25 cm au-delà de son bord, là où pendrait le second pan
+FENETRE_VUE = (0.6, 1.5)  # la fenêtre lue sur une photo ne sert d'étalon que si sa largeur vaut 0,6 à 1,5 fois celle du plan
 
 
 def repere_de_la_baie(ouverture: dict, logement: dict) -> dict | None:
@@ -1116,24 +1122,38 @@ def pan_d_une_vue(vue: dict, baie: dict) -> dict | None:
     marge = BORD_IMAGE * largeur
     s = [_sur_le_mur(appareil, u, (y0 + y1) / 2, baie) for u in (x0, x1)]
     etendue = tuple(sorted(s)) if None not in s else None
+    # la LARGEUR du pan (22/11/2026) : l'écart de ses deux bords sur le mur ; un rectangle qui touche le bord de l'image est
+    # un pan COUPÉ par le cadre : sa largeur n'est qu'un minimum
+    commun = {"s": etendue, "largeur": None if etendue is None else etendue[1] - etendue[0],
+              "coupe": x0 < marge or x1 > largeur - marge, "a_gauche": a_gauche, "a_droite": a_droite, "part": None}
     # --- dans l'image : la fenêtre lue sur la même photo, si elle touche le rideau (écart plus petit que sa largeur)
     voisines = []
     for fx0, fy0, fx1, fy1 in vue.get("baies_vues") or []:
-        commun = min(y1, fy1) - max(y0, fy0)
+        haut_commun = min(y1, fy1) - max(y0, fy0)
         ecart = max(0.0, fx0 - x1, x0 - fx1)
-        if commun >= 0.5 * min(y1 - y0, fy1 - fy0) and ecart <= fx1 - fx0:
-            voisines.append((ecart, fx0, fx1))
+        if haut_commun >= 0.5 * min(y1 - y0, fy1 - fy0) and ecart <= fx1 - fx0:
+            voisines.append((ecart, fx0, fx1, (fy0 + fy1) / 2))
     if voisines:
-        _, fx0, fx1 = min(voisines)
+        _, fx0, fx1, fy = min(voisines)
         milieu, decale = (x0 + x1) / 2, PAN_COTE_MIN * (fx1 - fx0) / 2
-        if milieu < (fx0 + fx1) / 2 - decale:
-            return {"cote": a_gauche, "par": "image", "s": etendue, "autre_cote_visible": fx1 <= largeur - marge}
-        if milieu > (fx0 + fx1) / 2 + decale:
-            return {"cote": a_droite, "par": "image", "s": etendue, "autre_cote_visible": fx0 >= marge}
-        return {"cote": None, "par": "image", "s": etendue, "autre_cote_visible": False}
+        cote = a_gauche if milieu < (fx0 + fx1) / 2 - decale else a_droite if milieu > (fx0 + fx1) / 2 + decale else None
+        if cote is None:
+            return {**commun, "cote": None, "par": "image", "autre_cote_visible": False}
+        # le pan mesuré CONTRE sa fenêtre, en PARTS de la largeur de celle-ci : les deux sont reportés sur le mur par le même
+        # appareil, donc ni sa place (fausse de 30-50 cm quand la photo est calée seule) ni son recul ne comptent. Il faut la
+        # fenêtre ENTIÈRE (ses deux bords dans le cadre, une largeur compatible avec celle du plan : le détecteur rend parfois
+        # un seul vantail, photo-12 d'app-004)
+        f = [_sur_le_mur(appareil, u, fy, baie, 0.0) for u in (fx0, fx1)]
+        if etendue is not None and None not in f and fx0 >= marge and fx1 <= largeur - marge:
+            f0, f1 = sorted(f)
+            if FENETRE_VUE[0] * 2 * baie["demi"] <= f1 - f0 <= FENETRE_VUE[1] * 2 * baie["demi"]:
+                devant = (f1 - etendue[0]) if cote == "fin" else (etendue[1] - f0)  # ce qui pend devant la fenêtre vue
+                commun["part"] = {"largeur": commun["largeur"] / (f1 - f0),
+                                  "recouvre": float(np.clip(devant, 0.0, commun["largeur"])) / (f1 - f0)}
+        return {**commun, "cote": cote, "par": "image", "autre_cote_visible": (fx1 <= largeur - marge) if cote == a_gauche else (fx0 >= marge)}
     # --- sur le mur du plan
     if etendue is None:
-        return {"cote": None, "par": "mur", "s": None, "autre_cote_visible": False}
+        return {**commun, "cote": None, "par": "mur", "autre_cote_visible": False}
     milieu = (etendue[0] + etendue[1]) / 2
     cote = None if abs(milieu) < PAN_COTE_MIN * baie["demi"] else ("fin" if milieu > 0 else "debut")
     visible = False
@@ -1142,12 +1162,14 @@ def pan_d_une_vue(vue: dict, baie: dict) -> dict | None:
         p = baie["centre"] + baie["n"] * ECART_RIDEAUX_M + baie["t"] * autre
         u, _, profondeur = projeter([p[0], p[1], baie["z"]], appareil)
         visible = profondeur > 0.1 and marge <= u <= largeur - marge
-    return {"cote": cote, "par": "mur", "s": etendue, "autre_cote_visible": visible}
+    return {**commun, "cote": cote, "par": "mur", "autre_cote_visible": visible}
 
 
-def pans_d_une_fenetre(vues: list[dict], baie: dict | None) -> list[dict] | None:
+def pans_d_une_fenetre(vues: list[dict], baie: dict | None, portee: tuple[float, float] | None = None) -> list[dict] | None:
     """Les pans de rideaux épais d'une fenêtre d'après toutes ses vues : [{"cote": "debut"}] ou [{"cote": "fin"}] (UN seul
     pan, de ce côté), [{"cote": "debut"}, {"cote": "fin"}] (deux pans, VUS), ou None (pas de preuve : deux pans, comme avant).
+    Depuis le 22/11/2026 chaque pan porte aussi ce que les photos en mesurent (largeurs_des_pans) : `largeur`, `recouvre`,
+    `etat` ; `portee` : jusqu'où le mur est libre de part et d'autre de la baie.
     - deux rectangles de rideaux sur une même photo, l'un à côté de l'autre : ce sont les deux pans ;
     - un seul pan n'est retenu que si TOUTES les photos le voient du même côté et qu'une au moins montre aussi l'autre côté de
       la fenêtre, sans rideau (un second pan hors du cadre ne se devine pas)."""
@@ -1159,26 +1181,115 @@ def pans_d_une_fenetre(vues: list[dict], baie: dict | None) -> list[dict] | None
             continue
         mesure = pan_d_une_vue(v, baie)
         if mesure is not None:
-            v["pan"] = {**mesure, "fenetre": baie["id"]}  # gardé sur la vue : pour contrôler (pc/verification/sonde_pans_rideaux.py)
+            mesure["dit"] = v.get("dit")
+            v["pan"] = {**mesure, "fenetre": baie["id"]}  # gardé sur la vue : pour contrôler (pc/verification/sonde_largeur_pans.py)
             par_photo.setdefault(v["photo"], []).append((v, mesure))
+
+    def combien() -> list[str] | None:
+        for de_la_photo in par_photo.values():
+            if len(de_la_photo) >= 2:
+                # deux rectangles pour la même fenêtre sur une photo : s'ils ne se recouvrent pas, ce sont ses deux pans
+                de_la_photo.sort(key=lambda vm: vm[0]["boite"][0])
+                g, d = de_la_photo[0][0]["boite"], de_la_photo[-1][0]["boite"]
+                if g[2] <= d[0] + 0.25 * (d[2] - d[0]):
+                    de_la_photo[0][1]["cote"], de_la_photo[-1][1]["cote"] = de_la_photo[0][1]["a_gauche"], de_la_photo[-1][1]["a_droite"]
+                    return ["debut", "fin"]
+        # la mesure faite DANS L'IMAGE fait foi (elle ne dépend pas de la place de l'appareil, connue à 30-50 cm) ; celle faite
+        # sur le mur du plan ne sert que si aucune photo ne montre le rideau contre sa fenêtre
+        mesures = [m for de_la_photo in par_photo.values() for _, m in de_la_photo if m["cote"]]
+        mesures = [m for m in mesures if m["par"] == "image"] or mesures
+        vus = {m["cote"] for m in mesures}
+        libres = {m["cote"] for m in mesures if m["autre_cote_visible"]}
+        if len(vus) == 2:
+            return ["debut", "fin"]
+        if len(vus) == 1 and libres:
+            return [next(iter(vus))]
+        return None
+
+    cotes = combien()
+    mesures = largeurs_des_pans(par_photo, baie, portee)
+    if cotes is None:
+        if not mesures:
+            return None  # ni preuve du nombre, ni mesure : deux pans de 45 cm, comme avant
+        cotes = ["debut", "fin"]  # pas de preuve du nombre (deux pans, comme avant), mais une largeur vue : elle vaut pour les deux
+    for cote, autre in (("debut", "fin"), ("fin", "debut")):
+        if cote in cotes and cote not in mesures and autre in mesures:  # le pan mal vu est le pendant de celui qui est mesuré
+            mesures[cote] = dict(mesures[autre])
+    return [{"cote": c, **mesures.get(c, {})} for c in cotes]
+
+
+TIRES = re.compile(r"\b(tires?|tirees?|fermes?|fermees?|deploye[es]*)\b")
+OUVERTS = re.compile(r"\b(ouverts?|ouvertes?|retenus?|retenues?|embrasses?|attaches?|ramasses?)\b")
+
+
+def largeurs_des_pans(par_photo: dict, baie: dict, portee: tuple[float, float] | None = None) -> dict[str, dict]:
+    """La LARGEUR de chaque pan d'une fenêtre, la part qui pend devant la baie et son état (22/11/2026, étape b) :
+    {"debut" | "fin": {"largeur", "recouvre", "etat"}} pour les côtés que les photos mesurent (moteur/pans_rideaux.py).
+    - Un pan vu CONTRE sa fenêtre (la fenêtre entière lue sur la même photo) est mesuré en PARTS de cette fenêtre, puis rendu
+      en mètres par la largeur de la baie du plan : ni la place de l'appareil ni l'échelle de la photo ne comptent, et le
+      rideau garde dans le film la proportion qu'il a sur la photo. Cette mesure fait foi.
+    - Sinon : la largeur mesurée sur le mur du plan par les rayons de ses deux bords (jamais une vue rasante). Deux pans vus
+      ainsi sur une même photo : l'ensemble (du bord extérieur de l'un à celui de l'autre) est CENTRÉ sur la baie, comme une
+      tringle l'est sur sa fenêtre ; cela retire le décalage de l'appareil. Un pan seul vu ainsi : sa largeur seulement.
+    - Plusieurs photos : la médiane. Un pan coupé par le cadre de la photo ne donne qu'un minimum.
+    - Un pan pend toujours jusqu'au bord de sa baie (+ 5 cm) ; il ne dépasse ni le coin de la pièce ni une autre ouverture
+      (`portee` : moteur.largeur_baies.portee_libre) ; deux pans ne se croisent pas.
+    - État : le mot de la lecture (« tirés », « ouverts », « retenus »…), sinon la mesure (moteur.pans_rideaux.etat)."""
+    from moteur import pans_rideaux as pr
+
+    demi = baie["demi"]
+    parts, murs, minima, centres, dits = {}, {}, {}, {}, []
     for de_la_photo in par_photo.values():
-        if len(de_la_photo) >= 2:
-            # deux rectangles pour la même fenêtre sur une photo : s'ils ne se recouvrent pas, ce sont ses deux pans
-            de_la_photo.sort(key=lambda vm: vm[0]["boite"][0])
-            g, d = de_la_photo[0][0]["boite"], de_la_photo[-1][0]["boite"]
-            if g[2] <= d[0] + 0.25 * (d[2] - d[0]):
-                return [{"cote": "debut"}, {"cote": "fin"}]
-    # la mesure faite DANS L'IMAGE fait foi (elle ne dépend pas de la place de l'appareil, connue à 30-50 cm) ; celle faite sur
-    # le mur du plan ne sert que si aucune photo ne montre le rideau contre sa fenêtre
-    mesures = [m for de_la_photo in par_photo.values() for _, m in de_la_photo if m["cote"]]
-    mesures = [m for m in mesures if m["par"] == "image"] or mesures
-    cotes = {m["cote"] for m in mesures}
-    libres = {m["cote"] for m in mesures if m["autre_cote_visible"]}
-    if len(cotes) == 2:
-        return [{"cote": "debut"}, {"cote": "fin"}]
-    if len(cotes) == 1 and libres:
-        return [{"cote": next(iter(cotes))}]
-    return None
+        cotes_vus = {}
+        for _, m in de_la_photo:
+            if m.get("dit"):
+                dits.append(_sans_accents(m["dit"]))
+            if not m["cote"] or m["largeur"] is None:
+                continue
+            if m["coupe"]:
+                minima.setdefault(m["cote"], []).append(m["largeur"])
+            elif m["part"]:
+                parts.setdefault(m["cote"], []).append(m["part"])
+            else:
+                murs.setdefault(m["cote"], []).append(m["largeur"])
+                cotes_vus[m["cote"]] = m
+        if len(cotes_vus) == 2:  # les deux pans sur le mur, sans fenêtre vue : l'ensemble centré sur la baie
+            milieu = (cotes_vus["debut"]["s"][0] + cotes_vus["fin"]["s"][1]) / 2
+            centres.setdefault("debut", []).append(demi + (cotes_vus["debut"]["s"][1] - milieu))
+            centres.setdefault("fin", []).append(demi - (cotes_vus["fin"]["s"][0] - milieu))
+    sortie = {}
+    for cote in ("debut", "fin"):
+        largeur = recouvre = None
+        if parts.get(cote):
+            largeur = float(np.median([p["largeur"] for p in parts[cote]])) * 2 * demi
+            recouvre = float(np.median([p["recouvre"] for p in parts[cote]])) * 2 * demi
+        elif murs.get(cote):
+            largeur = float(np.median(murs[cote]))
+            if centres.get(cote):
+                recouvre = float(np.median(centres[cote]))
+        au_moins = max(minima.get(cote) or [0.0])
+        if au_moins > (largeur if largeur is not None else pr.PAN_RIDEAUX):  # un pan coupé par le cadre, vu plus large que le reste
+            largeur = au_moins
+        if largeur is None or largeur < pr.PAN_MIN:
+            continue
+        if recouvre is not None:
+            recouvre = float(np.clip(recouvre, 0.0, 2 * demi))
+            largeur = max(largeur, recouvre + pr.DEBORD_MIN)  # il pend jusqu'au bord de sa baie, et un peu au-delà
+        if portee is not None:  # ni dans le mur d'à côté, ni devant une autre ouverture : le tissu se ramasse
+            from moteur.largeur_baies import JAMBAGE
+            libre = max(demi + pr.DEBORD_RIDEAUX, abs(portee[0 if cote == "debut" else 1]) + JAMBAGE)
+            devant = recouvre if recouvre is not None else max(0.0, largeur - pr.DEBORD_RIDEAUX)
+            largeur = max(pr.PAN_MIN, min(largeur, libre - demi + devant))
+        sortie[cote] = {"largeur": round(largeur, 2), **({} if recouvre is None else {"recouvre": round(recouvre, 2)})}
+    if len(sortie) == 2 and all("recouvre" in p for p in sortie.values()):  # deux pans ne se croisent pas
+        trop = sortie["debut"]["recouvre"] + sortie["fin"]["recouvre"] - 2 * demi
+        if trop > 0:
+            for p in sortie.values():
+                p["recouvre"] = round(p["recouvre"] - trop / 2, 2)
+    dit = " ; ".join(dits)
+    for p in sortie.values():
+        p["etat"] = "tire" if TIRES.search(dit) else "ouvert" if OUVERTS.search(dit) else pr.etat(p, demi)
+    return sortie
 
 
 def appliquer(logement: dict, resultat: dict) -> dict:

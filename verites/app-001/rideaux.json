@@ -1,14 +1,77 @@
 {
- "schema": "verite-rideaux/0.1",
+ "schema": "verite-rideaux/0.2",
  "releve": "à la main, d'après les photos du client, le 19/11/2026 (Claude ; à faire confirmer par NT). « gauche » et « droite » : vu de la pièce, face à la fenêtre. Seules les fenêtres dont une photo montre l'habillage sont relevées.",
  "fenetres": {
-  "O8": {"piece": "chambre 1", "voilage": true, "rideaux": true, "pans": ["gauche", "droite"], "photos": ["photo-08"],
-         "note": "deux pans brun-beige, un de chaque côté, devant un voilage blanc"},
-  "O9": {"piece": "chambre 2", "voilage": true, "rideaux": true, "pans": ["gauche", "droite"], "photos": ["photo-10"],
-         "note": "deux pans mauves, un de chaque côté, devant un voilage blanc"},
-  "O10": {"piece": "séjour", "voilage": true, "rideaux": false, "pans": [], "photos": ["photo-01"],
-          "note": "voilages blancs seuls, sur toute la baie"},
-  "O11": {"piece": "séjour, pan coupé du coin repas", "voilage": true, "rideaux": false, "pans": [], "photos": ["photo-04"],
-          "note": "voilages blancs seuls"}
- }
+  "O8": {
+   "piece": "chambre 1",
+   "voilage": true,
+   "rideaux": true,
+   "pans": [
+    "gauche",
+    "droite"
+   ],
+   "photos": [
+    "photo-08"
+   ],
+   "note": "deux pans brun-beige, un de chaque côté, devant un voilage blanc",
+   "mesures": {
+    "gauche": {
+     "largeur_m": 0.9,
+     "etat": "tire",
+     "note": "photo-08 : 100 px de large pour ~350 px de haut (bas caché par le fauteuil), vu de biais"
+    },
+    "droite": {
+     "largeur_m": 0.65,
+     "etat": "tire",
+     "note": "photo-08 : 105 px de large pour 446 px de haut ; borné à droite par le dressing"
+    }
+   }
+  },
+  "O9": {
+   "piece": "chambre 2",
+   "voilage": true,
+   "rideaux": true,
+   "pans": [
+    "gauche",
+    "droite"
+   ],
+   "photos": [
+    "photo-10"
+   ],
+   "note": "deux pans mauves, un de chaque côté, devant un voilage blanc",
+   "mesures": {
+    "gauche": {
+     "largeur_m": 0.95,
+     "etat": "tire",
+     "note": "photo-10 : 104 px de large pour 378 px de haut, vu de biais"
+    },
+    "droite": {
+     "largeur_m": 0.6,
+     "etat": "tire",
+     "note": "photo-10 : 117 px de large pour 516 px de haut"
+    }
+   }
+  },
+  "O10": {
+   "piece": "séjour",
+   "voilage": true,
+   "rideaux": false,
+   "pans": [],
+   "photos": [
+    "photo-01"
+   ],
+   "note": "voilages blancs seuls, sur toute la baie"
+  },
+  "O11": {
+   "piece": "séjour, pan coupé du coin repas",
+   "voilage": true,
+   "rideaux": false,
+   "pans": [],
+   "photos": [
+    "photo-04"
+   ],
+   "note": "voilages blancs seuls"
+  }
+ },
+ "mesures": "22/11/2026 (Claude ; à faire confirmer par NT) : la fenêtre est derrière un voilage, on ne peut pas mesurer les pans contre elle. Largeur de chaque pan en MÈTRES, estimée par sa hauteur (du sol à la tringle, ~2,75 m sous 3 m de plafond) et par la fuite du mur (le pan le plus haut dans l'image est le plus près) : à ± 20 %. « etat » : les pans sont à demi tirés devant une grande baie, plis larges et réguliers : « tire ». RÉSERVE : cette estimation et la mesure d'Atelya partent des mêmes rectangles."
 }
