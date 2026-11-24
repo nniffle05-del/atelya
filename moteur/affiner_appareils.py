@@ -60,6 +60,10 @@ RAPPEL_ZOOM = 0.08     # … vers le zoom commun du lot (quand les lignes de fui
 PORTE_M = 1.2          # m : l'appareil peut se tenir à moins de cela d'une porte de sa pièce (photo prise du seuil), et
                        #     une porte plus proche n'arrête pas son regard
 LOIN_M = 1.5           # m : l'appareil affiné ne s'éloigne pas de plus de la place du calage
+MARGE_MUR = 0.25       # m : un photographe ne colle pas son appareil à un mur : plus près, l'appareil est un peu pénalisé
+                       #     (jusqu'à NEUTRE_PX) ; et jamais à moins de CONTACT_MUR. Sans cela l'affinage reculait l'appareil
+                       #     DANS le mur pour voir plus large (app-004, séjour et chambre : à 1 cm du mur)
+CONTACT_MUR = 0.10     # m : l'appareil affiné n'est jamais plus près d'un mur (sauf si le calage l'y avait mis)
 ZOOMS = (0.70, 0.78, 0.86, 0.94)   # départs essayés pour le zoom, en part de celui du calage (MoGe-2 le voit trop serré)
 PAS_M = (-0.8, -0.4, 0.4, 0.8)     # départs essayés le long du regard (appareil reculé ou avancé)
 GARDES = 3                         # arrivées de la recherche grossière reprises par la recherche fine
@@ -334,6 +338,8 @@ def affiner(cam0, scene: Scene, jon: dict, reperes: list[dict] | None, rappels: 
     plan = scene.plan
     cam0 = np.array(cam0, float)
     seuils = (plan["face_piece"] == piece) & (plan["sorte"] == 1) if piece is not None else None
+    murs = (scene.A[~scene.portes], scene.B[~scene.portes])  # les murs pleins (pas les portes : on se tient sur un seuil)
+    contact = min(CONTACT_MUR, float(cp._dist_seg(cam0[None, :2], murs[0], murs[1]).min())) - 1e-6 if len(murs[0]) else 0.0
 
     gros = {"plafond": jon["plafond"][::3], "sol": jon["sol"][::3]}
 
@@ -348,6 +354,11 @@ def affiner(cam0, scene: Scene, jon: dict, reperes: list[dict] | None, rappels: 
         if piece is not None and ou != piece and not (seuils.any() and cp._dist_seg(c[None, :2], plan["A"][seuils], plan["B"][seuils]).min() < PORTE_M):
             return 1e9
         v = cout(c, scene, j, reperes, borne=borne) + RAPPEL_PX_M * math.hypot(c[0] - cam0[0], c[1] - cam0[1])
+        if len(murs[0]):
+            d = float(cp._dist_seg(c[None, :2], murs[0], murs[1]).min())
+            if d < contact:
+                return 1e9
+            v += NEUTRE_PX * max(0.0, MARGE_MUR - d) / (MARGE_MUR - CONTACT_MUR)
         for i, (val, tol) in rappels.items():
             ecart = (math.log(c[i] / val) if i == 5 else c[i] - val) / tol
             v += BORNE_PX / 4 * ecart * ecart / (1 + abs(ecart))  # doux près de la valeur, pas plus qu'en ligne droite au loin

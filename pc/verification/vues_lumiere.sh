@@ -41,7 +41,9 @@ filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet>
   # bois, garde-corps : maquettes app-004-v5-3d / parquet004f et app-002-v3-3d / parquet002d, logements « dessin-fenetres »)
   # (puis le 21/11/2026 : ferronnerie des garde-corps recopiée des photos, maquette app-004-v7-3d / parquet004h, logement
   # « ferronnerie »)
-  [ "$cas" = app-004 ] && log=../atelya/lectures-photos/hauteur-baies/app-004/logement-meuble.json
+  # (puis le 24/11/2026 : la place des appareils des photos, appareils affinés dans l'image ; app-004 refait avec ses
+  # nouveaux appareils : maquette app-004-v13-3d / parquet004o, logement et fiche « place-appareils »)
+  [ "$cas" = app-004 ] && log=../atelya/lectures-photos/place-appareils/app-004/logement-meuble.json
   [ "$cas" = app-002 ] && log=../atelya/lectures-photos/dessin-fenetres/app-002/logement-meuble.json
   local decor="--logement $log"
   [ -n "${SANS_DECOR-}" ] && decor=""
@@ -52,7 +54,7 @@ filmer() {  # <logement> <dossier 3d> <nom Unreal> <fiche des caméras> <paquet>
 
 filmer app-001 $B/app-001-v11-3d parquet001l verites/app-001/cameras-photos.json $B/app-001-v11/paquet "$VUES_001" "$@"
 filmer app-002 $B/app-002-v3-3d parquet002d verites/app-002/cameras-photos.json $B/app-002-v3/paquet "$VUES_002" "$@"
-filmer app-004 $B/app-004-v11-3d parquet004m ../atelya/b2/app-004/chaine-v2/cameras-photos-seul.json $B/app-004-v11/paquet "$VUES_004" "$@"
+filmer app-004 $B/app-004-v13-3d parquet004o ../atelya/lectures-photos/place-appareils/app-004/cameras-photos-affinees.json $B/app-004-v13/paquet "$VUES_004" "$@"
 
 VUES=""
 for cas in app-001 app-002 app-004; do

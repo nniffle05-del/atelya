@@ -89,6 +89,7 @@ def main() -> int:
     cameras = {n: d for n, d in fiche["cameras"].items() if not a.photos or n in a.photos}
     importee = a.sans_import
     faites = []
+    decor, logement = None, None
     if a.logement:
         import decor_film
 
@@ -102,7 +103,7 @@ def main() -> int:
             "logement": str(a.logement.resolve()),
             "caches": json.loads(boites.read_text(encoding="utf-8"))["boites"] if boites.is_file() else {}}, ensure_ascii=False),
             encoding="utf-8")
-        pour_le_film = ["--reglage-fichier", str((a.sortie / "decor.json").resolve())] + pour_le_film
+        logement = json.loads(a.logement.read_text(encoding="utf-8"))
         print(f"décor du film : {len(decor['vues_dehors'])} toile(s) de vraie vue, {len(decor['balcons'])} balcon(s), "
               f"ciel photographié {'oui' if decor['ciel_photo'] else 'non'}", flush=True)
     for nom, d in cameras.items():
@@ -110,8 +111,20 @@ def main() -> int:
         trajet = a.sortie / f"trajet-{nom}.json"
         trajet.write_text(json.dumps(trajet_de_la_photo(d, a.eclairage), ensure_ascii=False, indent=1), encoding="utf-8")
         suffixe = f"-{nom}"
+        du_decor = []
+        if decor is not None:
+            # la porte dont l'appareil occupe l'embrasure est OUVERTE (le photographe se tenait sur le seuil) : sinon son
+            # battant fermé cache l'image (moteur/cinema/navigation.portes_du_seuil)
+            from moteur.cinema.navigation import portes_du_seuil
+
+            portes = portes_du_seuil(logement, float(d["camera"]["x"]), float(d["camera"]["y"]))
+            reglage = a.sortie / ("decor.json" if not portes else f"decor-{nom}.json")
+            if portes:
+                reglage.write_text(json.dumps({**decor, "portes_ouvertes": portes}, ensure_ascii=False, indent=1), encoding="utf-8")
+                print(f"{nom} : appareil sur le seuil, porte(s) ouverte(s) : {[p['id'] for p in portes]}", flush=True)
+            du_decor = ["--reglage-fichier", str(reglage.resolve())]
         lancer([py, "outils/unreal/cinematique_unreal.py", paquet, a.nom, trajet, "--eclairages", a.eclairage, f"--suffixe={suffixe}"]
-               + (["--sans-import"] if importee else []) + pour_le_film, journal, f"film depuis la place de {nom}")
+               + (["--sans-import"] if importee else []) + du_decor + pour_le_film, journal, f"film depuis la place de {nom}")
         importee = True
         dossiers = [p for p in (STUDIO / "Paquets" / "rendus" / a.nom).glob(f"*{suffixe}") if p.stat().st_mtime >= debut - 1
                     and list(p.glob("image-*.png"))]

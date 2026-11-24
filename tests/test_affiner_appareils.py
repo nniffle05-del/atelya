@@ -199,3 +199,17 @@ def test_affiner_les_appareils_ecrit_l_appareil_et_garde_l_ancien():
     assert abs(d["affine"]["avant"]["x"] - faux[0]) < 1e-9 and abs(d["camera"]["x"] - VRAI[0]) < 0.15
     assert abs(d["camera"]["f"] / VRAI[5] - 1) < 0.04
     assert d["affine"]["ecart"]["plafond"][1] < d["affine"]["ecart"]["plafond"][0]
+
+
+def test_l_appareil_affine_ne_se_colle_pas_au_mur(scene, jon):
+    # des lignes qui « demandent » de reculer derrière le mur (photo plus large que la pièce ne le permet) : l'appareil
+    # recule, mais s'arrête à distance du mur au lieu d'entrer dedans
+    recule = VRAI.copy()
+    recule[0] -= 1.3 * math.cos(math.radians(VRAI[3]))
+    recule[1] -= 1.3 * math.sin(math.radians(VRAI[3]))           # 1,3 m en arrière : hors de la pièce
+    large = aa.Scene({**logement(), "pieces": [{"id": "sejour_1", "contour": [[-3, -3], [4, -3], [4, 3], [-3, 3]]}]})
+    j = {k: np.column_stack([jon[k][:, 0], aa.lignes_du_plan(recule, scene.A, scene.B, HSP, jon[k][:, 0])[i]]) for i, k in enumerate(("plafond", "sol"))}
+    del large
+    cam, _ = aa.affiner(VRAI, scene, {**j, "z": 1.3, "largeur": W}, None, {2: (1.3, aa.RAPPEL_Z), 5: (VRAI[5], aa.RAPPEL_ZOOM)}, piece=0)
+    from moteur import caler_photos as cp
+    assert float(cp._dist_seg(cam[None, :2], scene.A[~scene.portes], scene.B[~scene.portes]).min()) >= aa.CONTACT_MUR - 1e-3
