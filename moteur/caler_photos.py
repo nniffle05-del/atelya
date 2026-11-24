@@ -52,7 +52,7 @@ import torch
 from . import da3, fuites, moge
 from .oeil_dinov2 import ECART, MOYENNE, charger as charger_oeil, empreintes
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 PAS = 0.2                                   # une place possible tous les 20 cm
 HAUT_DES_MURS = 2.1                         # au-dessus : ni portes ni meubles, on y mesure la distance du mur
 ECHELLES = (0.72, 0.8, 0.88, 0.96, 1.04)    # MoGe-2 voit souvent trop profond : on essaie plusieurs tailles
@@ -81,6 +81,7 @@ AUTRE_POSE_MIN = 0.95                       # … douteux si une autre pose du b
 ACCORD_MIN = 0.6                            # … ou si une photo du bloc est à moins de 60 % de sa propre meilleure place
 ECART_POINTE = 0.75                         # photo pointée par NT que son bloc met à plus de 75 cm du point : elle se place seule, près du point
 PETITES_PIECES = ("cuisine", "salle_d_eau", "entree", "wc", "degagement")  # … et toujours dans ces petites pièces (demande de NT)
+AFFINER = True                              # l'appareil de chaque photo affiné dans l'image après le calage (moteur/affiner_appareils.py, 24/11/2026)
 CAP_FUITES = 12.0                          # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
@@ -822,7 +823,7 @@ class Outils:
 
 def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None,
           zoom_par_fuites: bool | str = False, detail: dict | None = None, pieces_donnees: dict | None = None,
-          confirmees=(), endroits_donnes: dict | None = None) -> dict:
+          confirmees=(), endroits_donnes: dict | None = None, affiner: bool | None = None) -> dict:
     """logement : le logement lu (pièces, murs, ouvertures) ; photos : {nom: photo RGB}.
     → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc",
                          "hesite_avec"}},
@@ -849,7 +850,17 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     (verites/app-002/cameras-photos-soigne.json), après correction de l'orientation (`fuites.orienter_au_zoom`) : app-002
     médiane 0,36 → 0,39 m, pire 0,90 → 0,75 m, orientation 2,2° → 0,9°, sols 87,9 → 90,2 %, meubles 19 → 20 sur 30 ; app-003
     médiane 0,53 → 0,51 m, pire 1,45 → 1,21 m mais une photo passe au-delà de 1 m (0,82 → 1,21). Pas de gain net en mètres :
-    reste en réserve."""
+    reste en réserve.
+    affiner (24/11/2026, « la place des appareils des photos », EN SERVICE par défaut : AFFINER) : une fois la pièce et la
+    place trouvées, l'appareil de chaque photo est AFFINÉ DANS L'IMAGE (moteur/affiner_appareils.py) : place, hauteur, cap, zoom
+    et horizon sont repris jusqu'à ce que les murs du plan, vus par lui, tombent sur les lignes du plafond et du sol que la
+    photo montre (trouvées seules dans le relief de MoGe-2). Chaque caméra porte alors « affine » ({comment, avant, …}) ;
+    l'appareil du calage reste quand la photo ne montre pas assez de murs ou qu'ils ne collent pas au plan. Mesuré sur les
+    quatre logements (pc/essais-place-appareils ; 39 photos affinées sur 58) : repères des murs relevés à la main, vus par
+    l'appareil d'Atelya, à 23 → 15 px de leur place sur la photo (app-002) et 36 → 22 px (app-003), 29 → 29 px sur app-001 ;
+    place contre les corrigés 0,44 → 0,27 m (app-003), 0,36 → 0,36 m mais au pire 0,90 → 0,56 m (app-002). False = le calage
+    d'avant. Avec la lecture des fenêtres, la chaîne reprend ensuite ces appareils sur les lignes lues
+    (outils/habillage/affiner_appareils_lus.py)."""
     o = outils or Outils()
     plan = plan_du_logement(logement)
     G = grille(plan); pg = piece_de(plan, G)
@@ -1087,11 +1098,21 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                 cameras[n]["endroit"].update(autre_pose=round(autre, 3), accord=round(accord, 3))
         return cameras, non, det
 
+    def affiner_dans_l_image(cameras):
+        if not (AFFINER if affiner is None else affiner) or not cameras:
+            return
+        from . import affiner_appareils
+        lignes = {n: {**(fu[n] if n in fu else fuites.mesurer(photos[n])), "largeur": photos[n].shape[1]} for n in cameras}
+        journal("  appareils affinés dans l'image (murs du plan posés sur les lignes du plafond et du sol de chaque photo) :")
+        affiner_appareils.affiner_les_appareils(logement, photos, cameras, mes, owl=getattr(o.pds, "owl", None),
+                                                zoom_du_lot=fuites.zoom_du_lot(lignes), journal=journal)
+
     muet = lambda *a: None
     seul, non_seul, det = choisir(R, T, {}, muet if PM else journal)  # l'avis d'Atelya seul
     if not PM:
         if detail is not None:  # pour les essais : de quoi rejuger le choix d'ensemble sans tout recalculer
             detail.update(det)
+        affiner_dans_l_image(seul)
         _signaler_les_endroits(seul, journal)
         return {"cameras": seul, "non_calees": {**non, **non_seul}}
     cameras, non_avec, det = choisir({**R, **Rd}, {**T, **Td}, PM, journal)  # avec les pièces données par le client
@@ -1114,5 +1135,6 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
         if raison and n not in confirmees:
             d.update(sure=False, a_verifier=raison)
             journal(f"  {n} : À VÉRIFIER, {raison}")
+    affiner_dans_l_image(cameras)
     _signaler_les_endroits(cameras, journal)
     return {"cameras": cameras, "non_calees": {**non, **non_avec}}

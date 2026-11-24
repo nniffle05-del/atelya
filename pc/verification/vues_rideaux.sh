@@ -17,8 +17,13 @@ export PYTHONIOENCODING=utf-8
 ESSAI="$1"; CAS="$2"; D3="$3"; NOM="$4"; LOG="$5"; PHOTOS="$6"; shift 6
 SORTIE=../atelya/b2/lumiere-film/$ESSAI/$CAS
 PAQUET="${D3%-3d}/paquet"
-FICHE=verites/$CAS/cameras-photos.json
-[ "$CAS" = app-004 ] && FICHE=../atelya/b2/app-004/chaine-v2/cameras-photos-seul.json
+# la fiche des appareils : FICHE_PHOTOS si elle est donnée (24/11/2026 : appareils affinés), sinon le relevé à la main, et pour
+# app-004 (pas de relevé) la fiche du premier examen
+FICHE="${FICHE_PHOTOS-}"
+if [ -z "$FICHE" ]; then
+  FICHE=verites/$CAS/cameras-photos.json
+  [ "$CAS" = app-004 ] && FICHE=../atelya/b2/app-004/chaine-v2/cameras-photos-seul.json
+fi
 for f in "$D3/maquette.blend" "$LOG" "$FICHE"; do
   [ -f "$f" ] || { echo "PLANTÉ : introuvable : $f"; exit 1; }
 done

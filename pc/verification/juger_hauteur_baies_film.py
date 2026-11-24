@@ -66,10 +66,13 @@ def juger(cas: str, spec: str, sortie: Path) -> list[dict]:
     from preparer_vitrages import photo_de
     from sonde_hauteur_baies import lecture_de
 
-    vues_hier, logement_hier, vues_auj, logement_auj = spec.split(",")
+    # (24/11/2026, « la place des appareils ») : deux champs de plus, facultatifs : la fiche des appareils d'hier et celle
+    # d'aujourd'hui, quand les vues n'ont pas été tournées depuis les mêmes appareils
+    vues_hier, logement_hier, vues_auj, logement_auj, *fiches_donnees = spec.split(",")
     logements = {"hier": json.loads(Path(logement_hier).read_text(encoding="utf-8")), "auj": json.loads(Path(logement_auj).read_text(encoding="utf-8"))}
     dossiers = {"hier": [Path(p) for p in vues_hier.split("+")], "auj": [Path(p) for p in vues_auj.split("+")]}
     fiche = json.loads(Path(CAS[cas]["fiche"]).read_text(encoding="utf-8"))
+    fiches = {q: (json.loads(Path(f).read_text(encoding="utf-8")) if f else fiche) for q, f in zip(("hier", "auj"), (fiches_donnees + ["", ""])[:2])}
     lignes = []
     for nom, fenetres in lecture_de(cas)["photos"].items():
         for f in (f for f in fenetres if f.get("cadre")):
@@ -81,14 +84,14 @@ def juger(cas: str, spec: str, sortie: Path) -> list[dict]:
                      "photo_haut": float((hg[1] + hd[1]) / 2) / Hp, "photo_bas": None if f.get("bas_cache") else float((bg[1] + bd[1]) / 2) / Hp}
             parts = hb.niveaux_d_une_photo([g for g in fenetres if g["baie"] == f["baie"]]) or {}
             ligne["photo_part_haut"], ligne["photo_part_bas"] = parts.get("haut"), parts.get("bas")
-            cam = camera_depuis_dict(fiche["cameras"][nom]["camera"])
             cases = [("la photo du client", photo, 1.0, x_photo, ligne["photo_haut"] * Hp, None if ligne["photo_bas"] is None else ligne["photo_bas"] * Hp)]
             for quand in QUAND:
                 fichier = next((d / f"vue-{nom}.png" for d in dossiers[quand] if (d / f"vue-{nom}.png").exists()), None)
                 o = next((o for o in logements[quand]["ouvertures"] if o["id"] == f["baie"]), None)
                 r = repere_de_la_baie(o, logements[quand]) if o is not None else None
-                if fichier is None or r is None:
+                if fichier is None or r is None or nom not in fiches[quand]["cameras"]:
                     continue
+                cam = camera_depuis_dict(fiches[quand]["cameras"][nom]["camera"])
                 film = cv2.cvtColor(lire_image(fichier), cv2.COLOR_BGR2RGB)
                 k = film.shape[1] / Wp
                 allege = float(o.get("allege", 0.0) or 0.0)

@@ -79,7 +79,7 @@ def fiche(resultat: dict, dossier: Path, modele: str) -> dict:
         rel = Path(os.path.relpath(dossier.resolve(), RACINE)).as_posix()
     except ValueError:  # autre disque
         rel = dossier.resolve().as_posix()
-    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier", "pointee", "endroit", "endroit_douteux")
+    garde = lambda d: {k: d[k] for k in ("camera", "largeur", "hauteur", "piece", "marge", "bloc", "hesite_avec", "donnee", "colle", "avis_seul", "a_verifier", "pointee", "endroit", "endroit_douteux", "affine")
                        if k in d and (k != "hesite_avec" or d[k])}
     return {"note": f"Caméras des photos retrouvées SEULES par Atelya (moteur/caler_photos.py {cp.VERSION}). « cameras » : photos "
                     "dont Atelya est sûr (seules à utiliser) ; « incertaines » : placées, mais pas sûres (« hesite_avec » : l'autre pièce possible).",

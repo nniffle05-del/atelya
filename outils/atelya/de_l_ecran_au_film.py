@@ -241,6 +241,18 @@ def main() -> int:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        if a.lecture_photos and not a.sortes_du_detecteur and (a.lecture_photos / "vitrages.json").is_file():
+            # LES APPAREILS DES PHOTOS repris avec les lignes LUES des fenêtres (24/11/2026, moteur/affiner_appareils.py) : le
+            # calage a déjà affiné chaque appareil sur les lignes du plafond et du sol qu'il trouve seul ; maintenant que les
+            # fenêtres du logement sont celles que les photos montrent (largeur, bas, haut), le pied et le haut de leur mur et
+            # le tour de leur menuiserie, lus sur chaque photo, fixent ce qui restait libre (glisser le long du mur). Avant
+            # les sols et les meubles, qui se posent depuis ces appareils. Une fiche relevée à la main n'est pas touchée.
+            fiche_affinee = sortie / "cameras-photos-affinees.json"
+            note("appareils", lancer("appareils", [py, "outils/habillage/affiner_appareils_lus.py", fiche, depart, a.lecture_photos / "vitrages.json",
+                                                   "--sortie", fiche_affinee], journaux))
+            fiche = fiche_affinee
+    elif a.lecture_photos and not a.sortes_du_detecteur and (sortie / "cameras-photos-affinees.json").is_file():
+        fiche = sortie / "cameras-photos-affinees.json"  # chaîne reprise après l'étape des baies : les appareils déjà repris
     lecture_seule = a.lecture_photos and not a.sortes_du_detecteur
     if "sols" in faire:
         commande = [py, "outils/habillage/sols_photos.py", "logement", fiche, depart, MODELE_SOLS, sols]

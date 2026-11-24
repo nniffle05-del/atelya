@@ -37,7 +37,7 @@ PC = RACINE.parent / "atelya"
 CAS = {
     "app-001": {"logement": PC / "lectures-claude/app-001/logement.json", "fiche": RACINE / "verites/app-001/cameras-photos.json"},
     "app-002": {"logement": RACINE / "verites/app-002/logement.json", "fiche": RACINE / "verites/app-002/cameras-photos.json"},
-    "app-004": {"logement": PC / "lectures-claude/v2/app-004/verification.json", "fiche": PC / "b2/app-004/chaine-v2/cameras-photos-seul.json"},
+    "app-004": {"logement": PC / "lectures-claude/v2/app-004/verification.json", "fiche": PC / "b2/app-004/chaine-v3/cameras-photos-seul.json"},  # v3 (24/11/2026) : appareils affinés dans l'image ; v2 : le calage du premier examen
 }
 SCENE = "2 Jour voilé"
 
