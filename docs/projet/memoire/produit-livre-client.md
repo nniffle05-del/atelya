@@ -1312,3 +1312,5 @@ Redit à NT en ouvrant : son « oui » du 24/11 = validation de l'étape « le b
 **Tests** : `tests/test_affiner_appareils.py` (14), `tests/test_promeneur.py` (+ 1) ; série complète : 1 243 réussis + 1 attendu.
 
 **Suites à proposer à NT** : (a) corriger `caler_photos.repere` (le même défaut « lit pris pour le sol » sert encore aux tringles, aux hauteurs de baies et à la taille des meubles) ; (b) sur app-001, comprendre pourquoi le calage est à ~0,9 m (zooms des photos en désaccord, grand séjour) ; (c) la porte du seuil : un garde-fou contre l'embrasure prise à tort ; puis l'ordre prévu : (d) matière du tissu des rideaux, (e) juge chiffré des rideaux, (f) plans en mouvement, et les restes des fenêtres.
+
+**NT a validé le 25/11/2026 (« Oui » au compte rendu, qui demandait : valider l'étape ; garder la mise en service par défaut malgré le léger recul sur app-001 ; corriger d'abord le « sol pris pour un lit » dans `caler_photos.repere`). Compris ainsi, à lui redire : étape validée, affinage en service par défaut, suite = la mesure du sol dans le relief des photos (détail : § 5 de CLAUDE.md, « PROCHAINE CONVERSATION »).**
