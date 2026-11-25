@@ -1311,6 +1311,7 @@ TRINGLE_ECART_PX = 5  # le mur se regarde 5 pixels au-dessus et au-dessous du tr
 TRINGLE_FORCE = 14.0  # écart de clarté (sur 255) entre le trait et le mur, tenu sur 60 % de sa longueur
 TRINGLE_COLONNES = 30  # longueur minimale du trait (pixels)
 TRINGLE_HAUTEUR_MIN = 1.6  # m : plus bas, ce n'est pas une tringle
+TRINGLE_SOUS_PLAFOND = 0.03  # m : … et une tringle est au moins à 3 cm sous le plafond
 # L'étalon de la couleur de la tringle : la couleur gardée = sa clarté contre le mur clair autour d'elle × ETALON_TRINGLE.
 # RÉGLÉ DANS LE FILM le 23/11/2026 (pc/verification/juger_tringle_film.py, 8 vues d'app-001 et d'app-004, un seul réglage pour
 # tous) : avec 0,85 (ce que renvoie un mur blanc) la tringle du film était trop claire contre son mur sur TOUTES les vues
@@ -1456,7 +1457,10 @@ def tringle_d_une_fenetre(vues: list[dict], hsp: float) -> dict | None:
         if not t:
             continue
         mesure = {"haut": t.get("haut"), "hauteur": t.get("hauteur"), "trait": t.get("trait")}
-        plausible = lambda h: h is not None and TRINGLE_HAUTEUR_MIN <= h <= hsp + 0.15
+        # une tringle lue AU-DESSUS du plafond : le relief est faux à cet endroit (mur lointain, étalé), sa hauteur ne dit rien
+        # (jusqu'au 25/11/2026 : plafond + 15 cm, puis rabattue sous le plafond ; avec le vrai plafond du séjour d'app-001, deux
+        # tringles lues à 3,05 et 3,10 m sous un plafond de 3,00 m entraient ainsi à 2,97 m, plus haut que la tringle d'avant)
+        plausible = lambda h: h is not None and TRINGLE_HAUTEUR_MIN <= h <= hsp - TRINGLE_SOUS_PLAFOND
         # un trait dont la hauteur n'est pas celle d'une tringle (une corniche, le bord d'une poutre) ne dit pas sa couleur
         if t.get("trait") and plausible(t.get("hauteur")):
             mesure["couleur"] = _a_blanc_de_mur(t["trait"]["couleur"], t["trait"]["mur"])
@@ -1472,7 +1476,7 @@ def tringle_d_une_fenetre(vues: list[dict], hsp: float) -> dict | None:
     sortie = {}
     hauteurs = traits or tissus
     if hauteurs:
-        sortie["hauteur"] = round(float(np.clip(np.median(hauteurs), TRINGLE_HAUTEUR_MIN, hsp - 0.03)), 2)
+        sortie["hauteur"] = round(float(np.clip(np.median(hauteurs), TRINGLE_HAUTEUR_MIN, hsp - TRINGLE_SOUS_PLAFOND)), 2)
     if dite or couleurs:
         sortie["couleur"] = [int(c) for c in (dite or np.median(np.array(couleurs), axis=0))]
     return sortie or None
