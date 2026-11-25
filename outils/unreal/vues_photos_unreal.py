@@ -34,7 +34,7 @@ sys.path.insert(0, str(RACINE))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from moteur.juge_lumiere import cadre_du_film  # noqa: E402
+from moteur.cadre_film import cadre_du_film  # noqa: E402  (module léger : pas de PyTorch dans ce script, il vit tout le tournage)
 
 STUDIO = Path("D:/Atelya-Unreal")
 SCENES = {"jour_voile": "2 Jour voilé", "jour_soleil": "1 Jour ensoleillé"}
