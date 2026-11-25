@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,25 @@ def lancer(commande: list, journal: Path, quoi: str) -> None:
     if r.returncode != 0:
         print(f"PLANTÉ : {quoi} (code {r.returncode}) : voir {journal}", flush=True)
         sys.exit(r.returncode or 1)
+
+
+DECOR_A_PART = ("import json, sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); import decor_film; "
+                "d = decor_film.decor_du_film(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4], Path(sys.argv[5])); "
+                "Path(sys.argv[6]).write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding='utf-8')")
+
+
+def decor_a_part(logement: Path, fiche: Path, eclairage: str, dossier_vues: Path, sortie: Path, code: str = DECOR_A_PART) -> dict:
+    """Le décor du film (outils/unreal/decor_film.py) préparé dans un processus À PART, qui écrit `sortie` (decor.json) et rend
+    toute sa mémoire avant que le film tourne. Jusqu'au 25/11/2026 il était préparé ici même, et ce script gardait 1 à 1,6 Go
+    (réseaux, photos) pendant tout le rendu d'Unreal : le 25/11 le PC est tombé à 0,5 Go de mémoire libre pendant une vue du
+    séjour d'app-001, et un tournage a planté le matin, mémoire pleine."""
+    r = subprocess.run([sys.executable, "-c", code, str(Path(__file__).resolve().parent), str(logement), str(fiche), eclairage,
+                        str(dossier_vues), str(sortie)], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})  # (ses messages portent des accents et des flèches)
+    if r.returncode != 0 or not sortie.is_file():
+        print(f"PLANTÉ : décor du film (code {r.returncode}) : {(r.stderr or r.stdout).strip()[-800:]}", flush=True)
+        sys.exit(r.returncode or 1)
+    return json.loads(sortie.read_text(encoding="utf-8"))
 
 
 def trajet_de_la_photo(d: dict, eclairage: str) -> dict:
@@ -91,11 +111,9 @@ def main() -> int:
     faites = []
     decor, logement = None, None
     if a.logement:
-        import decor_film
-
-        # hors du dossier du paquet dans le studio : il est refait à chaque vue
-        decor = decor_film.decor_du_film(a.logement, a.fiche, a.eclairage, STUDIO / "Paquets" / "vues" / a.nom)
-        (a.sortie / "decor.json").write_text(json.dumps(decor, ensure_ascii=False, indent=1), encoding="utf-8")
+        # hors du dossier du paquet dans le studio : il est refait à chaque vue ; dans un processus à part (decor_a_part)
+        a.sortie.mkdir(parents=True, exist_ok=True)
+        decor = decor_a_part(a.logement, a.fiche, a.eclairage, STUDIO / "Paquets" / "vues" / a.nom, a.sortie / "decor.json")
         # pour le juge (outils/unreal/juger_lumiere.py, la vue par les fenêtres) : le logement de la maquette et les meubles
         # que les photos montrent devant les fenêtres
         boites = STUDIO / "Paquets" / "vues" / a.nom / "meubles-devant-fenetres.json"
