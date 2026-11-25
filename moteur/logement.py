@@ -23,7 +23,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from moteur.matieres import NOMS_SOLS
+from moteur.matieres import NOMS_SOLS, SUR_MESURE
 from moteur.meubles import NOMS_MEUBLES
 
 VERSION_SCHEMA = "logement/0.1"
@@ -76,14 +76,53 @@ class Mur(Element):
 Couleur = tuple[Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)], Annotated[int, Field(ge=0, le=255)]]
 
 
+class PanDeRideau(BaseModel):
+    """Un pan de rideau épais (19/11/2026) : de quel côté de la fenêtre il pend. « debut » = le bord de la fenêtre le plus
+    proche du début de son mur, « fin » = l'autre (comme les gonds d'une porte, SensPorte). Depuis le 22/11/2026, ce que les
+    photos en mesurent : sa largeur, la part qui pend devant la baie, et s'il est ramassé sur le côté ou tiré
+    (moteur/pans_rideaux.py ; sans mesure : 45 cm, dont 30 devant la baie, ouvert)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cote: Literal["debut", "fin"]
+    largeur: Annotated[float, Field(gt=0, le=6)] | None = Field(default=None, description="Largeur du pan le long du mur (m), vue sur les photos.")
+    recouvre: Annotated[float, Field(ge=0, le=6)] | None = Field(
+        default=None, description="Part de la largeur qui pend DEVANT la baie, depuis le bord de la baie du côté du pan (m) ; le "
+                                  "reste pend sur le mur, à côté de la fenêtre.")
+    etat: Literal["ouvert", "tire"] | None = Field(
+        default=None, description="« ouvert » : ramassé sur le côté (plis serrés) ; « tire » : déployé devant la fenêtre (plis larges).")
+
+
+class Tringle(BaseModel):
+    """La tringle d'une fenêtre habillée, vue sur les photos (23/11/2026) : sa hauteur au-dessus du sol et sa couleur. Sans
+    mesure (champ absent) : 12 cm sous le plafond, métal sombre (moteur/pans_rideaux.py, moteur/blender/rideaux.py)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hauteur: Annotated[float, Field(gt=0.5, le=6)] | None = Field(default=None, description="Hauteur de l'axe de la tringle au-dessus du sol (m).")
+    couleur: Couleur | None = Field(default=None, description="Couleur de la tringle (sRGB), à côté d'un mur blanc bien exposé.")
+
+
 class Rideaux(BaseModel):
     """Ce qui habille une fenêtre côté intérieur (B4, 09/11/2026) : un voilage (tissu fin qui laisse passer la lumière, tiré
-    devant la vitre) et/ou des rideaux épais (deux pans ouverts sur les côtés). Couleur sRGB vue sur photo ; None = absent."""
+    devant la vitre) et/ou des rideaux épais (deux pans ouverts sur les côtés, ou les pans de `pans`). Couleur sRGB vue sur
+    photo ; None = absent."""
 
     model_config = ConfigDict(extra="forbid")
 
     voilage: Couleur | None = None
     rideaux: Couleur | None = None
+    pans: Annotated[list[PanDeRideau], Field(min_length=1, max_length=2)] | None = Field(
+        default=None, description="Les pans de rideaux épais vus sur les photos : un seul (et de quel côté) ou deux. Sans ce "
+                                  "champ : deux pans, un de chaque côté (la supposition d'avant le 19/11/2026).")
+    tringle: Tringle | None = Field(default=None, description="La tringle vue sur les photos : hauteur, couleur. Sans ce champ : "
+                                                               "12 cm sous le plafond, métal sombre.")
+    ecart: Annotated[float, Field(gt=0, le=0.5)] | None = Field(
+        default=None, description="Distance au mur de la nappe du voilage (m) ; les rideaux pendent 6 cm plus loin. Par défaut 10 cm. "
+                                  "Réglée par moteur/collisions.py pour passer DEVANT un radiateur.")
+    bas: Annotated[float, Field(ge=0)] | None = Field(
+        default=None, description="Hauteur du bas du tissu (m). Par défaut au ras du sol. Réglée par moteur/collisions.py quand "
+                                  "le rideau s'arrête au-dessus de ce qui est bâti sous la fenêtre.")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
@@ -98,6 +137,83 @@ class SensPorte(BaseModel):
 
     charniere: Literal["debut", "fin"] = "debut"
     ouvre_vers: Literal["gauche", "droite"] = "gauche"
+
+
+Part = Annotated[float, Field(ge=0, le=1)]
+
+
+class Vantail(BaseModel):
+    """Un vantail d'une fenêtre (20/11/2026) : où est sa VITRE dans la largeur de la baie, et ses petits bois. Tout est en
+    PARTS de la baie (0 à 1) : en largeur depuis le bord de la baie le plus proche du début du mur, en hauteur depuis son bas."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    debut: Part = Field(description="Où commence sa vitre (part de la largeur de la baie)")
+    fin: Part = Field(description="Où finit sa vitre")
+    montants: list[tuple[Part, Part]] = Field(default_factory=list, description="Petits bois debout : (début, fin) en parts de la largeur")
+    traverses: list[tuple[Part, Part]] = Field(default_factory=list, description="Petits bois couchés : (bas, haut) en parts de la hauteur")
+
+    @model_validator(mode="after")
+    def _dans_l_ordre(self) -> "Vantail":
+        if not self.debut < self.fin:
+            raise ValueError("un vantail finit après son début")
+        return self
+
+
+class MotifFerronnerie(BaseModel):
+    """Le MOTIF d'une ferronnerie RECOPIÉ des photos du client (moteur/ferronnerie.py, 20/11/2026) : un module (un barreau et
+    ses volutes) qui se répète le long du garde-corps. En parts : il vaut pour une fenêtre de n'importe quelle taille.
+    Vu de la PIÈCE (comme sur la photo) : x de gauche à droite, y de bas en haut."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pas: float = Field(gt=0.03, le=3.0, description="Largeur du module, en parts de la hauteur du motif")
+    contours: Annotated[list[Annotated[list[tuple[Part, Part]], Field(min_length=3)]], Field(min_length=1, max_length=400)] = Field(
+        description="Contours fermés du fer, pleins et trous mêlés (un point est dans le fer s'il est dans un nombre impair de "
+                    "contours) : (x en parts de la largeur du module, y en parts de sa hauteur)")
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+
+class GardeCorpsFenetre(BaseModel):
+    """Le garde-corps posé DEHORS devant une fenêtre dont le bas est à moins d'un mètre du sol (20/11/2026)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bas: Part = Field(default=0.0, description="Son pied (part de la hauteur de la baie)")
+    haut: Part = Field(description="Le dessus de sa main courante (part de la hauteur de la baie)")
+    genre: Literal["fer_forge", "barreaudage", "verre", "lisses"] = "barreaudage"
+    motif: MotifFerronnerie | None = Field(default=None, description="Sa ferronnerie recopiée des photos ; sans elle : des "
+                                           "barreaux droits")
+
+
+class DessinFenetre(BaseModel):
+    """Le DESSIN d'une fenêtre lu sur les photos du client (F2 pièce 3, 20/11/2026 ; moteur/dessin_fenetres.py) : ses vantaux,
+    ses petits bois, la largeur vraie de son cadre, la partie pleine sous ses vitres, son garde-corps. En PARTS de la baie, pas
+    en mètres : la fenêtre de la maquette peut être décalée ou d'une autre taille que la vraie, son dessin reste juste.
+    Sans ce champ : le cadre par défaut (moteur.habillage._fenetre). Même provenance que Plinthes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vantaux: Annotated[list[Vantail], Field(min_length=1, max_length=8)] = Field(description="Du début vers la fin du mur")
+    vitrage_bas: Part = Field(description="Où commencent les vitres (part de la hauteur de la baie, depuis son bas)")
+    vitrage_haut: Part = Field(description="Où finissent les vitres")
+    soubassement: Part = Field(default=0.0, description="Partie PLEINE au bas de la baie, sous la menuiserie (allège basse, "
+                               "marche) : part de la hauteur de la baie")
+    garde_corps: GardeCorpsFenetre | None = None
+    statut: Statut
+    source: str = Field(min_length=1)
+    confiance: float = Field(default=1.0, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _coherent(self) -> "DessinFenetre":
+        if not self.soubassement <= self.vitrage_bas < self.vitrage_haut:
+            raise ValueError("dessin de fenêtre : il faut soubassement ≤ vitrage_bas < vitrage_haut")
+        for a, b in zip(self.vantaux, self.vantaux[1:]):
+            if b.debut < a.fin:
+                raise ValueError("dessin de fenêtre : deux vantaux se recouvrent")
+        return self
 
 
 class Ouverture(Element):
@@ -115,6 +231,21 @@ class Ouverture(Element):
     )
     rideaux: Rideaux | None = Field(default=None, description="Voilage et rideaux côté intérieur (fenêtres seulement)")
     sens: SensPorte | None = Field(default=None, description="Gonds et côté d'ouverture (portes) ; sinon, réglage par défaut")
+    dessin: DessinFenetre | None = Field(default=None, description="Vantaux, petits bois, cadre et garde-corps lus sur les "
+                                         "photos (fenêtres seulement) ; sinon, le cadre par défaut")
+
+
+class PassePlat(Element):
+    """Un TROU dans un mur, sans menuiserie ni vitre (16/11/2026) : le passe-plat entre une cuisine et un séjour, une baie
+    libre à mi-hauteur. Le plan ne le dessine presque jamais (NT, 15/11/2026 : « le plan ne veut pas tout dire ») : il est lu
+    sur les photos (moteur/equipements.py). Ce n'est PAS une ouverture : on n'y passe pas, il n'a ni cadre ni vitre, il ne
+    donne pas dehors ; le mur reste un mur pour tout le reste d'Atelya (place des photos, trajet de la caméra)."""
+
+    mur: str = Field(description="Identifiant du mur percé")
+    position: Annotated[float, Field(ge=0)] = Field(description="Distance le long du mur, de son début au premier bord du trou")
+    largeur: Longueur
+    hauteur: Longueur
+    allege: Annotated[float, Field(ge=0)] = Field(default=1.0, description="Hauteur entre le sol et le bas du trou")
 
 
 class Plinthes(BaseModel):
@@ -150,8 +281,33 @@ class PortesPlacard(BaseModel):
     confiance: float = Field(default=1.0, ge=0, le=1)
 
 
+class Parquet(BaseModel):
+    """Un parquet à lames droites fait SUR MESURE d'après les photos du client (18/11/2026) : ce qu'Atelya a mesuré sur les
+    photos (moteur/parquet_photo.py) et qu'il dessine à la construction (moteur/parquet_sur_mesure.py).
+
+    « supposes » liste les valeurs qui n'ont PAS pu être mesurées (sol trop peu vu) et sont donc des suppositions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pose: Literal["lames", "point_de_hongrie"] = "lames"
+    angle: Annotated[float, Field(ge=30, le=60)] | None = Field(
+        default=None, description="Point de Hongrie : angle de coupe des lames (degrés), entre la lame et le rang de chevrons")
+    largeur: Annotated[float, Field(ge=0.04, le=0.35)] = Field(description="Largeur d'une lame (m)")
+    longueur: Annotated[float, Field(ge=0.25, le=2.5)] = Field(description="Longueur moyenne des lames (m) ; elles vont de la "
+                                                                 "moitié à une fois et demie cette longueur")
+    nuance: Annotated[float, Field(ge=0, le=0.25)] = Field(description="De combien la clarté change d'une lame à l'autre "
+                                                           "(0,10 = des lames 10 % plus claires ou plus foncées que la moyenne)")
+    chaleur: Annotated[float, Field(ge=0, le=0.12)] = Field(description="De combien la couleur change d'une lame à l'autre "
+                                                            "(plus rousse ou plus grise)")
+    joint_mm: Annotated[float, Field(ge=0, le=3.0)] = Field(description="Force du joint entre deux lames, en millimètres de "
+                                                            "noir (0 = joint invisible, 2 = joint très marqué d'un vieux parquet)")
+    bois: str = Field(default="chene_clair", min_length=1, description="La photo de bois de la bibliothèque dont les lames sont tirées")
+    supposes: list[Literal["largeur", "longueur", "nuance", "chaleur", "joint_mm"]] = Field(default_factory=list)
+
+
 class Sol(BaseModel):
-    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py).
+    """Le revêtement du sol d'une pièce (B2-3, 08/11/2026) : une matière du catalogue (moteur/matieres.py), ou un parquet
+    fait sur mesure d'après les photos (matière « parquet_sur_mesure », décrit par le champ « parquet »).
 
     Même provenance que Plinthes : « ajoute » (règle par défaut), « estime » (vu sur une photo), « mesure » (choisi à
     l'écran de vérification).
@@ -159,7 +315,9 @@ class Sol(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    matiere: Literal[*NOMS_SOLS]
+    matiere: Literal[*NOMS_SOLS, SUR_MESURE]
+    parquet: Parquet | None = Field(default=None, description="Le parquet sur mesure (obligatoire si la matière est "
+                                    "« parquet_sur_mesure », ignoré sinon)")
     teinte: tuple[Annotated[float, Field(ge=0.02, le=4.0)], Annotated[float, Field(ge=0.02, le=4.0)],
                   Annotated[float, Field(ge=0.02, le=4.0)]] | None = Field(
         default=None, description="Correction de couleur (rouge, vert, bleu) qui rapproche la matière de la photo du client")
@@ -169,9 +327,18 @@ class Sol(BaseModel):
         "même photo servant d'étalon (moteur/teinte_photo.py) : la cible du réglage de la teinte au rendu (moteur/blender/regler_teintes.py)")
     echelle: Annotated[float, Field(ge=0.3, le=3.0)] | None = Field(
         default=None, description="Taille du motif par rapport à la matière du catalogue (1,13 = chevrons 13 % plus grands)")
+    sens: Annotated[float, Field(ge=0, lt=180)] | None = Field(
+        default=None, description="Sens des lames de ce sol, en degrés dans le repère du logement (0 = le long de l'axe x, 90 = le "
+        "long de l'axe y), lu sur les photos du client (moteur/sens_des_lames.py) ; absent : le sens général du logement")
     statut: Statut
     source: str = Field(min_length=1)
     confiance: float = Field(default=1.0, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _sur_mesure_decrit(self) -> "Sol":
+        if self.matiere == SUR_MESURE and self.parquet is None:
+            raise ValueError("un sol « parquet_sur_mesure » doit décrire son parquet (champ « parquet »)")
+        return self
 
 
 class Corniche(BaseModel):
@@ -306,6 +473,7 @@ class Logement(BaseModel):
     pieces: list[Piece] = Field(default_factory=list)
     meubles: list[Meuble] = Field(default_factory=list)
     balcons: list[Balcon] = Field(default_factory=list)
+    passe_plats: list[PassePlat] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _coherence(self) -> Logement:
@@ -320,13 +488,13 @@ def verifier_coherence(logement: Logement) -> list[str]:
     erreurs: list[str] = []
 
     tous_les_ids = [e.id for e in [*logement.murs, *logement.ouvertures, *logement.pieces, *logement.meubles,
-                                   *logement.balcons]]
+                                   *logement.balcons, *logement.passe_plats]]
     doublons = sorted({i for i in tous_les_ids if tous_les_ids.count(i) > 1})
     if doublons:
         erreurs.append(f"identifiants en double : {', '.join(doublons)}")
 
     murs = {m.id: m for m in logement.murs}
-    for o in logement.ouvertures:
+    for o in [*logement.ouvertures, *logement.passe_plats]:
         mur = murs.get(o.mur)
         if mur is None:
             erreurs.append(f"l'ouverture {o.id} désigne un mur inconnu : {o.mur}")

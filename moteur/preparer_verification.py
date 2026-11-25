@@ -115,6 +115,69 @@ def doutes_de_construction(logement: dict) -> list[dict]:
             for t in trous_a_signaler(briques, log.hauteur_sous_plafond)]
 
 
+LIMITE_MIN, LIMITE_ECART = 0.3, 0.08  # une limite sans mur : au moins 30 cm ; deux bords de pièces « se touchent » à 8 cm près
+LIMITE_DANS_MUR = 1.0  # m : jusqu'où une limite sans mur se prolonge DANS le mur qu'elle rejoint (elle le traverse)
+
+
+def limites_sans_mur(logement: dict) -> list[dict]:
+    """Les LIMITES SANS MUR entre deux pièces du logement lu : là où les contours de deux pièces se touchent sans qu'un mur
+    passe entre elles (cuisine ouverte sur l'entrée, entrée ouverte sur le séjour : le plan nomme deux pièces, sans cloison).
+    POURQUOI (16/11/2026, app-004) : à l'ouverture, l'écran de vérification recalcule les pièces à partir des murs ; sans ces
+    limites, trois pièces nommées par le plan fondaient en une seule (« Séjour 19 m² ») et la cuisine disparaissait, alors
+    que le client dit « cuisine » pour ses photos. Format de l'écran : [{"debut": [x, y], "fin": [x, y]}] en mètres."""
+    murs = [(np.array(m["debut"], float), np.array(m["fin"], float), float(m["epaisseur"])) for m in logement.get("murs", [])]
+
+    def sur_un_mur(q) -> bool:
+        for a, b, e in murs:
+            ab = b - a
+            s = float(np.clip(np.dot(q - a, ab) / max(float(ab @ ab), 1e-9), 0.0, 1.0))
+            if float(np.linalg.norm(q - (a + s * ab))) <= e / 2 + 0.02:
+                return True
+        return False
+
+    cotes = lambda piece: [(np.array(u, float), np.array(v, float)) for u, v in zip(piece["contour"], piece["contour"][1:] + piece["contour"][:1])]
+    limites, pieces = [], logement.get("pieces", [])
+    for i, pa in enumerate(pieces):
+        for pb in pieces[i + 1:]:
+            for a0, a1 in cotes(pa):
+                d = a1 - a0
+                long_a = float(np.linalg.norm(d))
+                if long_a < LIMITE_MIN:
+                    continue
+                d = d / long_a
+                n = np.array([-d[1], d[0]])
+                for b0, b1 in cotes(pb):
+                    if abs(float((b0 - a0) @ n)) > LIMITE_ECART or abs(float((b1 - a0) @ n)) > LIMITE_ECART:
+                        continue  # pas sur la même ligne
+                    t0, t1 = sorted((float((b0 - a0) @ d), float((b1 - a0) @ d)))
+                    t0, t1 = max(t0, 0.0), min(t1, long_a)
+                    if t1 - t0 < LIMITE_MIN:
+                        continue
+                    decal = n * (float((b0 - a0) @ n) + float((b1 - a0) @ n)) / 4  # à mi-chemin des deux bords
+                    pas = np.arange(t0, t1 + 1e-9, 0.02)
+                    libre = np.array([not sur_un_mur(a0 + d * s + decal) for s in pas])
+                    k = 0
+                    while k < len(pas):  # chaque morceau d'un seul tenant sans mur devient une limite
+                        if not libre[k]:
+                            k += 1; continue
+                        j = k
+                        while j + 1 < len(pas) and libre[j + 1]:
+                            j += 1
+                        if pas[j] - pas[k] >= LIMITE_MIN:
+                            # La limite TRAVERSE le mur qu'elle rejoint à chaque bout (15/11/2026, app-004 : NT a raccourci un
+                            # poteau à l'écran, la limite, qui s'arrêtait 4 cm dans le poteau, ne le touchait plus, et cuisine,
+                            # entrée et séjour ont fondu en une seule pièce). Au moins 4 cm, au plus LIMITE_DANS_MUR.
+                            s0, s1 = pas[k] - 0.04, pas[j] + 0.04
+                            while pas[k] - s0 < LIMITE_DANS_MUR and sur_un_mur(a0 + d * (s0 - 0.02) + decal):
+                                s0 -= 0.02
+                            while s1 - pas[j] < LIMITE_DANS_MUR and sur_un_mur(a0 + d * (s1 + 0.02) + decal):
+                                s1 += 0.02
+                            u, v = a0 + d * s0 + decal, a0 + d * s1 + decal
+                            limites.append({"debut": [round(float(u[0]), 3), round(float(u[1]), 3)], "fin": [round(float(v[0]), 3), round(float(v[1]), 3)]})
+                        k = j + 1
+    return limites
+
+
 def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | None:
     """Le contenu de verification.json ; None pour un plan refusé (rien à montrer : pas d'écran)."""
     g = plan.gardee
@@ -131,6 +194,10 @@ def verification_du_plan(plan: PlanLu, nom_image: str = "plan.png") -> dict | No
         if d.get("blocs_px"):
             sortie["blocs_px"] = [[float(v) for v in b] for b in d["blocs_px"]]
         doutes.append(sortie)
-    return {"schema": SCHEMA, "plan": nom_image, "calage": {"matrice": [[round(float(v), 10) for v in ligne] for ligne in M]},
-            "echelle": _echelle(g.echelle), "logement": completer_finitions(g.logement), "doutes": doutes,
-            "lecture": {"decision": plan.decision, "modele": g.modele, "aiguillage": plan.aiguillage, "preparateur": VERSION_PREPARATEUR}}
+    v = {"schema": SCHEMA, "plan": nom_image, "calage": {"matrice": [[round(float(v), 10) for v in ligne] for ligne in M]},
+         "echelle": _echelle(g.echelle), "logement": completer_finitions(g.logement), "doutes": doutes,
+         "lecture": {"decision": plan.decision, "modele": g.modele, "aiguillage": plan.aiguillage, "preparateur": VERSION_PREPARATEUR}}
+    limites = limites_sans_mur(g.logement)
+    if limites:  # deux pièces nommées par le plan sans mur entre elles : l'écran garde la limite au lieu de les fondre en une
+        v["limites"] = limites
+    return v

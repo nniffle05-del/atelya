@@ -59,9 +59,10 @@ import math
 import unicodedata
 from dataclasses import asdict, replace
 
+from moteur import pans_rideaux
 from moteur.geometrie import Brique, Point, _arrondi, _rectangle, _sens_direct, calculer_briques
 from moteur.logement import Logement, Mur, Ouverture, Piece
-from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, matiere_et_teinte, nom_materiau, sorte
+from moteur.matieres import NOMS_SOLS, SOL_PAR_SORTE, SUR_MESURE, matiere_et_teinte, nom_materiau, sorte
 
 VERSION_PLAN = "construction/0.2"
 
@@ -141,6 +142,7 @@ def plan_habille(logement: Logement) -> dict:
     # sols qu'elles touchent, elles se chevauchaient et faisaient de fines lignes sombres au rendu.
     briques = [replace(b, z_bas=JOINT_SOL_Z, z_haut=JOINT_SOL_Z) if b.id.startswith("joint_sol__") else b for b in briques]
     briques += menuiseries(logement)
+    briques += tablettes_des_passe_plats(logement)
     briques += plinthes(briques, logement)
     briques += corniches(briques, logement)
     briques += portes_de_placard(briques, logement)
@@ -157,7 +159,11 @@ def plan_habille(logement: Logement) -> dict:
         # la sorte (bois ou carrelage) de chaque matière du catalogue : Blender en a besoin pour la brillance et le relief,
         # sans pouvoir lire moteur/matieres.py (catalogue passé à 61 matières le 09/11/2026)
         "sortes_sols": {nom: sorte(nom) for nom in NOMS_SOLS},
+        # les parquets faits sur mesure d'après les photos : {nom de la matière : sa fiche} ; moteur.construire les dessine
+        "parquets_sur_mesure": parquets_sur_mesure(logement),
         "rideaux": rideaux_du_plan(logement),
+        # les ferronneries des garde-corps recopiées des photos (moteur/ferronnerie.py) : du métal découpé, pas des briques
+        "ferronneries": ferronneries_du_plan(logement),
     }
 
 
@@ -179,11 +185,27 @@ def rideaux_du_plan(logement: Logement) -> list[dict]:
         if not any(_dans((cx + nx * (m.epaisseur / 2 + 0.3), cy + ny * (m.epaisseur / 2 + 0.3)), p.contour) for p in logement.pieces):
             nx, ny = -nx, -ny
         hsp = m.hauteur or logement.hauteur_sous_plafond
-        sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2],
+        # les pans de rideaux épais, dans le repère que Blender donne à la fenêtre (y vers la pièce, x = (ny, −nx) le long du
+        # mur) : −1 = du côté des x négatifs, +1 = de l'autre. Sans mesure sur les photos : un pan de chaque côté.
+        # Depuis le 22/11/2026 chaque pan porte son étendue le long du mur (« x0 », « x1 », du même signe que son côté) et son
+        # état (« ouvert » / « tire ») : la largeur et la place vues sur les photos, ou 45 cm à cheval sur le bord de la baie
+        # (moteur/pans_rideaux.py, la même règle que le contrôle des collisions).
+        vers_la_fin = 1 if ny * ux - nx * uy > 0 else -1
+        pans = []
+        for sens, p in pans_rideaux.cotes([p.model_dump() for p in o.rideaux.pans] if o.rideaux.pans else None):
+            interieur, exterieur = pans_rideaux.etendue(o.largeur / 2, p)
+            pans.append({"cote": sens * vers_la_fin, "x0": round(interieur, 3), "x1": round(exterieur, 3),
+                         "etat": pans_rideaux.etat(p, o.largeur / 2)})
+        pans.sort(key=lambda p: p["cote"])
+        sortie.append({"id": o.id, "centre": [cx + nx * m.epaisseur / 2, cy + ny * m.epaisseur / 2], "pans": pans,
                        "normale_deg": math.degrees(math.atan2(ny, nx)), "largeur": o.largeur,
-                       "z_tringle": max(min(hsp - 0.12, hsp - 0.02), min(o.allege + o.hauteur + 0.3, hsp - 0.02)),
+                       # le haut du tissu : sous la tringle vue sur les photos, sinon 12 cm sous le plafond (pans_rideaux)
+                       "z_tringle": pans_rideaux.haut_du_tissu(o.rideaux.model_dump(), hsp, o.allege, o.hauteur,
+                                                               pans_rideaux.haut_vu_sur_les_photos(o.source)),
+                       "couleur_tringle": list(o.rideaux.tringle.couleur) if o.rideaux.tringle and o.rideaux.tringle.couleur else None,
                        "voilage": list(o.rideaux.voilage) if o.rideaux.voilage else None,
-                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None})
+                       "rideaux": list(o.rideaux.rideaux) if o.rideaux.rideaux else None,
+                       "ecart": o.rideaux.ecart, "bas": o.rideaux.bas})
     return sortie
 
 
@@ -368,6 +390,24 @@ def completer_finitions(logement: dict) -> dict:
     return sortie
 
 
+def matiere_d_un_sol(sol) -> str:
+    """La matière d'un sol dans la maquette : celle du catalogue, ou le nom du parquet dessiné sur mesure (« psm_… »)."""
+    if sol.matiere == SUR_MESURE and sol.parquet is not None:
+        from moteur.parquet_sur_mesure import nom
+        return nom(sol.parquet.model_dump())
+    return sol.matiere
+
+
+def parquets_sur_mesure(logement: Logement) -> dict:
+    """Les parquets sur mesure du logement : {nom de la matière (« psm_… ») : fiche du parquet}."""
+    sortie = {}
+    for p in logement.pieces:
+        for sol in ([p.sol] if p.sol is not None else []) + [z.sol for z in p.zones_sol]:
+            if sol.matiere == SUR_MESURE and sol.parquet is not None:
+                sortie[matiere_d_un_sol(sol)] = sol.parquet.model_dump()
+    return sortie
+
+
 def materiau_de(brique: Brique, logement: Logement) -> str:
     """Le matériau d'une brique des murs, sols et plafonds."""
     if brique.categorie == "mur":
@@ -379,11 +419,37 @@ def materiau_de(brique: Brique, logement: Logement) -> str:
         piece = pieces[brique.element]
         if brique.id.startswith("zone_sol__"):  # « zone_sol__<pièce>__<n° de la zone, à partir de 1> »
             zone = piece.zones_sol[int(brique.id.rsplit("__", 1)[1]) - 1]
-            return nom_materiau(zone.sol.matiere, zone.sol.teinte, zone.sol.echelle)
+            return nom_materiau(matiere_d_un_sol(zone.sol), zone.sol.teinte, zone.sol.echelle, zone.sol.sens)
         if piece.sol is None:
-            return nom_materiau(matiere_du_sol(piece))
-        return nom_materiau(piece.sol.matiere, piece.sol.teinte, piece.sol.echelle)
+            return nom_materiau(matiere_du_sol(piece), sens=sens_par_defaut(piece, matiere_du_sol(piece), logement))
+        sens = piece.sol.sens if piece.sol.sens is not None else sens_par_defaut(piece, piece.sol.matiere, logement)
+        return nom_materiau(matiere_d_un_sol(piece.sol), piece.sol.teinte, piece.sol.echelle, sens)
     return "seuil"  # le sol sous une porte
+
+
+PIECE_ALLONGEE = 1.3  # une pièce au moins 1,3 fois plus longue que large a un « grand côté »
+
+
+def sens_par_defaut(piece: Piece, matiere: str, logement: Logement) -> float | None:
+    """Le sens des lames d'un parquet à lames droites quand les photos ne l'ont pas donné : le long du GRAND CÔTÉ de la pièce,
+    si elle est nettement allongée. None : le sens général du logement (moteur.habillage.orientation_sols).
+
+    Pourquoi (17/11/2026) : la règle d'avant (« le même sens partout, celui des murs les plus longs du logement ») était fausse
+    dans les chambres de deux logements sur trois. Sur les quatre pièces où les photos donnent le sens sans doute possible
+    (chambres d'app-001, séjours d'app-002 et d'app-004), le grand côté de la pièce le donne quatre fois, la règle générale
+    deux fois. Ce n'est qu'une supposition (aucune photo ne tranche) ; un sens lu sur les photos passe toujours devant."""
+    from moteur.matieres import LAMES_DROITES
+
+    if (matiere not in LAMES_DROITES and matiere != SUR_MESURE) or len(piece.contour) < 3:
+        return None
+    general = orientation_sols(logement)
+    c, s = math.cos(-general), math.sin(-general)
+    xs = [x * c - y * s for x, y in piece.contour]  # la pièce vue dans le repère des murs du logement
+    ys = [x * s + y * c for x, y in piece.contour]
+    long_, large = max(xs) - min(xs), max(ys) - min(ys)
+    if large < long_ * PIECE_ALLONGEE:  # le grand côté est le sens général (ou la pièce n'est pas allongée) : rien à dire
+        return None
+    return round((math.degrees(general) + 90.0) % 180.0, 1)
 
 
 # ------------------------------------------------------------- menuiseries
@@ -409,6 +475,23 @@ def menuiseries(logement: Logement) -> list[Brique]:
     return briques
 
 
+DEBORD_TABLETTE = 0.03  # m : la tablette d'un passe-plat dépasse de chaque côté du mur et de chaque bord du trou
+EPAISSEUR_TABLETTE = 0.03
+
+
+def tablettes_des_passe_plats(logement: Logement) -> list[Brique]:
+    """La tablette posée au bas de chaque passe-plat (16/11/2026) : une planche blanche de 3 cm, qui dépasse de 3 cm de chaque
+    côté du mur. Sans elle, le trou montre la tranche brute du mur."""
+    murs = {m.id: m for m in logement.murs}
+    sortie = []
+    for t in logement.passe_plats:
+        mur = murs[t.mur]
+        demi = mur.epaisseur / 2 + DEBORD_TABLETTE
+        sortie.append(_boite(t, mur, "tablette", (0.0, t.largeur), (-demi, demi), (t.allege, t.allege + EPAISSEUR_TABLETTE),
+                             "menuiserie_blanche"))
+    return sortie
+
+
 def _boite(o: Ouverture, mur: Mur, nom: str, t: tuple[float, float],
            n: tuple[float, float], z: tuple[float, float], materiau: str) -> Brique:
     """Une boîte posée dans l'ouverture : t le long du mur, n dans son épaisseur."""
@@ -417,12 +500,15 @@ def _boite(o: Ouverture, mur: Mur, nom: str, t: tuple[float, float],
 
 
 def _fenetre(o: Ouverture, mur: Mur, cote_interieur: int = 0) -> list[Brique]:
-    """Cadre tout autour, une ou deux vitres, un montant au milieu si elle est large.
+    """Cadre tout autour, une ou deux vitres, un montant au milieu si elle est large ; ou, si les photos ont dit le DESSIN de
+    la fenêtre (o.dessin, 20/11/2026), la fenêtre qu'elles montrent (_fenetre_dessinee).
 
     cote_interieur : +1 si la pièce est à gauche du mur, -1 à droite, 0 si on ne sait pas (pièce des deux côtés ou
     d'aucun). Le cadre est alors posé RETRAIT_FENETRE derrière la face intérieure (sinon au milieu du mur), avec un appui
     sous une fenêtre (pas sous une porte-fenêtre).
     """
+    if o.dessin is not None:
+        return _fenetre_dessinee(o, mur, cote_interieur)
     l, p = o.largeur, PROFIL
     bas, haut = o.allege, o.allege + o.hauteur
     s = cote_interieur
@@ -430,16 +516,7 @@ def _fenetre(o: Ouverture, mur: Mur, cote_interieur: int = 0) -> list[Brique]:
     cadre = (centre - PROFONDEUR_CADRE / 2, centre + PROFONDEUR_CADRE / 2)
     vitre = (centre - EPAISSEUR_VITRE / 2, centre + EPAISSEUR_VITRE / 2)
     m = "menuiserie_blanche"
-    appui = []
-    if s and o.type == "fenetre" and bas >= ALLEGE_MIN_APPUI:
-        face = s * mur.epaisseur / 2
-        z = (bas, bas + EPAISSEUR_APPUI)
-        # dans l'épaisseur du mur (entre le cadre et la face), puis le nez qui dépasse dans la pièce
-        appui = [
-            _boite(o, mur, "appui", (0, l), tuple(sorted((centre + s * PROFONDEUR_CADRE / 2, face))), z, m),
-            _boite(o, mur, "appui_nez", (-DEBORD_APPUI, l + DEBORD_APPUI),
-                   tuple(sorted((face, face + s * DEBORD_APPUI))), z, m),
-        ]
+    appui = _appui(o, mur, s, centre, bas) if o.type == "fenetre" and bas >= ALLEGE_MIN_APPUI else []
     briques = [
         _boite(o, mur, "montant_1", (0, p), cadre, (bas, haut), m),
         _boite(o, mur, "montant_2", (l - p, l), cadre, (bas, haut), m),
@@ -456,6 +533,160 @@ def _fenetre(o: Ouverture, mur: Mur, cote_interieur: int = 0) -> list[Brique]:
     for i, t in enumerate(carreaux, start=1):
         briques.append(_boite(o, mur, f"vitre_{i}", t, vitre, (bas + p, haut - p), "verre"))
     return briques + appui
+
+
+def _appui(o: Ouverture, mur: Mur, s: int, centre: float, z_bas: float) -> list[Brique]:
+    """L'appui d'une fenêtre, côté pièce, à la hauteur z_bas : dans l'épaisseur du mur (entre le cadre et la face), puis le
+    nez qui dépasse dans la pièce. Rien si on ne sait pas de quel côté est la pièce."""
+    if not s:
+        return []
+    face = s * mur.epaisseur / 2
+    z = (z_bas, z_bas + EPAISSEUR_APPUI)
+    m = "menuiserie_blanche"
+    return [
+        _boite(o, mur, "appui", (0, o.largeur), tuple(sorted((centre + s * PROFONDEUR_CADRE / 2, face))), z, m),
+        _boite(o, mur, "appui_nez", (-DEBORD_APPUI, o.largeur + DEBORD_APPUI), tuple(sorted((face, face + s * DEBORD_APPUI))), z, m),
+    ]
+
+
+PROFONDEUR_PETIT_BOIS = 0.035  # m : un petit bois est plus mince que le cadre, de part et d'autre de la vitre
+SOUBASSEMENT_MIN = 0.03  # m : une partie pleine plus basse n'est pas construite
+# Garde-corps d'une fenêtre (m). Fer plat pour la main courante, fers carrés pour les barreaux, écart réglementaire de 11 cm.
+RETRAIT_GARDE_CORPS = 0.05  # son axe est à 5 cm derrière la face EXTÉRIEURE du mur (dans le tableau de la fenêtre)
+MAIN_COURANTE = (0.04, 0.02)  # largeur (dans l'épaisseur du mur), hauteur
+LISSE = 0.016  # section des lisses
+BARREAU = 0.014  # section d'un barreau
+ECART_BARREAUX = 0.11
+PIED_GARDE_CORPS = 0.06  # la lisse du bas est à 6 cm au-dessus de son pied
+FRISE_FER_FORGE = 0.13  # fer forgé : une seconde lisse à 13 cm sous la main courante (la frise)
+
+
+def _fenetre_dessinee(o: Ouverture, mur: Mur, cote_interieur: int = 0) -> list[Brique]:
+    """La fenêtre que les photos montrent (o.dessin : parts de la baie, moteur/dessin_fenetres.py) : le cadre à sa vraie
+    largeur, un battement entre deux vantaux, les petits bois de chaque vantail, la partie pleine sous la menuiserie (allège
+    basse d'une fenêtre ancienne : un morceau de mur, avec son appui), le garde-corps dehors."""
+    d = o.dessin
+    l, h = o.largeur, o.hauteur
+    bas, haut = o.allege, o.allege + o.hauteur
+    s = cote_interieur
+    centre = s * max(0.0, mur.epaisseur / 2 - RETRAIT_FENETRE - PROFONDEUR_CADRE / 2)
+    cadre = (centre - PROFONDEUR_CADRE / 2, centre + PROFONDEUR_CADRE / 2)
+    vitre = (centre - EPAISSEUR_VITRE / 2, centre + EPAISSEUR_VITRE / 2)
+    bois = (centre - PROFONDEUR_PETIT_BOIS / 2, centre + PROFONDEUR_PETIT_BOIS / 2)
+    m = "menuiserie_blanche"
+    briques: list[Brique] = []
+    z_menuiserie = bas  # le bas de la menuiserie : au-dessus de la partie pleine, s'il y en a une
+    if d.soubassement * h >= SOUBASSEMENT_MIN:
+        z_menuiserie = bas + d.soubassement * h
+        # un morceau de MUR (toute son épaisseur, sa peinture) : la fenêtre est posée dessus
+        briques.append(_boite(o, mur, "soubassement", (0, l), (-mur.epaisseur / 2, mur.epaisseur / 2), (bas, z_menuiserie), "mur_blanc"))
+    z_vb, z_vh = max(bas + d.vitrage_bas * h, z_menuiserie + 0.01), bas + d.vitrage_haut * h
+    g, dr = d.vantaux[0].debut * l, d.vantaux[-1].fin * l
+    briques += [
+        _boite(o, mur, "montant_1", (0, g), cadre, (z_menuiserie, haut), m),
+        _boite(o, mur, "montant_2", (dr, l), cadre, (z_menuiserie, haut), m),
+        _boite(o, mur, "traverse_haut", (g, dr), cadre, (z_vh, haut), m),
+        _boite(o, mur, "traverse_bas", (g, dr), cadre, (z_menuiserie, z_vb), m),
+    ]
+    for i, (a, b) in enumerate(zip(d.vantaux, d.vantaux[1:]), start=1):  # le battement entre deux vantaux
+        if (b.debut - a.fin) * l > 1e-4:
+            briques.append(_boite(o, mur, "montant_milieu" if len(d.vantaux) == 2 else f"battement_{i}",
+                                  (a.fin * l, b.debut * l), cadre, (z_vb, z_vh), m))
+    for i, v in enumerate(d.vantaux, start=1):
+        briques.append(_boite(o, mur, f"vitre_{i}", (v.debut * l, v.fin * l), vitre, (z_vb, z_vh), "verre"))
+        for k, (a, b) in enumerate(v.montants, start=1):
+            briques.append(_boite(o, mur, f"petit_bois_{i}_m{k}", (a * l, b * l), bois, (z_vb, z_vh), m))
+        for k, (a, b) in enumerate(v.traverses, start=1):
+            if bas + a * h > z_vb and bas + b * h < z_vh:
+                briques.append(_boite(o, mur, f"petit_bois_{i}_t{k}", (v.debut * l, v.fin * l), bois, (bas + a * h, bas + b * h), m))
+    if z_menuiserie >= ALLEGE_MIN_APPUI or (o.type == "fenetre" and bas >= ALLEGE_MIN_APPUI):
+        briques += _appui(o, mur, s, centre, z_menuiserie)
+    if d.garde_corps is not None and s:
+        briques += _garde_corps_de_fenetre(o, mur, s)
+    return briques
+
+
+def _garde_corps_de_fenetre(o: Ouverture, mur: Mur, s: int) -> list[Brique]:
+    """Le garde-corps d'une fenêtre, DEHORS (du côté opposé à la pièce), dans le tableau : main courante, lisse basse et
+    barreaux droits tous les 11 cm au plus (« barreaudage » ; « fer_forge » : la même chose et la lisse de la frise : les
+    volutes de la ferronnerie ne sont PAS dessinées) ; « lisses » : des lisses couchées ; « verre » : un panneau de verre."""
+    gc = o.dessin.garde_corps
+    l, h = o.largeur, o.hauteur
+    z0, z1 = o.allege + gc.bas * h, o.allege + gc.haut * h
+    if z1 - z0 < 0.25:
+        return []
+    axe = -s * max(0.0, mur.epaisseur / 2 - RETRAIT_GARDE_CORPS)
+    fer = "fer_forge"
+
+    def n(largeur: float) -> tuple[float, float]:
+        return (axe - largeur / 2, axe + largeur / 2)
+
+    briques = [_boite(o, mur, "garde_corps_main_courante", (0, l), n(MAIN_COURANTE[0]), (z1 - MAIN_COURANTE[1], z1), fer)]
+    z_lisse = z0 + PIED_GARDE_CORPS
+    z_sous = z1 - MAIN_COURANTE[1]
+    if gc.genre == "verre":
+        briques.append(_boite(o, mur, "garde_corps_verre", (0.02, l - 0.02), n(EPAISSEUR_VITRE), (z_lisse, z_sous), "verre"))
+        return briques
+    briques.append(_boite(o, mur, "garde_corps_lisse_basse", (0, l), n(LISSE), (z_lisse, z_lisse + LISSE), fer))
+    if gc.motif is not None and gc.genre in ("fer_forge", "barreaudage"):
+        # la ferronnerie RECOPIÉE des photos remplit l'entre-deux : du métal découpé, posé à part (ferronneries_du_plan)
+        return briques
+    if gc.genre == "lisses":
+        nombre = max(1, math.ceil((z_sous - z_lisse - LISSE) / ECART_BARREAUX) - 1)
+        pas = (z_sous - z_lisse - LISSE) / (nombre + 1)
+        for i in range(1, nombre + 1):
+            z = z_lisse + LISSE + i * pas
+            briques.append(_boite(o, mur, f"garde_corps_lisse_{i}", (0, l), n(LISSE), (z - LISSE / 2, z + LISSE / 2), fer))
+        return briques
+    if gc.genre == "fer_forge" and z_sous - FRISE_FER_FORGE > z_lisse + 0.25:
+        briques.append(_boite(o, mur, "garde_corps_frise", (0, l), n(LISSE), (z_sous - FRISE_FER_FORGE, z_sous - FRISE_FER_FORGE + LISSE), fer))
+    nombre = max(1, math.ceil(l / ECART_BARREAUX) - 1)
+    pas = l / (nombre + 1)
+    for i in range(1, nombre + 1):
+        t = i * pas
+        briques.append(_boite(o, mur, f"garde_corps_barreau_{i}", (t - BARREAU / 2, t + BARREAU / 2), n(BARREAU), (z_lisse + LISSE, z_sous), fer))
+    return briques
+
+
+EPAISSEUR_FERRONNERIE = 0.014  # m : la fonte d'un garde-corps, vue par la tranche
+
+
+def ferronneries_du_plan(logement: Logement) -> list[dict]:
+    """Les FERRONNERIES des garde-corps de fenêtre dont le motif a été recopié des photos (moteur/ferronnerie.py,
+    20/11/2026), prêtes pour Blender : le module répété sur la largeur de la baie, entre la lisse basse et la main courante.
+    Chacune : {"id", "element", "origine": [x, y] (le bord de la baie du côté du début du mur, sur l'axe du garde-corps),
+    "direction": [ux, uy] (le long du mur), "z_bas", "epaisseur", "materiau", "morceaux": [{"contour": [(t, z) …], "trous":
+    […]}] en mètres (t le long du mur depuis l'origine, z au-dessus de z_bas)}."""
+    from moteur import ferronnerie
+
+    murs = {m.id: m for m in logement.murs}
+    sortie = []
+    for o in logement.ouvertures:
+        gc = o.dessin.garde_corps if o.dessin is not None else None
+        if o.type == "porte" or gc is None or gc.motif is None or gc.genre not in ("fer_forge", "barreaudage"):
+            continue
+        mur = murs[o.mur]
+        gauche, droite = _cotes_dans_une_piece(o, mur, logement)
+        if gauche == droite:
+            continue  # on ne sait pas où est le dehors : pas de garde-corps (comme _fenetre_dessinee)
+        s = 1 if gauche else -1
+        z0, z1 = o.allege + gc.bas * o.hauteur, o.allege + gc.haut * o.hauteur
+        z_bas = z0 + PIED_GARDE_CORPS
+        if z1 - z0 < 0.25:
+            continue
+        motif = gc.motif.model_dump()
+        morceaux = ferronnerie.panneau(motif, o.largeur, z1 - z_bas)
+        if s > 0:  # le motif est vu de la pièce ; pièce à gauche du mur : sa gauche est du côté de la FIN du mur
+            morceaux = [{"contour": [(round(o.largeur - t, 5), z) for t, z in m["contour"]][::-1],
+                         "trous": [[(round(o.largeur - t, 5), z) for t, z in trou][::-1] for trou in m["trous"]]} for m in morceaux]
+        (x0, y0), (x1, y1) = mur.debut, mur.fin
+        ux, uy = (x1 - x0) / mur.longueur, (y1 - y0) / mur.longueur
+        axe = -s * max(0.0, mur.epaisseur / 2 - RETRAIT_GARDE_CORPS)  # vers la gauche du mur
+        sortie.append({"id": f"{o.id}__garde_corps_ferronnerie", "element": o.id,
+                       "origine": [x0 + ux * o.position - uy * axe, y0 + uy * o.position + ux * axe],
+                       "direction": [ux, uy], "z_bas": round(z_bas, 4), "epaisseur": EPAISSEUR_FERRONNERIE,
+                       "materiau": "fer_forge", "morceaux": morceaux})
+    return sortie
 
 
 def _place_de_chaque_cote(o: Ouverture, mur: Mur, logement: Logement) -> tuple[float, float]:

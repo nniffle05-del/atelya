@@ -87,6 +87,29 @@ def portes_ouvertes(logement: dict, visitees: set | None = None) -> list[dict]:
     return sortie
 
 
+SEUIL_PHOTO_M = 0.35  # l'appareil d'une photo est « dans l'embrasure » d'une porte : à moins d'une demi-porte de son passage
+
+
+def portes_du_seuil(logement: dict, x: float, y: float, seuil: float = SEUIL_PHOTO_M) -> list[dict]:
+    """Les portes à OUVRIR pour filmer depuis la place d'une photo : celles dont l'appareil occupe l'embrasure (à moins de
+    `seuil` du passage). Un photographe qui se tient sur le seuil d'une pièce a la porte ouverte ; dans la maquette toutes
+    les portes sont fermées, et le battant fermé cachait la moitié de l'image (salle d'eau d'app-004, 24/11/2026, dès que
+    l'appareil a été remis à sa vraie place, sur le seuil). Même forme que portes_ouvertes, sans le rectangle du battant
+    (prête à écrire en JSON pour le réglage « portes_ouvertes » du film)."""
+    c = np.array([float(x), float(y)])
+    sortie = []
+    for p in portes_ouvertes(logement):
+        o = next(o for o in logement["ouvertures"] if o["id"] == p["id"])
+        m = next(m for m in logement["murs"] if m["id"] == o["mur"])
+        a, b = np.asarray(m["debut"], float), np.asarray(m["fin"], float)
+        d = (b - a) / np.linalg.norm(b - a)
+        p0, p1 = a + d * o["position"], a + d * (o["position"] + o["largeur"])
+        t = float(np.clip(np.dot(c - p0, p1 - p0) / np.dot(p1 - p0, p1 - p0), 0.0, 1.0))
+        if float(np.linalg.norm(c - (p0 + t * (p1 - p0)))) < seuil:
+            sortie.append({k: v for k, v in p.items() if k != "battant"})
+    return sortie
+
+
 def porte_palliere(logement: dict) -> str | None:
     """La porte d'entrée du logement : une porte du pourtour de l'entrée qui ne donne sur aucune autre pièce."""
     entree = next((p for p in logement["pieces"] if rz._type(p) == "entree"), None)

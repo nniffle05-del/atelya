@@ -91,7 +91,9 @@ def cuisine_basse(m, racine, collection):
     portes(m, racine, collection, facade, SOCLE, hauteur - plan)
     boite(f"Socle_{m['id']}", (0, -RETRAIT_SOCLE / 2 - 0.001, 0), (largeur - 0.01, profondeur - RETRAIT_SOCLE, SOCLE - 0.002),
           materiau("Socle_cuisine", (60, 60, 62), 0.6), racine, collection, biseau=0.0)
-    boite(f"Plan_{m['id']}", (0, -0.01, hauteur - plan), (largeur + 0.01, profondeur + 0.02 + 2 * SAILLIE + EPAISSEUR_PORTE, plan),
+    # le dessus du plan passe 1 mm AU-DESSUS du corps du meuble : à la même hauteur exactement, les deux faces se faisaient de
+    # l'ombre l'une à l'autre et le plan de travail sortait NOIR vu de dessus (vu le 16/11/2026 sur la cuisine d'app-004)
+    boite(f"Plan_{m['id']}", (0, -0.01, hauteur - plan), (largeur + 0.01, profondeur + 0.02 + 2 * SAILLIE + EPAISSEUR_PORTE, plan + 0.001),
           materiau("Plan_de_travail", (236, 236, 233), 0.18), racine, collection)
 
 
@@ -111,9 +113,12 @@ def colonnes(m, racine, collection):
     pas = largeur / n
     y = -(profondeur / 2 + SAILLIE + EPAISSEUR_PORTE / 2)
     four_bas, four_haut = 0.85, 1.45
+    # « sans four » (colonne posée d'après une lecture des photos) : le four n'est dessiné que s'il a été LU, à sa place
+    # (moteur/equipements.py) ; sans cette mention, comme avant, la première colonne porte un four.
+    avec_four = "sans four" not in (m.get("description") or "").lower()
     for i in range(n):
         cx = -largeur / 2 + (i + 0.5) * pas
-        if i == 0 and hauteur > 1.8:  # une colonne four : porte basse, four (verre noir), porte haute
+        if i == 0 and hauteur > 1.8 and avec_four:  # une colonne four : porte basse, four (verre noir), porte haute
             morceaux = [(SOCLE, four_bas, facade), (four_bas, four_haut, materiau("Four", (25, 25, 27), 0.08)),
                         (four_haut, hauteur, facade)]
         else:  # une colonne réfrigérateur ou rangement : deux portes
@@ -168,3 +173,13 @@ def television(m, racine, collection):
 
 DESSINS = {"meuble_cuisine_bas": cuisine_basse, "meuble_cuisine_haut": cuisine_haute, "colonne_cuisine": colonnes,
            "ilot": ilot, "placard": placard, "television": television}
+
+
+def _avec_les_equipements():
+    """Les équipements du logement (cheminée, radiateur, évier, baignoire… : equipements.py, même dossier) rejoignent les
+    dessins. Importé à la fin : equipements.py se sert de boite() et de materiau() de ce fichier."""
+    import equipements
+    DESSINS.update(equipements.DESSINS)
+
+
+_avec_les_equipements()

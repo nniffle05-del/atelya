@@ -676,6 +676,10 @@
     meuble_cuisine_bas: "Meubles bas de cuisine", meuble_cuisine_haut: "Meubles hauts de cuisine",
     colonne_cuisine: "Colonne de cuisine (four, frigo)", ilot: "Îlot de cuisine", caisson: "Caisson, cloison meuble",
     placard: "Placard, dressing", television: "Télévision",
+    cheminee: "Cheminée", radiateur: "Radiateur, sèche-serviettes", refrigerateur: "Réfrigérateur",
+    four: "Four ou micro-ondes encastré", plaque: "Plaque de cuisson", hotte: "Hotte", evier: "Évier",
+    electromenager: "Lave-linge, lave-vaisselle", lavabo: "Lavabo, vasque", baignoire: "Baignoire", douche: "Douche", wc: "WC",
+    applique: "Applique murale", plafonnier: "Plafonnier, spots", etagere_murale: "Étagères murales, niche",
   };
   // Taille d'un meuble courant (largeur, profondeur, hauteur en m) et hauteur du bas pour ceux qui sont au mur ou au plafond.
   const TAILLES_MEUBLES = {
@@ -685,8 +689,13 @@
     tapis: [2.0, 1.4, 0.02], meuble_cuisine_bas: [2.4, 0.6, 0.9], meuble_cuisine_haut: [2.4, 0.35, 0.7],
     colonne_cuisine: [0.6, 0.6, 2.1], ilot: [1.8, 0.9, 0.9], placard: [1.8, 0.6, 2.4], television: [1.2, 0.08, 0.7],
     tableau: [0.8, 0.04, 0.6], miroir: [0.6, 0.04, 0.9],
+    cheminee: [1.3, 0.35, 1.15], radiateur: [0.9, 0.1, 0.6], refrigerateur: [0.6, 0.65, 1.8], four: [0.6, 0.03, 0.6],
+    plaque: [0.6, 0.52, 0.01], hotte: [0.7, 0.45, 0.5], evier: [0.8, 0.5, 0.02], electromenager: [0.6, 0.6, 0.85],
+    lavabo: [0.7, 0.48, 0.88], baignoire: [1.7, 0.75, 0.58], douche: [0.9, 0.9, 2.0], wc: [0.38, 0.66, 0.8],
+    applique: [0.2, 0.12, 0.25], plafonnier: [0.4, 0.4, 0.1], etagere_murale: [0.9, 0.25, 1.2],
   };
-  const ALTITUDES_MEUBLES = { tableau: 1.3, miroir: 1.1, horloge: 1.6, meuble_cuisine_haut: 1.45, television: 0.6 };
+  const ALTITUDES_MEUBLES = { tableau: 1.3, miroir: 1.1, horloge: 1.6, meuble_cuisine_haut: 1.45, television: 0.6,
+    radiateur: 0.12, four: 0.85, plaque: 0.9, hotte: 1.6, evier: 0.9, applique: 1.7, plafonnier: 2.4, etagere_murale: 1.0 };
 
   /** L'emprise au sol d'un meuble : rectangle tourné ; « face » = la direction de son avant (0° = +x, 90° = +y). */
   function empreinteMeuble(m) {
@@ -1090,6 +1099,13 @@
     vieux_carrelage: "Vieux carrelage",
     carreaux_cubes: "Carreaux de ciment en cubes (losanges)",
     petits_carreaux_clairs: "Petits carreaux clairs, 10 cm",
+    lames_chene_miel: "Chêne miel, lames à l'anglaise",
+    lames_chene_clair: "Chêne clair, lames à l'anglaise",
+    lames_chene_dore: "Chêne doré, lames à l'anglaise",
+    lames_miel_fines: "Parquet miel, lames fines",
+    lames_miel_moyennes: "Parquet miel, lames moyennes",
+    pin_clair_larges: "Pin clair, larges lames",
+    lames_chene_anglaise: "Chêne à l'anglaise, lames de 10 cm",
   };
 
   /** Le sol d'une pièce, choisi par la personne. */

@@ -90,3 +90,12 @@ def test_monter_film(tmp_path):
         plans.append(d)
     b = mf.monter(tmp_path / "film.mp4", plans, fondu_s=2 / 24, ips=24)
     assert b["images"] == 18 and (tmp_path / "film.mp4").is_file()
+
+
+def test_le_ciel_couvert_du_film_est_un_vrai_ciel_couvert():
+    """Le défaut depuis le 18/11/2026 : ciel couvert de la CIE et sol de rue sous l'horizon (plus la boule uniforme, qui
+    éclairait autant par en dessous que par au-dessus)."""
+    texte = (Path(__file__).resolve().parents[1] / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
+    assert 'CIEL_COUVERT = "cie"' in texte
+    assert texte.count('reglage.get("ciel_couvert", CIEL_COUVERT)') == 2
+    assert 'ciel_couvert if ciel == "couvert" else "uni"' in texte  # la nuit garde son fond uni

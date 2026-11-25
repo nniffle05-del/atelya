@@ -370,3 +370,48 @@ def objets(sortie: dict, noms: list[str], seuil: float = 0.2, recouvrement_max: 
                     "boite": [round(float(max(0, x0)), 1), round(float(max(0, y0)), 1),
                               round(float(min(w, x1)), 1), round(float(min(h, y1)), 1)]})
     return out
+
+
+MEME_OBJET = 0.5  # deux rectangles de même sorte qui se recouvrent autant (surface commune / réunie) ne font qu'un objet
+MORCEAU = 0.8  # un rectangle dont 80 % est dans un autre de même sorte en est un morceau (un tiroir et son armoire)
+TOUT_MIN = 0.6  # le grand rectangle remplace ses morceaux s'il est au moins à 60 % aussi sûr que le plus sûr d'entre eux
+
+
+def _part_dedans(a, b) -> float:
+    x0, y0, x1, y1 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
+    surface = (a[2] - a[0]) * (a[3] - a[1])
+    return max(0.0, x1 - x0) * max(0.0, y1 - y0) / surface if surface > 0 else 0.0
+
+
+def _recouvrement(a, b) -> float:
+    x0, y0, x1, y1 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
+    commun = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+    reunion = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - commun
+    return commun / reunion if reunion > 0 else 0.0
+
+
+def objets_distincts(detections: list[dict], sorte_de: dict, seuils: dict, seuil_defaut: float, surface_min: float = 0.0) -> list[dict]:
+    """UN rectangle par objet (16/11/2026) : parmi les rectangles bruts d'`objets` ({"nom", "note", "boite"}), ceux dont la
+    sorte (`sorte_de[nom]`, None = ignoré) a une note suffisante (`seuils[sorte]`, sinon `seuil_defaut`) et une surface d'au
+    moins `surface_min` pixels ; deux phrases pour le même meuble ne font qu'un objet (MEME_OBJET) ; un morceau et son tout
+    (un tiroir et son armoire, le foyer et sa cheminée) ne font qu'un objet, le tout étant gardé s'il est assez sûr (MORCEAU,
+    TOUT_MIN). Rend [{"sorte", "phrase", "note", "boite"}], du plus sûr au moins sûr. Deux objets de même sorte qui restent
+    sur une même photo sont deux objets différents."""
+    retenus: list[dict] = []
+    for d in sorted(detections, key=lambda d: -d["note"]):
+        sorte = sorte_de.get(d["nom"])
+        if sorte is None or d["note"] < seuils.get(sorte, seuil_defaut):
+            continue
+        x0, y0, x1, y1 = d["boite"]
+        if (x1 - x0) * (y1 - y0) < surface_min:
+            continue
+        if any(r["sorte"] == sorte and _recouvrement(r["boite"], d["boite"]) > MEME_OBJET for r in retenus):
+            continue
+        nouveau = {"sorte": sorte, "phrase": d["nom"], "note": d["note"], "boite": [float(v) for v in d["boite"]]}
+        if any(r["sorte"] == sorte and _part_dedans(nouveau["boite"], r["boite"]) >= MORCEAU for r in retenus):
+            continue  # un morceau d'un objet déjà retenu
+        morceaux = [r for r in retenus if r["sorte"] == sorte and _part_dedans(r["boite"], nouveau["boite"]) >= MORCEAU]
+        if morceaux and d["note"] < TOUT_MIN * max(r["note"] for r in morceaux):
+            continue  # un grand rectangle peu sûr autour d'objets sûrs : on garde les objets
+        retenus = [r for r in retenus if not any(r is m for m in morceaux)] + [nouveau]
+    return retenus

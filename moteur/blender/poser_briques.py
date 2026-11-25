@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from materiaux import creer_materiaux  # noqa: E402
 from poser_meubles import poser_meubles  # noqa: E402
 from rideaux import poser_rideaux  # noqa: E402
+from ferronneries import poser_ferronneries  # noqa: E402
 
 COLLECTIONS = {"mur": "Murs", "sol": "Sols", "plafond": "Plafonds", "menuiserie": "Menuiseries", "dalle": "Dalles"}
 SCHEMAS = ("construction/0.1", "construction/0.2")
@@ -52,7 +53,7 @@ def main() -> None:
 
     import materiaux as module_materiaux
     module_materiaux.SORTES.update(plan.get("sortes_sols", {}))  # le catalogue complet d'Atelya (moteur/matieres.py)
-    materiaux = creer_materiaux(bibliotheque, plan.get("orientation_sols", 0.0))
+    materiaux = creer_materiaux(bibliotheque, plan.get("orientation_sols", 0.0), plan.get("matieres_sur_mesure"))
     # B1 (08/11/2026) : deux murs qui se croisent (en X, murs épais) ont leurs dessus exactement à la même hauteur ; au rendu,
     # chacun fait de l'ombre à l'autre et la croisée sort NOIRE. Chaque mur monte donc d'un dixième de millimètre de plus que
     # le précédent (cycle de 10, au plus 0,9 mm) : invisible (caché dans le plafond, ou de quelques millimètres vu de dessus).
@@ -84,6 +85,7 @@ def main() -> None:
 
     nb_meubles = poser_meubles(scene, plan.get("meubles", []))
     poser_rideaux(scene, plan.get("rideaux", []))
+    poser_ferronneries(scene, plan.get("ferronneries", []), materiaux)
     regler_apercu(scene)
     Path(sortie_blend).parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(Path(sortie_blend).resolve()))

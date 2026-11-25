@@ -137,3 +137,12 @@ def test_pas_de_corniche_sans_choix():
     assert not [b for b in plan_habille(_avec_corniche(None))["briques"] if b["id"].startswith("corniche__")]
     simple = [b for b in plan_habille(_avec_corniche("simple"))["briques"] if b["id"].startswith("corniche__")]
     assert len(simple) == 4
+
+
+def test_deux_zones_qui_se_recouvrent_ne_sont_pas_a_la_meme_hauteur():
+    """Deux zones qui se chevauchent (enveloppes de deux sols voisins) : la seconde est au-dessus de la première, sinon les
+    deux surfaces se disputent chaque point au rendu (tache noire au pied de l'îlot d'app-001, 17/11/2026)."""
+    log = _avec_zones([{"contour": [[0, 0], [3, 0], [3, 2], [0, 2]], "sol": _sol("chene_naturel_photo")},
+                       {"contour": [[2, 1], [4, 1], [4, 3], [2, 3]], "sol": _sol("carreaux_cubes")}], _sol("point_de_hongrie"))
+    zones = [b for b in calculer_briques(log) if b.id.startswith("zone_sol__")]
+    assert [b.z_bas for b in zones] == [ZONE_SOL_Z, 2 * ZONE_SOL_Z]

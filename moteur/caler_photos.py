@@ -43,6 +43,7 @@ Mesuré sur les 22 photos calées à la main d'app-001 et app-002 (examens déj�
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 import cv2
@@ -52,7 +53,7 @@ import torch
 from . import da3, fuites, moge
 from .oeil_dinov2 import ECART, MOYENNE, charger as charger_oeil, empreintes
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 PAS = 0.2                                   # une place possible tous les 20 cm
 HAUT_DES_MURS = 2.1                         # au-dessus : ni portes ni meubles, on y mesure la distance du mur
 ECHELLES = (0.72, 0.8, 0.88, 0.96, 1.04)    # MoGe-2 voit souvent trop profond : on essaie plusieurs tailles
@@ -81,7 +82,17 @@ AUTRE_POSE_MIN = 0.95                       # … douteux si une autre pose du b
 ACCORD_MIN = 0.6                            # … ou si une photo du bloc est à moins de 60 % de sa propre meilleure place
 ECART_POINTE = 0.75                         # photo pointée par NT que son bloc met à plus de 75 cm du point : elle se place seule, près du point
 PETITES_PIECES = ("cuisine", "salle_d_eau", "entree", "wc", "degagement")  # … et toujours dans ces petites pièces (demande de NT)
+AFFINER = True                              # l'appareil de chaque photo affiné dans l'image après le calage (moteur/affiner_appareils.py, 24/11/2026)
 CAP_FUITES = 12.0                          # le cap des lignes de fuite remplace celui du calage s'il en est à moins de 12°
+# le sol et le plafond dans le relief d'une photo (sol_et_plafond, 25/11/2026 ; réglés sur les 58 photos des quatre logements,
+# pc/verification/mesurer_sol_des_photos.py : le vrai sol le plus maigre pèse 17 % de la plus grande surface et 5 ‰ de l'image,
+# le vrai plafond le plus maigre 55 % ; aucune surface parasite plus basse que le sol ni plus haute que le plafond dès 1 %)
+PART_SOL, PART_PLAFOND = 0.10, 0.25         # une surface à plat compte si elle pèse au moins cela de la plus grande de son côté
+POINTS_SURFACE = 0.003                      # … et au moins 3 ‰ des points de l'image
+MEME_SOL, MEME_PLAFOND = 0.15, 0.30         # m : deux niveaux plus proches que cela sont la même surface (la plus fournie)
+SOL_AU_PLUS_BAS = 2.2                       # m sous l'appareil : plus bas, ce n'est pas le sol de la pièce (rue, cour, étage du dessous)
+SOL_JUSTE_AU_CALAGE = False                 # le calage (profil) garde le sol d'avant tant que son non-recul n'est pas mesuré (règle 8)
+SOL_JUSTE = os.environ.get("ATELYA_SOL_JUSTE", "1") != "0"  # ATELYA_SOL_JUSTE=0 : les mesures aussi reprennent le sol d'avant (pour comparer)
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
 
@@ -242,9 +253,60 @@ def mesurer(modele_moge, rgb: np.ndarray, focale_px: float | None = None) -> dic
     return m
 
 
-def repere(mes: dict, hsp: float) -> dict | None:
+def _pics(v: np.ndarray, pas: float = 0.02) -> list[tuple[float, float]]:
+    """Les surfaces à plat parmi les hauteurs `v` : [(niveau, nombre de points)], une par bosse de l'histogramme (mêmes cases
+    que `_pic` : la plus grosse bosse est au centimètre près celle d'avant)."""
+    if len(v) < 30:
+        return []
+    h, b = np.histogram(v, bins=np.arange(v.min(), v.max() + pas, pas))
+    if len(h) >= 3:  # (une surface parfaitement plate tient dans une ou deux cases : rien à lisser)
+        h = np.convolve(h, np.ones(3), "same")
+    return [(float(b[i] + pas / 2), float(h[i])) for i in range(len(h)) if h[i] > 0 and h[i] >= h[max(0, i - 3):i + 4].max()]
+
+
+def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None) -> tuple[float | None, float | None]:
+    """Le niveau du SOL et celui du PLAFOND dans le relief d'une photo (`h` : hauteur de chaque point, 0 = l'appareil ; `horiz` :
+    les points d'une surface à plat). LA règle d'Atelya (25/11/2026, « le sol pris pour un lit ») :
+      - le SOL est la surface à plat la plus BASSE (rien de plat n'est sous le sol d'une pièce), pas la plus grande : un lit, une
+        table, un plan de travail, un banc montrent souvent plus de surface que le sol (9 photos sur 58 : hauteurs fausses de 42 à
+        88 cm). Elle doit peser PART_SOL de la plus grande et POINTS_SURFACE de l'image (un bruit n'est pas un sol), et ne pas
+        être à plus de SOL_AU_PLUS_BAS sous l'appareil (la rue ou une cour vues par la fenêtre). Deux niveaux à moins de
+        MEME_SOL l'un de l'autre sont la même surface (le sol de la pièce voisine, vu par une porte) : le plus fourni ;
+      - le PLAFOND est la surface à plat la plus HAUTE (une grande suspension en disque, un caisson bas en montrent parfois plus
+        que le plafond), avec PART_PLAFOND ; deux niveaux à moins de MEME_PLAFOND = la même surface (plafond à poutres, plafond
+        lointain que le relief étale sur 40 cm). Quand la hauteur sous plafond est connue, un plafond dont l'écart au sol n'est
+        pas vraisemblable (vide sur un étage, verrière) laisse la place au suivant.
+    Sans surface assez nette : comme avant (la plus grande)."""
+    bas, haut = h[horiz & (h < -0.4)], h[horiz & (h > 0.3)]
+    mini = POINTS_SURFACE * h.size
+    sol = plaf = None
+    pb = _pics(bas)
+    if pb:
+        gros = max(n for _, n in pb)
+        bons = [p for p, n in pb if n >= PART_SOL * gros and n >= mini and p >= -SOL_AU_PLUS_BAS]
+        if bons:
+            p0 = min(bons)
+            sol = max(((p, n) for p, n in pb if p0 - 1e-6 <= p <= p0 + MEME_SOL), key=lambda t: t[1])[0]
+        else:
+            sol = _pic(bas)
+    ph = _pics(haut)
+    if ph:
+        gros = max(n for _, n in ph)
+        bons = sorted((p for p, n in ph if n >= PART_PLAFOND * gros and n >= mini), reverse=True)
+        choix = [max(((p, n) for p, n in ph if q - MEME_PLAFOND <= p <= q + 1e-6), key=lambda t: t[1])[0] for q in bons]
+        if choix and sol is not None and hsp:
+            vraisemblables = [p for p in choix if 0.75 < hsp / (p - sol) < 1.33]
+            plaf = vraisemblables[0] if vraisemblables else choix[0]
+        else:
+            plaf = choix[0] if choix else _pic(haut)
+    return sol, plaf
+
+
+def repere(mes: dict, hsp: float, juste: bool | None = None) -> dict | None:
     """Chaque point de la photo dans le repère de la pièce : hauteur au-dessus du sol, direction (degrés, + = à gauche),
-    distance à plat ; la taille est recalée sur la hauteur sous plafond quand sol et plafond sont visibles."""
+    distance à plat ; la taille est recalée sur la hauteur sous plafond quand sol et plafond sont visibles.
+    juste=False : le sol et le plafond d'avant le 25/11/2026 (les deux plus GRANDES surfaces à plat ; encore pris par le calage,
+    SOL_JUSTE_AU_CALAGE, tant que son non-recul n'est pas mesuré)."""
     P, N, M, haut = mes["points"], mes["normales"], mes["masque"], mes["haut"]
     av = np.array([0, 0, 1.0]) - haut * haut[2]; av /= np.linalg.norm(av)
     dr = np.cross(av, haut)
@@ -253,7 +315,7 @@ def repere(mes: dict, hsp: float) -> dict | None:
     h, a, b = P @ haut, P @ dr, P @ av
     nh = N @ haut
     horiz = M & (np.abs(nh) > 0.95)
-    sol, plaf = _pic(h[horiz & (h < -0.4)]), _pic(h[horiz & (h > 0.3)])
+    sol, plaf = sol_et_plafond(h, horiz, hsp) if (SOL_JUSTE if juste is None else juste) else (_pic(h[horiz & (h < -0.4)]), _pic(h[horiz & (h > 0.3)]))
     ech = 1.0
     if sol is not None and plaf is not None and 0.75 < hsp / (plaf - sol) < 1.33:
         ech = hsp / (plaf - sol)
@@ -262,7 +324,7 @@ def repere(mes: dict, hsp: float) -> dict | None:
     if sol is None:
         sol = plaf - hsp / ech
     return {"h": (h - sol) * ech, "phi": np.degrees(np.arctan2(-a, b)), "r": np.hypot(a, b) * ech, "M": M,
-            "vert": np.abs(nh) < 0.35, "devant": b > 0.2, "ech": ech, "z": -sol * ech}
+            "vert": np.abs(nh) < 0.35, "devant": b > 0.2, "ech": ech, "z": -sol * ech, "nh": nh}
 
 
 def _mur_par_direction(R, hsp):
@@ -281,7 +343,7 @@ def _mur_par_direction(R, hsp):
 def profil(mes: dict, hsp: float, fenetres: np.ndarray | None = None) -> dict | None:
     """Ce que la photo dit de la pièce, direction par direction (degrés, 0 = droit devant) : distance du mur, creux vu
     (1 = relief, 2 = fenêtre reconnue à son aspect, 3 = les deux), creux jusqu'au sol (1 oui, -1 non, 0 caché)."""
-    R = repere(mes, hsp)
+    R = repere(mes, hsp, juste=SOL_JUSTE_AU_CALAGE)
     if R is None:
         return None
     mur = _mur_par_direction(R, hsp)
@@ -822,7 +884,7 @@ class Outils:
 
 def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None = None, journal=print, fenetres_de: dict | None = None,
           zoom_par_fuites: bool | str = False, detail: dict | None = None, pieces_donnees: dict | None = None,
-          confirmees=(), endroits_donnes: dict | None = None) -> dict:
+          confirmees=(), endroits_donnes: dict | None = None, affiner: bool | None = None) -> dict:
     """logement : le logement lu (pièces, murs, ouvertures) ; photos : {nom: photo RGB}.
     → {"cameras": {nom: {"camera": {x, y, z, cap, tangage, f, u0, v0}, "largeur", "hauteur", "piece", "sure", "marge", "bloc",
                          "hesite_avec"}},
@@ -849,7 +911,17 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
     (verites/app-002/cameras-photos-soigne.json), après correction de l'orientation (`fuites.orienter_au_zoom`) : app-002
     médiane 0,36 → 0,39 m, pire 0,90 → 0,75 m, orientation 2,2° → 0,9°, sols 87,9 → 90,2 %, meubles 19 → 20 sur 30 ; app-003
     médiane 0,53 → 0,51 m, pire 1,45 → 1,21 m mais une photo passe au-delà de 1 m (0,82 → 1,21). Pas de gain net en mètres :
-    reste en réserve."""
+    reste en réserve.
+    affiner (24/11/2026, « la place des appareils des photos », EN SERVICE par défaut : AFFINER) : une fois la pièce et la
+    place trouvées, l'appareil de chaque photo est AFFINÉ DANS L'IMAGE (moteur/affiner_appareils.py) : place, hauteur, cap, zoom
+    et horizon sont repris jusqu'à ce que les murs du plan, vus par lui, tombent sur les lignes du plafond et du sol que la
+    photo montre (trouvées seules dans le relief de MoGe-2). Chaque caméra porte alors « affine » ({comment, avant, …}) ;
+    l'appareil du calage reste quand la photo ne montre pas assez de murs ou qu'ils ne collent pas au plan. Mesuré sur les
+    quatre logements (pc/essais-place-appareils ; 39 photos affinées sur 58) : repères des murs relevés à la main, vus par
+    l'appareil d'Atelya, à 23 → 15 px de leur place sur la photo (app-002) et 36 → 22 px (app-003), 29 → 29 px sur app-001 ;
+    place contre les corrigés 0,44 → 0,27 m (app-003), 0,36 → 0,36 m mais au pire 0,90 → 0,56 m (app-002). False = le calage
+    d'avant. Avec la lecture des fenêtres, la chaîne reprend ensuite ces appareils sur les lignes lues
+    (outils/habillage/affiner_appareils_lus.py)."""
     o = outils or Outils()
     plan = plan_du_logement(logement)
     G = grille(plan); pg = piece_de(plan, G)
@@ -1087,11 +1159,21 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
                 cameras[n]["endroit"].update(autre_pose=round(autre, 3), accord=round(accord, 3))
         return cameras, non, det
 
+    def affiner_dans_l_image(cameras):
+        if not (AFFINER if affiner is None else affiner) or not cameras:
+            return
+        from . import affiner_appareils
+        lignes = {n: {**(fu[n] if n in fu else fuites.mesurer(photos[n])), "largeur": photos[n].shape[1]} for n in cameras}
+        journal("  appareils affinés dans l'image (murs du plan posés sur les lignes du plafond et du sol de chaque photo) :")
+        affiner_appareils.affiner_les_appareils(logement, photos, cameras, mes, owl=getattr(o.pds, "owl", None),
+                                                zoom_du_lot=fuites.zoom_du_lot(lignes), journal=journal)
+
     muet = lambda *a: None
     seul, non_seul, det = choisir(R, T, {}, muet if PM else journal)  # l'avis d'Atelya seul
     if not PM:
         if detail is not None:  # pour les essais : de quoi rejuger le choix d'ensemble sans tout recalculer
             detail.update(det)
+        affiner_dans_l_image(seul)
         _signaler_les_endroits(seul, journal)
         return {"cameras": seul, "non_calees": {**non, **non_seul}}
     cameras, non_avec, det = choisir({**R, **Rd}, {**T, **Td}, PM, journal)  # avec les pièces données par le client
@@ -1114,5 +1196,6 @@ def caler(logement: dict, photos: dict[str, np.ndarray], outils: Outils | None =
         if raison and n not in confirmees:
             d.update(sure=False, a_verifier=raison)
             journal(f"  {n} : À VÉRIFIER, {raison}")
+    affiner_dans_l_image(cameras)
     _signaler_les_endroits(cameras, journal)
     return {"cameras": cameras, "non_calees": {**non, **non_avec}}

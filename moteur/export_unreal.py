@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 
 from moteur.geometrie import rectangles
-from moteur.matieres import CALCULEES, echelle_du_nom, matiere_et_teinte
+from moteur.matieres import CALCULEES, echelle_du_nom, matiere_et_teinte, sens_du_nom
 
 SCHEMA = "scene-unreal/0.1"
 
@@ -35,7 +35,10 @@ SCHEMA = "scene-unreal/0.1"
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
 RUGOSITE_BOIS = (0.6, 0.85)
 REFLET_BOIS = 0.15
-ROTATION_PHOTO = {"carrelage_interieur": 45.0}
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "stratifie": 90.0, "chene_clair_moderne": 90.0, "chene_grise": 90.0,
+                  "chene_naturel_photo": 90.0, "parquet_use": 90.0, "lames_bois": 90.0, "stratifie_2": 90.0, "lames_foncees_2": 90.0,
+                  "lames_chene_miel": 90.0, "lames_chene_clair": 90.0, "lames_chene_dore": 90.0, "lames_miel_fines": 90.0,
+                  "lames_miel_moyennes": 90.0, "lames_chene_anglaise": 90.0}
 RUGOSITE_PEINTURE = (0.8, 0.95)  # moteur/blender/materiaux._enduit : une peinture mate
 RELIEF_PEINTURE = 0.25
 ALPHA_VERRE = 0.06  # moteur/blender/exporter_gltf.ALPHA_VERRE
@@ -44,6 +47,7 @@ UNIES = {  # nom : (couleur, rugosité, métal)
     "porte_interieure": ((0.88, 0.87, 0.84), 0.45, 0.0),
     "porte_entree": ((0.12, 0.13, 0.14), 0.4, 0.0),
     "metal": ((0.75, 0.75, 0.76), 0.25, 1.0),
+    "fer_forge": ((0.035, 0.035, 0.04), 0.5, 0.0),  # ferronnerie peinte en noir (garde-corps de fenêtre)
     "seuil": ((0.55, 0.53, 0.5), 0.6, 0.0),
 }
 PEINTURES = {"mur_blanc": COULEUR_PEINTURE, "plafond_blanc": (0.9, 0.9, 0.9)}
@@ -116,8 +120,10 @@ def fiche_materiau(nom: str, fiches_bibliotheque: dict, teintes: dict, orientati
     matiere, gains = matiere_et_teinte(nom)
     if matiere in fiches_bibliotheque or matiere in CALCULEES:
         echelle = echelle_du_nom(nom)
+        sens = sens_du_nom(nom)  # le sens des lames lu sur les photos pour CE sol, sinon le sens général du logement
         f = {"genre": "dessin" if matiere in CALCULEES else "photo", "matiere": matiere, "sorte": sortes.get(matiere, "bois"),
-             "echelle": round(echelle, 3), "rotation_deg": round(orientation_deg + ROTATION_PHOTO.get(matiere, 0.0), 3),
+             "echelle": round(echelle, 3),
+             "rotation_deg": round((orientation_deg if sens is None else sens) + ROTATION_PHOTO.get(matiere, 0.0), 3),
              "teinte": _arrondi(teintes.get(nom) or gains), "placage": "monde : vu d'en haut sur les sols, de face sur les côtés"}
         base = CALCULEES.get(matiere, matiere) if matiere in CALCULEES else matiere
         if matiere in CALCULEES:
@@ -127,6 +133,10 @@ def fiche_materiau(nom: str, fiches_bibliotheque: dict, teintes: dict, orientati
             taille = fiches_bibliotheque[base].get("taille_image_m") or [1.0, 1.0]
             f["photos"] = {"dossier": f"matieres/{base}", "taille_m": _arrondi([t * echelle for t in taille], 3)}
             f["credit"] = base
+            if fiches_bibliotheque[base].get("dossier"):  # un parquet sur mesure : ses images sont à côté de la maquette
+                f["photos"]["source"] = fiches_bibliotheque[base]["dossier"]
+                f["parquet"] = fiches_bibliotheque[base].get("parquet")
+                f["credit"] = (fiches_bibliotheque[base].get("parquet") or {}).get("bois", base)
         if f["sorte"] == "bois":
             f["rugosite"], f["reflet"] = list(RUGOSITE_BOIS), REFLET_BOIS
         return f
@@ -153,6 +163,8 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
     eclairages = _lire(dossier_3d / "eclairages.json", [])
     reglages = _lire(dossier_3d / "reglages_teinte.json")
     fiches = _lire(bibliotheque / "matieres.json", {}) if bibliotheque else {}
+    # les parquets dessinés sur mesure pour ce logement (moteur/parquet_sur_mesure.py) : des images comme celles de la bibliothèque
+    fiches = {**fiches, **(construction.get("matieres_sur_mesure") or {})}
     orientation = float(construction.get("orientation_sols") or 0.0)
     teintes = teintes_reglees(construction, reglages)
     meubles = construction.get("meubles") or []
@@ -225,15 +237,15 @@ def fiche_de_scene(dossier_3d: Path, export: dict, bibliotheque: Path | None, gl
 
 def copier_photos(fiche: dict, bibliotheque: Path | None, sortie: Path) -> list[str]:
     """Copie dans le paquet les photos des matières utilisées (et le grain de la peinture), pour les matériaux natifs d'Unreal."""
-    if not bibliotheque:
-        return []
     noms = {f["photos"]["dossier"].split("/", 1)[1] for f in fiche["materiaux"].values() if f.get("photos")}
-    if any(f.get("grain") for f in fiche["materiaux"].values()):
+    ailleurs = {f["photos"]["dossier"].split("/", 1)[1]: Path(f["photos"]["source"]) for f in fiche["materiaux"].values()
+                if (f.get("photos") or {}).get("source")}  # les parquets sur mesure, dessinés à côté de la maquette
+    if bibliotheque and any(f.get("grain") for f in fiche["materiaux"].values()):
         noms.add("enduit_peint_blanc")
     copies = []
     for nom in sorted(noms):
-        source = bibliotheque / nom
-        if not source.is_dir():
+        source = ailleurs.get(nom) or (bibliotheque / nom if bibliotheque else None)
+        if source is None or not source.is_dir():
             continue
         cible = sortie / "matieres" / nom
         cible.mkdir(parents=True, exist_ok=True)

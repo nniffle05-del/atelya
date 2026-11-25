@@ -30,6 +30,19 @@ from moteur.habillage import plan_habille
 from moteur.logement import charger_logement
 
 DOSSIER_SCRIPTS = Path(__file__).parent / "blender"
+# LA TEINTE DES SOLS VUS SUR PHOTO (17/11/2026, étape 4 : parquets « trop foncés et trop rouges » sur tous les logements).
+# La teinte calculée sur la photo (moteur/teinte_photo.py : le sol renvoie telle part de la lumière d'un mur blanc) est posée
+# TELLE QUELLE. Avant, elle était « réglée au rendu » (moteur/blender/regler_teintes.py : petites images, sol comparé aux murs) :
+# ce réglage se faisait au soleil, sans meubles, et gardait une correction non vérifiée → parquets deux fois trop foncés.
+# Mesuré sur 12 photos de parquet de trois logements (pc/verification/essai_teintes.py ; clarté du sol rapportée aux murs blancs,
+# maquette / photo ; puis écart de couleur, de clarté, de teinte) :
+#   ancien réglage                      × 0,45 | écart 23,2 | clarté −19,2 | teinte −4,9° (plus rouge)
+#   aucun réglage au rendu (1)          × 1,01 | écart 14,4 | clarté  −4,9 | teinte −2,0°
+#   réglage refait, borné à × 2 (2)     × 0,87 | écart 14,2 | clarté  −8,3 | teinte −3,9°
+#   réglage refait, sans borne          × 0,76 | écart 16,2 | clarté −10,2 | teinte −4,1° (trompé par le reflet des fenêtres au sol)
+# → 1 par défaut : le plus juste en clarté et en teinte, et 1 à 5 minutes de moins par maquette. Une valeur > 1 rallume le réglage
+# au rendu (refait le 17/11 : jour voilé, meubles en place, médiane, jamais plus loin que ce facteur de la teinte de départ).
+BORNE_REGLAGE_TEINTES = 1.0
 # B2-3 : la bibliothèque de matières (photos CC0, hors Git). Variable ATELYA_MATIERES, sinon à côté du dépôt sur le PC.
 MATIERES_PC = Path(__file__).resolve().parents[2] / "atelya" / "bibliotheque" / "matieres"
 BLENDER_MAC = "/Applications/Blender.app/Contents/MacOS/Blender"
@@ -111,6 +124,18 @@ def lancer_blender(*arguments: str) -> None:
         raise RuntimeError(f"Blender a échoué :\n{resultat.stdout}\n{resultat.stderr}")
 
 
+def dessiner_parquets(parquets: dict, matieres: Path | None, dossier: Path) -> dict:
+    """Dessine les parquets SUR MESURE du logement (moteur/parquet_sur_mesure.py, 18/11/2026) dans
+    <dossier>/matieres-sur-mesure/<nom>/ : de vraies images de matière (couleur, relief, brillance), que Blender pose comme
+    une photo de la bibliothèque et que le paquet pour Unreal emporte. Rend {nom : fiche de matière, avec son dossier}.
+    Sans la bibliothèque de matières (Mac, tests) : rien n'est dessiné, Blender retombe sur son parquet dessiné par calcul."""
+    if not parquets or matieres is None:
+        return {}
+    from moteur import parquet_sur_mesure as psm
+
+    return {nom: psm.ecrire(fiche, matieres, dossier / "matieres-sur-mesure") for nom, fiche in parquets.items()}
+
+
 def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     """Lit et vérifie le logement, calcule et habille les briques, fait construire Blender."""
     logement = charger_logement(chemin_logement)
@@ -118,22 +143,25 @@ def construire(chemin_logement: str | Path, dossier_sortie: str | Path) -> Path:
     dossier.mkdir(parents=True, exist_ok=True)
 
     plan = dossier / "construction.json"
-    plan.write_text(json.dumps(choisir_modeles(plan_habille(logement), trouver_meubles()), indent=2, ensure_ascii=False),
-                    encoding="utf-8")
+    contenu = choisir_modeles(plan_habille(logement), trouver_meubles())
+    matieres = trouver_matieres()
+    contenu["matieres_sur_mesure"] = dessiner_parquets(contenu.get("parquets_sur_mesure") or {}, matieres, dossier)
+    plan.write_text(json.dumps(contenu, indent=2, ensure_ascii=False), encoding="utf-8")
 
     maquette = dossier / "maquette.blend"
-    matieres = trouver_matieres()
     lancer_blender("--python", str(DOSSIER_SCRIPTS / "poser_briques.py"),
                    "--", str(plan), str(maquette), *([str(matieres.resolve())] if matieres else []))
-    if json.loads(plan.read_text(encoding="utf-8")).get("reglages_teinte"):
-        # B2 temps 2 : la teinte des sols vus sur une photo du client est réglée au rendu (voir regler_teintes.py).
-        lancer_blender(str(maquette), "--python", str(DOSSIER_SCRIPTS / "regler_teintes.py"),
-                       "--", str(plan), str(dossier / "reglages_teinte.json"))
     if json.loads(plan.read_text(encoding="utf-8")).get("vues"):
-        # B2 temps 2 (09/11/2026) : une scène Blender par éclairage (jour, voilé, fin de journée, soirée, nuit) ; la scène
-        # active reste le jour ensoleillé, où la teinte des sols vient d'être réglée (voir moteur/eclairages.py).
+        # B2 temps 2 (09/11/2026) : une scène Blender par éclairage (jour, voilé, fin de journée, soirée, nuit).
         from moteur.eclairages import poser as poser_eclairages
         poser_eclairages(plan, maquette, maquette)
+    (dossier / "reglages_teinte.json").unlink(missing_ok=True)  # jamais le réglage d'une construction précédente (export Unreal)
+    if BORNE_REGLAGE_TEINTES > 1.0 and json.loads(plan.read_text(encoding="utf-8")).get("reglages_teinte"):
+        # Réglage de la teinte des sols AU RENDU (regler_teintes.py) : ÉTEINT par défaut depuis le 17/11/2026 (voir
+        # BORNE_REGLAGE_TEINTES). S'il est rallumé : après la pose des éclairages, dans la scène « Jour voilé ».
+        from moteur.eclairages import AMBIANCE_DE_REFERENCE
+        lancer_blender(str(maquette), "--python", str(DOSSIER_SCRIPTS / "regler_teintes.py"),
+                       "--", str(plan), str(dossier / "reglages_teinte.json"), AMBIANCE_DE_REFERENCE, str(BORNE_REGLAGE_TEINTES))
     return maquette
 
 

@@ -1,0 +1,64 @@
+{
+ "schema": "verite-rideaux/0.3",
+ "releve": "à la main, d'après les photos du client, le 19/11/2026 (Claude ; à faire confirmer par NT). « gauche » et « droite » : vu de la pièce, face à la fenêtre.",
+ "fenetres": {
+  "O6": {
+   "piece": "séjour",
+   "voilage": false,
+   "rideaux": true,
+   "pans": [
+    "gauche"
+   ],
+   "photos": [
+    "photo-01",
+    "photo-04",
+    "photo-07"
+   ],
+   "note": "un seul pan beige, à gauche ; la tringle traverse toute la fenêtre, rien à droite",
+   "mesures": {
+    "gauche": {
+     "largeur_part": 0.23,
+     "devant_part": 0.03,
+     "etat": "ouvert",
+     "note": "photo-01 : 36 px pour une fenêtre de 166 px (pan plus loin) ; photo-07 : 50 px pour 198 px (pan plus près) ; il pend à côté de la fenêtre et ne cache que le bord du cadre"
+    }
+   },
+   "tringle": {
+    "hauteur_part": 0.925,
+    "teinte": "claire",
+    "note": "tringle fine en acier brossé gris clair, embouts cylindriques ; photo-01, à la colonne du pan : sol 560, tringle 214, bas de la corniche 201, plafond ~187 ; photo-07 : sol 655, tringle 169, bas de la corniche 150, plafond ~124 ; une dizaine de centimètres sous la corniche, une vingtaine au-dessus de la fenêtre"
+   }
+  },
+  "O7": {
+   "piece": "chambre",
+   "voilage": false,
+   "rideaux": true,
+   "pans": [
+    "droite"
+   ],
+   "photos": [
+    "photo-04",
+    "photo-09",
+    "photo-10",
+    "photo-12",
+    "photo-13"
+   ],
+   "note": "un seul pan gris, à droite ; rien à gauche (photos 09 et 10)",
+   "mesures": {
+    "droite": {
+     "largeur_part": 0.33,
+     "devant_part": 0.06,
+     "etat": "ouvert",
+     "note": "pan froncé en haut, évasé en bas : photo-10, 42 à 56 px pour une fenêtre de 180 px (pan plus loin) ; photo-09, 50 à 71 px pour 155 px (pan plus près) ; il mord un peu sur le cadre"
+    }
+   },
+   "tringle": {
+    "hauteur_part": 0.915,
+    "teinte": "claire",
+    "note": "la même tringle en acier brossé gris clair ; photo-10, à la colonne du pan : sol ~543, tringle 239, bas de la corniche 224, plafond ~210"
+   }
+  }
+ },
+ "mesures": "22/11/2026 (Claude ; à faire confirmer par NT) : largeur de chaque pan en PART de la largeur de sa fenêtre (cadre compris), prise à la règle sur les photos, à mi-hauteur du pan ; deux photos prises de côtés opposés sont moyennées (le pan paraît plus large que nature quand il est plus près de l'appareil que la fenêtre, plus étroit quand il est plus loin). « devant_part » : part de la largeur de la fenêtre que le pan cache. « etat » : ouvert = ramassé sur le côté ; tire = déployé.",
+ "tringles": "23/11/2026 (Claude ; à faire confirmer par NT) : « hauteur_part » = hauteur de la tringle en PART de la hauteur du sol au plafond, prise à la règle sur les photos à la colonne d'un pan (du pied du pan à la tringle, sur du pied du pan au plafond) ; juste à ± 0,02 (5 cm) : le plafond se lit mal derrière une corniche ou une retombée. « teinte » : claire (acier, blanc) ou foncee (fer, noir), à l'œil."
+}

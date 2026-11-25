@@ -130,7 +130,7 @@ def images_d_essai(dossier: Path) -> tuple[list[Path], list[Path]]:
 def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict, moteur: str = "lumen",
                  echantillons: int | None = None, intensite_max: float | None = None, exposition_fixe: float | None = None,
                  force_ciel: float | None = None, suffixe: str = "", temporel: bool = False,
-                 lampes_pieces: list[str] | None = None) -> dict:
+                 lampes_pieces: list[str] | None = None, essais_de_reglage: dict | None = None) -> dict:
     """Le photographe règle l'exposition et la balance sur de petits essais, puis le film est rendu et contrôlé."""
     ident = ambiance["id"]
     dossier = ident if moteur == "lumen" else f"{ident}-{moteur}" + (f"-{echantillons}" if echantillons else "")
@@ -150,7 +150,9 @@ def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict, moteur: s
                                       **({"intensite_max": intensite_max} if intensite_max is not None else {}),
                                       **({"force_ciel": force_ciel} if force_ciel is not None else {}),
                                       "debruiteur_temporel": temporel,
-                                      **({"lampes_pieces": lampes_pieces} if lampes_pieces else {})}, indent=1), encoding="utf-8")
+                                      "pellicule": photographe.PELLICULE, "pellicule_couleurs": photographe.PELLICULE_COULEURS,
+                                      **({"lampes_pieces": lampes_pieces} if lampes_pieces else {}),
+                                      **(essais_de_reglage or {})}, indent=1), encoding="utf-8")
         _python_unreal(SCRIPTS_UE / "preparer_cinematique.py", paquet.as_posix(), nom, trajet.as_posix(), reglage.as_posix())
 
     # a-b. ESSAIS : petites images du film, mesurées ; exposition corrigée (pente apprise) jusqu'à tomber juste.
@@ -197,8 +199,8 @@ def un_eclairage(paquet: Path, nom: str, trajet: Path, ambiance: dict, moteur: s
         print(f"  film{' (reprise)' if tour else ''} : murs à {controle['correction']:+.2f} cran de la clarté visée")
         if abs(controle["correction"]) <= photographe.TOLERANCE:
             break
-        historique = [(e["exposition_unreal"], e["correction"]) for e in essais + controles]
-        biais = photographe.prochaine_exposition(historique)
+        biais = photographe.exposition_de_reprise([(e["exposition_unreal"], e["correction"]) for e in essais],
+                                                  (controles[-1]["exposition_unreal"], controles[-1]["correction"]))
     else:
         print(f"  ATTENTION : film encore à {controles[-1]['correction']:+.2f} cran de la clarté visée (gardé, à regarder)")
     n = len(list(sortie.glob("image-*.png")))
@@ -227,6 +229,12 @@ def main() -> None:
     p.add_argument("--force-ciel", type=float, help="force de la lumière du ciel (Sky Light), 1 par défaut")
     p.add_argument("--suffixe", default="", help="ajouté au nom du dossier de sortie")
     p.add_argument("--temporel", action="store_true", help="path tracer : débruiteur temporel (NFOR) en plus")
+    p.add_argument("--reglage", action="append", default=[], metavar="CLE=VALEUR",
+                   help="essais : un réglage de plus pour la préparation Unreal (ex. ciel_couvert=uni : l'ancien ciel couvert ; valeur lue comme du JSON "
+                        "si possible)")
+    p.add_argument("--reglage-fichier", type=Path, metavar="JSON",
+                   help="des réglages de plus pour la préparation Unreal, lus dans un fichier (le DÉCOR du film : vraie vue par "
+                        "les fenêtres, balcons, ciel ; voir outils/unreal/decor_film.py) ; --reglage passe par-dessus")
     a = p.parse_args()
     paquet = STUDIO / "Paquets" / a.nom
     if Path(a.paquet).resolve() != paquet.resolve():
@@ -248,8 +256,15 @@ def main() -> None:
     if not a.sans_import:
         print("1. Import de la maquette dans Unreal")
         _python_unreal(SCRIPTS_UE / "importer_maquette.py", paquet.as_posix(), a.nom)
+    essais_de_reglage = json.loads(a.reglage_fichier.read_text(encoding="utf-8")) if a.reglage_fichier else {}
+    for r in a.reglage:
+        cle, valeur = r.split("=", 1)
+        try:
+            essais_de_reglage[cle] = json.loads(valeur)
+        except json.JSONDecodeError:
+            essais_de_reglage[cle] = valeur
     bilans = [un_eclairage(paquet, a.nom, trajet, x, a.moteur, a.echantillons, a.intensite_max, a.exposition_fixe, a.force_ciel,
-                           a.suffixe, a.temporel) for x in choisies]
+                           a.suffixe, a.temporel, essais_de_reglage=essais_de_reglage) for x in choisies]
     (STUDIO / "Paquets" / "rendus" / a.nom / "bilan.json").write_text(json.dumps(bilans, indent=1, ensure_ascii=False),
                                                                       encoding="utf-8")
 

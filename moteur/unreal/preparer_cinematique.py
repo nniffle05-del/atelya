@@ -7,7 +7,7 @@ Dans le niveau /Game/Logements/<nom>/Carte (fait par importer_maquette.py), d'ap
 et le réglage (reglage.json : {"eclairage": id ou nom, "exposition": crans, "gain": [r, v, b]} ; sans lui : l'éclairage du trajet,
 exposition 0, gain neutre) :
 - l'ÉCLAIRAGE (les 5 de Blender, moteur/eclairages.py) : « physique » = atmosphère + soleil à la hauteur et la direction de
-  l'ambiance (jour, fin de journée, soirée : soleil sous l'horizon) ; « couvert » = dôme uni blanc à peine bleuté ; « nuit » =
+  l'ambiance (jour, fin de journée, soirée : soleil sous l'horizon) ; « couvert » = le ciel couvert de la CIE, blanc à peine bleuté (plus clair au zénith, sol de rue sous l'horizon) ; « nuit » =
   dôme bleu nuit très sombre ; les plafonniers (Rect Light) allumés si l'ambiance le dit (soirée, nuit) ; une lumière de ciel
   (Sky Light) qui éclaire par les fenêtres ; la lumière qui rebondit est calculée par Lumen. Mêmes forces que Blender, converties
   en unités d'Unreal (1 W de Blender = 683 lumens ; 1 unité de ciel de Blender = 683 nits) : seuls les RAPPORTS comptent (ciel du
@@ -44,6 +44,7 @@ NITS_PAR_UNITE = 683.0  # une clarté de ciel de Blender (W/m²/sr) en nits (cd/
 SOLEIL_LUX = 110000.0
 STENCIL_BLANCS = 1
 STENCIL_DEHORS = 2  # le sol du dehors, pour le masque « dehors vu par une fenêtre »
+STENCIL_VOILAGE = 3  # un voilage : ni mur ni dehors (le mur vu À TRAVERS lui ne compte pas pour le photographe)
 PROFONDEUR_CIEL_CM = 1.0e6  # au-delà de 10 km, c'est le ciel (le sol du dehors est marqué à part)
 NIVEAU_FLOU_CIEL = 6.0  # niveau de détail de la photo de ciel qui donne sa clarté moyenne locale (~32 pixels par face)
 # Le photographe : images d'essai au quart de la taille, une image sur PAS_ESSAI (au moins ESSAI_MIN images par plan).
@@ -63,13 +64,14 @@ DEHORS_Z_M = -6.0
 # Force de la lumière du CIEL (Sky Light) avec l'atmosphère et le soleil. Mesuré le 11/11/2026 (séjour d'app-002, soleil à 50°,
 # path tracer, rendus avec et sans la lumière du ciel, même chose dans Cycles sans le disque du soleil) : le ciel apporte 59 % de
 # la lumière d'un mur dans Blender (cohérent avec un vrai ciel bleu), 26 % dans Unreal ; il faut ×3,3 (médiane de 7 zones, de 1,9
-# à 6,7) pour retrouver la part du ciel de Blender. Le ciel couvert (dôme) était déjà juste : inchangé.
+# à 6,7) pour retrouver la part du ciel de Blender. Le ciel couvert (dôme) n'a pas été touché ce jour-là ; sa FORME, elle,
+# était fausse (boule uniforme) : corrigée le 18/11/2026, voir CIEL_COUVERT.
 FORCE_CIEL_PHYSIQUE = 3.3
 FORCE_CIEL = 1.0
 DEHORS_ALBEDO = 0.2  # un trottoir, un bitume clair
 DEHORS_COTE_M = 20000.0  # 20 km : avec 2 km, le bord du sol faisait un trait sombre à l'horizon dans les fenêtres
-PELLICULE = {"film_slope": 0.514, "film_toe": 0.650, "film_shoulder": 0.545, "film_black_clip": 0.0, "film_white_clip": 0.0642}
-PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.04}
+PELLICULE = {"film_slope": 0.772, "film_toe": 0.416, "film_shoulder": 0.586, "film_black_clip": 0.0, "film_white_clip": 0.0642}
+PELLICULE_COULEURS = {"expand_gamut": 0.0, "blue_correction": 1.0, "saturation": 1.28}
 
 
 def _args():
@@ -124,8 +126,30 @@ def _nouveau(racine, nom, classe, fabrique):
     return unreal.AssetToolsHelpers.get_asset_tools().create_asset(court, dossier, classe, fabrique)
 
 
-def _materiau_ciel(racine, couleur, force):
-    """Un matériau « ciel » uni et lumineux (vu par la lumière de ciel), à poser à l'intérieur d'un grand dôme."""
+# Le ciel couvert de la CIE : clarté (1 + 2 sin h) / 3, h = hauteur au-dessus de l'horizon (1 au zénith, 1/3 à l'horizon).
+CIEL_COUVERT_HORIZON = 1.0 / 3.0
+# La FORME du ciel couvert du film. « cie » PAR DÉFAUT depuis le 18/11/2026 (point 2, la lumière du film, accord de NT) : mesuré
+# sur les images du film de trois logements contre les photos des clients (outils/unreal/juger_lumiere.py) : ce que le sol
+# renvoie face aux murs 0,29 → 0,37 pour 0,36 sur les photos, relief des murs 16,7 → 18,4 pour 18,6. « uni » = l'ancienne boule
+# uniforme (réglage « ciel_couvert » : pour comparer).
+CIEL_COUVERT = "cie"
+# Le NIVEAU du ciel couvert « cie » : remonté pour qu'une fenêtre reçoive AUTANT de lumière qu'avec l'ancienne boule uniforme.
+# Une façade reçoit pi fois la clarté de la boule uniforme ; du ciel couvert de la CIE elle reçoit 0,396 x 7 pi / 9 de la
+# clarté du zénith (rapport connu des éclairements vertical / horizontal), plus pi / 2 fois la clarté du sol de rue. Sans cela
+# les pièces recevaient 2,6 fois moins de lumière (1,4 cran) : l'exposition du film butait sur sa borne dans les pièces sombres
+# (app-001, 18/11/2026 : murs encore à +0,35 et +0,84 cran de la visée) et le rapport avec les plafonniers allumés dans les
+# pièces sans fenêtre changeait. Seule la FORME du ciel change ; la clarté d'ensemble reste l'affaire du photographe.
+CIEL_COUVERT_NIVEAU = math.pi / (0.396 * 7.0 * math.pi / 9.0 + (math.pi / 2.0) * DEHORS_ALBEDO * 7.0 / 9.0)
+
+
+def _materiau_ciel(racine, couleur, force, forme=CIEL_COUVERT):
+    """Un matériau « ciel » lumineux (vu par la lumière de ciel), à poser à l'intérieur d'un grand dôme.
+    forme « uni » : la même clarté dans toutes les directions, AUSSI PAR EN DESSOUS (le dôme d'origine, 11/11/2026 ; reste
+    celui de la nuit) ;
+    forme « cie » (18/11/2026, le défaut du ciel couvert) : le ciel couvert de la CIE, comme dans Blender (1 au zénith, 1/3 à l'horizon), et SOUS
+    l'horizon la clarté d'un sol de rue éclairé par ce ciel (albédo DEHORS_ALBEDO × 7/9 de la clarté du zénith) : avec le dôme
+    uni, il arrivait par le bas des fenêtres autant de lumière que du zénith (6 fois trop), qui éclairait les plafonds et le
+    haut des murs comme jamais en vrai et aplatissait la lumière des pièces."""
     m = _nouveau(racine, "Studio/M_Ciel", unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
     m.set_editor_property("two_sided", True)
@@ -133,7 +157,40 @@ def _materiau_ciel(racine, couleur, force):
     lib = unreal.MaterialEditingLibrary
     c = lib.create_material_expression(m, unreal.MaterialExpressionConstant3Vector, -400, 0)
     c.set_editor_property("constant", unreal.LinearColor(couleur[0] * force, couleur[1] * force, couleur[2] * force, 1.0))
-    lib.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    if forme != "cie":
+        lib.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    else:
+        # la direction regardée = l'opposé du « vecteur caméra » (du point vers l'œil) : vaut pour la caméra du film comme
+        # pour la capture de la lumière de ciel, où que soit le dôme
+        vers_oeil = lib.create_material_expression(m, unreal.MaterialExpressionCameraVectorWS, -1100, 300)
+        z = lib.create_material_expression(m, unreal.MaterialExpressionComponentMask, -900, 300)
+        for canal, garde in (("r", False), ("g", False), ("b", True), ("a", False)):
+            z.set_editor_property(canal, garde)
+        lib.connect_material_expressions(vers_oeil, "", z, "")
+        haut = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -750, 300)  # sin h (+ vers le zénith)
+        lib.connect_material_expressions(z, "", haut, "A")
+        haut.set_editor_property("const_b", -1.0)
+        pente = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -600, 200)
+        lib.connect_material_expressions(haut, "", pente, "A")
+        pente.set_editor_property("const_b", 1.0 - CIEL_COUVERT_HORIZON)
+        dessus = lib.create_material_expression(m, unreal.MaterialExpressionAdd, -450, 200)
+        lib.connect_material_expressions(pente, "", dessus, "A")
+        dessus.set_editor_property("const_b", CIEL_COUVERT_HORIZON)
+        dessous = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -450, 420)
+        dessous.set_editor_property("r", DEHORS_ALBEDO * 7.0 / 9.0)
+        horizon = lib.create_material_expression(m, unreal.MaterialExpressionConstant, -450, 520)
+        horizon.set_editor_property("r", CIEL_COUVERT_HORIZON)
+        clarte = lib.create_material_expression(m, unreal.MaterialExpressionIf, -250, 300)
+        lib.connect_material_expressions(haut, "", clarte, "A")
+        clarte.set_editor_property("const_b", 0.0)
+        clarte.set_editor_property("equals_threshold", 0.0)
+        lib.connect_material_expressions(dessus, "", clarte, "A > B")
+        lib.connect_material_expressions(horizon, "", clarte, "A == B")
+        lib.connect_material_expressions(dessous, "", clarte, "A < B")
+        produit = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -100, 100)
+        lib.connect_material_expressions(c, "", produit, "A")
+        lib.connect_material_expressions(clarte, "", produit, "B")
+        lib.connect_material_property(produit, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     lib.recompile_material(m)
     unreal.EditorAssetLibrary.save_loaded_asset(m)
     return m
@@ -240,7 +297,7 @@ def direction_soleil(ambiance, fiche):
     return soleil["direction"] if soleil else [0.6, 0.2, -0.77]
 
 
-def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None):
+def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None, ciel_couvert=CIEL_COUVERT):
     ciel = ambiance.get("ciel", "couvert")
     lumiere_ciel = _poser(unreal.SkyLight, centre, etiquette="Atelya_LumiereCiel")
     composant = lumiere_ciel.get_component_by_class(unreal.SkyLightComponent)
@@ -266,12 +323,14 @@ def poser_ciel(racine, ambiance, fiche, centre, force_ciel=None):
     else:
         couleur = ambiance.get("couleur_nuit") if ciel == "nuit" else ambiance.get("couleur_couvert", [0.92, 0.95, 1.0])
         force = (1.0 if ciel == "nuit" else float(ambiance.get("force_couvert", 1.2))) * NITS_PAR_UNITE
+        if ciel == "couvert" and ciel_couvert == "cie":
+            force *= CIEL_COUVERT_NIVEAU
         dome = _poser(unreal.StaticMeshActor, centre, etiquette="Atelya_Ciel")
         mesh = dome.static_mesh_component
         mesh.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Sphere"))
         mesh.set_editor_property("cast_shadow", False)
         mesh.set_world_scale3d(unreal.Vector(CIEL_RAYON_CM / 50.0, CIEL_RAYON_CM / 50.0, CIEL_RAYON_CM / 50.0))
-        mesh.set_material(0, _materiau_ciel(racine, couleur, force))
+        mesh.set_material(0, _materiau_ciel(racine, couleur, force, ciel_couvert if ciel == "couvert" else "uni"))
     return ciel
 
 
@@ -436,7 +495,7 @@ def _materiau_vue(racine, nom, texture, vue):
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     m.set_editor_property("two_sided", True)
-    _proprietes(m, {"use_translucency_vertex_fog": False, "apply_cloud_fogging": False, "allow_custom_depth_writes": False,
+    _proprietes(m, {"use_translucency_vertex_fog": False, "apply_cloud_fogging": False, "allow_translucent_custom_depth_writes": False,
                     "translucency_pass": unreal.MaterialTranslucencyPass.MTP_BEFORE_DOF})
     lib = unreal.MaterialEditingLibrary
     position = lib.create_material_expression(m, unreal.MaterialExpressionWorldPosition, -1100, 0)
@@ -463,10 +522,44 @@ def _materiau_vue(racine, nom, texture, vue):
     lib.connect_material_expressions(f1, "", f2, "A")
     lib.connect_material_expressions(inverse, "", f2, "B")
     lib.connect_material_property(f2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    lib.connect_material_property(image, "A", unreal.MaterialProperty.MP_OPACITY)
+    fen = vue.get("fenetre")
+    if not fen:
+        lib.connect_material_property(image, "A", unreal.MaterialProperty.MP_OPACITY)
+    else:
+        # UNE VUE PAR FENÊTRE (18/11/2026) : cette toile ne s'affiche que pour un regard qui passe par SA fenêtre, de l'intérieur
+        # vers le dehors. MÊME FORMULE que moteur/vue_dehors.py, passe_par_la_fenetre : les changer ensemble.
+        camera = lib.create_material_expression(m, unreal.MaterialExpressionCameraPositionWS, -1100, 500)
+        passe = lib.create_material_expression(m, unreal.MaterialExpressionCustom, -800, 500)
+        passe.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+        entrees = []
+        for nom_entree in ("P", "C"):
+            e = unreal.CustomInput()
+            e.set_editor_property("input_name", nom_entree)
+            entrees.append(e)
+        passe.set_editor_property("inputs", entrees)
+        n, t, a = fen["normale"], fen["axe"], fen["centre"]
+        passe.set_editor_property("code",
+                                  f"float3 n = float3({n[0]:.6f}, {n[1]:.6f}, {n[2]:.6f});\n"
+                                  f"float3 a = float3({a[0]:.3f}, {a[1]:.3f}, {a[2]:.3f});\n"
+                                  "float3 d = P - C;\n"
+                                  "float den = dot(d, n);\n"
+                                  "float s = (dot(a, n) - dot(C, n)) / (abs(den) > 1e-4 ? den : 1e-4);\n"
+                                  "float3 q = C + s * d;\n"
+                                  f"float le_long = dot(q - a, float3({t[0]:.6f}, {t[1]:.6f}, {t[2]:.6f}));\n"
+                                  f"return (den > 1e-4 && s > 0.0 && s < 1.0 && abs(le_long) < {fen['demi_largeur_cm']:.3f}"
+                                  f" && q.z > {fen['bas_cm']:.3f} && q.z < {fen['haut_cm']:.3f}) ? 1.0 : 0.0;")
+        lib.connect_material_expressions(position, "", passe, "P")
+        lib.connect_material_expressions(camera, "", passe, "C")
+        opacite = lib.create_material_expression(m, unreal.MaterialExpressionMultiply, -250, 400)
+        lib.connect_material_expressions(image, "A", opacite, "A")
+        lib.connect_material_expressions(passe, "", opacite, "B")
+        lib.connect_material_property(opacite, "", unreal.MaterialProperty.MP_OPACITY)
     lib.recompile_material(m)
     unreal.EditorAssetLibrary.save_loaded_asset(m)
     return m
+
+
+RETRAIT_TOILE_FENETRE_CM = 5.0  # une toile de fenêtre est posée devant la toile commune (vers le logement) de cette distance
 
 
 def poser_vues_dehors(racine, vues):
@@ -480,7 +573,8 @@ def poser_vues_dehors(racine, vues):
         texture = _texture_vue(racine, vue["image"])
         m = _materiau_vue(racine, vue.get("id", str(i)).replace("-", "_"), texture, vue)
         c, au, av, n = (unreal.Vector(*vue[k]) for k in ("coin", "axe_u", "axe_v", "normale_vers_logement"))
-        centre = c + au * (vue["largeur_cm"] / 2) + av * (vue["hauteur_cm"] / 2)
+        priorite = int(vue.get("priorite", 0))
+        centre = c + au * (vue["largeur_cm"] / 2) + av * (vue["hauteur_cm"] / 2) + n * (RETRAIT_TOILE_FENETRE_CM * priorite)
         rotation = unreal.MathLibrary.make_rot_from_zx(n, au)
         a = _poser(unreal.StaticMeshActor, centre, rotation, etiquette=f"Atelya_Vue_{vue.get('id', i)}")
         comp = a.static_mesh_component
@@ -488,6 +582,8 @@ def poser_vues_dehors(racine, vues):
         comp.set_static_mesh(plan)
         comp.set_world_scale3d(unreal.Vector(vue["largeur_cm"] / 100.0, vue["hauteur_cm"] / 100.0, 1.0))
         comp.set_material(0, m)
+        # les toiles de fenêtre sont dessinées APRÈS la toile commune (par-dessus), quel que soit l'ordre des distances
+        comp.set_editor_property("translucency_sort_priority", priorite)
         _proprietes(comp, {"cast_shadow": False, "cast_dynamic_shadow": False, "cast_static_shadow": False,
                            "cast_hidden_shadow": False, "affect_dynamic_indirect_lighting": False,
                            "affect_indirect_lighting_while_hidden": False, "affect_distance_field_lighting": False,
@@ -754,6 +850,70 @@ def verre_clair(racine, actif=True):
     return n, (origine.get_path_name() if origine else None)
 
 
+# VOILAGES (19/11/2026). Dans Blender le voilage laisse passer la lumière (moteur/blender/rideaux.py) ; ce mélange n'existe pas
+# dans glTF : dans Unreal il arrivait GRIS et OPAQUE, comme un mur devant la fenêtre (NT, séjour d'app-001 : « tu as carrément
+# enlevé la fenêtre »). Ici : un tissu clair TRANSLUCIDE (on devine le dehors à travers) qui ne fait pas d'ombre (le jour entre).
+VOILAGE_COULEUR = (0.80, 0.80, 0.78)
+VOILAGE_OPACITE = 0.45
+
+
+VELOUTE_MAX = 0.04  # part de « velouté » (reflet rasant blanc des tissus) gardée dans le film
+
+
+def adoucir_le_veloute(racine):
+    """Les tissus de la maquette (rideaux) portent un « velouté » : dans le paquet il arrive BLANC et À FOND, et Unreal en
+    recouvre toute la couleur du tissu (rideaux bruns et mauves d'app-001 affichés beige pâle et rose pâle, alors que leur
+    couleur de base était la bonne ; vu le 19/11/2026 en lisant les matières importées). On n'en garde qu'un reflet léger.
+    Renvoie le nombre de matières corrigées."""
+    n = 0
+    for chemin in unreal.EditorAssetLibrary.list_assets(racine, recursive=True, include_folder=False):
+        a = unreal.load_asset(chemin)
+        if not isinstance(a, unreal.MaterialInstanceConstant):
+            continue
+        for v in a.get_editor_property("vector_parameter_values"):
+            if str(v.get_editor_property("parameter_info").get_editor_property("name")) != "SheenColorFactor":
+                continue
+            c = v.get_editor_property("parameter_value")
+            if max(c.r, c.g, c.b) > VELOUTE_MAX + 1e-6:
+                unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(
+                    a, "SheenColorFactor", unreal.LinearColor(VELOUTE_MAX, VELOUTE_MAX, VELOUTE_MAX, 1.0))
+                unreal.MaterialEditingLibrary.update_material_instance(a)
+                unreal.EditorAssetLibrary.save_loaded_asset(a)
+                n += 1
+    return n
+
+
+def voilages(racine, opacite=None):
+    """Pose le tissu translucide sur tous les voilages de la maquette (matières importées « Voilage… »). Renvoie leur nombre.
+    `opacite` : pour un essai (réglage « voilage_opacite ») ; None = VOILAGE_OPACITE."""
+    m = _materiau_simple(racine, "M_Voilage", VOILAGE_COULEUR, 0.9, VOILAGE_OPACITE if opacite is None else float(opacite))
+    # le voilage s'inscrit dans le marquage (il est translucide : sans cela le mur derrière lui, vu à travers le tissu clair,
+    # comptait comme un mur et le photographe assombrissait tout le film ; essai du 19/11/2026 : murs −0,3 cran)
+    # (nom de la propriété dans Unreal 5.8 : « allow_translucent_custom_depth_writes » ; « allow_custom_depth_writes »
+    # n'existe pas, vu dans le journal d'Unreal le 19/11/2026)
+    _proprietes(m, {"allow_translucent_custom_depth_writes": True})
+    unreal.MaterialEditingLibrary.recompile_material(m)
+    unreal.EditorAssetLibrary.save_loaded_asset(m)
+    n = 0
+    for a in _acteurs().get_all_level_actors():
+        if not isinstance(a, unreal.StaticMeshActor):
+            continue
+        comp = a.static_mesh_component
+        pose = False
+        for i in range(comp.get_num_materials()):
+            mi = comp.get_material(i)
+            if mi and mi.get_name().lower().startswith(("voilage", "mi_voilage", "m_voilage")):
+                comp.set_material(i, m)
+                pose = True
+        if pose:
+            _proprietes(comp, {"cast_shadow": False, "affect_dynamic_indirect_lighting": False,
+                               "affect_distance_field_lighting": False, "visible_in_ray_tracing": False})
+            comp.set_render_custom_depth(True)
+            comp.set_custom_depth_stencil_value(STENCIL_VOILAGE)
+            n += 1
+    return n
+
+
 def marquer_blancs(fiche):
     """Murs et plafonds (fiche : surfaces_blanches) marqués pour le masque du photographe."""
     noms = set(fiche.get("surfaces_blanches") or [])
@@ -769,10 +929,15 @@ def marquer_blancs(fiche):
     return n
 
 
-def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None, halo=0.2):
+def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, locale=None, halo=0.2, pellicule=None,
+                        couleurs=None):
     """Le réglage d'image (Post Process). `locale` : exposition LOCALE {"hautes_lumieres": 0..1, "pivot_crans": crans,
     "flou": 0..1} : les grandes zones plus claires que le pivot (les fenêtres) voient leur contraste réduit (1 = rien) ; le pivot
-    est placé au-dessus du gris moyen d'Unreal (0,18) ; None = pas d'exposition locale."""
+    est placé au-dessus du gris moyen d'Unreal (0,18) ; None = pas d'exposition locale. `pellicule`, `couleurs` : la courbe des
+    tons et les couleurs envoyées par l'outil qui tourne (moteur/photographe.PELLICULE, PELLICULE_COULEURS : la seule source,
+    aussi pour les essais) ; à défaut, les copies de ce fichier."""
+    pellicule = {**PELLICULE, **(pellicule or {})}
+    couleurs = {**PELLICULE_COULEURS, **(couleurs or {})}
     v = _poser(unreal.PostProcessVolume, etiquette="Atelya_ReglageImage")
     v.set_editor_property("unbound", True)
     r = v.get_editor_property("settings")
@@ -794,10 +959,10 @@ def poser_reglage_image(exposition, gain, moteur="lumen", intensite_max=None, lo
         "motion_blur_amount": 0.5,
         "vignette_intensity": 0.0,
         "bloom_intensity": float(halo),
-        **PELLICULE,
-        "expand_gamut": PELLICULE_COULEURS["expand_gamut"],
-        "blue_correction": PELLICULE_COULEURS["blue_correction"],
-        "color_saturation": unreal.Vector4(1.0, 1.0, 1.0, PELLICULE_COULEURS["saturation"]),
+        **{cle: float(valeur) for cle, valeur in pellicule.items()},
+        "expand_gamut": float(couleurs["expand_gamut"]),
+        "blue_correction": float(couleurs["blue_correction"]),
+        "color_saturation": unreal.Vector4(1.0, 1.0, 1.0, float(couleurs["saturation"])),
     }
     if moteur == "path_tracer":
         reglages.update({"path_tracing_max_bounces": REBONDS_PT, "path_tracing_enable_denoiser": True,
@@ -997,7 +1162,7 @@ def main():
     moteur = reglage.get("moteur", "lumen")
     if moteur not in MOTEURS:
         raise RuntimeError(f"PLANTÉ : moteur « {moteur} » inconnu ({MOTEURS})")
-    ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"))
+    ciel = poser_ciel(racine, ambiance, fiche, centre, reglage.get("force_ciel"), reglage.get("ciel_couvert", CIEL_COUVERT))
     if ciel == "physique" and reglage.get("dehors", True):
         poser_dehors(racine, centre, invisible=bool(reglage.get("vues_dehors")) and not reglage.get("dehors_visible", False))
     ciel_photo, materiau_ciel = None, None
@@ -1012,12 +1177,14 @@ def main():
     refermer_portes()
     portes = ouvrir_portes(reglage.get("portes_ouvertes") or [])
     blancs = marquer_blancs(fiche)
+    nb_veloutes = adoucir_le_veloute(racine)
+    nb_voilages = voilages(racine, reglage.get("voilage_opacite"))  # APRÈS le marquage des murs (qui remet à zéro celui de tous les autres objets)
     if not blancs:
         raise RuntimeError("PLANTÉ : aucun mur ni plafond reconnu (fiche : surfaces_blanches)")
     exposition = float(reglage.get("exposition", 0.0))
     gain = reglage.get("gain") or [1.0, 1.0, 1.0]
     volume = poser_reglage_image(exposition, gain, moteur, reglage.get("intensite_max"), reglage.get("exposition_locale"),
-                                 reglage.get("halo", 0.2))
+                                 reglage.get("halo", 0.2), reglage.get("pellicule"), reglage.get("pellicule_couleurs"))
     if materiau_ciel is not None:  # le ciel photographié, posé sur l'image (réglage d'image)
         r = volume.get_editor_property("settings")
         r.set_editor_property("weighted_blendables", unreal.WeightedBlendables(
@@ -1037,8 +1204,10 @@ def main():
     unreal.log("ATELYA prépare " + json.dumps({"ambiance": ambiance.get("id"), "ciel": ciel, "lampes": lampes,
                                                  "vitres_sans_ombre": vitres, "murs_et_plafonds": blancs, "dalles": nb_dalles, "cles_exposition": nb_cles, "pieces_de_portes_ouvertes": portes,
                                                  "exposition": exposition, "gain": gain, "moteur": moteur,
+                                                 "ciel_couvert": reglage.get("ciel_couvert", CIEL_COUVERT),
                                                  "ciel_photo_decalage": ciel_photo, "vues_dehors": vues, "objets_balcons": nb_balcons,
                                                  "vitres_claires": vitres_claires if reglage.get("verre_clair") else 0,
+                                                 "voilages": nb_voilages, "veloutes_adoucis": nb_veloutes,
                                                  "verre_importe": verre_importe,
                                                  "sortie": str(dossier)},
                                                 ensure_ascii=False))

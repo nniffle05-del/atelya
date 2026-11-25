@@ -46,12 +46,38 @@ def main() -> int:
     releve = fiche_ou_photos(args.releve, logement, args.sortie.with_suffix(".cameras-seul.json"))
     trouves = reperer_depuis_releve(releve, logement, RACINE, journal=print)
     nouveaux = vers_meubles_du_logement(trouves, logement)
+    # rangés par défaut (15/11/2026) : jamais deux meubles au même endroit, jamais un meuble dans un mur ; ceux déjà dans le
+    # logement (relevés, placés à l'écran) ne bougent pas, les nouveaux s'y adaptent
+    from moteur.ranger_meubles import ranger
+    deja = list(logement.get("meubles", []))
+    # les chaises et tabourets autour de leur table, tournés vers elle (moteur/tablees.py, 17/11/2026)
+    from moteur import tablees
+
+    tous, _ = tablees.ranger(deja + nouveaux, logement, print)
+    ranges, _ = ranger(tous, logement, journal=print)
+    ranges, _ = tablees.ranger(ranges, logement)  # une table que le rangement a déplacée retrouve ses chaises
+    nouveaux = [m for m in ranges if not any(m["id"] == d["id"] for d in deja)]
     pris = {m["id"] for m in logement.get("meubles", [])} | {p["id"] for p in logement["pieces"]}
     for m in nouveaux:
         while m["id"] in pris:
             m["id"] += "b"
         pris.add(m["id"])
     logement["meubles"] = list(logement.get("meubles", [])) + nouveaux
+    # les LUMINAIRES SUSPENDUS (16/11/2026) : vus sur presque toutes les photos, placés par la profondeur (moteur/objets_accroches.py)
+    from moteur.objets_accroches import reperer_suspensions
+    pris = {m["id"] for m in logement["meubles"]} | {p["id"] for p in logement["pieces"]}
+    suspensions = [m for m in reperer_suspensions(releve, logement, RACINE, journal=print) if m["id"] not in pris]
+    logement["meubles"] += suspensions
+    nouveaux = nouveaux + suspensions
+    # ZÉRO COLLISION par défaut (NT, 16/11/2026) : aucun objet dans un mur ni dans un autre (moteur/collisions.py) ; ce qui a été
+    # placé par quelqu'un ne bouge pas
+    from moteur import collisions
+    logement, actions = collisions.reparer(logement, journal=print)
+    restes = collisions.mesurer(logement)
+    print(f"zéro collision : {collisions.bilan(actions)} ; il en reste {len(restes)}"
+          + ("" if not restes else " (objets placés par quelqu'un : à corriger à l'écran de vérification)"), flush=True)
+    gardes = {m["id"]: m for m in logement["meubles"]}
+    nouveaux = [gardes[m["id"]] for m in nouveaux if m["id"] in gardes]
     Logement.model_validate(logement)
     args.sortie.parent.mkdir(parents=True, exist_ok=True)
     args.sortie.write_text(json.dumps(logement, ensure_ascii=False, indent=1), encoding="utf-8")

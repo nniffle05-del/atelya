@@ -39,6 +39,18 @@ def test_portes_ouvertes_comme_un_agent():
     assert abs(abs(portes["P1"]["angle_deg"]) - 90) < 1e-6
 
 
+def test_la_porte_du_seuil_d_une_photo_est_ouverte():
+    from moteur.cinema import navigation as nav
+
+    log = _logement()
+    # l'appareil sur le seuil de la porte séjour / chambre (P2, mur M1 en x = 6, de y = 1,5 à 2,25) : elle seule s'ouvre
+    assert [p["id"] for p in nav.portes_du_seuil(log, 6.05, 1.9)] == ["P2"]
+    assert "battant" not in nav.portes_du_seuil(log, 6.05, 1.9)[0]
+    # au milieu du séjour, ou devant la porte palière (jamais ouverte) : aucune
+    assert nav.portes_du_seuil(log, 3.0, 2.0) == []
+    assert nav.portes_du_seuil(log, 2.9, 5.9) == []
+
+
 def test_balade_praticable_et_complete():
     log = _logement()
     b = pm.balade(log)

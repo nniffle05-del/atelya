@@ -26,6 +26,8 @@ def test_meme_pellicule_dans_unreal():
     texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
     ligne = next(l for l in texte.splitlines() if l.startswith("PELLICULE = "))
     assert ast.literal_eval(ligne.split("=", 1)[1].strip()) == ph.PELLICULE
+    ligne = next(l for l in texte.splitlines() if l.startswith("PELLICULE_COULEURS = "))
+    assert ast.literal_eval(ligne.split("=", 1)[1].strip()) == ph.PELLICULE_COULEURS
     assert '"render_warm_up_frames", True' in texte  # préchauffe calculée : plus de 1re image sombre
 
 
@@ -42,9 +44,22 @@ def test_reglage_exposition_et_balance():
     assert ph.reglage(np.zeros((5, 3))) is None  # trop peu de murs : pas de réglage
 
 
-def test_pellicule_imite_agx():
+def test_l_ancienne_pellicule_imite_agx_et_la_nouvelle_est_plus_contrastee():
+    """Jusqu'au 18/11/2026 la pellicule du film imitait AgX (gardée : PELLICULE_AGX). Depuis, elle est réglée sur les photos
+    des clients : des clairs moins écrasés, des murs du jour voilé plus blancs."""
     for x, agx in ph.AGX_MESURES.items():
-        assert abs(float(ph.courbe_unreal(x, **ph.PELLICULE)) * 255 - agx) < 3.0, x
+        assert abs(float(ph.courbe_unreal(x, **ph.PELLICULE_AGX)) * 255 - agx) < 3.0, x
+    # mêmes sombres et même gris moyen, mais des clairs moins écrasés : du gris moyen au blanc, plus d'écart à l'écran
+    contraste = lambda pellicule: float(ph.courbe_unreal(1.0, **pellicule)) - float(ph.courbe_unreal(0.18, **pellicule))
+    assert contraste(ph.PELLICULE) > 1.15 * contraste(ph.PELLICULE_AGX)
+    assert abs(float(ph.courbe_unreal(0.18, **ph.PELLICULE)) - float(ph.courbe_unreal(0.18, **ph.PELLICULE_AGX))) < 0.02
+    murs_avant = 255 * float(ph.courbe_unreal(0.55, **ph.PELLICULE_AGX))
+    murs = 255 * float(ph.courbe_unreal(ph.CLARTE_UNREAL["jour_voile"], **ph.PELLICULE))
+    assert murs_avant == pytest.approx(172, abs=3) and murs == pytest.approx(191, abs=3)
+    # les éclairages non jugés contre des photos gardent des murs affichés au même niveau qu'avant
+    for ident, ancienne in (("jour_soleil", 1.0), ("fin_de_journee", 1.30), ("soiree", 0.45), ("nuit", 0.35)):
+        avant = 255 * float(ph.courbe_unreal(ancienne, **ph.PELLICULE_AGX))
+        assert 255 * float(ph.courbe_unreal(ph.CLARTE_UNREAL[ident], **ph.PELLICULE)) == pytest.approx(avant, abs=1.5), ident
     ecarts_usine = [abs(float(ph.courbe_unreal(x, **ph.PELLICULE_USINE)) * 255 - agx) for x, agx in ph.AGX_MESURES.items()]
     assert max(ecarts_usine) > 15  # la courbe d'usine écrase les sombres (sol trop foncé du comparatif)
     assert float(ph.courbe_unreal(0.18, **ph.PELLICULE_USINE)) * 255 == pytest.approx(117.6, abs=0.5)  # formule d'Unreal
@@ -93,7 +108,8 @@ def test_prochaine_exposition():
 
 
 def test_couleurs_de_la_pellicule():
-    """Le modèle des couleurs d'Unreal retombe sur la courbe des gris, et les réglages de couleur rapprochent du nuancier AgX."""
+    """Le modèle des couleurs d'Unreal retombe sur la courbe des gris, et les ANCIENS réglages de couleur (jusqu'au 18/11/2026)
+    rapprochaient du nuancier AgX ; ceux d'aujourd'hui sont réglés sur les photos des clients."""
     import json
 
     from moteur import pellicule_unreal as pu
@@ -104,8 +120,8 @@ def test_couleurs_de_la_pellicule():
     L, A = np.array(d["lineaire"]), np.array(d["affiche"])
 
     def ecart(**c):
-        return float(np.sqrt(((pu.affiche(L, ph.PELLICULE, **c) - A) ** 2).mean()) * 255)
-    c = ph.PELLICULE_COULEURS
+        return float(np.sqrt(((pu.affiche(L, ph.PELLICULE_AGX, **c) - A) ** 2).mean()) * 255)
+    c = ph.PELLICULE_COULEURS_AGX
     assert ecart(saturation=c["saturation"], expand_gamut=c["expand_gamut"], blue_correction=c["blue_correction"]) < 6.0
     assert ecart() > 8.0  # réglages d'usine d'Unreal
     texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
@@ -114,8 +130,8 @@ def test_couleurs_de_la_pellicule():
 
 
 def test_clarte_visee_comme_les_images_de_blender():
-    assert ph.clarte_visee({"id": "jour_soleil", "clarte_murs": 0.55}) == 1.0  # éclat du film v3 retrouvé, masque des murs juste (12/11/2026)
-    assert ph.clarte_visee({"id": "nuit", "clarte_murs": 0.35}) == 0.35
+    assert ph.clarte_visee({"id": "jour_soleil", "clarte_murs": 0.55}) == 0.71  # éclat du film v3 retrouvé, masque des murs juste (12/11/2026)
+    assert ph.clarte_visee({"id": "nuit", "clarte_murs": 0.35}) == 0.33
     assert ph.clarte_visee({"id": "autre", "clarte_murs": 0.4}) == 0.4
     texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
     assert "FORCE_CIEL_PHYSIQUE = 3.3" in texte  # lumière du ciel recalée sur la part du ciel de Blender
@@ -128,3 +144,14 @@ def test_exposition_bornee():
     assert ph.prochaine_exposition([(-15.5, -3.0)]) == ph.EXPOSITION_UNREAL_BORNES[0]
     texte = (RACINE / "moteur" / "unreal" / "preparer_cinematique.py").read_text(encoding="utf-8")
     assert 'reglage.get("lampes_pieces")' in texte  # plafonnier allumé dans une pièce sans fenêtre filmée de jour
+
+
+def test_la_reprise_du_film_corrige_l_ecart_du_film_et_pas_trois_fois_trop():
+    """Vu le 18/11/2026 sur app-004 : essais (-8,00 ; +2,70) puis (-5,30 ; +0,05), film à -5,435 mesuré à -0,17 cran. La
+    reprise partait à -5,99 (pente « essai contre film » absurde, bornée à 0,3) et rendait des murs gris ; elle doit corriger
+    de l'écart du film, à la pente des essais (ici ~1)."""
+    essais = [(-8.0, 2.70), (-5.30, 0.05)]
+    b = ph.exposition_de_reprise(essais, (-5.435, -0.17))
+    assert b == pytest.approx(-5.435 - 0.17 / (2.65 / 2.70), abs=1e-6)
+    assert ph.exposition_de_reprise(essais[:1], (-5.0, 0.3)) == pytest.approx(-4.7)  # un seul essai : 1 cran pour 1 cran
+    assert ph.exposition_de_reprise(essais, (-3.1, 2.0)) == ph.EXPOSITION_UNREAL_BORNES[1]  # toujours borné

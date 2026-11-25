@@ -26,35 +26,15 @@ RACINE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RACINE))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cinematique_unreal as cu  # noqa: E402
+import decor_film  # noqa: E402
 import mesurer_lumiere  # noqa: E402
-import vue_dehors_photos  # noqa: E402
 from moteur.cinema import vide_dehors  # noqa: E402
 
 from moteur import photographe, promeneur  # noqa: E402
-from moteur.cinema import ciels  # noqa: E402
 from moteur.cinema import controle as controle_vol  # noqa: E402
 
 PREMIER_ESSAI = -9.0
-# La VRAIE VUE (étape 5, 13/11/2026) n'est posée qu'aux moments de JOUR : les photos d'annonce sont prises de jour.
-MOMENTS_VUE = ("jour_soleil", "jour_voile")
 PASSES = 2  # essais du photographe en marchant
-BIBLIOTHEQUE_CIELS = RACINE.parent / "atelya" / "bibliotheque" / "ciels"
-
-
-def ciel_photo(ambiance_id: str) -> dict | None:
-    """Le ciel photographié de cet éclairage (moteur/cinema/ciels.py), copié au besoin dans un dossier SANS ACCENT pour Unreal."""
-    reglage = ciels.ciel_photo(ambiance_id, (cu.STUDIO / "Paquets" / "ciels").as_posix())
-    if reglage is None:
-        return None
-    cible = Path(reglage["image"])
-    if not cible.is_file():
-        source = BIBLIOTHEQUE_CIELS / cible.name
-        if not source.is_file():
-            print(f"   (pas de ciel photographié : {source} absent)", flush=True)
-            return None
-        cible.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, cible)
-    return reglage
 
 
 def numero(chemin: Path) -> int:
@@ -77,6 +57,8 @@ def main() -> None:
     p.add_argument("--photos", default=None,
                    help="caméras des photos du client (cameras-photos.json) : la VRAIE VUE par les fenêtres, tirée des photos "
                         "(outils/unreal/vue_dehors_photos.py), posée aux moments de jour")
+    p.add_argument("--reglage", action="append", default=[], metavar="CLE=VALEUR",
+                   help="essais : un réglage de plus pour la préparation Unreal (ex. ciel_couvert=uni : l'ancien ciel couvert)")
     a = p.parse_args()
     debut = time.time()
     paquet = Path(a.paquet)
@@ -91,9 +73,9 @@ def main() -> None:
     print("1. Le promeneur trace la balade", flush=True)
     # la VRAIE VUE d'abord : le vol doit savoir ce qu'elle couvre pour ne pas cadrer ce que les photos ne montrent pas
     vues, decor = [], None
-    if a.photos and ambiance["id"] in MOMENTS_VUE:
+    if a.photos and ambiance["id"] in decor_film.MOMENTS_VUE:
         dossier_vues = cu.STUDIO / "Paquets" / a.nom / "vues"
-        vues = vue_dehors_photos.preparer(Path(a.logement), Path(a.photos), dossier_vues)
+        vues = decor_film.vues_par_les_fenetres(Path(a.logement), Path(a.photos), ambiance["id"], dossier_vues)
         decor = vide_dehors.charger(dossier_vues)
         print(f"   vraie vue : {len(vues)} toile(s) d'après les photos du client", flush=True)
     if a.mode == "vol":
@@ -118,14 +100,17 @@ def main() -> None:
     clarte = photographe.clarte_visee(ambiance)
     balance = float(ambiance.get("balance", photographe.FORCE_BALANCE))
     base = {"eclairage": ambiance["id"], "moteur": a.moteur, "dossier": nom_dossier, "portes_ouvertes": b["portes_ouvertes"],
-            "vues_dehors": vues, "verre_clair": bool(vues),
-            # les BALCONS du plan (logement.json : balcons), construits dans la scène (13/11/2026)
-            "balcons": logement.get("balcons", []), "hauteur_etage": logement.get("hauteur_sous_plafond", 2.5),
+            # la vraie vue, la vitre claire, les balcons, le ciel photographié : le même décor que les vues de mesure
+            **decor_film.reglage_du_decor(logement, vues, ambiance["id"]),
             "lampes_pieces": [] if ambiance.get("lampes") else b["pieces_sans_fenetre"],
             "exposition_locale": photographe.exposition_locale(clarte),
-            # le ciel photographié est posé SUR L'IMAGE à la place de tout ce qui est « ciel » : il passait par-dessus la vraie vue
-            # (translucide) et lui retirait ses couleurs (arbres gris, 13/11/2026) ; avec la vraie vue, pas de ciel photographié
-            "ciel_photo": None if vues else ciel_photo(ambiance["id"])}
+            "pellicule": photographe.PELLICULE, "pellicule_couleurs": photographe.PELLICULE_COULEURS}
+    for r in a.reglage:
+        cle, valeur = r.split("=", 1)
+        try:
+            base[cle] = json.loads(valeur)
+        except json.JSONDecodeError:
+            base[cle] = valeur
 
     def preparer(exposition, gain, cles=None):
         contenu = {**base, "exposition": exposition, "gain": list(gain)}

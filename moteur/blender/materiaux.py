@@ -29,7 +29,10 @@ SORTES = {"parquet_chene_lames": "bois", "parquet_batons_rompus": "bois", "point
           "damier_pierre": "carrelage", "pierre_beige": "carrelage", "carreaux_cubes": "carrelage",
           "petits_carreaux_clairs": "carrelage"}
 # Photos dont les carreaux sont en biais : tournées pour que les joints suivent les murs (même liste que moteur/matieres.py).
-ROTATION_PHOTO = {"carrelage_interieur": 45.0}
+ROTATION_PHOTO = {"carrelage_interieur": 45.0, "stratifie": 90.0, "chene_clair_moderne": 90.0, "chene_grise": 90.0,
+                  "chene_naturel_photo": 90.0, "parquet_use": 90.0, "lames_bois": 90.0, "stratifie_2": 90.0, "lames_foncees_2": 90.0,
+                  "lames_chene_miel": 90.0, "lames_chene_clair": 90.0, "lames_chene_dore": 90.0, "lames_miel_fines": 90.0,
+                  "lames_miel_moyennes": 90.0, "lames_chene_anglaise": 90.0}
 COULEUR_PEINTURE = (0.86, 0.85, 0.82)
 # B2 temps 2 (09/11/2026) : un parquet d'appartement est vitrifié SATINÉ, pas ciré. Avec la brillance des photos de la
 # bibliothèque (presque miroir) et le reflet normal, le bois renvoyait le ciel vu en biais : app-001, parquet miel sur la photo,
@@ -41,7 +44,7 @@ REFLET_BOIS = 0.15  # « Specular IOR Level » (0,5 = reflet normal d'un vernis)
 class Materiaux(dict):
     """Les matériaux de la maquette, créés à la demande par leur nom (les sols : seulement ceux du logement)."""
 
-    def __init__(self, bibliotheque=None, orientation=0.0):
+    def __init__(self, bibliotheque=None, orientation=0.0, sur_mesure=None):
         super().__init__()
         self.bibliotheque = Path(bibliotheque) if bibliotheque else None
         self.fiches = {}
@@ -50,6 +53,10 @@ class Materiaux(dict):
         else:
             self.bibliotheque = None
         self.orientation = orientation
+        # Les parquets dessinés SUR MESURE pour ce logement (moteur/parquet_sur_mesure.py) : {nom : fiche avec son « dossier »}.
+        # Ce sont des images comme celles de la bibliothèque, rangées à côté de la maquette.
+        self.sur_mesure = {n: f for n, f in (sur_mesure or {}).items() if (Path(f["dossier"]) / "couleur.jpg").is_file()}
+        self.fiches.update(self.sur_mesure)
 
     def __missing__(self, nom):
         materiau = bpy.data.materials.new(nom)
@@ -59,16 +66,18 @@ class Materiaux(dict):
         return materiau
 
     def photo(self, nom):
-        """(dossier, taille en m) d'une matière de la bibliothèque, ou None."""
+        """(dossier, taille en m) d'une matière de la bibliothèque (ou d'un parquet sur mesure du logement), ou None."""
+        if nom in self.sur_mesure:
+            return Path(self.sur_mesure[nom]["dossier"]), (self.sur_mesure[nom].get("taille_image_m") or [1.0, 1.0])[0]
         if self.bibliotheque is None or nom not in self.fiches or not (self.bibliotheque / nom / "couleur.jpg").is_file():
             return None
         taille = (self.fiches[nom].get("taille_image_m") or [1.0, 1.0])[0]
         return self.bibliotheque / nom, taille
 
 
-def creer_materiaux(bibliotheque=None, orientation=0.0) -> dict:
+def creer_materiaux(bibliotheque=None, orientation=0.0, sur_mesure=None) -> dict:
     """Les matériaux connus, créés à la demande quand une brique les demande par leur nom."""
-    return Materiaux(bibliotheque, orientation)
+    return Materiaux(bibliotheque, orientation, sur_mesure)
 
 
 def _peinture(couleur, rugosite):
@@ -85,16 +94,23 @@ def _sol(materiau, m):
     Un nom « matiere~r,g,b » porte une teinte : la couleur est multipliée par ces trois nombres (rouge, vert, bleu), pour
     rapprocher la matière de ce que montrent les photos du client."""
     nom, _, gains = materiau.name.partition("~")
+    nom, _, sens = nom.partition("^")  # « matiere^90 » : lames dans ce sens (degrés, lu sur les photos ; champ sens du sol)
     nom, _, echelle = nom.partition("@")  # « matiere@1.13 » : motif 13 % plus grand (champ echelle du sol)
     echelle = float(echelle) if echelle else 1.0
-    if nom == "carreaux_ciment":
-        _carreaux_ciment(materiau, m, echelle)
-    elif nom == "point_de_hongrie" and m.photo("chene_clair"):
-        _point_de_hongrie(materiau, m, echelle)
-    elif m.photo(nom):
-        _photo(materiau, m, nom, echelle)
-    else:
-        (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
+    generale = m.orientation
+    if sens:
+        m.orientation = math.radians(float(sens))  # ce sol a son propre sens ; les autres gardent le sens général
+    try:
+        if nom == "carreaux_ciment":
+            _carreaux_ciment(materiau, m, echelle)
+        elif nom == "point_de_hongrie" and m.photo("chene_clair"):
+            _point_de_hongrie(materiau, m, echelle)
+        elif m.photo(nom):
+            _photo(materiau, m, nom, echelle)
+        else:
+            (_carrelage if SORTES.get(nom, "carrelage" if "carrel" in nom else "bois") == "carrelage" else _parquet)(materiau)
+    finally:
+        m.orientation = generale
     if gains:
         _teinter(materiau, [float(g) for g in gains.split(",")])
 
@@ -139,6 +155,7 @@ def _fabriques_simples():
         "porte_interieure": lambda m, _: _uni(m, (0.88, 0.87, 0.84), rugosite=0.45),
         "porte_entree": lambda m, _: _uni(m, (0.12, 0.13, 0.14), rugosite=0.4),
         "metal": lambda m, _: _uni(m, (0.75, 0.75, 0.76), rugosite=0.25, metal=1.0),
+        "fer_forge": lambda m, _: _uni(m, (0.035, 0.035, 0.04), rugosite=0.5),  # ferronnerie peinte en noir (garde-corps de fenêtre)
         "seuil": lambda m, _: _uni(m, (0.55, 0.53, 0.5), rugosite=0.6),
         "parquet": lambda m, _: _parquet(m),
         "carrelage": lambda m, _: _carrelage(m),
@@ -338,7 +355,7 @@ def _photo(materiau, m, nom, echelle=1.0):
         normale.inputs["Strength"].default_value = 1.0
         liens.new(relief.outputs["Color"], normale.inputs["Color"])
         liens.new(normale.outputs["Normal"], bsdf.inputs["Normal"])
-    materiau.diffuse_color = (0.5, 0.4, 0.3, 1.0) if SORTES.get(nom) == "bois" else (0.75, 0.73, 0.7, 1.0)
+    materiau.diffuse_color = (0.5, 0.4, 0.3, 1.0) if _sorte(nom) == "bois" else (0.75, 0.73, 0.7, 1.0)
 
 
 def _enduit(materiau, m, couleur):

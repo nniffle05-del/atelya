@@ -124,9 +124,9 @@ def test_placage_comme_blender_au_rendu():
     """Carte UV « monde » : rotation autour du haut, taille réelle, projection vue d'en haut (sol) ou de face (côtés)."""
     uv = _script_blender("exporter_gltf").uv_du_point
     p = {"angle": 0.0, "echelle": (0.5, 0.5, 0.5), "decalage": (0.0, 0.0, 0.0)}
-    assert uv((2.0, 3.0, 0.0), (0, 0, 1), p) == (1.0, 1.5)  # sol : x, y à l'échelle d'une photo de 2 m
+    assert uv((2.0, 3.0, 0.0), (0, 0, 1), p) == (1.5, 1.0)  # sol : y, x (la largeur de la photo le long de y, comme Blender)
     assert uv((2.0, 3.0, 0.1), (1, 0, 0), p) == (1.5, 0.05)  # côté face à x : y, z
     assert uv((2.0, 3.0, 0.1), (0, -1, 0), p) == (1.0, 0.05)  # côté face à y : x, z
     tourne = dict(p, angle=math.radians(90))  # photo tournée d'un quart de tour : x devient y
     u, v = uv((2.0, 0.0, 0.0), (0, 0, 1), tourne)
-    assert abs(u) < 1e-9 and abs(v - 1.0) < 1e-9
+    assert abs(u - 1.0) < 1e-9 and abs(v) < 1e-9
