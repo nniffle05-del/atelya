@@ -1368,3 +1368,5 @@ NT a dit « Oui » à la règle proposée après la mesure (les mesures d'abord 
 **Tests** : `tests/test_sol_des_photos.py` (11) ; série complète : 1 254 réussis + 1 attendu.
 
 **Note honnête** : prêt client, plans fabriqués (~93) et vrais plans (~53) inchangés (la lecture des plans n'est pas touchée) ; brique « mesures dans le relief des photos » : le défaut le plus grossier (sol faux sur une photo de chambre sur trois) est levé, deux biais plus fins apparaissent ; produit entier sur app-004 ~54 → ~55/100 À L'ŒIL (le lit de la chambre à sa place ; logement déjà vu, pas de film entier refait).
+
+**NT a validé le 25/11/2026 (« Oui et oui » au compte rendu : valider le 1er temps malgré les trois reculs ; nouvelle conversation pour le 2e temps — la même règle dans le calage des photos et la hauteur sous plafond, mesurée à part —, puis la distance des luminaires suspendus). Restés sans réponse : fermer Steam et les anciennes conversations pendant un tournage, agrandir la réserve de mémoire sur disque de Windows (accord écrit).**
