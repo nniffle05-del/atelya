@@ -10,6 +10,9 @@
 # 1. PRÉDIRE : avant de lancer, le contrôle de départ. Refus (code 2, une ligne « PAS LANCÉ : … » qui dit quoi faire) si
 #    la mémoire libre (RAM + réserve sur disque) est sous BesoinGo (un tournage Unreal demande ~10 Go : mesuré le 25/11),
 #    si l'éditeur Unreal est ouvert, si un disque a moins de 10 Go, ou si le PC peut se mettre en veille sur secteur.
+#    Quand la mémoire est juste (moins de BesoinGo + 3 Go), il LIBÈRE d'abord ce que NT a permis de fermer (accord du
+#    25/11/2026) : Steam, et les anciennes conversations Claude de plus de 12 heures qui ne travaillent pas (jamais celle
+#    qui lance le calcul) ; -SansLiberer pour ne rien fermer.
 # 2. SURVEILLER : le calcul tourne détaché (il survit à la conversation), le garde de la mémoire à côté de lui
 #    (garde_memoire.ps1 → <journal>.memoire.csv, <journal>.ALERTE.txt).
 # 3. REPRENDRE : si le script plante, il est relancé seul (Relances fois, après 2 minutes), tant qu'il reste de la mémoire :
@@ -17,7 +20,7 @@
 #    « code=0 » (fini) ou « PLANTÉ POUR DE BON … ».
 # Suivre depuis la conversation : pc/verification/veille_tournage.sh <journal> <minutes> <dossiers…>.
 param([Parameter(Mandatory = $true)][string]$Script, [Parameter(Mandatory = $true)][string]$Journal,
-      [double]$BesoinGo = 11, [int]$Relances = 2, [switch]$SansControle,
+      [double]$BesoinGo = 11, [int]$Relances = 2, [switch]$SansControle, [switch]$SansLiberer,
       [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 $depot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location -LiteralPath $depot
@@ -25,10 +28,51 @@ if (-not (Test-Path -LiteralPath $Script)) { Write-Output "PAS LANCE : script in
 $bash = "C:\Program Files\Git\usr\bin\bash.exe"
 if (-not (Test-Path -LiteralPath $bash)) { Write-Output "PAS LANCE : bash introuvable : $bash"; exit 1 }
 
+function Liberer-LaMemoire {
+    # ACCORD DE NT (25/11/2026 : « Faut tout ces points-là, je t'y autorise ») : pendant un tournage, fermer Steam et les ANCIENNES
+    # conversations Claude restées ouvertes dans VS Code (chacune garde 0,5 Go, plus ses outils). Jamais la conversation qui
+    # lance ce calcul, ni une conversation ouverte depuis moins de 12 heures, ni une conversation qui travaille.
+    $faits = @()
+    $steam = Get-Process steam -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($steam -and $steam.Path) {
+        Start-Process -FilePath $steam.Path -ArgumentList "-shutdown"   # la sortie propre de Steam, pas un arrêt forcé
+        for ($i = 0; $i -lt 20 -and (Get-Process steam -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Seconds 1 }
+        $faits += $(if (Get-Process steam -ErrorAction SilentlyContinue) { "Steam ne s'est pas ferme" } else { "Steam ferme" })
+    }
+    # la conversation qui lance ce calcul : le claude.exe parmi les ancêtres de ce script
+    $tous = @{}; Get-CimInstance Win32_Process | ForEach-Object { $tous[[int]$_.ProcessId] = $_ }
+    $miens = @(); $p = $PID
+    for ($i = 0; $i -lt 12 -and $tous.ContainsKey([int]$p); $i++) { if ($tous[[int]$p].Name -eq "claude.exe") { $miens += [int]$p }; $p = $tous[[int]$p].ParentProcessId }
+    $autres = @($tous.Values | Where-Object { $_.Name -eq "claude.exe" -and ($miens -notcontains [int]$_.ProcessId) -and $_.CreationDate -lt (Get-Date).AddHours(-12) })
+    if ($miens.Count -eq 0) { $autres = @() }   # lancé hors d'une conversation : on ne sait pas laquelle épargner, on n'en ferme aucune
+    if ($autres.Count) {
+        $avant = @{}; foreach ($a in $autres) { $avant[[int]$a.ProcessId] = (Get-Process -Id $a.ProcessId -ErrorAction SilentlyContinue).TotalProcessorTime }
+        Start-Sleep -Seconds 8
+        foreach ($a in $autres) {
+            $q = Get-Process -Id $a.ProcessId -ErrorAction SilentlyContinue
+            if ($q -and $avant[[int]$a.ProcessId] -ne $null -and (($q.TotalProcessorTime - $avant[[int]$a.ProcessId]).TotalSeconds -lt 0.2)) {
+                & taskkill /PID $a.ProcessId /T /F | Out-Null   # cette conversation-là et ses propres outils, rien d'autre
+                $faits += "conversation Claude du $($a.CreationDate.ToString('dd/MM HH:mm')) fermee"
+            } elseif ($q) { $faits += "conversation Claude du $($a.CreationDate.ToString('dd/MM HH:mm')) laissee (elle travaille)" }
+        }
+    }
+    return $faits
+}
+
 if (-not $SansControle) {
     $refus = @()
     $os = Get-CimInstance Win32_OperatingSystem
     $libre = [math]::Round($os.FreeVirtualMemory / 1MB, 1)
+    if (($libre -lt $BesoinGo + 3) -and -not $SansLiberer) {
+        $faits = Liberer-LaMemoire
+        if ($faits.Count) {
+            Start-Sleep -Seconds 3
+            $os = Get-CimInstance Win32_OperatingSystem
+            $apres = [math]::Round($os.FreeVirtualMemory / 1MB, 1)
+            Write-Output ("memoire liberee ($libre -> $apres Go libres) : " + ($faits -join " ; "))
+            $libre = $apres
+        }
+    }
     if ($libre -lt $BesoinGo) {
         $gros = Get-Process | Sort-Object PrivateMemorySize64 -Descending | Select-Object -First 6 | ForEach-Object { "{0} {1:N1} Go" -f $_.ProcessName, ($_.PrivateMemorySize64 / 1GB) }
         $refus += "memoire libre $libre Go pour $BesoinGo Go demandes ; plus gros programmes ouverts : $($gros -join ' ; ')"
