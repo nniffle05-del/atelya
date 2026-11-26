@@ -91,9 +91,10 @@ PART_SOL, PART_PLAFOND = 0.10, 0.25         # une surface à plat compte si elle
 POINTS_SURFACE = 0.003                      # … et au moins 3 ‰ des points de l'image
 MEME_SOL, MEME_PLAFOND = 0.15, 0.30         # m : deux niveaux plus proches que cela sont la même surface (la plus fournie)
 SOL_AU_PLUS_BAS = 2.2                       # m sous l'appareil : plus bas, ce n'est pas le sol de la pièce (rue, cour, étage du dessous)
-# le calage (profil) et l'affinage des appareils gardent le sol d'avant tant que leur non-recul n'est pas mesuré et accepté par NT
-# (règle 8) ; ATELYA_SOL_JUSTE_AU_CALAGE=1 : la règle partagée y est prise aussi (essais du 2e temps, 25/11/2026)
-SOL_JUSTE_AU_CALAGE = os.environ.get("ATELYA_SOL_JUSTE_AU_CALAGE", "0") == "1"
+# le calage (profil) et l'affinage des appareils prennent aussi la règle partagée : PAR DÉFAUT depuis le 26/11/2026 (accord de
+# NT après la mesure du non-recul : en service mêmes pièces et mêmes photos sûres, 8 appareils à la bonne hauteur ; recul accepté
+# en « Atelya seul » : photos sûres 33 → 27, aucune fausse de plus). ATELYA_SOL_JUSTE_AU_CALAGE=0 : le sol d'avant (pour comparer)
+SOL_JUSTE_AU_CALAGE = os.environ.get("ATELYA_SOL_JUSTE_AU_CALAGE", "1") != "0"
 SOL_JUSTE = os.environ.get("ATELYA_SOL_JUSTE", "1") != "0"  # ATELYA_SOL_JUSTE=0 : les mesures aussi reprennent le sol d'avant (pour comparer)
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
@@ -311,8 +312,7 @@ def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None, p
 def repere(mes: dict, hsp: float, juste: bool | None = None, plafond_haut: bool = False) -> dict | None:
     """Chaque point de la photo dans le repère de la pièce : hauteur au-dessus du sol, direction (degrés, + = à gauche),
     distance à plat ; la taille est recalée sur la hauteur sous plafond quand sol et plafond sont visibles.
-    juste=False : le sol et le plafond d'avant le 25/11/2026 (les deux plus GRANDES surfaces à plat ; encore pris par le calage,
-    SOL_JUSTE_AU_CALAGE, tant que son non-recul n'est pas mesuré)."""
+    juste=False : le sol et le plafond d'avant le 25/11/2026 (les deux plus GRANDES surfaces à plat ; gardé pour comparer)."""
     P, N, M, haut = mes["points"], mes["normales"], mes["masque"], mes["haut"]
     av = np.array([0, 0, 1.0]) - haut * haut[2]; av /= np.linalg.norm(av)
     dr = np.cross(av, haut)

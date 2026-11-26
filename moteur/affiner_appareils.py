@@ -40,7 +40,7 @@ from .camera_photo import residus
 
 VERSION = "0.1.0"
 SOL_PARTAGE = cp.SOL_JUSTE_AU_CALAGE  # le sol et le plafond du relief par la règle partagée (2e temps du « sol pris pour un
-                       #     lit ») : éteint tant que le non-recul du calage n'est pas mesuré et accepté par NT (règle 8)
+                       #     lit ») : par défaut depuis le 26/11/2026 (accord de NT), suit ATELYA_SOL_JUSTE_AU_CALAGE
 PAS_COLONNES = 6      # px : une colonne mesurée tous les 6 px (photo de 1206 px de large)
 CORNICHE = 0.15        # où est l'angle du mur et du plafond dans la bande d'une corniche (0 = en haut de la bande, 1 = en bas)
 BORNE_PX = 40.0        # px : au-delà, un écart ne compte pas plus (meuble pris pour un mur, porte ouverte)

@@ -17,6 +17,7 @@ Version 0.1.0 (15/11/2026).
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -29,8 +30,8 @@ ARRONDI = 0.05  # m
 # plus BASSE, le plafond = la plus HAUTE) au lieu des deux plus grandes. Mesuré le 25/11/2026 sur les quatre logements
 # (pc/verification/mesurer_hauteur_sous_plafond.py) : app-001 3,00 → 3,00 m, app-002 2,50 → 2,50, app-003 2,90 → 2,90,
 # app-004 2,70 → 2,75 (médiane 2,725 → 2,738, à cheval sur l'arrondi), et la hauteur ne dépend plus d'une seule photo.
-# ÉTEINT tant que NT n'a pas décidé (une hauteur sous plafond qui change déplace tout le logement).
-SOL_JUSTE = False
+# PAR DÉFAUT depuis le 26/11/2026 (accord de NT) ; ATELYA_SOL_JUSTE_AU_CALAGE=0 : les deux plus grandes surfaces (pour comparer).
+SOL_JUSTE = os.environ.get("ATELYA_SOL_JUSTE_AU_CALAGE", "1") != "0"
 
 
 def hauteur_d_une_photo(mesure: dict) -> float | None:
