@@ -87,9 +87,13 @@ if (-not $SansControle) {
     Write-Output "controle de depart : memoire libre $libre Go (besoin $BesoinGo), disques et veille bons, editeur Unreal ferme"
 }
 
+# le dossier du journal est créé ici (26/11/2026 : absent, le journal ne s'écrivait pas et le calcul ne démarrait jamais,
+# sans rien signaler)
+$dossierJournal = Split-Path -Parent $Journal
+if ($dossierJournal) { New-Item -ItemType Directory -Force -Path $dossierJournal | Out-Null }
 $j = $Journal -replace '\\', '/'
 $boucle = @"
-export PATH=/usr/bin:/mingw64/bin:`$PATH; n=0; : > '$j'
+export PATH=/usr/bin:/mingw64/bin:`$PATH; n=0; mkdir -p "`$(dirname '$j')"; : > '$j'
 while true; do
   n=`$((n+1)); echo "=== essai `$n, `$(date '+%d/%m %H:%M')" >> '$j'
   bash '$Script' $($Arguments -join ' ') > '$j.essai' 2>&1; code=`$?
