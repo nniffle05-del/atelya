@@ -39,7 +39,9 @@ from . import caler_photos as cp
 from .camera_photo import residus
 
 VERSION = "0.1.0"
-PAS_COLONNES = 6       # px : une colonne mesurée tous les 6 px (photo de 1206 px de large)
+SOL_PARTAGE = cp.SOL_JUSTE_AU_CALAGE  # le sol et le plafond du relief par la règle partagée (2e temps du « sol pris pour un
+                       #     lit ») : éteint tant que le non-recul du calage n'est pas mesuré et accepté par NT (règle 8)
+PAS_COLONNES = 6      # px : une colonne mesurée tous les 6 px (photo de 1206 px de large)
 CORNICHE = 0.15        # où est l'angle du mur et du plafond dans la bande d'une corniche (0 = en haut de la bande, 1 = en bas)
 BORNE_PX = 40.0        # px : au-delà, un écart ne compte pas plus (meuble pris pour un mur, porte ouverte)
 NEUTRE_PX = 6.0        # px : écart compté pour une colonne dont le regard traverse une limite sans mur du plan
@@ -143,7 +145,10 @@ def _niveau(v: np.ndarray, vers_le_bas: bool, pas: float = 0.02, part: float = 0
 
 def repere_du_mur(mes: dict, hsp: float) -> dict | None:
     """Comme moteur.caler_photos.repere (chaque point de la photo : hauteur au-dessus du sol, direction, distance à plat), mais
-    le sol est la surface à plat la plus BASSE et le plafond la plus HAUTE (`_niveau`)."""
+    le sol est la surface à plat la plus BASSE et le plafond la plus HAUTE (`_niveau`).
+    SOL_PARTAGE : la règle partagée d'Atelya à la place (moteur.caler_photos.sol_et_plafond, 25/11/2026)."""
+    if SOL_PARTAGE:
+        return cp.repere(mes, hsp, juste=True, plafond_haut=True)
     P, N, M, haut = mes["points"], mes["normales"], mes["masque"], mes["haut"]
     av = np.array([0, 0, 1.0]) - haut * haut[2]
     av /= np.linalg.norm(av)

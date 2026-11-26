@@ -25,15 +25,21 @@ VERSION = "0.1.0"
 PHOTOS_MIN = 3  # en dessous, la médiane ne veut rien dire
 VRAISEMBLABLE = (2.1, 4.5)  # m : une hauteur de pièce hors de là est une erreur de mesure (mezzanine, photo de détail…)
 ARRONDI = 0.05  # m
+# True : le sol et le plafond par la règle partagée d'Atelya (moteur.caler_photos.sol_et_plafond : le sol = la surface à plat la
+# plus BASSE, le plafond = la plus HAUTE) au lieu des deux plus grandes. Mesuré le 25/11/2026 sur les quatre logements
+# (pc/verification/mesurer_hauteur_sous_plafond.py) : app-001 3,00 → 3,00 m, app-002 2,50 → 2,50, app-003 2,90 → 2,90,
+# app-004 2,70 → 2,75 (médiane 2,725 → 2,738, à cheval sur l'arrondi), et la hauteur ne dépend plus d'une seule photo.
+# ÉTEINT tant que NT n'a pas décidé (une hauteur sous plafond qui change déplace tout le logement).
+SOL_JUSTE = False
 
 
 def hauteur_d_une_photo(mesure: dict) -> float | None:
     """L'écart sol → plafond (m) d'une photo mesurée par moteur.caler_photos.mesurer ; None si l'un des deux ne se voit pas."""
-    from moteur.caler_photos import _pic
+    from moteur.caler_photos import _pic, sol_et_plafond
 
     h = mesure["points"] @ mesure["haut"]
     horiz = mesure["masque"] & (np.abs(mesure["normales"] @ mesure["haut"]) > 0.95)
-    sol, plaf = _pic(h[horiz & (h < -0.4)]), _pic(h[horiz & (h > 0.3)])
+    sol, plaf = sol_et_plafond(h, horiz) if SOL_JUSTE else (_pic(h[horiz & (h < -0.4)]), _pic(h[horiz & (h > 0.3)]))
     if sol is None or plaf is None:
         return None
     return float(plaf - sol)

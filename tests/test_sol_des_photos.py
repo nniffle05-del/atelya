@@ -70,6 +70,17 @@ def test_un_plafond_a_poutres_reste_une_seule_surface():
     assert abs(cp.sol_et_plafond(h, plat, 2.9)[1] - 1.66) < 0.03         # la plus fournie, comme avant
 
 
+def test_pour_la_ligne_du_mur_le_plafond_a_poutres_est_le_niveau_le_plus_haut():
+    # l'affinage des appareils cherche où le MUR touche le plafond : il monte jusqu'au plafond, pas jusqu'au dessous des poutres
+    # (app-003 photos 07 et 08, 25/11/2026 : appareil reculé de 0,7 m avec le niveau le plus fourni)
+    h, plat = relief((-1.30, 50_000), (1.66, 14_000), (1.78, 13_000))
+    assert abs(cp.sol_et_plafond(h, plat, 2.9, plafond_haut=True)[1] - 1.78) < 0.03
+    # … sans rien changer au sol ni au garde-fou de la suspension
+    h, plat = relief((-1.02, 15_000), (-0.48, 86_000), (1.04, 24_000), (1.48, 18_000))
+    sol, plaf = cp.sol_et_plafond(h, plat, 2.5, plafond_haut=True)
+    assert abs(sol + 1.02) < 0.03 and abs(plaf - 1.48) < 0.03
+
+
 def test_un_vide_sur_un_etage_laisse_la_place_au_plafond_de_la_piece():
     h, plat = relief((-1.30, 100_000), (1.20, 60_000), (4.00, 30_000))   # 5,30 m du sol : pas la hauteur de cette pièce (2,50 m)
     assert abs(cp.sol_et_plafond(h, plat, 2.5)[1] - 1.20) < 0.03

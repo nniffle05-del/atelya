@@ -91,7 +91,9 @@ PART_SOL, PART_PLAFOND = 0.10, 0.25         # une surface à plat compte si elle
 POINTS_SURFACE = 0.003                      # … et au moins 3 ‰ des points de l'image
 MEME_SOL, MEME_PLAFOND = 0.15, 0.30         # m : deux niveaux plus proches que cela sont la même surface (la plus fournie)
 SOL_AU_PLUS_BAS = 2.2                       # m sous l'appareil : plus bas, ce n'est pas le sol de la pièce (rue, cour, étage du dessous)
-SOL_JUSTE_AU_CALAGE = False                 # le calage (profil) garde le sol d'avant tant que son non-recul n'est pas mesuré (règle 8)
+# le calage (profil) et l'affinage des appareils gardent le sol d'avant tant que leur non-recul n'est pas mesuré et accepté par NT
+# (règle 8) ; ATELYA_SOL_JUSTE_AU_CALAGE=1 : la règle partagée y est prise aussi (essais du 2e temps, 25/11/2026)
+SOL_JUSTE_AU_CALAGE = os.environ.get("ATELYA_SOL_JUSTE_AU_CALAGE", "0") == "1"
 SOL_JUSTE = os.environ.get("ATELYA_SOL_JUSTE", "1") != "0"  # ATELYA_SOL_JUSTE=0 : les mesures aussi reprennent le sol d'avant (pour comparer)
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 
@@ -264,7 +266,7 @@ def _pics(v: np.ndarray, pas: float = 0.02) -> list[tuple[float, float]]:
     return [(float(b[i] + pas / 2), float(h[i])) for i in range(len(h)) if h[i] > 0 and h[i] >= h[max(0, i - 3):i + 4].max()]
 
 
-def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None) -> tuple[float | None, float | None]:
+def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None, plafond_haut: bool = False) -> tuple[float | None, float | None]:
     """Le niveau du SOL et celui du PLAFOND dans le relief d'une photo (`h` : hauteur de chaque point, 0 = l'appareil ; `horiz` :
     les points d'une surface à plat). LA règle d'Atelya (25/11/2026, « le sol pris pour un lit ») :
       - le SOL est la surface à plat la plus BASSE (rien de plat n'est sous le sol d'une pièce), pas la plus grande : un lit, une
@@ -276,6 +278,10 @@ def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None) -
         que le plafond), avec PART_PLAFOND ; deux niveaux à moins de MEME_PLAFOND = la même surface (plafond à poutres, plafond
         lointain que le relief étale sur 40 cm). Quand la hauteur sous plafond est connue, un plafond dont l'écart au sol n'est
         pas vraisemblable (vide sur un étage, verrière) laisse la place au suivant.
+        plafond_haut : le niveau le plus haut lui-même, sans le fondre dans un voisin plus fourni. C'est ce qu'il faut à qui
+        cherche la ligne où le MUR touche le plafond (l'affinage des appareils, moteur/affiner_appareils.py) : sous un plafond
+        à poutres le mur monte jusqu'au plafond, pas jusqu'au dessous des poutres (mesuré le 25/11/2026 : deux photos d'app-003
+        reculaient de 0,7 m avec le niveau le plus fourni).
     Sans surface assez nette : comme avant (la plus grande)."""
     bas, haut = h[horiz & (h < -0.4)], h[horiz & (h > 0.3)]
     mini = POINTS_SURFACE * h.size
@@ -293,7 +299,7 @@ def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None) -
     if ph:
         gros = max(n for _, n in ph)
         bons = sorted((p for p, n in ph if n >= PART_PLAFOND * gros and n >= mini), reverse=True)
-        choix = [max(((p, n) for p, n in ph if q - MEME_PLAFOND <= p <= q + 1e-6), key=lambda t: t[1])[0] for q in bons]
+        choix = bons if plafond_haut else [max(((p, n) for p, n in ph if q - MEME_PLAFOND <= p <= q + 1e-6), key=lambda t: t[1])[0] for q in bons]
         if choix and sol is not None and hsp:
             vraisemblables = [p for p in choix if 0.75 < hsp / (p - sol) < 1.33]
             plaf = vraisemblables[0] if vraisemblables else choix[0]
@@ -302,7 +308,7 @@ def sol_et_plafond(h: np.ndarray, horiz: np.ndarray, hsp: float | None = None) -
     return sol, plaf
 
 
-def repere(mes: dict, hsp: float, juste: bool | None = None) -> dict | None:
+def repere(mes: dict, hsp: float, juste: bool | None = None, plafond_haut: bool = False) -> dict | None:
     """Chaque point de la photo dans le repère de la pièce : hauteur au-dessus du sol, direction (degrés, + = à gauche),
     distance à plat ; la taille est recalée sur la hauteur sous plafond quand sol et plafond sont visibles.
     juste=False : le sol et le plafond d'avant le 25/11/2026 (les deux plus GRANDES surfaces à plat ; encore pris par le calage,
@@ -315,7 +321,7 @@ def repere(mes: dict, hsp: float, juste: bool | None = None) -> dict | None:
     h, a, b = P @ haut, P @ dr, P @ av
     nh = N @ haut
     horiz = M & (np.abs(nh) > 0.95)
-    sol, plaf = sol_et_plafond(h, horiz, hsp) if (SOL_JUSTE if juste is None else juste) else (_pic(h[horiz & (h < -0.4)]), _pic(h[horiz & (h > 0.3)]))
+    sol, plaf = sol_et_plafond(h, horiz, hsp, plafond_haut) if (SOL_JUSTE if juste is None else juste) else (_pic(h[horiz & (h < -0.4)]), _pic(h[horiz & (h > 0.3)]))
     ech = 1.0
     if sol is not None and plaf is not None and 0.75 < hsp / (plaf - sol) < 1.33:
         ech = hsp / (plaf - sol)

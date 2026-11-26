@@ -31,7 +31,17 @@ from pieces_donnees import CLIENT  # noqa: E402
 SORTIE = PC / "b2/place-appareils"
 APP004 = {"logement": PC / "b2/app-004/chaine-v2/logement-depart.json", "photos": PC / "photos-clients/app-004/photos", "ext": "jpg"}
 VARIANTES = {"service": {"affiner": False}, "fin": {"zoom_par_fuites": "fin", "affiner": False}, "avec": {"zoom_par_fuites": True, "affiner": False},
-             "defaut": {}}  # « defaut » : le calage tel qu'il sort aujourd'hui (appareils affinés dans l'image)
+             "defaut": {},  # « defaut » : le calage tel qu'il sort aujourd'hui (appareils affinés dans l'image)
+             # 2e temps du « sol pris pour un lit » (25/11/2026) : la règle partagée du sol et du plafond (cp.sol_et_plafond)
+             # dans le calage (profil), dans l'affinage (repere_du_mur), ou dans les deux. UNE sorte de drapeaux par lancement
+             # (la mémoire des profils ne connaît pas les drapeaux).
+             "temoin": {"drapeaux": {"calage": False, "affinage": False}},
+             "sol-calage": {"drapeaux": {"calage": True, "affinage": False}},
+             "sol-affinage": {"drapeaux": {"calage": False, "affinage": True}},
+             "sol-partout": {"drapeaux": {"calage": True, "affinage": True}},
+             # … et les mêmes quand le client n'a PAS rangé ses photos (Atelya seul : ni pièce donnée, ni endroit pointé)
+             "temoin-seul": {"drapeaux": {"calage": False, "affinage": False}, "seul": True},
+             "sol-seul": {"drapeaux": {"calage": True, "affinage": True}, "seul": True}}
 
 
 def cas(nom: str) -> dict:
@@ -60,6 +70,14 @@ def main():
     args = sys.argv[1:]
     noms = args[args.index("--logements") + 1:] if "--logements" in args else ["app-001", "app-002", "app-003", "app-004"]
     variantes = [a for a in (args[:args.index("--logements")] if "--logements" in args else args)]
+    drapeaux = {json.dumps(VARIANTES[v].get("drapeaux"), sort_keys=True) for v in variantes}
+    if len(drapeaux) > 1:
+        raise SystemExit("PLANTÉ : une seule sorte de drapeaux par lancement (la mémoire des profils ne les connaît pas)")
+    d = VARIANTES[variantes[0]].get("drapeaux") if variantes else None
+    if d:
+        from moteur import affiner_appareils as aa
+        cp.SOL_JUSTE_AU_CALAGE, aa.SOL_PARTAGE = d["calage"], d["affinage"]
+        print(f"drapeaux : sol juste au calage = {cp.SOL_JUSTE_AU_CALAGE}, à l'affinage = {aa.SOL_PARTAGE}", flush=True)
     o = cp.Outils()
     memoire(o)
     gardes = []
@@ -68,8 +86,10 @@ def main():
         gardes.append(c)
         for v in variantes:
             t0 = time.time()
-            r = cp.caler(c["logement"], c["photos"], outils=o, journal=lambda *a: None, fenetres_de=c["cartes"], pieces_donnees=c["pieces"],
-                         confirmees=c["confirmees"], endroits_donnes=c["endroits"], **VARIANTES[v])
+            seul = VARIANTES[v].get("seul")
+            r = cp.caler(c["logement"], c["photos"], outils=o, journal=lambda *a: None, fenetres_de=c["cartes"], pieces_donnees=None if seul else c["pieces"],
+                         confirmees=() if seul else c["confirmees"], endroits_donnes=None if seul else c["endroits"],
+                         **{k: x for k, x in VARIANTES[v].items() if k not in ("drapeaux", "seul")})
             (SORTIE / v).mkdir(parents=True, exist_ok=True)
             (SORTIE / v / f"{nom}.json").write_text(json.dumps({"photos": str(c["dossier"]), "fichier": "{nom}." + c["ext"], "cameras": r["cameras"],
                                                                "non_calees": r["non_calees"]}, ensure_ascii=False, indent=1), encoding="utf-8")
