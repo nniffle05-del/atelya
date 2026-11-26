@@ -81,23 +81,9 @@ NOMS = ("x", "y", "z", "cap", "tangage", "f", "u0", "v0")
 def faces_pleines(logement: dict, plan: dict) -> np.ndarray:
     """Les faces du plan (moteur.caler_photos.plan_du_logement) qui sont de vrais murs. Une limite entre deux pièces SANS mur
     (espace ouvert coupé en deux pièces, passe-plat dessiné comme un passage) n'arrête pas le regard, et le plan ne dit pas
-    ce qu'il y a au-dessus d'elle. Un plan relevé en partie (moins de 80 % des faces portées par un mur) : toutes pleines."""
-    murs = [(np.array(m["debut"], float), np.array(m["fin"], float), float(m.get("epaisseur", 0.2))) for m in logement.get("murs", [])]
-    plein = np.zeros(len(plan["A"]), bool)
-    for i, (a, b) in enumerate(zip(plan["A"], plan["B"])):
-        milieu = (a + b) / 2
-        for d, f, ep in murs:
-            e = f - d
-            L = float(np.linalg.norm(e))
-            if L < 1e-6:
-                continue
-            t = e / L
-            if -0.15 <= float((milieu - d) @ t) <= L + 0.15 and abs(float((milieu - d) @ np.array([-t[1], t[0]]))) <= ep / 2 + 0.12:
-                plein[i] = True
-                break
-    if len(plein) and plein.mean() < 0.8:
-        plein[:] = True
-    return plein
+    ce qu'il y a au-dessus d'elle. Un plan relevé en partie (moins de 80 % des faces portées par un mur) : toutes pleines.
+    (Même règle que le calage : moteur.caler_photos.faces_pleines.)"""
+    return cp.faces_pleines(logement, plan)
 
 
 def tirer(A: np.ndarray, B: np.ndarray, o: np.ndarray, angles_deg: np.ndarray, portes: np.ndarray | None = None) -> np.ndarray:

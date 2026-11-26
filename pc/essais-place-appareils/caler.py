@@ -41,7 +41,10 @@ VARIANTES = {"service": {"affiner": False}, "fin": {"zoom_par_fuites": "fin", "a
              "sol-partout": {"drapeaux": {"calage": True, "affinage": True}},
              # … et les mêmes quand le client n'a PAS rangé ses photos (Atelya seul : ni pièce donnée, ni endroit pointé)
              "temoin-seul": {"drapeaux": {"calage": False, "affinage": False}, "seul": True},
-             "sol-seul": {"drapeaux": {"calage": True, "affinage": True}, "seul": True}}
+             "sol-seul": {"drapeaux": {"calage": True, "affinage": True}, "seul": True},
+             # « l'appareil dans un meuble » (26/11/2026) : côtés ouverts entre pièces (cp.COTES_OUVERTS), sur le calage du jour
+             "ouverts": {"drapeaux": {"calage": True, "affinage": True}, "ouverts": True},
+             "ouverts-seul": {"drapeaux": {"calage": True, "affinage": True}, "ouverts": True, "seul": True}}
 
 
 def cas(nom: str) -> dict:
@@ -87,9 +90,10 @@ def main():
         for v in variantes:
             t0 = time.time()
             seul = VARIANTES[v].get("seul")
+            cp.COTES_OUVERTS = bool(VARIANTES[v].get("ouverts"))
             r = cp.caler(c["logement"], c["photos"], outils=o, journal=lambda *a: None, fenetres_de=c["cartes"], pieces_donnees=None if seul else c["pieces"],
                          confirmees=() if seul else c["confirmees"], endroits_donnes=None if seul else c["endroits"],
-                         **{k: x for k, x in VARIANTES[v].items() if k not in ("drapeaux", "seul")})
+                         **{k: x for k, x in VARIANTES[v].items() if k not in ("drapeaux", "seul", "ouverts")})
             (SORTIE / v).mkdir(parents=True, exist_ok=True)
             (SORTIE / v / f"{nom}.json").write_text(json.dumps({"photos": str(c["dossier"]), "fichier": "{nom}." + c["ext"], "cameras": r["cameras"],
                                                                "non_calees": r["non_calees"]}, ensure_ascii=False, indent=1), encoding="utf-8")

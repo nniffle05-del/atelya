@@ -97,6 +97,10 @@ SOL_AU_PLUS_BAS = 2.2                       # m sous l'appareil : plus bas, ce n
 SOL_JUSTE_AU_CALAGE = os.environ.get("ATELYA_SOL_JUSTE_AU_CALAGE", "1") != "0"
 SOL_JUSTE = os.environ.get("ATELYA_SOL_JUSTE", "1") != "0"  # ATELYA_SOL_JUSTE=0 : les mesures aussi reprennent le sol d'avant (pour comparer)
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
+# côtés ouverts (26/11/2026, « l'appareil dans un meuble ») : une limite SANS mur entre deux pièces (cuisine ouverte sur
+# l'entrée) laisse passer le regard, et le photographe d'une pièce donnée peut se tenir au-delà, comme sur le seuil d'une porte
+# (PORTE_M, tourné vers la pièce). Avant : ce côté comptait comme un mur plein. ATELYA_COTES_OUVERTS=1 pour l'essayer.
+COTES_OUVERTS = os.environ.get("ATELYA_COTES_OUVERTS", "0") != "0"
 
 
 # ================================================================ le plan
@@ -151,9 +155,59 @@ def plan_du_logement(logement: dict) -> dict:
             if L - cur > 0.02:
                 A.append(a + t * cur); B.append(a + t * L); sorte.append(0); bas.append(0.0); haut.append(hsp)
         face_piece += [num] * (len(A) - avant)
-    return {"hsp": hsp, "A": np.array(A), "B": np.array(B), "sorte": np.array(sorte), "bas": np.array(bas), "haut": np.array(haut),
+    plan = {"hsp": hsp, "A": np.array(A), "B": np.array(B), "sorte": np.array(sorte), "bas": np.array(bas), "haut": np.array(haut),
             "face_piece": np.array(face_piece),
             "pieces": [np.array(p["contour"], float) for p in logement["pieces"]], "ids": [p["id"] for p in logement["pieces"]]}
+    plan["voisine"] = voisines(plan)
+    plan["ouverte"] = (plan["voisine"] >= 0) & ~faces_pleines(logement, plan) if COTES_OUVERTS else np.zeros(len(plan["A"]), bool)
+    return plan
+
+
+def voisines(plan: dict, ecart: float = 0.06) -> np.ndarray:
+    """Pour chaque face : la pièce dont le contour la longe de l'autre côté, à moins de `ecart` (deux pièces qui se touchent
+    sans mur : leurs contours sont confondus), ou -1. Une façade, ou une face séparée de sa voisine par l'épaisseur d'un
+    mur, n'a pas de voisine."""
+    A, B, fp = plan["A"], plan["B"], plan["face_piece"]
+    if not len(A):
+        return np.zeros(0, int)
+    M = (A + B) / 2
+    e = B - A
+    L = np.linalg.norm(e, axis=1)
+    t = e / np.maximum(L, 1e-9)[:, None]
+    d = _dist_seg(M, A, B)  # distance du milieu de chaque face à chaque face
+    paralleles = np.abs(t @ t.T) > 0.98
+    autre = fp[:, None] != fp[None, :]
+    ok = (d < ecart) & paralleles & autre
+    d = np.where(ok, d, np.inf)
+    j = d.argmin(1)
+    return np.where(np.isfinite(d[np.arange(len(A)), j]), fp[j], -1)
+
+
+def faces_pleines(logement: dict, plan: dict) -> np.ndarray:
+    """Les faces du plan qui sont de vrais murs. Une limite entre deux pièces SANS mur (espace ouvert coupé en deux pièces,
+    cuisine ouverte sur l'entrée, passe-plat dessiné comme un passage) n'arrête pas le regard, et le plan ne dit pas ce qu'il
+    y a au-dessus d'elle. Un plan relevé en partie (moins de 80 % des faces portées par un mur) : toutes pleines."""
+    murs = [(np.array(m["debut"], float), np.array(m["fin"], float), float(m.get("epaisseur", 0.2))) for m in logement.get("murs", [])]
+    plein = np.zeros(len(plan["A"]), bool)
+    for i, (a, b) in enumerate(zip(plan["A"], plan["B"])):
+        milieu = (a + b) / 2
+        for d, f, ep in murs:
+            e = f - d
+            L = float(np.linalg.norm(e))
+            if L < 1e-6:
+                continue
+            t = e / L
+            if -0.15 <= float((milieu - d) @ t) <= L + 0.15 and abs(float((milieu - d) @ np.array([-t[1], t[0]]))) <= ep / 2 + 0.12:
+                plein[i] = True
+                break
+    if len(plein) and plein.mean() < 0.8:
+        plein[:] = True
+    return plein
+
+
+def _passages(plan: dict) -> np.ndarray:
+    """Les faces par lesquelles on passe d'une pièce à l'autre : les portes, et (COTES_OUVERTS) les côtés sans mur."""
+    return (plan["sorte"] == 1) | plan.get("ouverte", np.zeros(len(plan["sorte"]), bool))
 
 
 def _dans_poly(P, c):
@@ -196,6 +250,8 @@ def tirs(plan: dict, P: np.ndarray, angles: np.ndarray):
         t = (ap[:, None, :, 0] * e[None, None, :, 1] - ap[:, None, :, 1] * e[None, None, :, 0]) / den
         s = (ap[:, None, :, 0] * D[None, :, None, 1] - ap[:, None, :, 1] * D[None, :, None, 0]) / den
         t = np.where(ok & (t > 0.03) & (s >= 0) & (s <= 1), t, np.inf)
+        if "ouverte" in plan and plan["ouverte"].any():  # un côté sans mur n'arrête pas le regard
+            t = np.where(plan["ouverte"][None, None, :], np.inf, t)
         j = np.argmin(t, 2)
         T.append(np.take_along_axis(t, j[..., None], 2)[..., 0]); S.append(plan["sorte"][j]); Ap.append(plan["bas"][j] > 0.4)
     return np.concatenate(T), np.concatenate(S), np.concatenate(Ap)
@@ -525,7 +581,7 @@ def pieces_montrees(plan: dict, G: np.ndarray, pg: np.ndarray, permises: list[in
     plus_pres = np.full(len(G), np.inf)
     cap_porte = np.full(len(G), np.nan)
     for q in permises:
-        portes = (plan["face_piece"] == q) & (plan["sorte"] == 1)
+        portes = (plan["face_piece"] == q) & _passages(plan)
         if not portes.any():
             continue
         A, B = plan["A"][portes], plan["B"][portes]
@@ -533,6 +589,10 @@ def pieces_montrees(plan: dict, G: np.ndarray, pg: np.ndarray, permises: list[in
         t = np.clip(((G[:, None, :] - A[None]) * e[None]).sum(2) / (e * e).sum(1)[None], 0, 1)
         vers = A[None] + t[..., None] * e[None] - G[:, None, :]   # de chaque place vers le point le plus proche de chaque porte
         d = np.linalg.norm(vers, axis=2)
+        ouv = plan.get("ouverte", np.zeros(len(plan["A"]), bool))[portes]
+        if ouv.any():  # au-delà d'un côté ouvert : seulement dans la pièce qui le longe (pas à travers un mur voisin)
+            vois = plan["voisine"][portes]
+            d = np.where(ouv[None, :] & (pg[:, None] != vois[None, :]), np.inf, d)
         j = d.argmin(1); d = d[np.arange(len(G)), j]; vers = vers[np.arange(len(G)), j]
         prend = hors & (d < PORTE_M) & (d < plus_pres)
         r[prend] = q; plus_pres[prend] = d[prend]
@@ -556,7 +616,7 @@ def zone_pointee(plan: dict, G: np.ndarray, pg: np.ndarray, point, donnee: list[
         seuils = []  # (écart au sens du regard, distance de la porte, pièce) pour chaque pièce donnée dont une porte est à portée
         cap = float(point[2]) if len(point) > 2 and point[2] is not None else None
         for q in donnee:
-            portes = (plan["face_piece"] == q) & (plan["sorte"] == 1)
+            portes = (plan["face_piece"] == q) & _passages(plan)
             if not portes.any():
                 continue
             A, B = plan["A"][portes], plan["B"][portes]
