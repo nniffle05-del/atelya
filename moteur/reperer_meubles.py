@@ -172,8 +172,58 @@ def fusionner(vus: list[dict]) -> list[dict]:
     return sortie
 
 
+AXE_TEMOINS = 2  # photos qui doivent voir nettement le sens d'un meuble pour qu'il choisisse son mur (axe_du_dos)
+
+
+def axe_du_dos(meuble: dict) -> float | None:
+    """La direction (degrés, modulo 180) de l'axe « dos → face » du meuble d'après la MESURE de son dessus sur les photos
+    (moteur.meubles_photos.taille_mesuree) : un lit est plus long que large, son grand côté EST cet axe ; un canapé est plus
+    large que profond, son grand côté lui est perpendiculaire. None sans mesure nette.
+    DEUX TÉMOINS : le sens n'est cru que si au moins AXE_TEMOINS photos le voient nettement et qu'aucune ne dit l'autre sens.
+    Une seule photo ne suffit pas (mesuré le 28/11/2026 : le lit d'une place de la chambre 1 d'app-002, vu par une seule photo
+    à 3 m, est mesuré en travers de son vrai sens ; tourné d'après elle, il entrait dans le meuble télé, qui était retiré)."""
+    if not (meuble.get("categorie") and meuble.get("emprises")):
+        return None
+    from moteur import meubles_photos
+    mesuree = meubles_photos.taille_mesuree(meuble["categorie"], meuble["emprises"], meuble.get("forme"))
+    if mesuree is None or mesuree.get("sens") is None:
+        return None
+    nets = [e["sens"] for e in meuble["emprises"] if e["distance"] <= meubles_photos.EMPRISE_LOIN_M
+            and e["grand"] >= meubles_photos.SENS_NET * e["petit"]]
+    d_accord = [s for s in nets if abs((s - mesuree["sens"] + 90.0) % 180.0 - 90.0) <= 45.0]
+    if len(d_accord) < AXE_TEMOINS or len(d_accord) < len(nets):
+        return None
+    l, p, _ = meubles_photos.taille_courante(meuble["categorie"])
+    return float(mesuree["sens"] if p > l else mesuree["sens"] + 90.0) % 180.0
+
+
+def mur_du_dos(murs: list[tuple], meuble: dict) -> tuple | None:
+    """Parmi `murs` = [(distance, pied sur le mur, normale vers le meuble)], celui où le meuble met son dos (sa tête de lit).
+    Le plus proche — SAUF quand la mesure du meuble sur les photos dit dans quel sens il est posé (`axe_du_dos`) et que le mur
+    le plus proche n'est pas dans ce sens alors qu'un mur qui l'est est presque aussi près : à moins de ce dont la place du
+    meuble peut être fausse (moteur.meubles_photos.incertitude). (28/11/2026, chambre d'app-004 : le lit est à 1,15 m de deux
+    murs ; une vue de plus l'a déplacé de 1 cm, « le mur le plus proche » a changé et le lit a tourné d'un quart de tour, tête
+    vers la fenêtre, alors que cinq photos mesurent toutes son grand côté dans l'autre sens.)"""
+    if not murs:
+        return None
+    proche = min(murs, key=lambda m: m[0])
+    axe = axe_du_dos(meuble)
+    if axe is None:
+        return proche
+    dans_l_axe = lambda m: abs((math.degrees(math.atan2(m[2][1], m[2][0])) - axe + 90.0) % 180.0 - 90.0) <= 45.0  # noqa: E731
+    if dans_l_axe(proche):
+        return proche
+    from moteur.meubles_photos import incertitude
+    marge = incertitude(meuble["distance_min"]) if meuble.get("distance_min") is not None else MARGE_COLLER_M
+    bons = [m for m in murs if dans_l_axe(m) and m[0] <= proche[0] + marge]
+    return min(bons, key=lambda m: m[0]) if bons else proche
+
+
 def orienter(meuble: dict, piece: dict) -> float:
-    """Face du meuble (degrés) : dos au mur le plus proche s'il en est à moins de CONTRE_MUR_M, sinon vers le milieu de la pièce."""
+    """Face du meuble (degrés) : dos au mur le plus proche s'il en est à moins de CONTRE_MUR_M, sinon vers le milieu de la pièce.
+    Un meuble que `coller_au_mur` a collé au mur désigné par son sens mesuré (`dos_au_mur`) lui tourne le dos."""
+    if meuble.get("dos_au_mur"):
+        return math.degrees(math.atan2(meuble["dos_au_mur"][1], meuble["dos_au_mur"][0]))
     c = np.asarray(piece["contour"], float)
     p = np.asarray(meuble["position"], float)
     meilleur, normale = math.inf, None
@@ -398,14 +448,16 @@ def coller_au_mur(meuble: dict, piece: dict) -> dict:
     c = np.asarray(piece["contour"], float)
     p = np.asarray(meuble["position"], float)
     pr = _profondeur(meuble)
-    meilleur, q_mur, normale = math.inf, None, None
+    murs = []
     for a, b in zip(c, np.roll(c, -1, axis=0)):
         ab = b - a
         t = float(np.clip((p - a) @ ab / max(ab @ ab, 1e-12), 0, 1))
         q = a + t * ab
         d = float(np.linalg.norm(p - q))
-        if d < meilleur and d > 1e-6 and 0.0 < t < 1.0:
-            meilleur, q_mur, normale = d, q, (p - q) / d
+        if d > 1e-6 and 0.0 < t < 1.0:
+            murs.append((d, q, (p - q) / d))
+    choisi = mur_du_dos(murs, meuble)  # le plus proche, ou celui que le sens mesuré du meuble désigne
+    meilleur, q_mur, normale = choisi if choisi else (math.inf, None, None)
     limite = COLLER_MAX_M
     if meuble.get("distance_min") is not None:
         # le mur corrige la profondeur dans la limite de ce dont la vue peut se tromper : une commode vue à 2 m (place sûre à
@@ -415,7 +467,10 @@ def coller_au_mur(meuble: dict, piece: dict) -> dict:
     if q_mur is None or meilleur > pr / 2 + limite:
         return meuble
     nouveau = q_mur + normale * (pr / 2 + 0.03)
-    return {**meuble, "position": [round(float(nouveau[0]), 3), round(float(nouveau[1]), 3)]}
+    colle = {**meuble, "position": [round(float(nouveau[0]), 3), round(float(nouveau[1]), 3)]}
+    if choisi is not min(murs, key=lambda m: m[0]):  # le sens mesuré a choisi le mur : `orienter` lui tournera le dos
+        colle["dos_au_mur"] = [round(float(normale[0]), 4), round(float(normale[1]), 4)]
+    return colle
 
 
 # Sortes plafonnées par pièce au nombre vu ensemble sur une même photo. Les TABLES en sont sorties le 16/11/2026 : depuis que deux

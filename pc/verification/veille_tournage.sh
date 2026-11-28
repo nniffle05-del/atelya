@@ -10,7 +10,8 @@ set -u
 JOURNAL="$1"; MINUTES="$2"; shift 2
 FIN=$(( $(date +%s) + MINUTES * 60 ))
 dernier() {  # l'âge (s) du fichier le plus récent des dossiers surveillés, et son nom
-  find "$@" "$JOURNAL" -type f -mmin -20 -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1
+  # le relevé du gardien de la mémoire (*.memoire.csv) bouge toutes les 30 s même si le tournage est bloqué : il ne compte pas
+  find "$@" "$JOURNAL" -type f -mmin -20 ! -name '*.memoire.csv' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1
 }
 while true; do
   if grep -q "code=" "$JOURNAL" 2>/dev/null; then echo "FINI : $(tail -2 "$JOURNAL" | tr '\n' ' ')"; exit 0; fi
