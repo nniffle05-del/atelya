@@ -861,9 +861,14 @@ def poser(releve: dict, logement: dict, racine, objets_par_photo: dict[str, list
         rangees = rg.poser(declarations, logement, plan, journal)
     # ce que les rangées ont déjà rangé, par pièce : une AUTRE photo qui aperçoit la même cuisine (par une porte, de loin) sans
     # en dire les rangées ne la pose pas une seconde fois
+    # … ni quand, vue de loin ou de biais, elle fait tomber un élément juste à côté, dans la pièce OUVERTE sur la cuisine
+    # (28/11/2026, app-004 : la colonne de la cuisine, vue du séjour et du fond de la cuisine, posée une seconde fois dans
+    # l'entrée ouverte, à 90 cm de la vraie) : ce que les rangées ont rangé vaut pour tout l'espace ouvert de leur pièce
     deja_ranges: dict[str, set] = {}
+    ouverts = cp.espaces_ouverts(logement, plan)
     for m in rangees["meubles"]:
-        deja_ranges.setdefault(m["piece"], set()).add(m["categorie"])
+        for p in ouverts.get(m["piece"], {m["piece"]}):
+            deja_ranges.setdefault(p, set()).add(m["categorie"])
     for k, (nom, d) in enumerate(releve["cameras"].items()):
         objets = [o for o in objets_par_photo.get(nom) or [] if (nom, int(o["numero"])) not in rangees["pris"]]
         image = lire_image(dossier / fichier.format(nom=nom))

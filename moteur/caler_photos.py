@@ -205,6 +205,22 @@ def faces_pleines(logement: dict, plan: dict) -> np.ndarray:
     return plein
 
 
+def espaces_ouverts(logement: dict, plan: dict | None = None) -> dict[str, set[str]]:
+    """Pour chaque pièce : les pièces du même ESPACE OUVERT qu'elle (elle comprise), reliées de proche en proche par un côté
+    sans mur (cuisine ouverte sur l'entrée, elle-même ouverte sur le séjour). Ne dépend pas de COTES_OUVERTS."""
+    plan = plan or plan_du_logement(logement)
+    ids = plan["ids"]
+    groupe = {i: {i} for i in ids}
+    if len(plan["A"]):
+        for i in np.where((plan["voisine"] >= 0) & ~faces_pleines(logement, plan))[0]:
+            a, b = ids[int(plan["face_piece"][i])], ids[int(plan["voisine"][i])]
+            if groupe[a] is not groupe[b]:
+                union = groupe[a] | groupe[b]
+                for p in union:
+                    groupe[p] = union
+    return groupe
+
+
 def _passages(plan: dict) -> np.ndarray:
     """Les faces par lesquelles on passe d'une pièce à l'autre : les portes, et (COTES_OUVERTS) les côtés sans mur."""
     return (plan["sorte"] == 1) | plan.get("ouverte", np.zeros(len(plan["sorte"]), bool))

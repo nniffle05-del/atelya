@@ -55,3 +55,16 @@ def test_photo_de_cuisine_prise_depuis_l_entree_mais_pas_a_travers_un_mur():
     assert montree[sde] == -1                                                        # derrière le mur, à 60 cm : jamais
     m_ferme, _ = cp.pieces_montrees(_plan(False), G, pg, [0])
     assert m_ferme[entree] == -1  # avant : la cuisine ne se photographiait que de l'intérieur
+
+
+def test_l_espace_ouvert_reunit_la_cuisine_et_l_entree_pas_la_salle_d_eau():
+    # sert à ne pas poser une seconde fois, dans l'entrée ouverte, un élément de cuisine déjà rangé le long de son mur
+    for ouverts in (True, False):  # ne dépend pas de l'interrupteur du calage
+        avant = cp.COTES_OUVERTS
+        cp.COTES_OUVERTS = ouverts
+        try:
+            g = cp.espaces_ouverts(_cuisine_ouverte())
+        finally:
+            cp.COTES_OUVERTS = avant
+        assert g["cuisine_1"] == g["entree_1"] == {"cuisine_1", "entree_1"}
+        assert g["salle_d_eau_1"] == {"salle_d_eau_1"}
