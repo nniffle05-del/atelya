@@ -99,8 +99,10 @@ SOL_JUSTE = os.environ.get("ATELYA_SOL_JUSTE", "1") != "0"  # ATELYA_SOL_JUSTE=0
 MODELE_FENETRES = Path(__file__).resolve().parent / "modeles" / "fenetres-vitb14-v1.npz"
 # côtés ouverts (26/11/2026, « l'appareil dans un meuble ») : une limite SANS mur entre deux pièces (cuisine ouverte sur
 # l'entrée) laisse passer le regard, et le photographe d'une pièce donnée peut se tenir au-delà, comme sur le seuil d'une porte
-# (PORTE_M, tourné vers la pièce). Avant : ce côté comptait comme un mur plein. ATELYA_COTES_OUVERTS=1 pour l'essayer.
-COTES_OUVERTS = os.environ.get("ATELYA_COTES_OUVERTS", "0") != "0"
+# (PORTE_M, tourné vers la pièce). Avant : ce côté comptait comme un mur plein. PAR DÉFAUT depuis le 28/11/2026 (accord de NT :
+# « je te donne les accords si tu penses que c'est le mieux » ; aucun changement sur les logements sans pièce ouverte, app-004
+# réparé : cuisine filmable, photo 04 qui compte enfin pour les meubles). ATELYA_COTES_OUVERTS=0 : comme avant (pour comparer).
+COTES_OUVERTS = os.environ.get("ATELYA_COTES_OUVERTS", "1") != "0"
 
 
 # ================================================================ le plan
