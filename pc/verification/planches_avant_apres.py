@@ -1,7 +1,10 @@
 r"""Planches à trois colonnes « la photo | la maquette AVANT | la maquette APRÈS », depuis deux logements meublés (16/11/2026).
 
     ..\atelya\.venv\Scripts\python.exe pc\verification\planches_avant_apres.py <dossier avant> <dossier après> <sortie> ^
-        <logement>:<photo>[,<photo>…] [<logement>:…] [--titres "avant" "après"] [--version c]
+        <logement>:<photo>[,<photo>…] [<logement>:…] [--titres "avant" "après"] [--version c] [--fiche <appareils>] [--fiche-avant <appareils>]
+
+C'est l'outil de la règle 25 (NT, 28/11/2026) : les PLACES et les formes se regardent ici, dans Blender, en quelques minutes ;
+l'aspect (sols, couleurs, lumière) se juge dans le film Unreal. Ne pas le lancer pendant un tournage.
 
 Pourquoi : juger à l'œil un changement de la POSE des meubles (NT : « résultats en images »). Les deux dossiers sont des sorties
 de pc\verification\essai_lecture_photos.py (ou mesurer_place_taille.py) : <dossier>/<logement>/<version>/logement-meuble.json.
@@ -43,22 +46,29 @@ def main() -> int:
     ap.add_argument("demandes", nargs="+")
     ap.add_argument("--titres", nargs=2, default=("avec la lecture, avant", "avec la lecture, après"))
     ap.add_argument("--version", default="c")
+    ap.add_argument("--fiche", type=Path, help="la fiche des appareils des photos (défaut : celle du banc pour ce logement)")
+    ap.add_argument("--fiche-avant", type=Path, help="une autre fiche pour la maquette d'avant (quand les appareils ont changé)")
     a = ap.parse_args()
     a.sortie.mkdir(parents=True, exist_ok=True)
     journal = a.sortie / "journal.txt"
     py = sys.executable
     for demande in a.demandes:
         cas, photos = demande.split(":")
-        fiche = json.loads(Path(CAS[cas]["fiche"]).read_text(encoding="utf-8"))
-        fiche["cameras"] = {n: c for n, c in fiche["cameras"].items() if n in photos.split(",")}
-        fiche_f = a.sortie / f"{cas}-fiche.json"
-        fiche_f.write_text(json.dumps(fiche, ensure_ascii=False, indent=1), encoding="utf-8")
+        fiches = {}
+        for nom, source in (("avant", a.fiche_avant or a.fiche or CAS[cas]["fiche"]), ("apres", a.fiche or CAS[cas]["fiche"])):
+            fiche = json.loads(Path(source).read_text(encoding="utf-8"))
+            fiche["cameras"] = {n: c for n, c in fiche["cameras"].items() if n in photos.split(",")}
+            fiches[nom] = a.sortie / f"{cas}-fiche-{nom}.json"
+            fiches[nom].write_text(json.dumps(fiche, ensure_ascii=False, indent=1), encoding="utf-8")
         maquettes = []
         for nom, dossier in (("avant", a.avant), ("apres", a.apres)):
             debut = time.time()
             d3 = a.sortie / f"{cas}-{nom}-3d"
-            lancer([py, "-m", "moteur.construire", dossier / cas / a.version / "logement-meuble.json", d3, "--sans-images"], journal)
-            maquettes += ["--maquette", f"{cas}-{nom}", d3 / "maquette.blend", fiche_f]
+            logement = dossier / cas / a.version / "logement-meuble.json"
+            if not logement.is_file():  # un dossier rangé à plat (..telya\lectures-photos\<étape>\<logement>\)
+                logement = dossier / "logement-meuble.json"
+            lancer([py, "-m", "moteur.construire", logement, d3, "--sans-images"], journal)
+            maquettes += ["--maquette", f"{cas}-{nom}", d3 / "maquette.blend", fiches[nom]]
             print(f"{cas} {nom} : maquette construite en {time.time() - debut:.0f} s", flush=True)
         debut = time.time()
         lancer([py, "outils/atelya/banc_ressemblance.py", a.sortie / "planches", *maquettes], journal)

@@ -132,6 +132,14 @@ images fixes de Blender, sans regarder une seule fois le résultat dans Unreal.)
     logements (« à grande échelle »), pas une recette par motif, par pièce ou par logement ; le dire même si cela contredit le
     plan de la veille.
 
+25. **Les PLACES se regardent dans Blender, l'ASPECT se juge dans le film** (accord de NT, 28/11/2026 : « Si tu considères que
+    c'est plus optimal alors oui » ; il attendait 3 heures de tournage Unreal pour voir un lit déplacé). Places et formes (meuble
+    déplacé, tourné, retiré ; fenêtre agrandie ; appareil d'une photo dans un meuble) : une image de Blender depuis la place de la
+    photo, à chaque changement, en quelques minutes (`pc/verification/planches_avant_apres.py`), montrée à NT. Aspect (sols,
+    couleurs, lumière, rideaux, vue par les fenêtres) : toujours dans le film Unreal. À la fin de chaque étape : UN passage dans
+    le film pour confirmer, avant de demander la validation. C'est un assouplissement voulu du § 0 et de la règle 23, limité aux
+    places : ne jamais conclure sur l'aspect d'après Blender. Rien dans Blender pendant un tournage Unreal.
+
 ## 3. Licences (vendre Atelya exige des licences commerciales)
 
 - **INTERDITS** : CubiCasa5k, CVC-FP, RPLAN (recherche seulement ; NT pense que l'entraînement n'est pas

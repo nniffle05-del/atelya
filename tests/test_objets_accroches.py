@@ -65,3 +65,20 @@ def test_une_suspension_au_dessus_d_une_table_ne_gene_personne():
     lampe, = oa.vers_meubles(oa.fusionner([_vu(3.0, 2.0, 0)]), LOGEMENT)
     ranges, actions = ranger([table, lampe], LOGEMENT)
     assert ranges == [table, lampe] and actions == [] and chevauchements(ranges) == []
+
+
+def test_un_luminaire_coupe_en_deux_par_la_limite_est_reuni():
+    # app-004, 28/11/2026 : les sept vues de la suspension du séjour (places et appareils mesurés), la troisième à 90 cm de la
+    # première le long de son regard : elle ouvrait un second luminaire, à 62 cm du premier. Aucune photo ne montre les deux.
+    vues = [((6.84, 4.48), 1.17, (8.01, 4.41), 5), ((6.62, 4.60), 1.47, (8.04, 5.01), 1), ((5.92, 4.62), 1.50, (4.55, 5.22), 4),
+            ((6.33, 4.40), 1.58, (7.58, 3.44), 2), ((6.18, 4.54), 1.99, (4.57, 3.38), 0), ((6.53, 4.63), 2.50, (4.23, 3.65), 3),
+            ((5.81, 4.52), 5.26, (0.59, 5.17), 7)]
+    vus = [{"position": list(p), "distance": d, "appareil": list(a), "photo": k, "note": 0.5, "bas": 1.9, "haut": 2.6, "largeur": 0.55,
+            "couleur": None} for p, d, a, k in vues]
+    trouves = oa.fusionner(vus)
+    assert len(trouves) == 1 and trouves[0]["vues"] == 7
+    # deux suspensions qu'une même photo montre côte à côte (une rangée au-dessus d'un îlot) restent deux
+    rangee = [{**vus[0], "position": [3.0, 2.0], "photo": 1}, {**vus[0], "position": [3.7, 2.0], "photo": 1},
+              {**vus[0], "position": [3.05, 2.05], "photo": 2, "appareil": [5.0, 2.0], "distance": 2.0},
+              {**vus[0], "position": [3.65, 1.95], "photo": 2, "appareil": [5.0, 2.0], "distance": 2.0}]
+    assert len(oa.fusionner(rangee)) == 2

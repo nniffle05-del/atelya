@@ -94,10 +94,29 @@ def fusionner(vus: list[dict]) -> list[dict]:
 
     # des vues les plus proches aux plus lointaines : un luminaire vu de l'autre bout de la pièce (place à 1 - 2 m près) rejoint
     # celui qu'une photo proche a déjà placé, au lieu d'en faire un second (16/11/2026, « place et taille justes »)
-    sortie = []
-    for paquet in reunir(vus, FUSION_M, MEME_LUMINAIRE_M):
+    def place(paquet: list[dict]) -> np.ndarray:
         poids = np.array([v["note"] / max(float(v.get("distance") or 1.0), 0.5) ** 2 for v in paquet])
-        position = (np.array([v["position"] for v in paquet]) * poids[:, None]).sum(0) / poids.sum()
+        return (np.array([v["position"] for v in paquet]) * poids[:, None]).sum(0) / poids.sum()
+
+    # Les vues rejoignent la vue la plus PROCHE déjà posée ; quand la limite tombe entre deux vues d'un même luminaire (app-004,
+    # 28/11/2026 : 0,90 m pour 0,90 m), il sort en DEUX luminaires collés l'un à l'autre (62 cm). Deux luminaires dont les
+    # places finales sont à moins de FUSION_M et qu'AUCUNE photo ne montre ensemble sont le même : réunis. (Une rangée de
+    # suspensions au-dessus d'un îlot se voit sur une même photo : elle reste une rangée.)
+    paquets = reunir(vus, FUSION_M, MEME_LUMINAIRE_M)
+    while True:
+        paires = [(float(np.linalg.norm(place(a) - place(b))), i, j) for i, a in enumerate(paquets) for j, b in enumerate(paquets)
+                  if i < j and all(v.get("photo") is not None for v in a + b)
+                  and not {v["photo"] for v in a} & {v["photo"] for v in b}]
+        paires = [p for p in paires if p[0] < FUSION_M]
+        if not paires:
+            break
+        _, i, j = min(paires)
+        paquets[i] = sorted(paquets[i] + paquets[j], key=lambda v: float(v.get("distance") or 0.0))
+        del paquets[j]
+    sortie = []
+    for paquet in paquets:
+        poids = np.array([v["note"] / max(float(v.get("distance") or 1.0), 0.5) ** 2 for v in paquet])
+        position = place(paquet)
         couleurs = [v["couleur"] for v in paquet if v.get("couleur")]
         sortie.append({"position": [round(float(position[0]), 3), round(float(position[1]), 3)], "vues": len(paquet),
                        "note": round(float(np.mean([v["note"] for v in paquet])), 3), "bas": float(np.median([v["bas"] for v in paquet])),
