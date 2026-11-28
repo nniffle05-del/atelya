@@ -74,6 +74,61 @@ def affiner_la_fiche(fiche: dict, logement: dict, lecture: dict, journal=print) 
     return bilan
 
 
+DERNIER_RECOURS = ("depart", "lus")  # l'affinage n'a pas pu caler la photo sur ses murs
+
+
+def reprendre_sur_les_rangees(fiche: dict, logement: dict, vitrages: dict, dossier_lecture: Path, journal=print) -> list[str]:
+    """DERNIER RECOURS (28/11/2026, moteur/appareil_sur_rangees.py) : une photo de cuisine que l'affinage n'a pas pu caler sur
+    ses murs (elle ne montre presque que des meubles) est reprise sur les éléments de cuisine que sa lecture range, ensemble
+    avec les lignes lues de ses fenêtres. `fiche` est modifiée sur place. → les photos reprises."""
+    import math
+
+    import numpy as np
+
+    from moteur import appareil_sur_rangees as ar
+
+    import os
+
+    if os.environ.get("ATELYA_RANGEES_DERNIER_RECOURS", "1") == "0":  # pour comparer : sans le dernier recours
+        return []
+    if not (dossier_lecture / "lecture.json").is_file() or not (dossier_lecture / "envoi").is_dir():
+        return []
+    sys.path.insert(0, str(RACINE / "outils" / "lecture_photos"))
+    from poser_photos_lues import objets_des_photos, rangees_des_photos
+
+    objets, rangees = objets_des_photos(fiche, dossier_lecture), rangees_des_photos(fiche, dossier_lecture)
+    scene, vide = aa.Scene(logement), {"plafond": np.zeros((0, 2)), "sol": np.zeros((0, 2))}
+    reprises = []
+    for nom in sorted(rangees):
+        d = fiche["cameras"][nom]
+        affine = d.get("affine")
+        if not affine or affine.get("comment") not in DERNIER_RECOURS:  # calée sur ses murs, ou relevée à la main : pas touchée
+            continue
+        image = lire_image(RACINE / str(fiche.get("photos") or "") / fiche.get("fichier", "{nom}.png").format(nom=nom))
+        if image is None:
+            continue
+        reps = aa.reperes_lus(logement, (vitrages.get("photos") or {}).get(nom) or [])
+        lignes = (lambda c, reps=reps: aa.cout(np.array(c, float), scene, vide, reps)) if reps else None
+        boites = {int(o["numero"]): o["boite"] for o in objets.get(nom) or []}
+        r = ar.affiner(d["camera"], rangees[nom], boites, image.shape[1], image.shape[0], logement, lignes=lignes)
+        if r is None:
+            continue
+        if not r["garde"] or (r.get("lignes") and r["lignes"][1] > aa.ACCEPTE_PX):
+            journal(f"  {nom} : éléments de cuisine essayés en dernier recours, appareil laissé à sa place "
+                    f"({r['raison'] or 'les lignes lues ne collent plus'})")
+            continue
+        c, n = d["camera"], r["camera"]
+        journal(f"  {nom} : appareil repris sur les éléments de cuisine (dernier recours) : déplacé de "
+                f"{math.hypot(n['x'] - c['x'], n['y'] - c['y']):.2f} m, cap {(n['cap'] - c['cap'] + 180) % 360 - 180:+.1f}°, écart aux éléments "
+                f"{r['avant']:.0f} → {r['apres']:.0f} px" + (f", aux lignes lues {r['lignes'][0]:.0f} → {r['lignes'][1]:.0f} px" if r.get("lignes") else ""))
+        affine["comment"] = "rangees" if affine["comment"] == "depart" else affine["comment"] + "+rangees"
+        affine["rangees"] = {"avant": dict(c), "ecart": [round(r["avant"], 1), round(r["apres"], 1)],
+                             "lignes": [round(v, 1) for v in r["lignes"]] if r.get("lignes") else None}
+        c.update(x=round(float(n["x"]), 3), y=round(float(n["y"]), 3), cap=round(float(n["cap"]), 2), f=round(float(n["f"]), 2))
+        reprises.append(nom)
+    return reprises
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Les appareils des photos affinés avec les lignes lues des fenêtres")
     ap.add_argument("fiche", type=Path)
@@ -89,7 +144,9 @@ def main() -> int:
     logement = json.loads(a.logement.read_text(encoding="utf-8"))
     logement = logement.get("logement", logement)
     print("Appareils des photos repris avec les lignes lues des fenêtres :", flush=True)
-    bilan = affiner_la_fiche(fiche, logement, json.loads(a.vitrages.read_text(encoding="utf-8")), journal=lambda *t: print(*t, flush=True))
+    vitrages = json.loads(a.vitrages.read_text(encoding="utf-8"))
+    bilan = affiner_la_fiche(fiche, logement, vitrages, journal=lambda *t: print(*t, flush=True))
+    reprendre_sur_les_rangees(fiche, logement, vitrages, a.vitrages.parent, journal=lambda *t: print(*t, flush=True))
     sortie = a.sortie or a.fiche
     sortie.parent.mkdir(parents=True, exist_ok=True)
     sortie.write_text(json.dumps(fiche, ensure_ascii=False, indent=1), encoding="utf-8")

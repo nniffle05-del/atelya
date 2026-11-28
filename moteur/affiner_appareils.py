@@ -328,7 +328,9 @@ def affiner(cam0, scene: Scene, jon: dict, reperes: list[dict] | None, rappels: 
     piece : l'appareil reste dans cette pièce (numéro), ou à moins de PORTE_M d'une de ses portes."""
     plan = scene.plan
     cam0 = np.array(cam0, float)
-    seuils = (plan["face_piece"] == piece) & (plan["sorte"] == 1) if piece is not None else None
+    # les seuils de la pièce : ses portes et (côtés ouverts, 28/11/2026) ses côtés sans mur — une photo de cuisine prise depuis
+    # l'entrée ouverte : sans cela l'appareil que le calage y a trouvé était refusé d'office, et jamais affiné (app-004, photo 05)
+    seuils = (plan["face_piece"] == piece) & cp._passages(plan) if piece is not None else None
     murs = (scene.A[~scene.portes], scene.B[~scene.portes])  # les murs pleins (pas les portes : on se tient sur un seuil)
     contact = min(CONTACT_MUR, float(cp._dist_seg(cam0[None, :2], murs[0], murs[1]).min())) - 1e-6 if len(murs[0]) else 0.0
 

@@ -68,3 +68,11 @@ def test_l_espace_ouvert_reunit_la_cuisine_et_l_entree_pas_la_salle_d_eau():
             cp.COTES_OUVERTS = avant
         assert g["cuisine_1"] == g["entree_1"] == {"cuisine_1", "entree_1"}
         assert g["salle_d_eau_1"] == {"salle_d_eau_1"}
+
+
+def test_le_cote_ouvert_est_un_seuil_comme_une_porte():
+    # l'affinage des appareils (moteur/affiner_appareils.py) laisse l'appareil d'une photo de cuisine se tenir près d'un SEUIL
+    # de la cuisine : ses portes, et son côté sans mur (sinon l'appareil trouvé dans l'entrée ouverte était refusé d'office)
+    plan = _plan(True)
+    assert (cp._passages(plan) & (np.array(plan["face_piece"]) == plan["ids"].index("cuisine_1"))).any()
+    assert not cp._passages(_plan(False)).any()  # ce logement n'a pas de porte : sans l'interrupteur, aucun seuil
